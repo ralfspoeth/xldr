@@ -22,6 +22,4 @@
             <artifactId>junit-jupiter-api</artifactId>
         </dependency>
     </dependencies>
-
-
 </project>

@@ -41,10 +41,79 @@ An input specification contains the following pieces of information:
 * the MIME type (String)
 * record selectors, each of which
     * is identified by a name,
-    * has an selector specification, and
-    * has related field selectors, which again
+    * has a selector specification, and
+    * has related field selectors, which in turn
         * are identified by a name,
         * a selector description,
         * and some data type.
 
-The first step of the input specification resolution is to load the appropriate adapter for the 
+Example:
+
+    "input": {
+        "mimeType": "text/xml",
+        "recordSelectors": [
+            {
+                "name": "xx",
+                "selector": "//xx",
+                "fieldSelectors": [
+                    {
+                        "name": "id",
+                        "type": "String", 
+                        "selector": "@xxid"
+                    }
+                ]
+            },
+            {
+                ...
+            }
+        ]
+    }
+
+### The Output Specification
+
+The output specification is comprised of a JDBC URL plus generic properties provided by name and value. Note that the
+user/password combination maybe included in the URL. The supported properties are JDBC driver specific.
+
+Example:
+
+    "output": {
+        "url": "jdbc:oracle:thin:@//host:1521/sid",
+        "info": {
+            "user": "dbuser",
+            "password": "secret"
+        }
+    }
+
+### The Record Mapping Specification
+
+The record mapping specification is provided by an array of record mappings each of which specifies the name of the
+record selector as defined in the input specification, a database table name which is the target of the mapping residing
+in the database specified in the output specification, followed by an array of field mappings of a field selector
+defined in the respective record selector and a target database column available in the target database table.
+
+Example:
+
+    "recordMapping": [
+        {
+            "recordSelector": "xx",
+            "databaseTable": "tab_xx",
+            "fieldMapping": [
+                {
+                    "fieldName": "id",
+                    "databaseColumn": "col_id"
+                },
+                ...
+            ]
+        },
+        ...
+    ]
+
+The mapping specification as a whole is specified by the three elements input, output, and record mapping; example:
+
+    {
+        "input": {...}
+        "output": {...}
+        "recordMapping": []
+    }
+
+The order of the elements is unspecified.
