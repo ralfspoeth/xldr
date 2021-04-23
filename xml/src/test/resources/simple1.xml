@@ -1,0 +1,17 @@
+<?xml version='1.0'?>
+<simple1>
+    <row>
+        <col name="a">25</col>
+        <col name="b">33</col>
+    </row>
+    <row>
+        <col name="a">181</col>
+        <col name="b">77</col>
+    </row>
+    <cow id="1">
+        <sound>Mooo</sound>
+    </cow>
+    <cow id="2">
+        <sound>Meow</sound>
+    </cow>
+</simple1>

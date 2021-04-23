@@ -1,0 +1,102 @@
+{
+  "input": {
+    "mimeType": "text/xml",
+    "recordSelectors": [
+      {
+        "name": "fund",
+        "selector": "/root/fund",
+        "fieldSelectors": [
+          {
+            "name": "id",
+            "selector": "@id"
+          },
+          {
+            "name": "desc",
+            "selector": "normalize-space(./text())"
+          },
+          {
+            "name": "cnst",
+            "selector": "'some text'"
+          }
+        ]
+      },
+      {
+        "name": "position",
+        "selector": "//position",
+        "fieldSelectors": [
+          {
+            "name": "fund",
+            "selector": "../../../fund/@id"
+          }
+        ]
+      },
+      {
+        "name": "root",
+        "selector": "/",
+        "fieldSelectors": [
+          {
+            "name": "sn",
+            "selector": "'PD'"
+          },
+          {
+            "name": "inst",
+            "selector": "1"
+          },
+          {
+            "name": "status",
+            "selector": "'WAIT'"
+          }
+        ]
+      }
+    ]
+  },
+  "output": {
+    "url": "jdbc:oracle:thin:@//pdxendb04:1521/xnt041",
+    "info": {
+      "user": "X_IFTAAS_20210311_563_PROJ",
+      "password": "clzlabo1"
+    }
+  },
+  "recordMapping": [
+    {
+      "recordSelector": "fund",
+      "databaseTable": "snmandat",
+      "fieldMapping": [
+        {
+          "fieldName": "id",
+          "databaseColumn": "ident1_txt"
+        },
+        {
+          "fieldName": "desc",
+          "databaseColumn": "kbez_txt"
+        },
+        {
+          "databaseColumn": "syssnmut_cd",
+          "fieldName": "cnst"
+        }
+      ]
+    },
+    {
+      "databaseTable": "snlieferung",
+      "recordSelector": "root",
+      "fieldMapping": [
+        {
+          "fieldName": "id",
+          "databaseColumn": "lieferung_nr"
+        },
+        {
+          "fieldName": "sn",
+          "databaseColumn": "schnittstelle_cd"
+        },
+        {
+          "fieldName": "status",
+          "databaseColumn": "syssnliefstatus_cd"
+        },
+        {
+          "fieldName": "inst",
+          "databaseColumn": "institut_nr"
+        }
+      ]
+    }
+  ]
+}

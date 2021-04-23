@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<root>
+    <fund id="1234">
+        interesting text
+    </fund>
+    <fund id="555">
+        Europa
+    </fund>
+    <fund id="777">Asien</fund>
+</root>

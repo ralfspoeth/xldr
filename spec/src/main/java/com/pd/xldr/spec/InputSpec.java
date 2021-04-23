@@ -1,0 +1,13 @@
+package com.pd.xldr.spec;
+
+import java.io.Serializable;
+import java.util.List;
+
+
+/**
+ * Instances of class {@code InputSpec} provide the information
+ * how to transform some input file into a stream of records
+ * and how to extract fields from these records.
+ */
+public record InputSpec(String mimeType, List<RecordSelectorSpec> recordSelectors) implements Serializable {
+}
