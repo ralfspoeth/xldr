@@ -7,4 +7,12 @@
         Europa
     </fund>
     <fund id="777">Asien</fund>
+    <fund id="1234">
+        <position>
+            asdf
+        </position>
+        <position>
+            wer
+        </position>
+    </fund>
 </root>
