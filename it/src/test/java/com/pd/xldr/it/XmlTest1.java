@@ -6,6 +6,7 @@ import com.pd.xldr.ldr.Loader;
 import com.pd.xldr.spec.FieldMappingSpec;
 import com.pd.xldr.spec.MappingSpec;
 import com.pd.xldr.spec.io.JsonMappingSpecReader;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
@@ -16,6 +17,7 @@ import java.util.stream.Collectors;
 
 public class XmlTest1 {
 
+    @Disabled
     @Test
     public void test1() throws IOException, SQLException {
 
