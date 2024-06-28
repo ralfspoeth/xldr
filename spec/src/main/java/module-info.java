@@ -1,5 +1,5 @@
 module com.pd.xldr.spec {
     exports com.pd.xldr.spec;
     exports com.pd.xldr.spec.io;
-    requires com.google.gson;
+    requires io.github.ralfspoeth.json;
 }

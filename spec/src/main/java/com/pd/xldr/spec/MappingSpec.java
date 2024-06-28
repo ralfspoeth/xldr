@@ -4,8 +4,8 @@ import java.io.Serializable;
 import java.util.List;
 
 public record MappingSpec(
-        InputSpec inputSpec,
+        InputSpec input,
         List<RecordMappingSpec> recordMappingSpecs,
-        OutputSpec outputSpec
+        OutputSpec output
 ) implements Serializable {
 }

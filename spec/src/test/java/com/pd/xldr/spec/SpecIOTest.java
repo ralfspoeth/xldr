@@ -1,16 +1,18 @@
 package com.pd.xldr.spec;
 
 import com.pd.xldr.spec.io.JsonMappingSpecReader;
+import io.github.ralfspoeth.json.conv.StandardConversions;
+import io.github.ralfspoeth.json.io.JsonReader;
 import org.junit.jupiter.api.Test;
 
 import java.io.*;
 import java.util.List;
 
 
-public class SpecIOTest {
+class SpecIOTest {
 
     @Test
-    public void testIO() throws IOException {
+    void testIO() throws IOException {
         var spec = new MappingSpec(
                 new InputSpec("text/xml", List.of(new RecordSelectorSpec("root", "/", List.of(new FieldSelectorSpec("id", "@id", Type.STRING))))),
                 List.of(new RecordMappingSpec("root", "sntrx", List.of(new FieldMappingSpec("id", "id_txt")))),
@@ -23,11 +25,30 @@ public class SpecIOTest {
         System.err.println(of.getAbsolutePath());
     }
 
+
+    @Test
+    void testSimple() {
+        var specSrc = """
+                {
+                    "input": {
+                        "mimeType": "text/xml"
+                    },
+                    "output": {
+                    }
+                }
+                """;
+        var specJsonObject = JsonReader.readElement(specSrc);
+        System.out.println(specJsonObject);
+        var spec = StandardConversions.as(MappingSpec.class, specJsonObject);
+        System.out.println(spec);
+    }
+
+
     @Test
     public void testGson() throws IOException {
         var reader = new StringReader("""
                 {
-                    input: {
+                    "input": {
                         "unk": false,
                         "mimeType": "text/xml",
                         "recordSelectors": [
@@ -45,17 +66,17 @@ public class SpecIOTest {
                             },
                             {
                                 "name": "position",
-                                a: false,
+                                "a": false,
                                 "fieldSelectors": [
                                     {
-                                        f: true,
-                                        "f": "oh, doppelt..."
+                                        "f": true,
+                                        "g": "oh, doppelt..."
                                     }
                                 ]
                             }
                         ]
                     },
-                    liliput: true;
+                    "liliput": true,
                     "output": {
                         "url": "jdbc:mock:dbx",
                         "looser": true,
@@ -94,10 +115,9 @@ public class SpecIOTest {
                 <?xml version='1.0'?>
                 <root>
                     <fund id='1234'>
-                    
+
                     </fund>
-                </root>
-                    """;
+                </root>""";
         var ms = new JsonMappingSpecReader().readFrom(reader);
         System.out.println(ms);
     }

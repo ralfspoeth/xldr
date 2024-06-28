@@ -15,19 +15,15 @@
         <dependency>
             <groupId>com.pd.xldr</groupId>
             <artifactId>ia</artifactId>
-            <version>${project.version}</version>
         </dependency>
         <dependency>
             <groupId>com.pd.xldr</groupId>
             <artifactId>csv</artifactId>
-            <version>${project.version}</version>
         </dependency>
         <dependency>
             <groupId>com.pd.xldr</groupId>
             <artifactId>ldr</artifactId>
-            <version>${project.version}</version>
         </dependency>
-
         <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter-api</artifactId>
