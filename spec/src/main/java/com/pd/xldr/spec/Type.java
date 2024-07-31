@@ -7,7 +7,7 @@ public enum Type {
 
     DATE(LocalDateTime.class),
     STRING(String.class),
-    INTEGER(Integer.class),
+    INTEGER(Long.class),
     DECIMAL(BigDecimal.class);
 
     private final Class<?> clazz;

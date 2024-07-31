@@ -1,22 +1,28 @@
 package com.pd.xldr.spec;
 
 import com.pd.xldr.spec.io.JsonMappingSpecReader;
-import io.github.ralfspoeth.json.conv.StandardConversions;
-import io.github.ralfspoeth.json.io.JsonReader;
 import org.junit.jupiter.api.Test;
 
 import java.io.*;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+
+import static org.junit.jupiter.api.Assertions.assertAll;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 
 class SpecIOTest {
 
     @Test
     void testIO() throws IOException {
+        var props = System.getProperties().entrySet().stream()
+                .map(e -> Map.entry((String)e.getKey(), (String)e.getValue()))
+                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
         var spec = new MappingSpec(
                 new InputSpec("text/xml", List.of(new RecordSelectorSpec("root", "/", List.of(new FieldSelectorSpec("id", "@id", Type.STRING))))),
                 List.of(new RecordMappingSpec("root", "sntrx", List.of(new FieldMappingSpec("id", "id_txt")))),
-                new OutputSpec("jdbc:oracle:thin:@localhost:1521:xe", System.getProperties())
+                new OutputSpec("jdbc:oracle:thin:@localhost:1521:xe", props)
         );
         var of = File.createTempFile("spec", ".ser");
         try (var oo = new ObjectOutputStream(new FileOutputStream(of))) {
@@ -27,25 +33,37 @@ class SpecIOTest {
 
 
     @Test
-    void testSimple() {
+    void testSimple() throws IOException {
         var specSrc = """
                 {
                     "input": {
                         "mimeType": "text/xml"
                     },
                     "output": {
+                        "url": "jdbc:oracle:thin://localhost:1521/xe",
+                        "info": {
+                            "user": "heinz",
+                            "password": "geheim"
+                        }
                     }
-                }
-                """;
-        var specJsonObject = JsonReader.readElement(specSrc);
-        System.out.println(specJsonObject);
-        var spec = StandardConversions.as(MappingSpec.class, specJsonObject);
-        System.out.println(spec);
+                }""";
+        var mappingSpecReader = new JsonMappingSpecReader();
+        MappingSpec result = mappingSpecReader.readFrom(new StringReader(specSrc));
+        MappingSpec expected = new MappingSpec(
+                new InputSpec("text/xml", List.of()),
+                List.of(),
+                new OutputSpec("jdbc:oracle:thin://localhost:1521/xe",
+                        Map.of("user", "heinz", "password", "geheim")
+                )
+        );
+        assertAll(
+                () -> assertEquals(expected, result)
+        );
     }
 
 
     @Test
-    public void testGson() throws IOException {
+    void testJsonInput() throws IOException {
         var reader = new StringReader("""
                 {
                     "input": {
@@ -80,12 +98,12 @@ class SpecIOTest {
                     "output": {
                         "url": "jdbc:mock:dbx",
                         "looser": true,
-                        "info": {
+                        "idnfo": {
                             "user": "usr",
                             "pwd": "geheim"
                         }
                     },
-                    "recordMapping": [
+                    "mapping": [
                         {
                             "recordSelector": "fund",
                             "databaseTable": "snmandat",

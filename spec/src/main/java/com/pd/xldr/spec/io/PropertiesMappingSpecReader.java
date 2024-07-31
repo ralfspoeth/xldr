@@ -8,24 +8,24 @@ import java.io.Reader;
 import java.util.HashMap;
 import java.util.Properties;
 
-final class PropertiesReader implements MappingSpecReader {
+public class PropertiesMappingSpecReader implements MappingSpecReader {
 
     @Override
     public MappingSpec readFrom(Reader source) throws IOException {
         var props = new Properties();
         props.load(source);
-        //output spec
-        var outProps = new Properties();
+        //outputSpec spec
+        var outProps = new HashMap<String, String>();
         props.stringPropertyNames()
                 .stream()
-                .filter(n -> n.startsWith("output.") && !n.equals("output.url"))
-                .forEach(name -> outProps.setProperty(name, props.getProperty(name)));
-        var os = new OutputSpec(props.getProperty("output.url"), outProps);
-        // input spec
+                .filter(n -> n.startsWith("outputSpec.") && !n.equals("outputSpec.url"))
+                .forEach(name -> outProps.put(name, props.getProperty(name)));
+        var os = new OutputSpec(props.getProperty("outputSpec.url"), outProps);
+        // inputSpec spec
         var recMap = new HashMap<String, String>();
         props.stringPropertyNames()
                 .stream()
-                .filter(n -> n.startsWith("input.") && !n.equals("input.mimeType"))
+                .filter(n -> n.startsWith("inputSpec.") && !n.equals("inputSpec.mimeType"))
                 .forEach(n -> {
 
                 });

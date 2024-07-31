@@ -1,7 +1,12 @@
 package com.pd.xldr.spec;
 
 import java.io.Serializable;
-import java.util.Properties;
+import java.util.Map;
 
-public record OutputSpec(String url, Properties info) implements Serializable {
+import static java.util.Objects.requireNonNullElse;
+
+public record OutputSpec(String url, Map<String, String> info) implements Serializable {
+    public OutputSpec {
+        info = Map.copyOf(requireNonNullElse(info, Map.of()));
+    }
 }
