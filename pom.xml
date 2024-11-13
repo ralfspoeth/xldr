@@ -29,24 +29,24 @@
             <dependency>
                 <groupId>io.github.ralfspoeth</groupId>
                 <artifactId>json</artifactId>
-                <version>1.1.5</version>
+                <version>1.1.13</version>
             </dependency>
             <dependency>
                 <groupId>org.junit.jupiter</groupId>
                 <artifactId>junit-jupiter-api</artifactId>
-                <version>5.10.2</version>
+                <version>5.11.3</version>
                 <scope>test</scope>
             </dependency>
             <dependency>
                 <groupId>org.junit.jupiter</groupId>
                 <artifactId>junit-jupiter-engine</artifactId>
-                <version>5.10.2</version>
+                <version>5.11.3</version>
                 <scope>test</scope>
             </dependency>
             <dependency>
                 <groupId>com.oracle.database.jdbc</groupId>
                 <artifactId>ojdbc11</artifactId>
-                <version>23.3.0.23.09</version>
+                <version>23.6.0.24.10</version>
             </dependency>
         </dependencies>
     </dependencyManagement>
@@ -65,12 +65,12 @@
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-jar-plugin</artifactId>
-                    <version>3.3.0</version>
+                    <version>3.4.2</version>
                 </plugin>
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-enforcer-plugin</artifactId>
-                    <version>3.4.1</version>
+                    <version>3.5.0</version>
                     <executions>
                         <execution>
                             <id>enforce-maven</id>
@@ -80,12 +80,17 @@
                             <configuration>
                                 <rules>
                                     <requireMavenVersion>
-                                        <version>3.8.1</version>
+                                        <version>3.6.3</version>
                                     </requireMavenVersion>
                                 </rules>
                             </configuration>
                         </execution>
                     </executions>
+                </plugin>
+                <plugin>
+                    <groupId>org.codehaus.mojo</groupId>
+                    <artifactId>versions-maven-plugin</artifactId>
+                    <version>2.17.1</version>
                 </plugin>
             </plugins>
         </pluginManagement>
@@ -97,6 +102,10 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-jar-plugin</artifactId>
+            </plugin>
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>versions-maven-plugin</artifactId>
             </plugin>
         </plugins>
     </build>

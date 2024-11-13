@@ -26,12 +26,12 @@ public class JsonMappingSpecReader implements MappingSpecReader {
         try(var jsonRdr = new JsonReader(src)) {
             var elem = jsonRdr.readElement();
             return new MappingSpec(
-                    inputSpec(members(elem).get("input")),
-                    elements(members(elem).get("mapping"))
+                    inputSpec(get(elem, "input")),
+                    elements(get(elem, "mapping"))
                             .stream()
                             .map(this::recordMappingSpec)
                             .toList(),
-                    outputSpec(members(elem).get("output"))
+                    outputSpec(get(elem, "output"))
             );
         }
     }
