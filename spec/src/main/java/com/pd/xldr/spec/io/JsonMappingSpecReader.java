@@ -37,8 +37,8 @@ public class JsonMappingSpecReader implements MappingSpecReader {
     }
 
     private InputSpec inputSpec(Element element) {
-        return new InputSpec(stringValue(members(element).get("mimeType"), null),
-                elements(members(element).get("recordSelectors"))
+        return new InputSpec(stringValue(get(element, "mimeType"), null),
+                elements(get(element, "recordSelectors"))
                         .stream()
                         .map(this::recordSelectorSpec)
                         .toList()
@@ -48,7 +48,7 @@ public class JsonMappingSpecReader implements MappingSpecReader {
     private OutputSpec outputSpec(Element element) {
         return new OutputSpec(
                 stringValue(members(element).get("url"), null),
-                members(members(element).get("info"))
+                members(get(element, "info"))
                         .entrySet()
                         .stream()
                         .collect(toMap(Map.Entry::getKey, e -> stringValue(e.getValue())))
@@ -57,27 +57,27 @@ public class JsonMappingSpecReader implements MappingSpecReader {
 
     private RecordMappingSpec recordMappingSpec(Element element) {
         return new RecordMappingSpec(
-                stringValue(members(element).get("recordSelector"), null),
-                stringValue(members(element).get("databaseTable"), null),
-                elements(members(element).get("fieldMapping"))
+                stringValue(get(element, "recordSelector"), null),
+                stringValue(get(element, "databaseTable"), null),
+                elements(get(element, "fieldMapping"))
                         .stream()
-                        .filter(e -> Objects.nonNull(members(e).get("fieldSelector")))
+                        .filter(e -> Objects.nonNull(get(e, "fieldSelector")))
                         .map(this::fieldMappingSpec).toList()
         );
     }
 
     private FieldMappingSpec fieldMappingSpec(Element element) {
         return new FieldMappingSpec(
-                stringValue(members(element).get("fieldSelector"), null),
-                stringValue(members(element).get("databaseColumnName"), null)
+                stringValue(get(element, "fieldSelector"), null),
+                stringValue(get(element, "databaseColumnName"), null)
         );
     }
 
     private RecordSelectorSpec recordSelectorSpec(Element element) {
         return new RecordSelectorSpec(
-                stringValue(members(element).get("name"), null),
-                stringValue(members(element).get("selector"), null),
-                elements(members(element).get("fieldSelectors"))
+                stringValue(get(element, "name"), null),
+                stringValue(get(element, "selector"), null),
+                elements(get(element, "fieldSelectors"))
                         .stream()
                         .map(this::fieldSelectorSpec)
                         .toList()
@@ -86,9 +86,9 @@ public class JsonMappingSpecReader implements MappingSpecReader {
 
     private FieldSelectorSpec fieldSelectorSpec(Element element) {
         return new FieldSelectorSpec(
-                stringValue(members(element).get("name"), null),
-                stringValue(members(element).get("selector"), null),
-                ofNullable(members(element).get("type"))
+                stringValue(get(element, "name"), null),
+                stringValue(get(element, "selector"), null),
+                ofNullable(get(element, "type"))
                         .map(Queries::stringValue)
                         .map(String::toUpperCase)
                         .map(Type::valueOf)
