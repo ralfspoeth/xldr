@@ -1,6 +1,7 @@
 package com.pd.xldr.spec;
 
 import com.pd.xldr.spec.io.JsonMappingSpecReader;
+import com.pd.xldr.spec.io.PropertiesMappingSpecReader;
 import org.junit.jupiter.api.Test;
 
 import java.io.*;
@@ -137,6 +138,39 @@ class SpecIOTest {
                     </fund>
                 </root>""";
         var ms = new JsonMappingSpecReader().readFrom(reader);
+        System.out.println(ms);
+    }
+
+    @Test
+    void testPropertiesReader() throws IOException {
+        var propSource = """
+                input.mimeType=text/csv
+                input.recordSelectors.1.name=t1
+                input.recordSelectors.1.selector=tsel1
+                input.recordSelectors.1.fieldSelectors.1.name=c1
+                input.recordSelectors.1.fieldSelectors.1.selector=1
+                input.recordSelectors.2.name=t2
+                input.recordSelectors.2.selector=tsel2
+                input.recordSelectors.2.fieldSelectors.1.name=c1
+                input.recordSelectors.2.fieldSelectors.1.selector=csel1
+                input.recordSelectors.2.fieldSelectors.2.name=c2
+                input.recordSelectors.2.fieldSelectors.2.selector=csel2
+                output.url=jdbc:oracle:thin://localhost/xe
+                output.info.user=heinz
+                output.info.password=geheim
+                recordMappings.1.recordSelector=t1
+                recordMappings.1.databaseTable=sntrx
+                recordMappings.1.fieldMappings.1.fieldName=c1
+                recordMappings.1.fieldMappings.1.databaseColumn=lieferung_nr
+                recordMappings.2.recordSelector=t1
+                recordMappings.2.databaseTable=sntrx
+                recordMappings.2.fieldMappings.1.fieldName=c1
+                recordMappings.2.fieldMappings.1.databaseColumn=lieferung_nr
+                recordMappings.2.fieldMappings.2.fieldName=c2
+                recordMappings.2.fieldMappings.2.databaseColumn=sort_no
+                """;
+
+        var ms = new PropertiesMappingSpecReader().readFrom(new StringReader(propSource));
         System.out.println(ms);
     }
 }
