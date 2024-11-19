@@ -8,6 +8,9 @@ import java.util.*;
 
 import static java.util.Optional.ofNullable;
 import static java.util.stream.Collectors.toMap;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Properties;
 
 public class PropertiesMappingSpecReader implements MappingSpecReader {
 
@@ -102,6 +105,49 @@ public class PropertiesMappingSpecReader implements MappingSpecReader {
         return root;
     }
 
+
+    record Path(Path parent, String name){
+        Path(String name) {
+            this(null, name);
+        }
+        static Path of(String propertyName) {
+            var parts = propertyName.split("\\.");
+            var root = new Path(parts[0]);
+            var p = root;
+            for(int i=1; i<parts.length; i++) {
+                p = new Path(p, parts[i]);
+            }
+            return p;
+        }
+        String propertyName() {
+            return parent==null?name:parent().propertyName() + "." + name;
+        }
+    }
+
+    sealed interface Node permits Parent, Leaf {}
+
+    record Leaf(String propertyName, String propertyValue) implements Node {}
+
+    final static class Parent implements Node {
+        final Map<String, Node> children = new HashMap<>();
+        void insert(Leaf l) {
+            String[] parts = l.propertyName.split("\\.");
+            Parent root = this;
+            for(int i=0; i< parts.length-1; i++) {
+                root = (Parent) root.children.computeIfAbsent(parts[i], _->new Parent());
+            }
+            root.children.put(parts[parts.length-1], l);
+        }
+    }
+
+    static Parent propertyTree(Properties props) {
+        var root = new Parent();
+        props.stringPropertyNames()
+                .stream()
+                .map(n -> new Leaf(n, props.getProperty(n)))
+                .forEach(root::insert);
+        return root;
+    }
 
     @Override
     public MappingSpec readFrom(Reader source) throws IOException {
