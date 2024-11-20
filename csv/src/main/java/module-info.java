@@ -1,5 +1,7 @@
+import com.pd.xldr.ia.*;
+
 module com.pd.xldr.csv {
     requires com.pd.xldr.ia;
-    provides com.pd.xldr.ia.InputAdapterFactory
+    provides InputAdapterFactory
             with com.pd.xldr.csv.CsvFileHandlerFactory;
 }
