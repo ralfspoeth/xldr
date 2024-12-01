@@ -2,7 +2,7 @@ import com.pd.xldr.ia.*;
 import com.pd.xldr.spec.FieldSelectorSpec;
 import com.pd.xldr.spec.InputSpec;
 import com.pd.xldr.spec.RecordSelectorSpec;
-import com.pd.xldr.spec.Type;
+import com.pd.xldr.spec.DataType;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
@@ -35,7 +35,7 @@ class InputAdapterFactoryTest {
                                 .orElseThrow();
                         var fs = rs.fieldSelectors().stream()
                                 .filter(x -> fieldSelectors.contains(x.name()))
-                                .map(x -> new Field(x.name(), x.type().clazz()))
+                                .map(x -> new Field(x.name(), x.dataType().clazz()))
                                 .toList();
                         return new Result(fs, Stream.of(
                                 Map.of("c1", 1)::get
@@ -47,7 +47,7 @@ class InputAdapterFactoryTest {
 
         var ia = factory.createInputAdapter(new InputSpec("in-mem"), List.of(new RecordSelectorSpec(
                 "t1", "*", List.of(
-                        new FieldSelectorSpec("c1", "*", Type.INTEGER)
+                        new FieldSelectorSpec("c1", "*", DataType.INTEGER)
         ))));
         var src= """
                 """;

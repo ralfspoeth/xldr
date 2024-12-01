@@ -57,9 +57,9 @@ public class PropertiesMappingSpecReader implements MappingSpecReader {
                                                 .map(f -> new FieldSelectorSpec(
                                                         f.value("name"),
                                                         f.value("selector"),
-                                                        Type.valueOf(f.resource("type")
+                                                        DataType.valueOf(f.resource("type")
                                                                 .map(Resource::value)
-                                                                .orElse(Type.STRING.name())))
+                                                                .orElse(DataType.STRING.name())))
                                                 )
                                                 .toList())
                                 )

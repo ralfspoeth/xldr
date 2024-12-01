@@ -5,6 +5,6 @@ import java.io.Serializable;
 public record FieldSelectorSpec(
         String name,
         String selector,
-        Type type
+        DataType dataType
 ) implements Serializable {
 }

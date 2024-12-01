@@ -91,7 +91,7 @@ public class JsonMappingSpecReader implements MappingSpecReader {
                 ofNullable(get(element, "type"))
                         .map(Queries::stringValue)
                         .map(String::toUpperCase)
-                        .map(Type::valueOf)
+                        .map(DataType::valueOf)
                         .orElse(null)
         );
     }

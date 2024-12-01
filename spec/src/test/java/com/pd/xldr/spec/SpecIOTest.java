@@ -21,7 +21,7 @@ class SpecIOTest {
                 .map(e -> Map.entry((String)e.getKey(), (String)e.getValue()))
                 .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
         var spec = new MappingSpec(
-                new InputSpec("text/xml", List.of(new RecordSelectorSpec("root", "/", List.of(new FieldSelectorSpec("id", "@id", Type.STRING))))),
+                new InputSpec("text/xml", List.of(new RecordSelectorSpec("root", "/", List.of(new FieldSelectorSpec("id", "@id", DataType.STRING))))),
                 List.of(new RecordMappingSpec("root", "sntrx", List.of(new FieldMappingSpec("id", "id_txt")))),
                 new OutputSpec("jdbc:oracle:thin:@localhost:1521:xe", props)
         );
