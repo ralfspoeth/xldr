@@ -15,7 +15,7 @@
     <modules>
         <module>spec</module>
 <!--        <module>app</module>-->
-<!--        <module>csv</module>-->
+        <module>csv</module>
 <!--        <module>xlsx</module>-->
 <!--        <module>xml</module>-->
 <!--        <module>ldr</module>-->

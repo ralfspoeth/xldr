@@ -19,6 +19,9 @@ class InputAdapterFactoryTest {
         var factory = new InputAdapterFactory() {
 
             @Override
+            public void setProperty(String p, String v) {}
+
+            @Override
             public boolean accepts(String mimeType) {
                 return true;
             }
