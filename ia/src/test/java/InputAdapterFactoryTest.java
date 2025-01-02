@@ -1,8 +1,11 @@
-import com.pd.xldr.ia.*;
+import com.pd.xldr.ia.Field;
+import com.pd.xldr.ia.InputAdapter;
+import com.pd.xldr.ia.InputAdapterFactory;
+import com.pd.xldr.ia.Result;
+import com.pd.xldr.spec.DataType;
 import com.pd.xldr.spec.FieldSelectorSpec;
 import com.pd.xldr.spec.InputSpec;
 import com.pd.xldr.spec.RecordSelectorSpec;
-import com.pd.xldr.spec.DataType;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
@@ -19,7 +22,8 @@ class InputAdapterFactoryTest {
         var factory = new InputAdapterFactory() {
 
             @Override
-            public void setProperty(String p, String v) {}
+            public void setProperty(String p, String v) {
+            }
 
             @Override
             public boolean accepts(String mimeType) {
@@ -48,11 +52,13 @@ class InputAdapterFactoryTest {
             }
         };
 
-        var ia = factory.createInputAdapter(new InputSpec("in-mem"), List.of(new RecordSelectorSpec(
-                "t1", "*", List.of(
-                        new FieldSelectorSpec("c1", "*", DataType.INTEGER)
-        ))));
-        var src= """
+        var ia = factory.createInputAdapter(
+                new InputSpec("text/in-mem",
+                        List.of(new RecordSelectorSpec(
+                                "t1", "*",
+                                List.of(new FieldSelectorSpec("c1", "*", DataType.INTEGER)
+                        )))));
+        var src = """
                 """;
     }
 
