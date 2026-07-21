@@ -7,22 +7,21 @@ import com.pd.xldr.ia.Result;
 import com.pd.xldr.ia.Row;
 import com.pd.xldr.spec.FieldSelectorSpec;
 import com.pd.xldr.spec.InputSpec;
-import io.github.ralfspoeth.basix.fn.Indexed;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.InputStreamReader;
 import java.nio.charset.Charset;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 import java.util.function.ToIntFunction;
+import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
-import static io.github.ralfspoeth.basix.fn.Functions.indexed;
 import static io.github.ralfspoeth.basix.fn.Predicates.in;
-import static java.util.stream.Collectors.toMap;
 
 class CsvFileHandler implements InputAdapter {
 
@@ -46,30 +45,34 @@ class CsvFileHandler implements InputAdapter {
     private record Line(String[] values, ToIntFunction<String> index) implements Row {
         @Override
         public String get(String name) {
-            return values[index.applyAsInt(name)];
+            var i = index.applyAsInt(name);
+            return i >= 0 && i < values.length ? values[i] : null;
         }
     }
 
 
     @Override
     public Result parse(InputStream source, String recordSelector, Set<String> fieldSelectors) throws IOException {
-        return inputSpec.recordSelectors()
+        var fields = fields(recordSelector, fieldSelectors);
+        var selected = inputSpec.recordSelectors()
                 .stream()
-                .filter(rss -> rss.name().equals(recordSelector))
-                .findAny()
-                .map(s -> {
-                    try (var rdr = new InputStreamReader(source, charset)) {
-                        var all = rdr.readAllAsString();
-                        var lines = all.split(rowSeparator);
-                        return new Result(
-                                null, Arrays.stream(lines).skip(1)
-                                .map(fieldSeparator::split)
-                                .map(values -> new Line(values, indexOfHeader(lines)))
-                        );
-                    } catch (IOException e) {
-                        throw new RuntimeException(e);
-                    }
-                }).orElseGet(() -> new Result(fields(recordSelector, fieldSelectors), Stream.empty()));
+                .anyMatch(rss -> rss.name().equals(recordSelector));
+        if (!selected) {
+            return new Result(fields, Stream.empty());
+        }
+        var content = new String(source.readAllBytes(), charset);
+        var lines = content.split(rowSeparator, -1);
+        if (lines.length == 0) {
+            return new Result(fields, Stream.empty());
+        }
+        var fieldSep = Pattern.quote(fieldSeparator);
+        var index = indexOfHeader(lines[0]);
+        var rows = Arrays.stream(lines)
+                .skip(1)
+                .filter(line -> !line.isEmpty())
+                .map(line -> line.split(fieldSep, -1))
+                .map(values -> (Row) new Line(values, index));
+        return new Result(fields, rows);
     }
 
     private List<Field> fields(String recordSelector, Set<String> fieldSelectors) {
@@ -82,19 +85,12 @@ class CsvFileHandler implements InputAdapter {
                 .toList();
     }
 
-    private ToIntFunction<String> indexOfHeader(String[] lines) {
-        if (lines.length > 0) {
-            return Arrays
-                    // stream header names
-                    .stream(lines[0].split(fieldSeparator))
-                    // add index starting with 0
-                    .map(indexed(0))
-                    // into a map from header names to index
-                    .collect(
-                            toMap(Indexed::value, Indexed::index)
-                    )::get; // turn into function
-        } else {
-            return name -> -1;
+    private ToIntFunction<String> indexOfHeader(String headerLine) {
+        Map<String, Integer> index = new HashMap<>();
+        var headers = headerLine.split(Pattern.quote(fieldSeparator), -1);
+        for (int i = 0; i < headers.length; i++) {
+            index.putIfAbsent(headers[i], i);
         }
+        return name -> index.getOrDefault(name, -1);
     }
 }

@@ -28,8 +28,8 @@ public class CsvFileHandlerFactory implements InputAdapterFactory {
     public InputAdapter createInputAdapter(InputSpec spec) {
         return new CsvFileHandler(
                 csvFileHandlerProperties.getProperty("rowSeparator", System.lineSeparator()),
-                csvFileHandlerProperties.getProperty("fieldSeparator", System.getProperty("\t")),
-                csvFileHandlerProperties.getProperty("textEnclosingQuotes", System.getProperty("\"")),
+                csvFileHandlerProperties.getProperty("fieldSeparator", "\t"),
+                csvFileHandlerProperties.getProperty("textEnclosingQuotes", "\""),
                 csvFileHandlerProperties.containsKey("encoding")?
                         Charset.forName(csvFileHandlerProperties.getProperty("encoding")):Charset.defaultCharset(),
                 csvFileHandlerProperties.containsKey("locale")?
