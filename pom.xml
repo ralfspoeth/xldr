@@ -20,13 +20,13 @@
 
     <modules>
         <module>spec</module>
- <!--       <module>app</module>
-        <module>csv</module>
-        <module>xlsx</module>
-        <module>xml</module>
-        <module>ldr</module>
         <module>ia</module>
-        <module>it</module>-->
+        <module>csv</module>
+        <!--       <module>app</module>
+               <module>xlsx</module>
+               <module>xml</module>
+               <module>ldr</module>
+               <module>it</module>-->
     </modules>
     <packaging>pom</packaging>
 
@@ -45,6 +45,12 @@
                 <version>23.26.2.0.0</version>
             </dependency>
             <!-- my helpers -->
+            <!-- basix -->
+            <dependency>
+                <groupId>io.github.ralfspoeth</groupId>
+                <artifactId>basix</artifactId>
+                <version>1.5.4</version>
+            </dependency>
             <!-- directories and resources -->
             <dependency>
                 <groupId>io.github.ralfspoeth</groupId>

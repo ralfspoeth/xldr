@@ -8,7 +8,7 @@ public interface Row {
         return type.cast(get(name));
     }
 
-    default <T> T get(Field fld) {
-        return get(fld.name(), (Class<T>) fld.type());
+    default Object get(Field fld) {
+        return get(fld.name(), fld.type());
     }
 }
