@@ -2,23 +2,20 @@
 <project xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xmlns="http://maven.apache.org/POM/4.0.0"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
-
+    <modelVersion>4.0.0</modelVersion>
     <parent>
-        <artifactId>xldr</artifactId>
         <groupId>com.pd.xldr</groupId>
+        <artifactId>xldr</artifactId>
         <version>1.0.0-SNAPSHOT</version>
     </parent>
-    <modelVersion>4.0.0</modelVersion>
 
     <artifactId>spec</artifactId>
-    <version>1.0.0-SNAPSHOT</version>
 
     <dependencies>
         <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter-api</artifactId>
         </dependency>
-        <!--
         <dependency>
             <groupId>io.github.ralfspoeth</groupId>
             <artifactId>dirs</artifactId>
@@ -27,6 +24,9 @@
             <groupId>io.github.ralfspoeth</groupId>
             <artifactId>json</artifactId>
         </dependency>
-        -->
+        <dependency>
+            <groupId>io.github.ralfspoeth</groupId>
+            <artifactId>xmls</artifactId>
+        </dependency>
     </dependencies>
 </project>
