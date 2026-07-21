@@ -1,18 +1,16 @@
 package com.pd.xldr.spec.io;
 
 import com.pd.xldr.spec.*;
-import io.github.ralfspoeth.json.Element;
-import io.github.ralfspoeth.json.io.JsonReader;
-import io.github.ralfspoeth.json.query.Queries;
+import io.github.ralfspoeth.json.Greyson;
+import io.github.ralfspoeth.json.data.JsonValue;
+import io.github.ralfspoeth.json.query.Pointer;
+import io.github.ralfspoeth.json.query.Selector;
 
 import java.io.IOException;
 import java.io.Reader;
 import java.util.Map;
-import java.util.Objects;
 
-import static java.util.Optional.ofNullable;
 import static java.util.stream.Collectors.toMap;
-import static io.github.ralfspoeth.json.query.Queries.*;
 
 /**
  * Reads a JSON mapping specification; the spec by example is given below.
@@ -23,76 +21,78 @@ public class JsonMappingSpecReader implements MappingSpecReader {
 
     @Override
     public MappingSpec readFrom(Reader src) throws IOException {
-        try(var jsonRdr = new JsonReader(src)) {
-            var elem = jsonRdr.readElement();
-            return new MappingSpec(
-                    inputSpec(get(elem, "input")),
-                    elements(get(elem, "mapping"))
-                            .stream()
-                            .map(this::recordMappingSpec)
-                            .toList(),
-                    outputSpec(get(elem, "output"))
-            );
-        }
+        return Greyson.readValue(src)
+                .map(v -> new MappingSpec(
+                        PTR.member("input").apply(v).map(JsonMappingSpecReader::inputSpec).orElseThrow(),
+                        PTR.member("mapping").select(Selector.all()).apply(v).map(JsonMappingSpecReader::recordMappingSpec).toList(),
+                        PTR.member("output").apply(v).map(JsonMappingSpecReader::outputSpec).orElseThrow()
+                ))
+                .orElseThrow();
     }
 
-    private InputSpec inputSpec(Element element) {
-        return new InputSpec(stringValue(get(element, "mimeType"), null),
-                elements(get(element, "recordSelectors"))
-                        .stream()
-                        .map(this::recordSelectorSpec)
+    private static InputSpec inputSpec(JsonValue is) {
+        return new InputSpec(
+                PTR.member("mimeType").stringOrThrow(is),
+                PTR.member("recordSelectors")
+                        .select(Selector.all())
+                        .apply(is)
+                        .map(JsonMappingSpecReader::recordSelectorSpec)
                         .toList()
         );
     }
 
-    private OutputSpec outputSpec(Element element) {
+    private static OutputSpec outputSpec(JsonValue os) {
         return new OutputSpec(
-                stringValue(members(element).get("url"), null),
-                members(get(element, "info"))
-                        .entrySet()
+                PTR.member("url").stringOrThrow(os),
+                PTR.member("info").apply(os)
                         .stream()
-                        .collect(toMap(Map.Entry::getKey, e -> stringValue(e.getValue())))
+                        .flatMap(v -> v.members().entrySet().stream())
+                        .collect(toMap(Map.Entry::getKey, e -> e.getValue().string().orElseThrow()))
         );
     }
 
-    private RecordMappingSpec recordMappingSpec(Element element) {
+    private static RecordMappingSpec recordMappingSpec(JsonValue element) {
         return new RecordMappingSpec(
-                stringValue(get(element, "recordSelector"), null),
-                stringValue(get(element, "databaseTable"), null),
-                elements(get(element, "fieldMapping"))
-                        .stream()
-                        .filter(e -> Objects.nonNull(get(e, "fieldSelector")))
-                        .map(this::fieldMappingSpec).toList()
-        );
-    }
-
-    private FieldMappingSpec fieldMappingSpec(Element element) {
-        return new FieldMappingSpec(
-                stringValue(get(element, "fieldSelector"), null),
-                stringValue(get(element, "databaseColumnName"), null)
-        );
-    }
-
-    private RecordSelectorSpec recordSelectorSpec(Element element) {
-        return new RecordSelectorSpec(
-                stringValue(get(element, "name"), null),
-                stringValue(get(element, "selector"), null),
-                elements(get(element, "fieldSelectors"))
-                        .stream()
-                        .map(this::fieldSelectorSpec)
+                PTR.member("recordSelector").stringOrThrow(element),
+                PTR.member("databaseTable").stringOrThrow(element),
+                PTR.member("fieldMapping")
+                        .select(Selector.all())
+                        .apply(element)
+                        .map(JsonMappingSpecReader::fieldMappingSpec)
                         .toList()
         );
     }
 
-    private FieldSelectorSpec fieldSelectorSpec(Element element) {
+    private static FieldMappingSpec fieldMappingSpec(JsonValue fm) {
+        return new FieldMappingSpec(
+                PTR.member("fieldSelector").stringOrThrow(fm),
+                PTR.member("databaseColumn").stringOrThrow(fm)
+        );
+    }
+
+    private static RecordSelectorSpec recordSelectorSpec(JsonValue rs) {
+        return new RecordSelectorSpec(
+                PTR.member("name").stringOrThrow(rs),
+                PTR.member("selector").stringOrThrow(rs),
+                PTR.member("fieldSelectors")
+                        .select(Selector.all())
+                        .apply(rs)
+                        .map(JsonMappingSpecReader::fieldSelectorSpec)
+                        .toList()
+        );
+    }
+
+    private static FieldSelectorSpec fieldSelectorSpec(JsonValue fs) {
         return new FieldSelectorSpec(
-                stringValue(get(element, "name"), null),
-                stringValue(get(element, "selector"), null),
-                ofNullable(get(element, "type"))
-                        .map(Queries::stringValue)
+                PTR.member("name").stringOrThrow(fs),
+                PTR.member("selector").stringOrThrow(fs),
+                PTR.member("type")
+                        .stringValue(fs)
                         .map(String::toUpperCase)
                         .map(DataType::valueOf)
                         .orElse(null)
         );
     }
+
+    private static final Pointer PTR = Pointer.self();
 }

@@ -8,45 +8,60 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     </properties>
 
+    <parent>
+        <groupId>io.github.ralfspoeth</groupId>
+        <artifactId>plumbum</artifactId>
+        <version>2.0.8</version>
+    </parent>
+
     <groupId>com.pd.xldr</groupId>
     <artifactId>xldr</artifactId>
     <version>1.0-SNAPSHOT</version>
 
     <modules>
         <module>spec</module>
-<!--        <module>app</module>-->
-<!--        <module>csv</module>-->
-<!--        <module>xlsx</module>-->
-<!--        <module>xml</module>-->
-<!--        <module>ldr</module>-->
-<!--        <module>ia</module>-->
-<!--        <module>it</module>-->
+ <!--       <module>app</module>
+        <module>csv</module>
+        <module>xlsx</module>
+        <module>xml</module>
+        <module>ldr</module>
+        <module>ia</module>
+        <module>it</module>-->
     </modules>
     <packaging>pom</packaging>
 
     <dependencyManagement>
         <dependencies>
             <dependency>
-                <groupId>io.github.ralfspoeth</groupId>
-                <artifactId>json</artifactId>
-                <version>1.1.14</version>
-            </dependency>
-            <dependency>
-                <groupId>org.junit.jupiter</groupId>
-                <artifactId>junit-jupiter-api</artifactId>
-                <version>5.11.3</version>
-                <scope>test</scope>
-            </dependency>
-            <dependency>
-                <groupId>org.junit.jupiter</groupId>
-                <artifactId>junit-jupiter-engine</artifactId>
-                <version>5.11.3</version>
-                <scope>test</scope>
+                <groupId>org.junit</groupId>
+                <artifactId>junit-bom</artifactId>
+                <version>6.1.2</version>
+                <type>pom</type>
+                <scope>import</scope>
             </dependency>
             <dependency>
                 <groupId>com.oracle.database.jdbc</groupId>
-                <artifactId>ojdbc11</artifactId>
-                <version>23.6.0.24.10</version>
+                <artifactId>ojdbc17</artifactId>
+                <version>23.26.2.0.0</version>
+            </dependency>
+            <!-- my helpers -->
+            <!-- directories and resources -->
+            <dependency>
+                <groupId>io.github.ralfspoeth</groupId>
+                <artifactId>dirs</artifactId>
+                <version>0.1.2</version>
+            </dependency>
+            <!-- JSON -->
+            <dependency>
+                <groupId>io.github.ralfspoeth</groupId>
+                <artifactId>json</artifactId>
+                <version>1.6.1</version>
+            </dependency>
+            <!-- XML -->
+            <dependency>
+                <groupId>io.github.ralfspoeth</groupId>
+                <artifactId>xmls</artifactId>
+                <version>0.10.0</version>
             </dependency>
         </dependencies>
     </dependencyManagement>
@@ -59,7 +74,7 @@
                     <artifactId>maven-compiler-plugin</artifactId>
                     <version>3.13.0</version>
                     <configuration>
-                        <release>23</release>
+                        <release>25</release>
                     </configuration>
                 </plugin>
                 <plugin>
