@@ -4,11 +4,20 @@ import com.pd.xldr.ia.InputAdapter;
 import com.pd.xldr.ia.InputAdapterFactory;
 import com.pd.xldr.spec.InputSpec;
 
+import java.nio.charset.Charset;
 import java.util.List;
+import java.util.Locale;
+import java.util.Properties;
 
 public class CsvFileHandlerFactory implements InputAdapterFactory {
 
     private static final List<String> ACCEPT = List.of("text/csv");
+    private final Properties csvFileHandlerProperties = new Properties();
+
+    @Override
+    public void setProperty(String property, String value) {
+        csvFileHandlerProperties.setProperty(property, value);
+    }
 
     @Override
     public boolean accepts(String mimeType) {
@@ -17,6 +26,15 @@ public class CsvFileHandlerFactory implements InputAdapterFactory {
 
     @Override
     public InputAdapter createInputAdapter(InputSpec spec) {
-        return null;
+        return new CsvFileHandler(
+                csvFileHandlerProperties.getProperty("rowSeparator", System.lineSeparator()),
+                csvFileHandlerProperties.getProperty("fieldSeparator", System.getProperty("\t")),
+                csvFileHandlerProperties.getProperty("textEnclosingQuotes", System.getProperty("\"")),
+                csvFileHandlerProperties.containsKey("encoding")?
+                        Charset.forName(csvFileHandlerProperties.getProperty("encoding")):Charset.defaultCharset(),
+                csvFileHandlerProperties.containsKey("locale")?
+                        Locale.of(csvFileHandlerProperties.getProperty("locale")):Locale.getDefault(),
+                spec
+        );
     }
 }

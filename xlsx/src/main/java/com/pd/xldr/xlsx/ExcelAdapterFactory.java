@@ -5,12 +5,20 @@ import com.pd.xldr.ia.InputAdapterFactory;
 import com.pd.xldr.spec.InputSpec;
 
 import java.util.List;
+import java.util.Properties;
 
 public class ExcelAdapterFactory implements InputAdapterFactory {
 
     private static final String XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
     private static final String XLS = "application/vnd.ms-excel";
     private static final List<String> ACCEPT = List.of(XLSX, XLS);
+
+    private final Properties properties = new Properties();
+
+    @Override
+    public void setProperty(String key, String value){
+        properties.setProperty(key, value);
+    }
 
     @Override
     public boolean accepts(String mimeType) {
