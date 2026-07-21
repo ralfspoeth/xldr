@@ -6,6 +6,7 @@
 
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <revision>1.0.0-SNAPSHOT</revision>
     </properties>
 
     <parent>
@@ -16,7 +17,7 @@
 
     <groupId>com.pd.xldr</groupId>
     <artifactId>xldr</artifactId>
-    <version>1.0.0-SNAPSHOT</version>
+    <version>${revision}</version>
 
     <modules>
         <module>spec</module>

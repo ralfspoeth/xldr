@@ -7,7 +7,7 @@
     <parent>
         <groupId>com.pd.xldr</groupId>
         <artifactId>xldr</artifactId>
-        <version>1.0.0-SNAPSHOT</version>
+        <version>${revision}</version>
     </parent>
 
     <artifactId>ia</artifactId>
@@ -16,11 +16,12 @@
         <dependency>
             <groupId>com.pd.xldr</groupId>
             <artifactId>spec</artifactId>
-            <version>1.0.0-SNAPSHOT</version>
+            <version>${project.version}</version>
         </dependency>
         <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter-api</artifactId>
+            <scope>test</scope>
         </dependency>
     </dependencies>
 </project>
