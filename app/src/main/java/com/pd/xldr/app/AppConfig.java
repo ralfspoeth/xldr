@@ -1,9 +1,14 @@
 package com.pd.xldr.app;
 
+import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
+import java.util.Optional;
 import java.util.Properties;
+import java.util.regex.Pattern;
+import java.util.stream.Stream;
 
 /**
  * Server configuration: the directory tree to watch and the single target
@@ -14,24 +19,36 @@ import java.util.Properties;
  * stay out of the watched input tree.
  *
  * <pre>
- * xldr.root     = /var/lib/xldr
+ * xldr.roots        = /var/lib/xldr:/mnt/feeds
+ * xldr.scanInterval = 30
  * jdbc.url      = jdbc:oracle:thin:@//host:1521/sid
  * jdbc.user     = dbuser
  * jdbc.password = secret
  * pool.maximumPoolSize = 4
  * </pre>
  *
- * Every {@code pool.*} key is passed straight to {@code HikariConfig} under its
- * own name, so the whole pool configuration is reachable without this class
- * having to mirror it.
+ * The roots are the only directories in which feeds may be created; they are
+ * separated by the platform path separator and have to exist at startup, since
+ * nothing watches their parents. Every {@code pool.*} key is passed straight to
+ * {@code HikariConfig} under its own name, so the whole pool configuration is
+ * reachable without this class having to mirror it.
+ *
+ * @param scanIntervalSeconds how often the whole tree is reconciled; watch
+ *                            events only make the reaction quicker
  */
-public record AppConfig(Path root, Properties poolProperties) {
+public record AppConfig(List<Path> roots, long scanIntervalSeconds, Properties poolProperties) {
 
     private static final String POOL_PREFIX = "pool.";
-    private static final String ROOT_KEY = "xldr.root";
+    private static final String ROOTS_KEY = "xldr.roots";
+    private static final String SCAN_KEY = "xldr.scanInterval";
+    private static final long DEFAULT_SCAN_INTERVAL = 30L;
     private static final String URL_KEY = "jdbc.url";
     private static final String USER_KEY = "jdbc.user";
     private static final String PASSWORD_KEY = "jdbc.password";
+
+    public AppConfig {
+        roots = List.copyOf(roots);
+    }
 
     public static AppConfig load(Path propertiesFile) throws IOException {
         var props = new Properties();
@@ -42,7 +59,20 @@ public record AppConfig(Path root, Properties poolProperties) {
     }
 
     public static AppConfig of(Properties props) {
-        var root = Path.of(require(props, ROOT_KEY));
+        var roots = Stream.of(require(props, ROOTS_KEY).split(Pattern.quote(File.pathSeparator)))
+                .map(String::trim)
+                .filter(s -> !s.isEmpty())
+                .map(Path::of)
+                .map(Path::toAbsolutePath)
+                .map(Path::normalize)
+                .toList();
+        if (roots.isEmpty()) {
+            throw new IllegalArgumentException(ROOTS_KEY + " names no directory");
+        }
+        var scanInterval = Optional.ofNullable(props.getProperty(SCAN_KEY))
+                .map(String::trim)
+                .map(Long::parseLong)
+                .orElse(DEFAULT_SCAN_INTERVAL);
 
         // HikariConfig(Properties) assigns by bean property name
         var pool = new Properties();
@@ -54,7 +84,7 @@ public record AppConfig(Path root, Properties poolProperties) {
                 pool.setProperty(name.substring(POOL_PREFIX.length()), props.getProperty(name));
             }
         }
-        return new AppConfig(root, pool);
+        return new AppConfig(roots, scanInterval, pool);
     }
 
     private static void copyIfPresent(Properties from, String key, Properties to, String targetKey) {
@@ -70,9 +100,5 @@ public record AppConfig(Path root, Properties poolProperties) {
             throw new IllegalArgumentException("missing configuration property " + key);
         }
         return value;
-    }
-
-    public String jdbcUrl() {
-        return poolProperties.getProperty("jdbcUrl");
     }
 }

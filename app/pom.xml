@@ -41,6 +41,11 @@
             <artifactId>h2</artifactId>
             <scope>test</scope>
         </dependency>
+        <!-- directory watching -->
+        <dependency>
+            <groupId>io.github.ralfspoeth</groupId>
+            <artifactId>filews</artifactId>
+        </dependency>
         <dependency>
             <groupId>com.pd.xldr</groupId>
             <artifactId>ia</artifactId>

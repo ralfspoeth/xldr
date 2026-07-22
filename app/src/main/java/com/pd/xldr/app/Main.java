@@ -1,35 +1,50 @@
 package com.pd.xldr.app;
 
-import com.pd.xldr.spec.MappingSpec;
-import com.pd.xldr.spec.io.JsonMappingSpecReader;
-import com.pd.xldr.spec.io.MappingSpecReader;
-import com.pd.xldr.spec.io.PropertiesMappingSpecReader;
-import com.pd.xldr.spec.io.XmlMappingSpecReader;
-
 import java.io.IOException;
-import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.Locale;
+import java.util.concurrent.CountDownLatch;
 import java.util.logging.LogManager;
 
+import static java.lang.System.Logger.Level.ERROR;
+import static java.lang.System.Logger.Level.INFO;
+
+/**
+ * Entry point: starts the server and watches the configured roots until the
+ * process is asked to stop.
+ */
 public class Main {
+
+    private static final System.Logger LOG = System.getLogger(Main.class.getName());
 
     static void main(String[] args) throws Exception {
         initLogging();
-        if (args.length != 3) {
-            System.err.println("usage: xldr <config.properties> <mapping-spec-file> <input-file>");
+        if (args.length != 1) {
+            System.err.println("usage: xldr <config.properties>");
             System.exit(2);
             return;
         }
         var config = AppConfig.load(Path.of(args[0]));
-        var mappingSpec = readMappingSpec(Path.of(args[1]));
-        var input = Path.of(args[2]);
-        // the pool belongs to the process, not to a single load - once the
-        // server watches directories it is opened at startup and closed on exit
-        try (var pool = new ConnectionPool(config)) {
-            var rows = new LoadJob(mappingSpec, pool).load(input);
-            System.out.printf("inserted %d row(s) from %s%n", rows, input);
+
+        // both belong to the process: the pool is opened once and closed on exit
+        try (var pool = new ConnectionPool(config);
+             var watcher = new Watcher(config, pool)) {
+            watcher.start();
+            awaitShutdown();
+            LOG.log(INFO, "shutting down");
+        } catch (Exception e) {
+            LOG.log(ERROR, "startup failed", e);
+            System.exit(1);
         }
+    }
+
+    /**
+     * Blocks until the JVM is asked to terminate, so that the loads in flight
+     * finish inside the try-with-resources above rather than being cut off.
+     */
+    private static void awaitShutdown() throws InterruptedException {
+        var stopped = new CountDownLatch(1);
+        Runtime.getRuntime().addShutdownHook(new Thread(stopped::countDown, "xldr-shutdown"));
+        stopped.await();
     }
 
     /**
@@ -49,34 +64,6 @@ public class Main {
             }
         } catch (IOException e) {
             System.err.println("could not apply the bundled logging configuration: " + e);
-        }
-    }
-
-    static MappingSpec readMappingSpec(Path file) throws IOException {
-        var reader = readerFor(file);
-        try (var in = Files.newBufferedReader(file)) {
-            return reader.readFrom(in);
-        }
-    }
-
-    /**
-     * Picks the reader by file extension.
-     * <p>
-     * {@code MappingSpecReader} carries no discriminator - no
-     * {@code accepts(...)} the way {@code InputAdapterFactory} has one - so the
-     * implementations cannot be told apart through {@code ServiceLoader} even
-     * though {@code spec} declares them as providers. Hence the explicit switch.
-     */
-    private static MappingSpecReader readerFor(Path file) {
-        var name = file.getFileName().toString().toLowerCase(Locale.ROOT);
-        if (name.endsWith(".json")) {
-            return new JsonMappingSpecReader();
-        } else if (name.endsWith(".xml")) {
-            return new XmlMappingSpecReader();
-        } else if (name.endsWith(".properties")) {
-            return new PropertiesMappingSpecReader();
-        } else {
-            throw new IllegalArgumentException("unsupported mapping spec format: " + file);
         }
     }
 }

@@ -8,11 +8,11 @@ structure into database tables.
 The toolkit provides adapters for different file types that can be loaded as modules and utilize the service framework
 of JPMS.
 
-Loading data from a file into one or more database tables is guarded by a *mapping specification* which comprises an *
-input specification*, a *mapping*, and an *output specification*. The *input specification* tells the engine how to
-parse of given file and to load *records* and *fields*. The *mapping* provides - as its name implies - a mapping from
-records to database tables and from fields to database columns. The *output specification* provides connection
-information that the engine needs to connect to the target database.
+Loading data from a file into one or more database tables is guarded by a *mapping specification* which comprises an
+*input specification*, a *mapping*, and a *load specification*. The *input specification* tells the engine how to
+parse a given file and to load *records* and *fields*. The *mapping* provides - as its name implies - a mapping from
+records to database tables and from fields to database columns. The *load specification* says how the load is carried
+out; the target database itself is configured on the application, not in the mapping.
 
 The mapping specification can be constructed programmatically or can be provided through some source text in one of the
 following formats:
@@ -89,7 +89,8 @@ The application is configured separately with the target database. Connections a
 `pool.*` key is handed to `HikariConfig` under its own name, so the full pool configuration is available without the
 application having to mirror it.
 
-    xldr.root     = /var/lib/xldr
+    xldr.roots        = /var/lib/xldr:/mnt/feeds
+    xldr.scanInterval = 30
     jdbc.url      = jdbc:oracle:thin:@//host:1521/sid
     jdbc.user     = dbuser
     jdbc.password = secret
@@ -113,7 +114,7 @@ properties itself:
 
 The record mapping specification is provided by an array of record mappings each of which specifies the name of the
 record selector as defined in the input specification, a database table name which is the target of the mapping residing
-in the database specified in the output specification, followed by an array of field mappings of a field selector
+in the target database, followed by an array of field mappings of a field selector
 defined in the respective record selector and a target database column available in the target database table.
 
 Example:
@@ -142,3 +143,43 @@ The mapping specification as a whole is specified by the three elements input, l
     }
 
 The order of the elements is unspecified.
+
+## The Server
+
+The application runs as a server watching a number of configured *roots*. A root is the only place in which feeds may
+be created; a feed is a directory exactly one level below a root that contains a mapping spec.
+
+    <root>/<feed>/
+        spec.json           one of spec.json | spec.xml | spec.properties; its presence activates the feed
+        adapter.properties  optional, input adapter settings such as fieldSeparator for CSV
+        in/                 producers move input files in here
+        work/               claimed, currently being loaded
+        archive/2026/07/22/ loaded successfully
+        hospital/           failed, together with an error log
+
+Creating a feed is `mkdir` plus dropping a spec in it; the four working directories are created by the server. Removing
+the spec deactivates the feed, replacing it reloads it - no restart in either case. Exactly one spec file must be
+present: two of them is refused rather than resolved by precedence, because loading through the wrong spec is worse
+than not loading at all.
+
+### Delivering files
+
+Producers must place input files in `in/` by an **atomic move** - writing directly into `in/` risks the file being
+picked up while it is still being written. The server claims a file by moving it to `work/`, which is also what stops
+two threads, or two server processes on the same tree, from loading it twice.
+
+Files left in `work/` at startup were claimed by a run that died. Whether their transaction committed is unknown, so
+they are moved to `hospital/` for inspection rather than retried - a blind retry could duplicate rows, the loader
+being insert only. Files in `hospital/` are never retried automatically either; moving one back into `in/` is a
+deliberate operator action.
+
+### Watching
+
+Three levels are watched: each root, so a new feed directory is noticed; each feed directory, so a spec appearing,
+changing or being removed takes effect immediately; and the `in/` of every active feed. Because a feed lives exactly
+one level below a root, `work/`, `archive/` and `hospital/` are never watched and the archive tree cannot accumulate
+watches as it grows.
+
+Watch events only reduce latency. The guarantee is `xldr.scanInterval`, a periodic reconciliation that re-derives the
+whole state from the file system, so a lost event, an event overflow or a subtree moved in complete with content
+costs a few seconds rather than a feed that never comes up.

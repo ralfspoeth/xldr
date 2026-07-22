@@ -5,6 +5,7 @@ module com.pd.xldr.app {
     requires java.sql;
     requires java.logging;
     requires com.zaxxer.hikari;
+    requires io.github.ralfspoeth.filews;
     // the slf4j -> java.util.logging provider. A service provider module is only
     // resolved if something requires it (or --add-modules names it); as the
     // application module this is where the binding is chosen.
