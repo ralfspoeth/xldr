@@ -1,71 +1,67 @@
 package com.pd.xldr.xml;
 
+import org.w3c.dom.Document;
+import org.w3c.dom.NodeList;
+
+import javax.xml.xpath.XPathConstants;
 import javax.xml.xpath.XPathExpression;
 import javax.xml.xpath.XPathExpressionException;
 import java.util.Collections;
-import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
 
-import static com.pd.xldr.xml.XmlObjects.XP;
-
-
+/**
+ * One kind of record, addressed by an XPath expression that must select a node
+ * set - {@code /root/fund} or {@code //position}. Each node of that set becomes
+ * one row, and the field selectors are evaluated against it.
+ */
 public class XmlRecordSelector {
 
     private final String name;
-    private final XPathExpression recordExpression;
-    private final Map<String, XmlFieldSelector> fieldSelectorMap = new HashMap<>();
+    private final String selector;
+    private final XPathExpression expression;
+    // insertion order, so Result.fields() follows the order of the spec
+    private final Map<String, XmlFieldSelector> fieldSelectors = new LinkedHashMap<>();
 
-    public XmlRecordSelector(String name, XPathExpression recordExpression) {
+    XmlRecordSelector(String name, String selector, XPathExpression expression) {
         this.name = Objects.requireNonNull(name);
-        this.recordExpression = Objects.requireNonNull(recordExpression);
-    }
-
-    public XmlRecordSelector(String name, String recordExpression) throws XPathExpressionException {
-        this(name, XP.compile(recordExpression));
+        this.selector = selector;
+        this.expression = Objects.requireNonNull(expression);
     }
 
     public String name() {
         return name;
     }
 
-    public XPathExpression recordExpression() {
-        return recordExpression;
+    public Map<String, XmlFieldSelector> fieldSelectors() {
+        return Collections.unmodifiableMap(fieldSelectors);
     }
 
-    Map<String, XmlFieldSelector> fieldSelectors() {
-        return fieldSelectorMap;
+    void add(XmlFieldSelector fieldSelector) {
+        var previous = fieldSelectors.putIfAbsent(fieldSelector.name(), fieldSelector);
+        if (previous != null) {
+            throw new IllegalArgumentException(
+                    "duplicate field selector " + fieldSelector.name() + " in record selector " + name);
+        }
     }
 
-    public Map<String, XmlFieldSelector> fieldSelectorMap() {
-        return Collections.unmodifiableMap(fieldSelectorMap);
+    /**
+     * The record nodes of {@code document}.
+     */
+    NodeList records(Document document) {
+        try {
+            return (NodeList) expression.evaluate(document, XPathConstants.NODESET);
+        } catch (XPathExpressionException e) {
+            // typically an expression that yields a string or a number rather
+            // than a node set - it cannot address records
+            throw new IllegalStateException(
+                    "record selector " + name + " (" + selector + ") does not select a node set", e);
+        }
     }
 
-
-    /*
-    public Stream<Node> records(FileHandler fileHandler) throws IOException {
-        if (fileHandler instanceof XmlFileHandler) {
-            XmlFileHandler xfh = (XmlFileHandler) fileHandler;
-            try {
-                final var nl = (NodeList) recordExpression.evaluate(xfh.open(), XPathConstants.NODESET);
-                return StreamSupport.stream(new Spliterators.AbstractSpliterator<Node>(nl.getLength(), Spliterator.SIZED) {
-                    private int ptr = 0;
-
-                    @Override
-                    public boolean tryAdvance(Consumer<? super Node> action) {
-                        if (ptr < nl.getLength()) {
-                            action.accept(nl.item(ptr++));
-                            return true;
-                        } else {
-                            return false;
-                        }
-                    }
-                }, false);
-            } catch (ParserConfigurationException | SAXException | XPathExpressionException e) {
-                throw new RuntimeException(e);
-            }
-        } else return Stream.empty();
+    @Override
+    public String toString() {
+        return name + "=" + selector;
     }
-    */
-
 }

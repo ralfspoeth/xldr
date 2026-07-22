@@ -1,0 +1,13 @@
+<?xml version='1.0'?>
+<portfolio xmlns="http://example.com/funds" version="2">
+    <fund id="F-1">
+        <name>Alpha</name>
+        <nav>1234.56</nav>
+        <asOf>2026-07-22</asOf>
+    </fund>
+    <fund id="F-2">
+        <name>Beta</name>
+        <nav>78.90</nav>
+        <asOf>2026-07-21T14:30:00</asOf>
+    </fund>
+</portfolio>

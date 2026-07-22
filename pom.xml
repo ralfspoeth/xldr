@@ -21,10 +21,10 @@
         <module>ia</module>
         <module>csv</module>
         <module>ldr</module>
+        <module>xml</module>
         <module>app</module>
         <!--
                <module>xlsx</module>
-               <module>xml</module>
                <module>it</module>
                -->
     </modules>

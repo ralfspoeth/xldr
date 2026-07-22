@@ -1,95 +1,161 @@
 package com.pd.xldr.xml;
 
-
 import com.pd.xldr.ia.Field;
 import com.pd.xldr.ia.InputAdapter;
 import com.pd.xldr.ia.Result;
 import com.pd.xldr.ia.Row;
 import com.pd.xldr.spec.InputSpec;
 import org.w3c.dom.Node;
-import org.w3c.dom.NodeList;
 import org.xml.sax.SAXException;
 
+import javax.xml.XMLConstants;
+import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
-import javax.xml.xpath.XPathConstants;
+import javax.xml.xpath.XPath;
 import javax.xml.xpath.XPathExpressionException;
+import javax.xml.xpath.XPathFactory;
 import java.io.IOException;
 import java.io.InputStream;
-import java.util.*;
-import java.util.function.Consumer;
-import java.util.stream.Collectors;
-import java.util.stream.StreamSupport;
+import java.time.format.DateTimeFormatter;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Properties;
+import java.util.Set;
+import java.util.stream.IntStream;
 
+/**
+ * Reads records out of an XML document, both record and field selectors being
+ * XPath expressions.
+ * <p>
+ * Every expression of the input spec is compiled once, in the constructor, so a
+ * malformed selector is reported when the adapter is created rather than half
+ * way through a load - and the compiled form is reused for every record.
+ * <p>
+ * One adapter serves all record selectors of one file, but it is not safe for
+ * use by several threads at once: {@code XPathExpression} and
+ * {@code DocumentBuilderFactory} are not thread safe. That matches how the
+ * application uses it, one adapter per file being loaded.
+ */
 public class XmlFileHandler implements InputAdapter {
 
-    private final Map<String, XmlRecordSelector> recordSelectorMap = new HashMap<>();
+    /**
+     * Optional adapter property naming the pattern for {@code DATE} fields;
+     * without it an ISO timestamp and a plain ISO date are both accepted.
+     */
+    static final String DATE_FORMAT = "dateFormat";
 
-    public XmlFileHandler(InputSpec spec) {
-        for (var rsSpec : spec.recordSelectors()) {
-            try {
-                var rs = new XmlRecordSelector(rsSpec.name(), rsSpec.selector());
-                var prev = recordSelectorMap
-                        .putIfAbsent(rsSpec.name(), rs);
-                if (prev != null) throw new IllegalArgumentException("duplicate record selector " + rsSpec.name());
-                for (var fsSpec : rsSpec.fieldSelectors()) {
-                    var fs = new XmlFieldSelector(fsSpec.name(), fsSpec.selector(), fsSpec.type());
-                    rs.fieldSelectors().putIfAbsent(fsSpec.name(), fs);
-                }
-            } catch (XPathExpressionException xpex) {
-                throw new IllegalArgumentException(xpex);
+    private final Map<String, XmlRecordSelector> recordSelectors = new HashMap<>();
+    private final DocumentBuilderFactory parsers;
+
+    XmlFileHandler(InputSpec spec, Properties properties) {
+        var namespaces = Namespaces.of(properties);
+        var dateFormat = properties.containsKey(DATE_FORMAT)
+                ? DateTimeFormatter.ofPattern(properties.getProperty(DATE_FORMAT))
+                : null;
+
+        var xpath = newXPath(namespaces);
+        for (var recordSpec : spec.recordSelectors()) {
+            var record = new XmlRecordSelector(
+                    recordSpec.name(), recordSpec.selector(), compile(xpath, recordSpec.selector()));
+            if (recordSelectors.putIfAbsent(recordSpec.name(), record) != null) {
+                throw new IllegalArgumentException("duplicate record selector " + recordSpec.name());
+            }
+            for (var fieldSpec : recordSpec.fieldSelectors()) {
+                record.add(new XmlFieldSelector(
+                        fieldSpec.name(),
+                        fieldSpec.selector(),
+                        compile(xpath, fieldSpec.selector()),
+                        fieldSpec.dataType(),
+                        dateFormat));
             }
         }
+        this.parsers = newParserFactory(!namespaces.isEmpty());
     }
 
     @Override
-    public Result parse(InputStream source, String recordSelector, List<String> fieldSelectors) throws IOException {
-        try {
-            var doc = XmlObjects.PARSER.newDocumentBuilder().parse(source);
-            var rs = recordSelectorMap.get(recordSelector);
-
-            List<Field> fieldList = fieldSelectors.stream()
-                    .map(selName -> rs.fieldSelectors().get(selName))
-                    .map(Optional::ofNullable)
-                    .map(os -> os.map(sel -> new Field(sel.name(), sel.type().clazz())).orElse(new Field("<<UNNAMED>>", Object.class)))
-                    .collect(Collectors.toList());
-
-            var recs = (NodeList) rs.recordExpression().evaluate(doc, XPathConstants.NODESET);
-
-            var rowStream = StreamSupport.stream(new Spliterator<Row>() {
-                private int index = 0;
-
-                @Override
-                public boolean tryAdvance(Consumer<? super Row> action) {
-                    var row = new Row() {
-                        Node recordNode = recs.item(index++);
-
-                        @Override
-                        public Object get(String name) {
-                            return Optional.ofNullable(rs.fieldSelectors().get(name)).map(s -> s.evaluate(recordNode)).orElse("");
-                        }
-                    };
-                    action.accept(row);
-                    return index < recs.getLength();
-                }
-
-                @Override
-                public Spliterator<Row> trySplit() {
-                    return null;
-                }
-
-                @Override
-                public long estimateSize() {
-                    return recs.getLength();
-                }
-
-                @Override
-                public int characteristics() {
-                    return Spliterator.IMMUTABLE | Spliterator.ORDERED | Spliterator.NONNULL;
-                }
-            }, false);
-            return new Result(fieldList, rowStream);
-        } catch (SAXException | ParserConfigurationException | XPathExpressionException e) {
-            throw new RuntimeException(e);
+    public Result parse(InputStream source, String recordSelector, Set<String> fieldSelectors) throws IOException {
+        var record = recordSelectors.get(recordSelector);
+        if (record == null) {
+            throw new IllegalArgumentException("no record selector named " + recordSelector
+                    + "; the input spec declares " + recordSelectors.keySet());
         }
+        var selected = selected(record, fieldSelectors);
+
+        try {
+            var document = parsers.newDocumentBuilder().parse(source);
+            var nodes = record.records(document);
+            // IntStream rather than a hand written Spliterator: it is lazy,
+            // correctly sized, and an empty node set yields no rows at all
+            var rows = IntStream.range(0, nodes.getLength())
+                    .mapToObj(nodes::item)
+                    .map(node -> (Row) new XmlRow(node, record));
+            return new Result(
+                    selected.stream().map(fs -> new Field(fs.name(), fs.dataType().clazz())).toList(),
+                    rows);
+        } catch (SAXException | ParserConfigurationException e) {
+            throw new IOException("cannot parse the XML input", e);
+        }
+    }
+
+    /**
+     * The field selectors asked for, in the order of the input spec.
+     */
+    private static List<XmlFieldSelector> selected(XmlRecordSelector record, Set<String> wanted) {
+        var unknown = wanted.stream().filter(name -> !record.fieldSelectors().containsKey(name)).toList();
+        if (!unknown.isEmpty()) {
+            // a mapping referring to a field the input spec does not declare is
+            // a broken spec; saying so beats returning empty columns
+            throw new IllegalArgumentException("record selector " + record.name()
+                    + " declares no field selector(s) " + unknown);
+        }
+        return record.fieldSelectors()
+                .values()
+                .stream()
+                .filter(fs -> wanted.contains(fs.name()))
+                .toList();
+    }
+
+    private record XmlRow(Node node, XmlRecordSelector record) implements Row {
+        @Override
+        public Object get(String name) {
+            var selector = record.fieldSelectors().get(name);
+            // unknown name -> null, which the loader binds as SQL NULL
+            return selector == null ? null : selector.evaluate(node);
+        }
+    }
+
+    private static XPath newXPath(Namespaces namespaces) {
+        // a fresh factory per adapter: neither XPathFactory nor XPath is thread safe
+        var xpath = XPathFactory.newDefaultInstance().newXPath();
+        if (!namespaces.isEmpty()) {
+            xpath.setNamespaceContext(namespaces);
+        }
+        return xpath;
+    }
+
+    private static javax.xml.xpath.XPathExpression compile(XPath xpath, String selector) {
+        try {
+            return xpath.compile(selector);
+        } catch (XPathExpressionException e) {
+            throw new IllegalArgumentException("not a valid XPath expression: " + selector, e);
+        }
+    }
+
+    private static DocumentBuilderFactory newParserFactory(boolean namespaceAware) {
+        var factory = DocumentBuilderFactory.newDefaultInstance();
+        // input arrives from a watched directory, so it is not trusted: no
+        // doctype means no external entity resolution and no billion laughs
+        try {
+            factory.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
+            factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
+        } catch (ParserConfigurationException e) {
+            throw new IllegalStateException("cannot configure a safe XML parser", e);
+        }
+        factory.setXIncludeAware(false);
+        factory.setExpandEntityReferences(false);
+        // only worth paying for when the selectors actually use prefixes
+        factory.setNamespaceAware(namespaceAware);
+        return factory;
     }
 }
