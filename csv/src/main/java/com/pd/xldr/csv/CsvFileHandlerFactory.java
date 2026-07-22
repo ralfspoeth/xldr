@@ -34,6 +34,7 @@ public class CsvFileHandlerFactory implements InputAdapterFactory {
                         Charset.forName(csvFileHandlerProperties.getProperty("encoding")):Charset.defaultCharset(),
                 csvFileHandlerProperties.containsKey("locale")?
                         Locale.of(csvFileHandlerProperties.getProperty("locale")):Locale.getDefault(),
+                Boolean.parseBoolean(csvFileHandlerProperties.getProperty("header", "true")),
                 spec
         );
     }

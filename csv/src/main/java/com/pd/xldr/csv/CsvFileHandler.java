@@ -30,15 +30,17 @@ class CsvFileHandler implements InputAdapter {
     private final String textEnclosingQuotes;
     private final Charset charset;
     private final Locale locale;
+    private final boolean header;
 
     private final InputSpec inputSpec;
 
-    CsvFileHandler(String rowSeparator, String fieldSeparator, String textEnclosingQuotes, Charset charset, Locale locale, InputSpec spec) {
+    CsvFileHandler(String rowSeparator, String fieldSeparator, String textEnclosingQuotes, Charset charset, Locale locale, boolean header, InputSpec spec) {
         this.rowSeparator = rowSeparator;
         this.fieldSeparator = fieldSeparator;
         this.textEnclosingQuotes = textEnclosingQuotes;
         this.charset = charset;
         this.locale = locale;
+        this.header = header;
         this.inputSpec = spec;
     }
 
@@ -66,9 +68,11 @@ class CsvFileHandler implements InputAdapter {
             return new Result(fields, Stream.empty());
         }
         var fieldSep = Pattern.quote(fieldSeparator);
-        var index = indexOfHeader(lines[0]);
+        // with a header the first line maps names to positions; without one the
+        // field name itself is the 1-based column number ("1" -> 0, "2" -> 1, ...)
+        var index = header ? indexOfHeader(lines[0]) : positionalIndex();
         var rows = Arrays.stream(lines)
-                .skip(1)
+                .skip(header ? 1 : 0)
                 .filter(line -> !line.isEmpty())
                 .map(line -> line.split(fieldSep, -1))
                 .map(values -> (Row) new Line(values, index));
@@ -92,5 +96,15 @@ class CsvFileHandler implements InputAdapter {
             index.putIfAbsent(headers[i], i);
         }
         return name -> index.getOrDefault(name, -1);
+    }
+
+    private static ToIntFunction<String> positionalIndex() {
+        return name -> {
+            try {
+                return Integer.parseInt(name.trim()) - 1;
+            } catch (NumberFormatException e) {
+                return -1;
+            }
+        };
     }
 }
