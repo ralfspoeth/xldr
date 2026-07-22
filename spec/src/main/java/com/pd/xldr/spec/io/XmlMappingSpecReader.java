@@ -37,7 +37,7 @@ public class XmlMappingSpecReader implements MappingSpecReader {
 
     private static OutputSpec outputSpec(Element output) {
         return new OutputSpec(
-                output.getAttribute("url"), null
+                output.getAttribute("dataSource"), null
         );
     }
 

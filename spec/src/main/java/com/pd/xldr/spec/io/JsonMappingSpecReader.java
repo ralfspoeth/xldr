@@ -43,7 +43,7 @@ public class JsonMappingSpecReader implements MappingSpecReader {
 
     private static OutputSpec outputSpec(JsonValue os) {
         return new OutputSpec(
-                PTR.member("url").stringOrThrow(os),
+                PTR.member("dataSource").stringOrThrow(os),
                 PTR.member("info").apply(os)
                         .stream()
                         .flatMap(v -> v.members().entrySet().stream())

@@ -1,0 +1,83 @@
+package com.pd.xldr.app;
+
+import com.pd.xldr.ia.InputAdapter;
+import com.pd.xldr.ia.InputAdapterFactory;
+import com.pd.xldr.ldr.Loader;
+import com.pd.xldr.spec.InputSpec;
+import com.pd.xldr.spec.MappingSpec;
+
+import javax.naming.NamingException;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.sql.SQLException;
+import java.util.Properties;
+import java.util.ServiceLoader;
+
+/**
+ * Loads one file according to one {@link MappingSpec}.
+ * <p>
+ * The sequence is: resolve the data source named by the output spec, pick the
+ * input adapter factory that accepts the input spec's MIME type, create a
+ * single adapter for the file, and then run every record mapping against it -
+ * each with a freshly opened stream, since a stream is read only once.
+ * <p>
+ * The whole file is one transaction: {@link Loader#close()} commits, or rolls
+ * back if any mapping failed.
+ */
+public class LoadJob {
+
+    private final MappingSpec mappingSpec;
+    private final Properties adapterProperties;
+
+    public LoadJob(MappingSpec mappingSpec) {
+        this(mappingSpec, new Properties());
+    }
+
+    /**
+     * @param adapterProperties format specific settings handed to the input
+     *                          adapter factory, e.g. {@code fieldSeparator} for CSV
+     */
+    public LoadJob(MappingSpec mappingSpec, Properties adapterProperties) {
+        this.mappingSpec = mappingSpec;
+        this.adapterProperties = adapterProperties;
+    }
+
+    /**
+     * @return the total number of rows inserted across all record mappings
+     */
+    public int load(Path file) throws IOException, SQLException, NamingException {
+        var dataSource = DataSources.lookup(mappingSpec.outputSpec());
+        var adapter = createInputAdapter(mappingSpec.inputSpec());
+
+        // the loader closes the connection; the outer resource only guards the
+        // case of the Loader constructor itself failing - closing twice is a no-op
+        try (var connection = dataSource.getConnection();
+             var loader = new Loader(mappingSpec, connection)) {
+            int total = 0;
+            for (var mapping : mappingSpec.recordMappingSpecs()) {
+                try (var in = Files.newInputStream(file)) {
+                    total += loader.loadInput(adapter, in, mapping);
+                }
+            }
+            return total;
+        }
+    }
+
+    /**
+     * One adapter serves every record mapping of the file - {@code parse} takes
+     * the record selector as a parameter, so there is no reason to rebuild it
+     * (and, for XML, recompile every XPath) per mapping.
+     */
+    private InputAdapter createInputAdapter(InputSpec inputSpec) {
+        var factory = ServiceLoader.load(InputAdapterFactory.class)
+                .stream()
+                .map(ServiceLoader.Provider::get)
+                .filter(iaf -> iaf.accepts(inputSpec))
+                .findFirst()
+                .orElseThrow(() -> new IllegalStateException(
+                        "no input adapter for mime type " + inputSpec.mimeType()));
+        factory.setProperties(adapterProperties);
+        return factory.createInputAdapter(inputSpec);
+    }
+}

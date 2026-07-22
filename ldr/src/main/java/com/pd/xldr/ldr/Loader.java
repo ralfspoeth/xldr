@@ -1,56 +1,157 @@
 package com.pd.xldr.ldr;
 
+import com.pd.xldr.ia.InputAdapter;
+import com.pd.xldr.spec.FieldMappingSpec;
 import com.pd.xldr.spec.MappingSpec;
-import com.pd.xldr.spec.OutputSpec;
+import com.pd.xldr.spec.RecordMappingSpec;
 
+import java.io.IOException;
+import java.io.InputStream;
 import java.sql.*;
 import java.util.*;
-import java.util.concurrent.Executors;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
+/**
+ * Inserts the records of a single input into the target database.
+ * <p>
+ * The connection is supplied by the caller - the application resolves the JNDI
+ * name in {@code OutputSpec.dataSource()} and hands over
+ * {@code dataSource.getConnection()}. The loader borrows it: it switches
+ * auto-commit off for the duration of the load and {@link #close()} commits, or
+ * rolls back if any {@code loadInput} call has failed, restores the previous
+ * auto-commit setting and closes the connection - which returns it to its pool.
+ * Intent is insert only.
+ */
 public class Loader implements AutoCloseable {
     private static final Pattern QS_PATTERN = Pattern.compile("\".*\"");
+
+    private final MappingSpec mappingSpec;
     private final Connection connection;
-    private final Map<String, PreparedStatement> statementCache = new HashMap<>();
+    private final boolean autoCommit;
+    private final Map<TabCol, PreparedStatement> statementCache = new HashMap<>();
+    private boolean failed = false;
 
+    /**
+     * Key of the prepared-statement cache: a target table plus the columns of one
+     * insert. The same table may be the target of several mappings, each
+     * producing its own rows and possibly covering a different set of columns.
+     * <p>
+     * The columns are held in an ordered, immutable {@code List} on purpose - the
+     * position of a column is its bind-parameter position. A {@code Set} would
+     * let {@code (a, b)} and {@code (b, a)} collide on one cache entry and bind
+     * values into the wrong columns.
+     */
+    record TabCol(String table, List<String> columns) {
+        TabCol {
+            Objects.requireNonNull(table);
+            table = normalizeName(table);
+            columns = columns.stream().map(TabCol::normalizeName).toList();
+        }
 
-    public Loader(MappingSpec ms) throws SQLException {
-        var futConn = Executors.newFixedThreadPool(1).submit(() -> openDatabaseConnection(ms.outputSpec()));
-        ms.recordMappingSpecs().stream().forEach(rm -> {
-            var tableName = rm.databaseTable();
-            var columnList = rm.fieldMappings()
+        /**
+         * Unquoted SQL identifiers are case-insensitive in every target database;
+         * they only disagree on the case they fold to - Oracle and H2 fold up,
+         * PostgreSQL folds down. Folding to upper case here is portable because
+         * we never add quotes: each database then folds what we send onto the
+         * name it stored. A quoted name is case-sensitive by definition and is
+         * passed through verbatim, which also keeps {@code "t1"} and {@code t1}
+         * distinct cache entries - conservative, since whether they denote the
+         * same table differs per database.
+         * <p>
+         * {@code Locale.ROOT} is required: under a Turkish default locale
+         * {@code "id".toUpperCase()} yields {@code "İD"}.
+         */
+        private static String normalizeName(String name) {
+            return QS_PATTERN.matcher(name).matches() ? name : name.toUpperCase(Locale.ROOT);
+        }
+
+        String insertStatement() {
+            var columnList = String.join(", ", columns);
+            var questionmarks = IntStream.range(0, columns.size())
+                    .mapToObj(i -> "?")
+                    .collect(Collectors.joining(", "));
+            return String.format("insert into %s(%s) values(%s)", table, columnList, questionmarks);
+        }
+    }
+
+    /**
+     * @param ms         the mapping spec whose record mappings this loader accepts
+     * @param connection an open connection to the target database, obtained by the
+     *                   caller from the data source named in {@code ms.outputSpec()}
+     */
+    public Loader(MappingSpec ms, Connection connection) throws SQLException {
+        this.mappingSpec = Objects.requireNonNull(ms);
+        this.connection = Objects.requireNonNull(connection);
+        this.autoCommit = connection.getAutoCommit();
+        connection.setAutoCommit(false);
+    }
+
+    /**
+     * Parses {@code source} with the given adapter and inserts every record into
+     * the table named by {@code mapping}.
+     * <p>
+     * A single adapter instance may be reused across all mappings of a file; the
+     * caller supplies a freshly opened stream per call since a stream is read
+     * only once.
+     *
+     * @return the number of rows inserted
+     */
+    public int loadInput(InputAdapter adapter, InputStream source, RecordMappingSpec mapping)
+            throws IOException, SQLException {
+        Objects.requireNonNull(adapter);
+        Objects.requireNonNull(source);
+        if (!mappingSpec.recordMappingSpecs().contains(mapping)) {
+            throw new IllegalArgumentException("mapping is not part of this loader's mapping spec: " + mapping);
+        }
+        try {
+            // column order is driven by the field mappings, not by the order in
+            // which the adapter happens to report its fields
+            var fieldMappings = mapping.fieldMappings()
                     .stream()
-                    .map(fm -> fm.databaseColumnName())
-                    .filter(obj -> obj != null)
-                    .distinct().collect(Collectors.toList());
-        });
-        try {
-            this.connection = futConn.get();
-        } catch (Exception e) {
-            throw new RuntimeException(e);
+                    .filter(fm -> fm.fieldName() != null && fm.databaseColumnName() != null)
+                    .toList();
+            if (fieldMappings.isEmpty()) {
+                return 0;
+            }
+            var fieldNames = fieldMappings.stream().map(FieldMappingSpec::fieldName).toList();
+            var columns = fieldMappings.stream().map(FieldMappingSpec::databaseColumnName).toList();
+
+            var result = adapter.parse(source, mapping.recordSelector(), Set.copyOf(fieldNames));
+            var ps = prepareInsert(new TabCol(mapping.databaseTable(), columns));
+
+            int count = 0;
+            try (var rows = result.rows()) {
+                var it = rows.iterator();
+                while (it.hasNext()) {
+                    var row = it.next();
+                    ps.clearParameters();
+                    for (int i = 0; i < fieldNames.size(); i++) {
+                        var value = row.get(fieldNames.get(i));
+                        if (value == null) {
+                            ps.setNull(i + 1, Types.VARCHAR);
+                        } else {
+                            ps.setObject(i + 1, value);
+                        }
+                    }
+                    count += ps.executeUpdate();
+                }
+            }
+            return count;
+        } catch (IOException | SQLException | RuntimeException e) {
+            failed = true;
+            throw e;
         }
     }
 
-    private static String generateInsertStatement(String table, List<String> columns) {
-        var columnList = columns.stream().collect(Collectors.joining(", "));
-        var questionmarks = IntStream.range(0, columns.size())
-                .mapToObj(i -> "?")
-                .collect(Collectors.joining(", "));
-        return String.format("insert into %s(%s) values(%s)", table, columnList, questionmarks);
-    }
-
-    public PreparedStatement prepareInsert(String statement) {
-        return statementCache.computeIfAbsent(statement, (s) -> create(connection, s));
-    }
-
-    private static PreparedStatement create(Connection conn, String stmt) {
-        try {
-            return conn.prepareStatement(stmt);
-        } catch (SQLException ex) {
-            throw new RuntimeException(ex);
+    private PreparedStatement prepareInsert(TabCol tabCol) throws SQLException {
+        var cached = statementCache.get(tabCol);
+        if (cached == null) {
+            cached = connection.prepareStatement(tabCol.insertStatement());
+            statementCache.put(tabCol, cached);
         }
+        return cached;
     }
 
 
@@ -106,23 +207,54 @@ public class Loader implements AutoCloseable {
     } */
 
     public void insert(String table, List<String> cols, List<?> values) throws SQLException {
-        var stmt = generateInsertStatement(table, cols);
-        var ps = statementCache.computeIfAbsent(stmt, this::prepareInsert);
+        var ps = prepareInsert(new TabCol(table, cols));
         ps.clearParameters();
         for (int i = 0; i < values.size(); i++) {
-            ps.setObject(i + 1, values.get(i));
+            var value = values.get(i);
+            if (value == null) {
+                ps.setNull(i + 1, Types.VARCHAR);
+            } else {
+                ps.setObject(i + 1, value);
+            }
         }
         int rows = ps.executeUpdate();
         assert rows == 1;
     }
 
 
+    /**
+     * Commits the work of this loader - or rolls it back if any {@code loadInput}
+     * call failed - releases the cached statements, restores the auto-commit
+     * setting the connection had on arrival and closes it.
+     */
     @Override
     public void close() throws SQLException {
         try {
-            connection.commit();
+            if (failed) {
+                connection.rollback();
+            } else {
+                connection.commit();
+            }
         } finally {
-            connection.close();
+            try {
+                for (var ps : statementCache.values()) {
+                    try {
+                        ps.close();
+                    } catch (SQLException ignored) {
+                        // keep closing the remaining statements
+                    }
+                }
+                statementCache.clear();
+                // the connection was borrowed - hand it back as it was found,
+                // a pool would otherwise lend it out with auto-commit still off
+                try {
+                    connection.setAutoCommit(autoCommit);
+                } catch (SQLException ignored) {
+                    // closing is more important than restoring
+                }
+            } finally {
+                connection.close();
+            }
         }
     }
 
@@ -167,31 +299,5 @@ public class Loader implements AutoCloseable {
         }
         return jobdef;
     } */
-
-    private String normalizeName(String name) {
-        return QS_PATTERN.matcher(name).matches() ? name : name.toUpperCase();
-    }
-
-
-    private static Connection openDatabaseConnection(OutputSpec spec) throws SQLException {
-        Connection tmp = null;
-        for (var drv : ServiceLoader.load(Driver.class)) {
-            if (drv.acceptsURL(spec.url())) {
-                tmp = drv.connect(spec.url(), mapToProperties(spec.info()));
-                tmp.setAutoCommit(false);
-                break;
-            }
-        }
-        if (tmp == null) {
-            throw new IllegalStateException("couldn't establish the target connection");
-        }
-        return tmp;
-    }
-
-    private static Properties mapToProperties(Map<String, String> m) {
-        var p = new Properties();
-        p.putAll(m);
-        return p;
-    }
 
 }

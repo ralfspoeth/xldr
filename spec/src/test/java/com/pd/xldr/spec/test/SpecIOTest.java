@@ -47,7 +47,7 @@ public class SpecIOTest {
                     },
                     "mapping":[],
                     "output": {
-                        "url": "jdbc:oracle:thin://localhost:1521/xe",
+                        "dataSource": "jdbc/prod/orcl",
                         "info": {
                             "user": "heinz",
                             "password": "geheim"
@@ -64,7 +64,7 @@ public class SpecIOTest {
                         )))
                 ),
                 List.of(),
-                new OutputSpec("jdbc:oracle:thin://localhost:1521/xe",
+                new OutputSpec("jdbc/prod/orcl",
                         Map.of("user", "heinz", "password", "geheim")
                 )
         );
@@ -111,7 +111,7 @@ public class SpecIOTest {
                     },
                     "liliput": true,
                     "output": {
-                        "url": "jdbc:mock:dbx",
+                        "dataSource": "jdbc/mock/dbx",
                         "looser": true,
                         "info": {
                             "user": "usr",
@@ -169,7 +169,7 @@ public class SpecIOTest {
                 input.recordSelectors.2.fieldSelectors.1.selector=csel1
                 input.recordSelectors.2.fieldSelectors.2.name=c2
                 input.recordSelectors.2.fieldSelectors.2.selector=csel2
-                output.url=jdbc:oracle:thin://localhost/xe
+                output.dataSource=jdbc/prod/orcl
                 output.info.user=heinz
                 output.info.password=geheim
                 recordMappings.1.recordSelector=t1

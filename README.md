@@ -71,13 +71,18 @@ Example:
 
 ### The Output Specification
 
-The output specification is comprised of a JDBC URL plus generic properties provided by name and value. Note that the
-user/password combination maybe included in the URL. The supported properties are JDBC driver specific.
+The output specification is comprised of the JNDI name of a `DataSource` plus generic properties provided by name and
+value. The supported properties are JDBC driver specific.
+
+Resolving the name is the responsibility of the application, not of the toolkit: the `spec` module keeps the data source
+as an opaque string so that a mapping specification remains plain, serializable configuration with no JDBC dependency.
+The `app` module looks the name up - as given, then below `java:comp/env/` - and hands the resulting connection to the
+loader.
 
 Example:
 
     "output": {
-        "url": "jdbc:oracle:thin:@//host:1521/sid",
+        "dataSource": "jdbc/prod/orcl",
         "info": {
             "user": "dbuser",
             "password": "secret"
