@@ -1,4 +1,6 @@
 module com.pd.xldr.app {
+    exports com.pd.xldr.app;
+
     requires com.pd.xldr.ia;
     requires com.pd.xldr.ldr;
     requires com.pd.xldr.spec;

@@ -19,8 +19,9 @@ import java.util.stream.Stream;
  * stay out of the watched input tree.
  *
  * <pre>
- * xldr.roots        = /var/lib/xldr:/mnt/feeds
- * xldr.scanInterval = 30
+ * xldr.roots             = /var/lib/xldr:/mnt/feeds
+ * xldr.scanInterval      = 30
+ * xldr.maxConcurrentLoads = 4
  * jdbc.url      = jdbc:oracle:thin:@//host:1521/sid
  * jdbc.user     = dbuser
  * jdbc.password = secret
@@ -33,15 +34,26 @@ import java.util.stream.Stream;
  * {@code HikariConfig} under its own name, so the whole pool configuration is
  * reachable without this class having to mirror it.
  *
- * @param scanIntervalSeconds how often the whole tree is reconciled; watch
- *                            events only make the reaction quicker
+ * @param scanIntervalSeconds  how often the whole tree is reconciled; watch
+ *                             events only make the reaction quicker
+ * @param maxConcurrentLoads   how many files may be loaded at the same time.
+ *                             Keep it at or below the pool size, otherwise the
+ *                             pool becomes the real limit and the surplus
+ *                             threads merely queue in {@code getConnection()}.
  */
-public record AppConfig(List<Path> roots, long scanIntervalSeconds, Properties poolProperties) {
+public record AppConfig(
+        List<Path> roots,
+        long scanIntervalSeconds,
+        int maxConcurrentLoads,
+        Properties poolProperties
+) {
 
     private static final String POOL_PREFIX = "pool.";
     private static final String ROOTS_KEY = "xldr.roots";
     private static final String SCAN_KEY = "xldr.scanInterval";
+    private static final String CONCURRENCY_KEY = "xldr.maxConcurrentLoads";
     private static final long DEFAULT_SCAN_INTERVAL = 30L;
+    private static final int DEFAULT_MAX_CONCURRENT_LOADS = 4;
     private static final String URL_KEY = "jdbc.url";
     private static final String USER_KEY = "jdbc.user";
     private static final String PASSWORD_KEY = "jdbc.password";
@@ -73,6 +85,13 @@ public record AppConfig(List<Path> roots, long scanIntervalSeconds, Properties p
                 .map(String::trim)
                 .map(Long::parseLong)
                 .orElse(DEFAULT_SCAN_INTERVAL);
+        var maxConcurrentLoads = Optional.ofNullable(props.getProperty(CONCURRENCY_KEY))
+                .map(String::trim)
+                .map(Integer::parseInt)
+                .orElse(DEFAULT_MAX_CONCURRENT_LOADS);
+        if (maxConcurrentLoads < 1) {
+            throw new IllegalArgumentException(CONCURRENCY_KEY + " must be at least 1");
+        }
 
         // HikariConfig(Properties) assigns by bean property name
         var pool = new Properties();
@@ -84,7 +103,7 @@ public record AppConfig(List<Path> roots, long scanIntervalSeconds, Properties p
                 pool.setProperty(name.substring(POOL_PREFIX.length()), props.getProperty(name));
             }
         }
-        return new AppConfig(roots, scanInterval, pool);
+        return new AppConfig(roots, scanInterval, maxConcurrentLoads, pool);
     }
 
     private static void copyIfPresent(Properties from, String key, Properties to, String targetKey) {

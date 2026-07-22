@@ -89,12 +89,17 @@ The application is configured separately with the target database. Connections a
 `pool.*` key is handed to `HikariConfig` under its own name, so the full pool configuration is available without the
 application having to mirror it.
 
-    xldr.roots        = /var/lib/xldr:/mnt/feeds
-    xldr.scanInterval = 30
+    xldr.roots              = /var/lib/xldr:/mnt/feeds
+    xldr.scanInterval       = 30
+    xldr.maxConcurrentLoads = 4
     jdbc.url      = jdbc:oracle:thin:@//host:1521/sid
     jdbc.user     = dbuser
     jdbc.password = secret
     pool.maximumPoolSize = 4
+
+Each file is loaded on a virtual thread of its own; `xldr.maxConcurrentLoads` is a semaphore bounding how many loads
+run at once. Keep it at or below `pool.maximumPoolSize` - otherwise the pool becomes the real limit and the surplus
+threads merely queue inside `getConnection()`, which is far harder to reason about than a permit count.
 
 The JDBC drivers for Oracle and PostgreSQL are `provided` dependencies: the deployment supplies the driver matching its
 target database.

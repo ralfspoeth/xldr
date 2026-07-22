@@ -52,7 +52,7 @@ public class Watcher implements AutoCloseable {
         this.watchService = new DirectoryWatchService(
                 this::onEvent, roots, dir -> roots.contains(dir.getParent()));
         this.registry = new FeedRegistry(watchService);
-        this.processor = new FileProcessor(connectionSource);
+        this.processor = new FileProcessor(connectionSource, config.maxConcurrentLoads());
         this.scanner = Executors.newSingleThreadScheduledExecutor(Thread.ofVirtual().factory());
     }
 

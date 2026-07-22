@@ -6,9 +6,12 @@ import java.io.StringWriter;
 import java.nio.file.Files;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
+import java.util.List;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Semaphore;
 
 import static java.lang.System.Logger.Level.ERROR;
 import static java.lang.System.Logger.Level.INFO;
@@ -23,6 +26,13 @@ import static java.nio.file.StandardCopyOption.ATOMIC_MOVE;
  * event callbacks - or two server processes on the same tree - cannot both load
  * it. It also means a crash leaves the file in {@code work/}, where it is a
  * known-ambiguous case rather than something that gets loaded twice.
+ * <p>
+ * Every caller arrives on a virtual thread of its own - one per watch event -
+ * so the number of loads running at once is bounded here rather than by the
+ * connection pool: a semaphore is a limit one can reason about, whereas
+ * exhausting the pool merely turns into threads parked in
+ * {@code getConnection()}. Claiming and filing away are not counted, only the
+ * load itself.
  */
 public class FileProcessor {
 
@@ -30,9 +40,12 @@ public class FileProcessor {
     private static final DateTimeFormatter STAMP = DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss-SSS");
 
     private final ConnectionSource connectionSource;
+    /** fair, so a file cannot be starved by a steady stream of newer arrivals */
+    private final Semaphore loadPermits;
 
-    public FileProcessor(ConnectionSource connectionSource) {
+    public FileProcessor(ConnectionSource connectionSource, int maxConcurrentLoads) {
         this.connectionSource = connectionSource;
+        this.loadPermits = new Semaphore(maxConcurrentLoads, true);
     }
 
     /**
@@ -51,6 +64,15 @@ public class FileProcessor {
             return;
         }
         try {
+            loadPermits.acquire();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            // nothing was loaded, so hand the file back rather than leave a
+            // stale claim for the next startup to send to the hospital
+            unclaim(feed, claimed);
+            return;
+        }
+        try {
             var rows = new LoadJob(feed.mappingSpec(), connectionSource, feed.adapterProperties()).load(claimed);
             var target = archive(feed, claimed);
             LOG.log(INFO, () -> "loaded " + rows + " row(s) from " + file.getFileName()
@@ -64,6 +86,20 @@ public class FileProcessor {
             } catch (IOException io) {
                 LOG.log(ERROR, () -> "could not move " + claimed + " to the hospital: " + io);
             }
+        } finally {
+            loadPermits.release();
+        }
+    }
+
+    /**
+     * Undoes a claim that was never acted upon - only safe because no load has
+     * been attempted yet.
+     */
+    private void unclaim(Feed feed, Path claimed) {
+        try {
+            Files.move(claimed, unique(feed.in(), claimed.getFileName().toString()), ATOMIC_MOVE);
+        } catch (IOException e) {
+            LOG.log(WARNING, () -> "could not return " + claimed + " to " + feed.in() + ": " + e);
         }
     }
 
@@ -150,10 +186,18 @@ public class FileProcessor {
      * before the directory was watched, or whose event was lost.
      */
     public void scanInbox(Feed feed) {
-        try (var pending = Files.list(feed.in())) {
-            pending.filter(Files::isRegularFile).toList().forEach(file -> process(feed, file));
+        List<Path> pending;
+        try (var files = Files.list(feed.in())) {
+            pending = files.filter(Files::isRegularFile).toList();
         } catch (IOException e) {
             LOG.log(WARNING, () -> "cannot list " + feed.in() + ": " + e);
+            return;
+        }
+        // a virtual thread each, exactly as the watch events arrive, so a
+        // backlog is governed by the same semaphore instead of trickling
+        // through one at a time; close() waits for them
+        try (var exec = Executors.newVirtualThreadPerTaskExecutor()) {
+            pending.forEach(file -> exec.submit(() -> process(feed, file)));
         }
     }
 
