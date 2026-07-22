@@ -8,7 +8,7 @@ import com.pd.xldr.ldr.Loader;
 import com.pd.xldr.spec.FieldMappingSpec;
 import com.pd.xldr.spec.InputSpec;
 import com.pd.xldr.spec.MappingSpec;
-import com.pd.xldr.spec.OutputSpec;
+import com.pd.xldr.spec.LoadSpec;
 import com.pd.xldr.spec.RecordMappingSpec;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -28,7 +28,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 public class LoaderTest {
 
-    private OutputSpec outputSpec;
+    private LoadSpec loadSpec;
     private String jdbcUrl;
 
 /*
@@ -78,9 +78,9 @@ public class LoaderTest {
     @BeforeEach
     public void prepareConn() throws SQLException {
         jdbcUrl = ResourceBundle.getBundle("h2").getString("url");
-        // the loader no longer opens the connection itself - it is handed one -
-        // so the output spec only carries the JNDI name the app would resolve
-        outputSpec = new OutputSpec("jdbc/h2/test", Map.of());
+        // the loader is handed a connection; the load spec only says when to
+        // commit, which defaults to ON_CLOSE
+        loadSpec = new LoadSpec();
         try (var conn = DriverManager.getConnection(jdbcUrl);
              var stmt = conn.createStatement()) {
             stmt.execute("drop table if exists person");
@@ -108,7 +108,7 @@ public class LoaderTest {
         var spec = new MappingSpec(
                 new InputSpec("text/csv", List.of()),
                 List.of(people, visitors),
-                outputSpec
+                loadSpec
         );
 
         var adapter = adapterFor(Map.of(
@@ -155,7 +155,7 @@ public class LoaderTest {
         var spec = new MappingSpec(
                 new InputSpec("text/csv", List.of()),
                 List.of(good, broken),
-                outputSpec
+                loadSpec
         );
         var adapter = adapterFor(Map.of("people", List.of(Map.of("id", "1"))));
 
@@ -184,7 +184,7 @@ public class LoaderTest {
         var spec = new MappingSpec(
                 new InputSpec("text/csv", List.of()),
                 List.of(known),
-                outputSpec
+                loadSpec
         );
         var adapter = adapterFor(Map.of());
 

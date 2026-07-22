@@ -10,19 +10,46 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Locale;
+import java.util.logging.LogManager;
 
 public class Main {
 
-    public static void main(String[] args) throws Exception {
-        if (args.length != 2) {
-            System.err.println("usage: xldr <mapping-spec-file> <input-file>");
+    static void main(String[] args) throws Exception {
+        initLogging();
+        if (args.length != 3) {
+            System.err.println("usage: xldr <config.properties> <mapping-spec-file> <input-file>");
             System.exit(2);
             return;
         }
-        var mappingSpec = readMappingSpec(Path.of(args[0]));
-        var input = Path.of(args[1]);
-        var rows = new LoadJob(mappingSpec).load(input);
-        System.out.printf("inserted %d row(s) from %s%n", rows, input);
+        var config = AppConfig.load(Path.of(args[0]));
+        var mappingSpec = readMappingSpec(Path.of(args[1]));
+        var input = Path.of(args[2]);
+        // the pool belongs to the process, not to a single load - once the
+        // server watches directories it is opened at startup and closed on exit
+        try (var pool = new ConnectionPool(config)) {
+            var rows = new LoadJob(mappingSpec, pool).load(input);
+            System.out.printf("inserted %d row(s) from %s%n", rows, input);
+        }
+    }
+
+    /**
+     * Applies the bundled {@code logging.properties} unless the deployment
+     * already points java.util.logging at a configuration of its own. slf4j
+     * itself needs no setup - {@code slf4j-jdk14} is discovered as a service
+     * provider - so configuring JUL configures everything.
+     */
+    private static void initLogging() {
+        if (System.getProperty("java.util.logging.config.file") != null
+                || System.getProperty("java.util.logging.config.class") != null) {
+            return;
+        }
+        try (var in = Main.class.getResourceAsStream("/logging.properties")) {
+            if (in != null) {
+                LogManager.getLogManager().readConfiguration(in);
+            }
+        } catch (IOException e) {
+            System.err.println("could not apply the bundled logging configuration: " + e);
+        }
     }
 
     static MappingSpec readMappingSpec(Path file) throws IOException {

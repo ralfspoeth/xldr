@@ -1,6 +1,7 @@
 package com.pd.xldr.ldr;
 
 import com.pd.xldr.ia.InputAdapter;
+import com.pd.xldr.spec.CommitPolicy;
 import com.pd.xldr.spec.FieldMappingSpec;
 import com.pd.xldr.spec.MappingSpec;
 import com.pd.xldr.spec.RecordMappingSpec;
@@ -16,13 +17,12 @@ import java.util.stream.IntStream;
 /**
  * Inserts the records of a single input into the target database.
  * <p>
- * The connection is supplied by the caller - the application resolves the JNDI
- * name in {@code OutputSpec.dataSource()} and hands over
- * {@code dataSource.getConnection()}. The loader borrows it: it switches
- * auto-commit off for the duration of the load and {@link #close()} commits, or
- * rolls back if any {@code loadInput} call has failed, restores the previous
- * auto-commit setting and closes the connection - which returns it to its pool.
- * Intent is insert only.
+ * The connection is supplied by the caller - which database is fed is a
+ * deployment concern of the application, not part of the mapping. The loader
+ * borrows the connection: it switches auto-commit off for the duration of the
+ * load, commits according to {@code ms.loadSpec().commitPolicy()}, and on
+ * {@link #close()} restores the previous auto-commit setting and closes the
+ * connection - which returns it to its pool. Intent is insert only.
  */
 public class Loader implements AutoCloseable {
     private static final Pattern QS_PATTERN = Pattern.compile("\".*\"");
@@ -78,8 +78,8 @@ public class Loader implements AutoCloseable {
 
     /**
      * @param ms         the mapping spec whose record mappings this loader accepts
-     * @param connection an open connection to the target database, obtained by the
-     *                   caller from the data source named in {@code ms.outputSpec()}
+     * @param connection an open connection to the target database, supplied by the
+     *                   application
      */
     public Loader(MappingSpec ms, Connection connection) throws SQLException {
         this.mappingSpec = Objects.requireNonNull(ms);
@@ -137,6 +137,9 @@ public class Loader implements AutoCloseable {
                     }
                     count += ps.executeUpdate();
                 }
+            }
+            if (mappingSpec.loadSpec().commitPolicy() == CommitPolicy.PER_MAPPING) {
+                connection.commit();
             }
             return count;
         } catch (IOException | SQLException | RuntimeException e) {

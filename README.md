@@ -69,25 +69,45 @@ Example:
         ]
     }
 
-### The Output Specification
+### The Load Specification
 
-The output specification is comprised of the JNDI name of a `DataSource` plus generic properties provided by name and
-value. The supported properties are JDBC driver specific.
+The load specification says *how* a load is carried out, currently only when it is committed. It deliberately carries no
+connection information: which database is fed is a deployment concern configured on the application, so that the same
+mapping specification can be promoted from test to production unchanged and no credentials live in the input tree.
 
-Resolving the name is the responsibility of the application, not of the toolkit: the `spec` module keeps the data source
-as an opaque string so that a mapping specification remains plain, serializable configuration with no JDBC dependency.
-The `app` module looks the name up - as given, then below `java:comp/env/` - and hands the resulting connection to the
-loader.
+`commitPolicy` is either `ON_CLOSE` - one transaction for the whole input, rolled back entirely if any record mapping
+fails - or `PER_MAPPING`, which commits after each record mapping that succeeded. The element as a whole is optional and
+defaults to `ON_CLOSE`.
 
 Example:
 
-    "output": {
-        "dataSource": "jdbc/prod/orcl",
-        "info": {
-            "user": "dbuser",
-            "password": "secret"
-        }
+    "load": {
+        "commitPolicy": "ON_CLOSE"
     }
+
+The application is configured separately with the target database. Connections are pooled with HikariCP; every
+`pool.*` key is handed to `HikariConfig` under its own name, so the full pool configuration is available without the
+application having to mirror it.
+
+    xldr.root     = /var/lib/xldr
+    jdbc.url      = jdbc:oracle:thin:@//host:1521/sid
+    jdbc.user     = dbuser
+    jdbc.password = secret
+    pool.maximumPoolSize = 4
+
+The JDBC drivers for Oracle and PostgreSQL are `provided` dependencies: the deployment supplies the driver matching its
+target database.
+
+### Logging
+
+HikariCP logs through SLF4J. The application binds `slf4j-jdk14`, so everything ends up in `java.util.logging` and a
+single JUL configuration covers the whole process; no second logging framework is involved. The application module
+`requires org.slf4j.jul` because a service provider module is otherwise never resolved into the module graph.
+
+A default `logging.properties` is bundled and applied at startup unless the deployment sets one of the standard system
+properties itself:
+
+    java -Djava.util.logging.config.file=/etc/xldr/logging.properties ...
 
 ### The Record Mapping Specification
 
@@ -113,11 +133,11 @@ Example:
         ...
     ]
 
-The mapping specification as a whole is specified by the three elements input, output, and record mapping; example:
+The mapping specification as a whole is specified by the three elements input, load, and record mapping; example:
 
     {
         "input": {...}
-        "output": {...}
+        "load": {...}
         "recordMapping": []
     }
 

@@ -6,6 +6,7 @@ import io.github.ralfspoeth.xmls.XmlFunctions;
 import org.w3c.dom.Element;
 
 import java.io.Reader;
+import java.util.Locale;
 
 
 public class XmlMappingSpecReader implements MappingSpecReader {
@@ -21,7 +22,11 @@ public class XmlMappingSpecReader implements MappingSpecReader {
                             .apply(root)
                             .map(XmlMappingSpecReader::recordMappingSpec)
                             .toList(),
-                    outputSpec(XmlFunctions.elements("output").apply(root).findFirst().orElseThrow())
+                    XmlFunctions.elements("load")
+                            .apply(root)
+                            .findFirst()
+                            .map(XmlMappingSpecReader::loadSpec)
+                            .orElseGet(LoadSpec::new)
             );
         } catch (Exception e) {
             throw new RuntimeException(e);
@@ -35,9 +40,10 @@ public class XmlMappingSpecReader implements MappingSpecReader {
         );
     }
 
-    private static OutputSpec outputSpec(Element output) {
-        return new OutputSpec(
-                output.getAttribute("dataSource"), null
+    private static LoadSpec loadSpec(Element load) {
+        var policy = load.getAttribute("commitPolicy");
+        return new LoadSpec(
+                policy.isBlank() ? null : CommitPolicy.valueOf(policy.toUpperCase(Locale.ROOT))
         );
     }
 

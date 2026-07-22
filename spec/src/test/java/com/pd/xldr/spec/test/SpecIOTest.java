@@ -7,8 +7,6 @@ import org.junit.jupiter.api.Test;
 
 import java.io.*;
 import java.util.List;
-import java.util.Map;
-import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -18,13 +16,10 @@ public class SpecIOTest {
 
     @Test
     public void testIO() throws IOException {
-        var props = System.getProperties().entrySet().stream()
-                .map(e -> Map.entry((String) e.getKey(), (String) e.getValue()))
-                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
         var spec = new MappingSpec(
                 new InputSpec("text/xml", List.of(new RecordSelectorSpec("root", "/", List.of(new FieldSelectorSpec("id", "@id", DataType.STRING))))),
                 List.of(new RecordMappingSpec("root", "sntrx", List.of(new FieldMappingSpec("id", "id_txt")))),
-                new OutputSpec("jdbc:oracle:thin:@localhost:1521:xe", props)
+                new LoadSpec(CommitPolicy.PER_MAPPING)
         );
         var of = File.createTempFile("spec", ".ser");
         try (var oo = new ObjectOutputStream(new FileOutputStream(of))) {
@@ -46,12 +41,8 @@ public class SpecIOTest {
                         }]
                     },
                     "mapping":[],
-                    "output": {
-                        "dataSource": "jdbc/prod/orcl",
-                        "info": {
-                            "user": "heinz",
-                            "password": "geheim"
-                        }
+                    "load": {
+                        "commitPolicy": "PER_MAPPING"
                     }
                 }""";
 
@@ -64,9 +55,7 @@ public class SpecIOTest {
                         )))
                 ),
                 List.of(),
-                new OutputSpec("jdbc/prod/orcl",
-                        Map.of("user", "heinz", "password", "geheim")
-                )
+                new LoadSpec(CommitPolicy.PER_MAPPING)
         );
         assertAll(
                 () -> assertEquals(expected, result)
@@ -110,13 +99,9 @@ public class SpecIOTest {
                         ]
                     },
                     "liliput": true,
-                    "output": {
-                        "dataSource": "jdbc/mock/dbx",
-                        "looser": true,
-                        "info": {
-                            "user": "usr",
-                            "pwd": "geheim"
-                        }
+                    "load": {
+                        "commitPolicy": "on_close",
+                        "looser": true
                     },
                     "mapping": [
                         {

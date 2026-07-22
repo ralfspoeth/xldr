@@ -9,9 +9,10 @@ import static java.util.Objects.requireNonNullElse;
 public record MappingSpec(
         InputSpec inputSpec,
         Collection<RecordMappingSpec> recordMappingSpecs,
-        OutputSpec outputSpec
+        LoadSpec loadSpec
 ) implements Serializable {
     public MappingSpec {
         recordMappingSpecs = requireNonNullElse(recordMappingSpecs, List.of());
+        loadSpec = requireNonNullElse(loadSpec, new LoadSpec());
     }
 }

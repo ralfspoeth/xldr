@@ -2,7 +2,7 @@ package com.pd.xldr.spec.io;
 
 import com.pd.xldr.spec.InputSpec;
 import com.pd.xldr.spec.MappingSpec;
-import com.pd.xldr.spec.OutputSpec;
+import com.pd.xldr.spec.LoadSpec;
 import io.github.ralfspoeth.dirs.Directory;
 import io.github.ralfspoeth.dirs.Path;
 
@@ -41,7 +41,7 @@ public class PropertiesMappingSpecReader implements MappingSpecReader {
         return new MappingSpec(
                 new InputSpec(null, null),
                 new ArrayList<>(),
-                new OutputSpec(null, null)
+                new LoadSpec()
         );
     }
 }

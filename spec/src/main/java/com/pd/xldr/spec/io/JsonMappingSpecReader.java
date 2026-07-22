@@ -8,9 +8,6 @@ import io.github.ralfspoeth.json.query.Selector;
 
 import java.io.IOException;
 import java.io.Reader;
-import java.util.Map;
-
-import static java.util.stream.Collectors.toMap;
 
 /**
  * Reads a JSON mapping specification; the spec by example is given below.
@@ -25,7 +22,7 @@ public class JsonMappingSpecReader implements MappingSpecReader {
                 .map(v -> new MappingSpec(
                         PTR.member("input").apply(v).map(JsonMappingSpecReader::inputSpec).orElseThrow(),
                         PTR.member("mapping").select(Selector.all()).apply(v).map(JsonMappingSpecReader::recordMappingSpec).toList(),
-                        PTR.member("output").apply(v).map(JsonMappingSpecReader::outputSpec).orElseThrow()
+                        PTR.member("load").apply(v).map(JsonMappingSpecReader::loadSpec).orElseGet(LoadSpec::new)
                 ))
                 .orElseThrow();
     }
@@ -41,13 +38,13 @@ public class JsonMappingSpecReader implements MappingSpecReader {
         );
     }
 
-    private static OutputSpec outputSpec(JsonValue os) {
-        return new OutputSpec(
-                PTR.member("dataSource").stringOrThrow(os),
-                PTR.member("info").apply(os)
-                        .stream()
-                        .flatMap(v -> v.members().entrySet().stream())
-                        .collect(toMap(Map.Entry::getKey, e -> e.getValue().string().orElseThrow()))
+    private static LoadSpec loadSpec(JsonValue ls) {
+        return new LoadSpec(
+                PTR.member("commitPolicy")
+                        .stringValue(ls)
+                        .map(String::toUpperCase)
+                        .map(CommitPolicy::valueOf)
+                        .orElse(null)
         );
     }
 
