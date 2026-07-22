@@ -3,7 +3,6 @@ package com.pd.xldr.ldr;
 import com.pd.xldr.spec.MappingSpec;
 import com.pd.xldr.spec.OutputSpec;
 
-import java.sql.Date;
 import java.sql.*;
 import java.util.*;
 import java.util.concurrent.Executors;
@@ -54,9 +53,13 @@ public class Loader implements AutoCloseable {
         }
     }
 
+
+    /*
+
     void generateImportHeader(String lfnr, boolean exec) throws SQLException {
         generateImportHeader(lfnr, exec, Optional.empty(), Optional.empty());
     }
+
 
     void generateImportHeader(String lfnr, boolean exec, Optional<String> sndef, Optional<String> inst) throws SQLException {
         var psImp = statementCache.computeIfAbsent(normalizeName("snlieferung"), (key) -> {
@@ -100,7 +103,7 @@ public class Loader implements AutoCloseable {
 
     void triggerImport(String lfnr) throws SQLException {
         triggerImport(lfnr, Optional.empty());
-    }
+    } */
 
     public void insert(String table, List<String> cols, List<?> values) throws SQLException {
         var stmt = generateInsertStatement(table, cols);
@@ -123,7 +126,7 @@ public class Loader implements AutoCloseable {
         }
     }
 
-
+/*
     String defaultInstitut() throws SQLException {
         String inr = null;
         try (var si = connection.createStatement(); var instituts = si.executeQuery("select institut_nr from institut where inaktiv_dat is null")) {
@@ -163,7 +166,7 @@ public class Loader implements AutoCloseable {
             }
         }
         return jobdef;
-    }
+    } */
 
     private String normalizeName(String name) {
         return QS_PATTERN.matcher(name).matches() ? name : name.toUpperCase();
@@ -174,15 +177,21 @@ public class Loader implements AutoCloseable {
         Connection tmp = null;
         for (var drv : ServiceLoader.load(Driver.class)) {
             if (drv.acceptsURL(spec.url())) {
-                tmp = drv.connect(spec.url(), spec.info());
+                tmp = drv.connect(spec.url(), mapToProperties(spec.info()));
                 tmp.setAutoCommit(false);
                 break;
             }
         }
         if (tmp == null) {
-            throw new IllegalStateException("couldn't estable the target connection");
+            throw new IllegalStateException("couldn't establish the target connection");
         }
         return tmp;
+    }
+
+    private static Properties mapToProperties(Map<String, String> m) {
+        var p = new Properties();
+        p.putAll(m);
+        return p;
     }
 
 }

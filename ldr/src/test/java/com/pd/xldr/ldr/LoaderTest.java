@@ -3,13 +3,15 @@ package com.pd.xldr.ldr;
 import com.pd.xldr.spec.MappingSpec;
 import com.pd.xldr.spec.OutputSpec;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
 
 import java.sql.Connection;
 import java.sql.SQLException;
-import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
+import java.util.Properties;
 import java.util.ResourceBundle;
+
+import static java.util.stream.Collectors.toMap;
 
 
 public class LoaderTest {
@@ -18,7 +20,7 @@ public class LoaderTest {
     private OutputSpec os;
     private MappingSpec ms;
 
-
+/*
     @Test
     public void testInsKurs() throws SQLException {
         String lfnr = "test1-" + LocalDateTime.now();
@@ -29,7 +31,7 @@ public class LoaderTest {
             ldr.prepareInsert("snkurs", List.of("kurs_dat", "syssnmut_cd", "lieferung_nr"));
             ldr.insert("snkurs", Date.valueOf(LocalDate.now()), "X", lfnr);
             ldr.insert("snkurs", Date.valueOf(LocalDate.now()), "UEX", lfnr);
-        }*/
+        }
     }
 
     @Test
@@ -57,16 +59,24 @@ public class LoaderTest {
             ldr.insert("snkurs", lfnr, "X", Date.valueOf(LocalDate.now().minusDays(4)), "519000", new BigDecimal("996"), "EUR");
             ldr.triggerImport(lfnr);
 
-             */
+
         }
     }
-
+*/
 
     @BeforeEach
     public void prepareConn() throws SQLException {
-        var jdbcUrl = ResourceBundle.getBundle("dz_t2").getString("url");
-        os = new OutputSpec(jdbcUrl, System.getProperties());
+        var jdbcUrl = ResourceBundle.getBundle("h2").getString("url");
+        os = new OutputSpec(jdbcUrl, propertiesToMap(System.getProperties()));
         ms = new MappingSpec(null, List.of(), os);
+    }
+
+    private static Map<String, String> propertiesToMap(Properties p) {
+        return p.entrySet().stream()
+                .collect(toMap(
+                        e -> e.getKey().toString(),
+                        e -> e.getValue().toString()
+                ));
     }
 
 }
