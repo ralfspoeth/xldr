@@ -60,6 +60,26 @@
             <artifactId>ldr</artifactId>
             <version>${project.version}</version>
         </dependency>
+        <!-- input adapters -->
+        <dependency>
+            <groupId>com.pd.xldr</groupId>
+            <artifactId>csv</artifactId>
+            <version>${project.version}</version>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.pd.xldr</groupId>
+            <artifactId>xml</artifactId>
+            <version>${project.version}</version>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.pd.xldr</groupId>
+            <artifactId>xlsx</artifactId>
+            <version>${project.version}</version>
+            <scope>provided</scope>
+        </dependency>
+        <!-- testing -->
         <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter-api</artifactId>
