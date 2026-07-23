@@ -1,4 +1,4 @@
-package com.pd.xldr.app.test;
+package com.pd.xldr.it;
 
 import com.pd.xldr.app.AppConfig;
 import com.pd.xldr.app.ConnectionPool;

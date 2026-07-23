@@ -8,6 +8,17 @@ structure into database tables.
 The toolkit provides adapters for different file types that can be loaded as modules and utilize the service framework
 of JPMS.
 
+### Modules and building
+
+The core - `spec`, `ia`, `ldr` and `app` - is the reactor of the `xldr` parent POM and builds with a single
+`mvn install`. The application depends on no adapter: adapters are discovered at runtime through `ServiceLoader`, so a
+concrete one need not be on the compile path.
+
+The input adapters (`csv`, `xml`, `xlsx`) and the integration-test module (`it`) share the `xldr` parent for
+configuration and version, but are *not* part of the core reactor - they sit on top of the core and are built on their
+own. So the order is: `mvn install` the core, then build each adapter, then `it` (which exercises the whole pipeline
+end to end against a local H2 database and therefore depends on `app` and the concrete adapters).
+
 Loading data from a file into one or more database tables is guarded by a *mapping specification* which comprises an
 *input specification*, a *mapping*, and a *load specification*. The *input specification* tells the engine how to
 parse a given file and to load *records* and *fields*. The *mapping* provides - as its name implies - a mapping from

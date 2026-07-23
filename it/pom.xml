@@ -14,7 +14,7 @@
     <dependencies>
         <dependency>
             <groupId>com.pd.xldr</groupId>
-            <artifactId>ia</artifactId>
+            <artifactId>spec</artifactId>
             <version>${project.version}</version>
         </dependency>
         <dependency>
@@ -24,7 +24,17 @@
         </dependency>
         <dependency>
             <groupId>com.pd.xldr</groupId>
+            <artifactId>app</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.pd.xldr</groupId>
             <artifactId>xml</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.pd.xldr</groupId>
+            <artifactId>csv</artifactId>
             <version>${project.version}</version>
         </dependency>
         <dependency>
