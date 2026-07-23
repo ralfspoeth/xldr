@@ -1,8 +1,9 @@
 package com.pd.xldr.ldr;
 
 import com.pd.xldr.ia.InputAdapter;
+import com.pd.xldr.ia.Row;
+import com.pd.xldr.spec.ColumnSource;
 import com.pd.xldr.spec.CommitPolicy;
-import com.pd.xldr.spec.FieldMappingSpec;
 import com.pd.xldr.spec.MappingSpec;
 import com.pd.xldr.spec.RecordMappingSpec;
 
@@ -10,9 +11,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.sql.*;
 import java.util.*;
+import java.util.function.Function;
 import java.util.regex.Pattern;
-import java.util.stream.Collectors;
-import java.util.stream.IntStream;
 
 /**
  * Inserts the records of a single input into the target database.
@@ -43,37 +43,37 @@ public class Loader implements AutoCloseable {
      * let {@code (a, b)} and {@code (b, a)} collide on one cache entry and bind
      * values into the wrong columns.
      */
-    record TabCol(String table, List<String> columns) {
+    record TabCol(String table, List<String> columns, List<String> valueExprs) {
         TabCol {
             Objects.requireNonNull(table);
-            table = normalizeName(table);
-            columns = columns.stream().map(TabCol::normalizeName).toList();
-        }
-
-        /**
-         * Unquoted SQL identifiers are case-insensitive in every target database;
-         * they only disagree on the case they fold to - Oracle and H2 fold up,
-         * PostgreSQL folds down. Folding to upper case here is portable because
-         * we never add quotes: each database then folds what we send onto the
-         * name it stored. A quoted name is case-sensitive by definition and is
-         * passed through verbatim, which also keeps {@code "t1"} and {@code t1}
-         * distinct cache entries - conservative, since whether they denote the
-         * same table differs per database.
-         * <p>
-         * {@code Locale.ROOT} is required: under a Turkish default locale
-         * {@code "id".toUpperCase()} yields {@code "İD"}.
-         */
-        private static String normalizeName(String name) {
-            return QS_PATTERN.matcher(name).matches() ? name : name.toUpperCase(Locale.ROOT);
+            table = normalizeIdentifier(table);
+            columns = columns.stream().map(Loader::normalizeIdentifier).toList();
+            // verbatim: "?" for a bound parameter, or a raw SQL expression for a
+            // function or lookup column - never normalized, and part of the cache
+            // identity so two mappings that differ only there do not collide
+            valueExprs = List.copyOf(valueExprs);
         }
 
         String insertStatement() {
             var columnList = String.join(", ", columns);
-            var questionmarks = IntStream.range(0, columns.size())
-                    .mapToObj(i -> "?")
-                    .collect(Collectors.joining(", "));
-            return String.format("insert into %s(%s) values(%s)", table, columnList, questionmarks);
+            var values = String.join(", ", valueExprs);
+            return String.format("insert into %s(%s) values(%s)", table, columnList, values);
         }
+    }
+
+    /**
+     * Unquoted SQL identifiers are case-insensitive in every target database;
+     * they only disagree on the case they fold to - Oracle and H2 fold up,
+     * PostgreSQL folds down. Folding to upper case here is portable because we
+     * never add quotes: each database then folds what we send onto the name it
+     * stored. A quoted name is case-sensitive by definition and is passed through
+     * verbatim, which also keeps {@code "t1"} and {@code t1} distinct.
+     * <p>
+     * {@code Locale.ROOT} is required: under a Turkish default locale
+     * {@code "id".toUpperCase()} yields {@code "İD"}.
+     */
+    private static String normalizeIdentifier(String name) {
+        return QS_PATTERN.matcher(name).matches() ? name : name.toUpperCase(Locale.ROOT);
     }
 
     /**
@@ -110,25 +110,40 @@ public class Loader implements AutoCloseable {
             // which the adapter happens to report its fields
             var fieldMappings = mapping.fieldMappings()
                     .stream()
-                    .filter(fm -> fm.fieldName() != null && fm.databaseColumnName() != null)
+                    .filter(fm -> fm.source() != null && fm.databaseColumnName() != null)
                     .toList();
             if (fieldMappings.isEmpty()) {
                 return 0;
             }
-            var fieldNames = fieldMappings.stream().map(FieldMappingSpec::fieldName).toList();
-            var columns = fieldMappings.stream().map(FieldMappingSpec::databaseColumnName).toList();
+
+            var columns = new ArrayList<String>(fieldMappings.size());
+            // one value expression per column: "?", a function's raw SQL, or a
+            // lookup subquery, parallel to columns
+            var valueExprs = new ArrayList<String>(fieldMappings.size());
+            // one binder per "?" placeholder, in left-to-right placeholder order
+            var binders = new ArrayList<Function<Row, Object>>();
+            // only field sources need the adapter to resolve anything
+            var fieldNames = new LinkedHashSet<String>();
+            for (var fm : fieldMappings) {
+                columns.add(fm.databaseColumnName());
+                valueExprs.add(plan(fm.source(), binders, fieldNames));
+            }
 
             var result = adapter.parse(source, mapping.recordSelector(), Set.copyOf(fieldNames));
-            var ps = prepareInsert(new TabCol(mapping.databaseTable(), columns));
+            var ps = prepareInsert(new TabCol(mapping.databaseTable(), columns, valueExprs));
 
+            var rowStream = result.rows();
+            if (mapping.limit() != null) {
+                rowStream = rowStream.limit(mapping.limit());
+            }
             int count = 0;
-            try (var rows = result.rows()) {
+            try (var rows = rowStream) {
                 var it = rows.iterator();
                 while (it.hasNext()) {
                     var row = it.next();
                     ps.clearParameters();
-                    for (int i = 0; i < fieldNames.size(); i++) {
-                        var value = row.get(fieldNames.get(i));
+                    for (int i = 0; i < binders.size(); i++) {
+                        var value = binders.get(i).apply(row);
                         if (value == null) {
                             ps.setNull(i + 1, Types.VARCHAR);
                         } else {
@@ -155,6 +170,34 @@ public class Loader implements AutoCloseable {
             statementCache.put(tabCol, cached);
         }
         return cached;
+    }
+
+    /**
+     * The value expression for one column, appending a binder (and, for a field,
+     * the field name) as a side effect for every {@code ?} it introduces. The
+     * order in which binders are appended matches the left-to-right order of the
+     * {@code ?} in the generated SQL, which is what JDBC parameter numbering
+     * follows - including a {@code ?} nested inside a lookup subquery.
+     */
+    private static String plan(ColumnSource source, List<Function<Row, Object>> binders, Set<String> fieldNames) {
+        return switch (source) {
+            case ColumnSource.Function f -> f.sql();
+            case ColumnSource.Field fld -> {
+                fieldNames.add(fld.fieldName());
+                binders.add(row -> row.get(fld.fieldName()));
+                yield "?";
+            }
+            case ColumnSource.Constant c -> {
+                binders.add(row -> c.value());
+                yield "?";
+            }
+            case ColumnSource.Lookup lk -> {
+                var keyExpr = plan(lk.key(), binders, fieldNames); // key is field/constant/function
+                yield "(select " + normalizeIdentifier(lk.column())
+                        + " from " + normalizeIdentifier(lk.table())
+                        + " where " + normalizeIdentifier(lk.keyColumn()) + " = " + keyExpr + ")";
+            }
+        };
     }
 
 
@@ -210,7 +253,7 @@ public class Loader implements AutoCloseable {
     } */
 
     public void insert(String table, List<String> cols, List<?> values) throws SQLException {
-        var ps = prepareInsert(new TabCol(table, cols));
+        var ps = prepareInsert(new TabCol(table, cols, cols.stream().map(c -> "?").toList()));
         ps.clearParameters();
         for (int i = 0; i < values.size(); i++) {
             var value = values.get(i);

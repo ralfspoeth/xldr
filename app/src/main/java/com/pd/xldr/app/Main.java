@@ -35,7 +35,7 @@ public class Main implements Callable<Integer> {
     )
     private Path configFile;
 
-    public static void main(String[] args) {
+    static void main(String[] args) {
         initLogging();
         // picocli turns a parse error into usage help and exit code 2, an
         // exception from call() into a stack trace and exit code 1, and the

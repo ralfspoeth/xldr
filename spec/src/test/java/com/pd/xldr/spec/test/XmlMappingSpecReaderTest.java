@@ -1,5 +1,6 @@
 package com.pd.xldr.spec.test;
 
+import com.pd.xldr.spec.ColumnSource;
 import com.pd.xldr.spec.CommitPolicy;
 import com.pd.xldr.spec.DataType;
 import com.pd.xldr.spec.FieldMappingSpec;
@@ -39,8 +40,10 @@ public class XmlMappingSpecReaderTest {
                     <mapping recordSelector="fund" databaseTable="snmandat">
                         <fieldMapping fieldSelector="id" databaseColumn="ident1_txt"/>
                         <fieldMapping fieldSelector="desc" databaseColumn="kbez_txt"/>
+                        <fieldMapping constant="PD" databaseColumn="syssnmut_cd"/>
+                        <fieldMapping function="sysdate" databaseColumn="mut_dat"/>
                     </mapping>
-                    <mapping recordSelector="position" databaseTable="snposition">
+                    <mapping recordSelector="position" databaseTable="snposition" limit="500">
                         <fieldMapping fieldSelector="fund" databaseColumn="mandat_nr"/>
                     </mapping>
                     <load commitPolicy="PER_MAPPING"/>
@@ -63,11 +66,14 @@ public class XmlMappingSpecReaderTest {
                 List.of(
                         new RecordMappingSpec("fund", "snmandat", List.of(
                                 new FieldMappingSpec("id", "ident1_txt"),
-                                new FieldMappingSpec("desc", "kbez_txt")
+                                new FieldMappingSpec("desc", "kbez_txt"),
+                                // XML constants are strings; sysdate is a raw function
+                                new FieldMappingSpec(new ColumnSource.Constant("PD"), "syssnmut_cd"),
+                                new FieldMappingSpec(new ColumnSource.Function("sysdate"), "mut_dat")
                         )),
                         new RecordMappingSpec("position", "snposition", List.of(
                                 new FieldMappingSpec("fund", "mandat_nr")
-                        ))
+                        ), 500)
                 ),
                 new LoadSpec(CommitPolicy.PER_MAPPING)
         );

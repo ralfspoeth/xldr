@@ -11,30 +11,33 @@
 
     <artifactId>it</artifactId>
 
+    <!-- integration only: no production code, the whole pipeline is exercised
+         from the test sources against a local H2 database -->
     <dependencies>
-        <dependency>
-            <groupId>com.pd.xldr</groupId>
-            <artifactId>xml</artifactId>
-            <version>${project.version}</version>
-        </dependency>
         <dependency>
             <groupId>com.pd.xldr</groupId>
             <artifactId>ia</artifactId>
             <version>${project.version}</version>
         </dependency>
         <dependency>
-            <groupId>org.junit.jupiter</groupId>
-            <artifactId>junit-jupiter-api</artifactId>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>com.oracle.database.jdbc</groupId>
-            <artifactId>ojdbc17</artifactId>
-        </dependency>
-        <dependency>
             <groupId>com.pd.xldr</groupId>
             <artifactId>ldr</artifactId>
             <version>${project.version}</version>
+        </dependency>
+        <!-- the XML input adapter provider, discovered through ServiceLoader -->
+        <dependency>
+            <groupId>com.pd.xldr</groupId>
+            <artifactId>xml</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.h2database</groupId>
+            <artifactId>h2</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter-api</artifactId>
             <scope>test</scope>
         </dependency>
     </dependencies>

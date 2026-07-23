@@ -117,10 +117,32 @@ properties itself:
 
 ### The Record Mapping Specification
 
-The record mapping specification is provided by an array of record mappings each of which specifies the name of the
-record selector as defined in the input specification, a database table name which is the target of the mapping residing
-in the target database, followed by an array of field mappings of a field selector
-defined in the respective record selector and a target database column available in the target database table.
+The record mapping specification is an array of record mappings, each naming a record selector from the input
+specification, the target table, and an array of field mappings from a source to a target column. Every field mapping
+carries exactly one of three sources:
+
+* `fieldSelector` - a field of the record, resolved by the adapter and bound as a parameter (the ordinary case);
+* `constant` - a fixed value from the spec, bound as a parameter. In JSON its type follows the literal (string, number,
+  boolean); in XML, an attribute, it is always a string;
+* `function` - a raw SQL expression such as `sysdate` or `myseq.nextval`, emitted inline in the `values(...)` list
+  rather than bound. The text is spec-authored and trusted;
+* `lookup` - a value read from a reference table, emitted as an inline scalar subquery
+  `(select column from table where keyColumn = key)`. The `key` is itself a `fieldSelector`, `constant` or
+  `function`; a key that matches no row yields NULL.
+
+A record mapping may also carry a `limit`, the maximum number of records inserted for it.
+
+A lookup example - translate an ISO code carried in the input to a surrogate key:
+
+    {
+        "lookup": {
+            "table": "country",
+            "column": "id",
+            "keyColumn": "iso",
+            "fieldSelector": "country_code"
+        },
+        "databaseColumn": "country_id"
+    }
 
 Example:
 
@@ -128,12 +150,11 @@ Example:
         {
             "recordSelector": "xx",
             "databaseTable": "tab_xx",
+            "limit": 1000,
             "fieldMapping": [
-                {
-                    "fieldName": "id",
-                    "databaseColumn": "col_id"
-                },
-                ...
+                { "fieldSelector": "id", "databaseColumn": "col_id" },
+                { "constant": "PD",      "databaseColumn": "source_cd" },
+                { "function": "sysdate", "databaseColumn": "loaded_at" }
             ]
         },
         ...

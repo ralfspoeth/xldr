@@ -98,11 +98,56 @@ public class XmlMappingSpecReader implements MappingSpecReader {
                 required(mapping, "databaseTable"),
                 elements("fieldMapping")
                         .apply(mapping)
-                        .map(fm -> new FieldMappingSpec(
-                                required(fm, "fieldSelector"),
-                                required(fm, "databaseColumn")))
-                        .toList()
+                        .map(fm -> new FieldMappingSpec(columnSource(fm), required(fm, "databaseColumn")))
+                        .toList(),
+                attributeValue("limit").apply(mapping).map(Integer::valueOf).orElse(null)
         );
+    }
+
+    /**
+     * A field mapping carries exactly one source: a {@code fieldSelector},
+     * {@code constant} or {@code function} attribute, or a child {@code <lookup>}
+     * element. A constant in XML is always a string - attribute values carry no
+     * type.
+     */
+    private static ColumnSource columnSource(Element fm) {
+        var lookup = elements("lookup").apply(fm).findFirst();
+        if (lookup.isPresent()) {
+            if (hasBasicSource(fm)) {
+                throw new IllegalArgumentException("a <lookup> field mapping must carry no source attribute");
+            }
+            var lk = lookup.get();
+            return new ColumnSource.Lookup(
+                    required(lk, "table"),
+                    required(lk, "column"),
+                    required(lk, "keyColumn"),
+                    basicSource(lk));
+        }
+        return basicSource(fm);
+    }
+
+    private static boolean hasBasicSource(Element e) {
+        return attributeValue("fieldSelector").apply(e).isPresent()
+                || attributeValue("function").apply(e).isPresent()
+                || attributeValue("constant").apply(e).isPresent();
+    }
+
+    private static ColumnSource basicSource(Element e) {
+        var field = attributeValue("fieldSelector").apply(e);
+        var function = attributeValue("function").apply(e);
+        var constant = attributeValue("constant").apply(e);
+
+        var present = (field.isPresent() ? 1 : 0) + (function.isPresent() ? 1 : 0) + (constant.isPresent() ? 1 : 0);
+        if (present != 1) {
+            throw new IllegalArgumentException("needs exactly one of fieldSelector, constant, function");
+        }
+        if (field.isPresent()) {
+            return new ColumnSource.Field(field.get());
+        } else if (function.isPresent()) {
+            return new ColumnSource.Function(function.get());
+        } else {
+            return new ColumnSource.Constant(constant.get());
+        }
     }
 
     private static LoadSpec loadSpec(Element load) {

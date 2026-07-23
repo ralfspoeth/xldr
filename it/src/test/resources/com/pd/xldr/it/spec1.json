@@ -1,0 +1,28 @@
+{
+  "input": {
+    "mimeType": "text/xml",
+    "recordSelectors": [
+      {
+        "name": "fund",
+        "selector": "/root/fund",
+        "fieldSelectors": [
+          { "name": "id",   "selector": "@id",                   "type": "STRING" },
+          { "name": "desc", "selector": "normalize-space(text())", "type": "STRING" }
+        ]
+      }
+    ]
+  },
+  "mapping": [
+    {
+      "recordSelector": "fund",
+      "databaseTable": "fund",
+      "fieldMapping": [
+        { "fieldSelector": "id",           "databaseColumn": "id_txt" },
+        { "fieldSelector": "desc",         "databaseColumn": "desc_txt" },
+        { "constant": "PD",                "databaseColumn": "source_cd" },
+        { "function": "current_timestamp", "databaseColumn": "loaded_at" }
+      ]
+    }
+  ],
+  "load": { "commitPolicy": "ON_CLOSE" }
+}

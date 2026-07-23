@@ -17,11 +17,16 @@
             <groupId>org.apache.poi</groupId>
             <artifactId>poi-ooxml</artifactId>
         </dependency>
-        <!--
+
         <dependency>
             <groupId>com.pd.xldr</groupId>
             <artifactId>ia</artifactId>
+            <version>${project.version}</version>
         </dependency>
-        -->
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter-api</artifactId>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
 </project>

@@ -5,6 +5,7 @@ import com.pd.xldr.ia.InputAdapter;
 import com.pd.xldr.ia.Result;
 import com.pd.xldr.ia.Row;
 import com.pd.xldr.ldr.Loader;
+import com.pd.xldr.spec.ColumnSource;
 import com.pd.xldr.spec.FieldMappingSpec;
 import com.pd.xldr.spec.InputSpec;
 import com.pd.xldr.spec.MappingSpec;
@@ -22,7 +23,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.ResourceBundle;
 
+import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 
@@ -192,6 +195,118 @@ public class LoaderTest {
             assertThrows(IllegalArgumentException.class,
                     () -> loader.loadInput(adapter, InputStream.nullInputStream(), foreign));
         }
+    }
+
+    /**
+     * A field value, a spec constant and a database function share one insert:
+     * the function is emitted inline in the values list (not bound), the constant
+     * and the field are bound.
+     */
+    @Test
+    public void insertsConstantsAndFunctions() throws Exception {
+        try (var conn = DriverManager.getConnection(jdbcUrl);
+             var stmt = conn.createStatement()) {
+            stmt.execute("drop table if exists event");
+            stmt.execute("create table event(id varchar(10), source varchar(10), loaded_at timestamp)");
+        }
+        var mapping = new RecordMappingSpec("events", "event", List.of(
+                new FieldMappingSpec("id", "id"),
+                new FieldMappingSpec(new ColumnSource.Constant("PD"), "source"),
+                new FieldMappingSpec(new ColumnSource.Function("current_timestamp"), "loaded_at")
+        ));
+        var spec = new MappingSpec(new InputSpec("text/csv", List.of()), List.of(mapping), loadSpec);
+        var adapter = adapterFor(Map.of("events", List.of(Map.of("id", "1"), Map.of("id", "2"))));
+
+        try (var loader = new Loader(spec, DriverManager.getConnection(jdbcUrl))) {
+            assertEquals(2, loader.loadInput(adapter, InputStream.nullInputStream(), mapping));
+        }
+
+        try (var conn = DriverManager.getConnection(jdbcUrl);
+             var stmt = conn.createStatement();
+             var rs = stmt.executeQuery("select id, source, loaded_at from event order by id")) {
+            var rows = new ArrayList<List<Object>>();
+            while (rs.next()) {
+                rows.add(Arrays.asList(rs.getString(1), rs.getString(2), rs.getObject(3)));
+            }
+            assertEquals(2, rows.size());
+            assertAll(
+                    () -> assertEquals("1", rows.get(0).get(0)),
+                    () -> assertEquals("PD", rows.get(0).get(1)),
+                    // the function ran on the database, so the column is populated
+                    () -> assertNotNull(rows.get(0).get(2)),
+                    () -> assertEquals("PD", rows.get(1).get(1))
+            );
+        }
+    }
+
+    /**
+     * A lookup resolves a column from a reference table via an inline subquery,
+     * keyed here by an input field. A key that matches no row yields SQL NULL.
+     */
+    @Test
+    public void resolvesLookups() throws Exception {
+        try (var conn = DriverManager.getConnection(jdbcUrl);
+             var stmt = conn.createStatement()) {
+            stmt.execute("drop table if exists country");
+            stmt.execute("drop table if exists holder");
+            stmt.execute("create table country(iso varchar(2), id int)");
+            stmt.execute("insert into country values ('DE', 49), ('US', 1)");
+            stmt.execute("create table holder(name varchar(20), country_id int)");
+        }
+        var mapping = new RecordMappingSpec("holders", "holder", List.of(
+                new FieldMappingSpec("name", "name"),
+                new FieldMappingSpec(
+                        new ColumnSource.Lookup("country", "id", "iso", new ColumnSource.Field("c")),
+                        "country_id")
+        ));
+        var spec = new MappingSpec(new InputSpec("text/csv", List.of()), List.of(mapping), loadSpec);
+        var adapter = adapterFor(Map.of("holders", List.of(
+                Map.of("name", "Alice", "c", "DE"),
+                Map.of("name", "Bob", "c", "US"),
+                Map.of("name", "Carol", "c", "ZZ")   // no such country -> null
+        )));
+
+        try (var loader = new Loader(spec, DriverManager.getConnection(jdbcUrl))) {
+            assertEquals(3, loader.loadInput(adapter, InputStream.nullInputStream(), mapping));
+        }
+
+        try (var conn = DriverManager.getConnection(jdbcUrl);
+             var stmt = conn.createStatement();
+             var rs = stmt.executeQuery("select name, country_id from holder order by name")) {
+            var rows = new ArrayList<List<Object>>();
+            while (rs.next()) {
+                rows.add(Arrays.asList(rs.getString(1), rs.getObject(2)));
+            }
+            assertEquals(List.of(
+                    Arrays.asList("Alice", 49),
+                    Arrays.asList("Bob", 1),
+                    Arrays.asList("Carol", null)
+            ), rows);
+        }
+    }
+
+    /**
+     * A record mapping with a limit inserts at most that many rows.
+     */
+    @Test
+    public void honoursTheRowLimit() throws Exception {
+        var mapping = new RecordMappingSpec("people", "person", List.of(
+                new FieldMappingSpec("id", "id"),
+                new FieldMappingSpec("name", "name")
+        ), 2);
+        var spec = new MappingSpec(new InputSpec("text/csv", List.of()), List.of(mapping), loadSpec);
+        var adapter = adapterFor(Map.of("people", List.of(
+                Map.of("id", "1", "name", "Alice"),
+                Map.of("id", "2", "name", "Bob"),
+                Map.of("id", "3", "name", "Carol"),
+                Map.of("id", "4", "name", "Dave")
+        )));
+
+        try (var loader = new Loader(spec, DriverManager.getConnection(jdbcUrl))) {
+            assertEquals(2, loader.loadInput(adapter, InputStream.nullInputStream(), mapping));
+        }
+        assertEquals(List.of("1:Alice", "2:Bob"),
+                selectPersons().stream().map(r -> r.get(0) + ":" + r.get(1)).toList());
     }
 
     /**

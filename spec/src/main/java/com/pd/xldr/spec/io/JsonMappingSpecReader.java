@@ -57,15 +57,73 @@ public class JsonMappingSpecReader implements MappingSpecReader {
                         .select(Selector.all())
                         .apply(element)
                         .map(JsonMappingSpecReader::fieldMappingSpec)
-                        .toList()
+                        .toList(),
+                PTR.member("limit").intValue(element).stream().boxed().findFirst().orElse(null)
         );
     }
 
     private static FieldMappingSpec fieldMappingSpec(JsonValue fm) {
-        return new FieldMappingSpec(
-                PTR.member("fieldSelector").stringOrThrow(fm),
-                PTR.member("databaseColumn").stringOrThrow(fm)
-        );
+        return new FieldMappingSpec(columnSource(fm), PTR.member("databaseColumn").stringOrThrow(fm));
+    }
+
+    /**
+     * A field mapping carries exactly one source: {@code fieldSelector},
+     * {@code constant}, {@code function}, or a {@code lookup} object.
+     */
+    private static ColumnSource columnSource(JsonValue fm) {
+        var lookup = PTR.member("lookup").apply(fm);
+        if (lookup.isPresent()) {
+            if (hasBasicSource(fm)) {
+                throw new IllegalArgumentException("a lookup mapping must carry no other source: " + fm);
+            }
+            return new ColumnSource.Lookup(
+                    PTR.member("table").stringOrThrow(lookup.get()),
+                    PTR.member("column").stringOrThrow(lookup.get()),
+                    PTR.member("keyColumn").stringOrThrow(lookup.get()),
+                    // the key is one of the three basic sources, keyed the same way
+                    basicSource(lookup.get()));
+        }
+        return basicSource(fm);
+    }
+
+    private static boolean hasBasicSource(JsonValue v) {
+        return PTR.member("fieldSelector").stringValue(v).isPresent()
+                || PTR.member("function").stringValue(v).isPresent()
+                || PTR.member("constant").apply(v).isPresent();
+    }
+
+    /**
+     * Exactly one of {@code fieldSelector}, {@code constant} or {@code function}.
+     */
+    private static ColumnSource basicSource(JsonValue v) {
+        var field = PTR.member("fieldSelector").stringValue(v);
+        var function = PTR.member("function").stringValue(v);
+        var constant = PTR.member("constant").apply(v);
+
+        var present = (field.isPresent() ? 1 : 0) + (function.isPresent() ? 1 : 0) + (constant.isPresent() ? 1 : 0);
+        if (present != 1) {
+            throw new IllegalArgumentException(
+                    "needs exactly one of fieldSelector, constant, function: " + v);
+        }
+        if (field.isPresent()) {
+            return new ColumnSource.Field(field.get());
+        } else if (function.isPresent()) {
+            return new ColumnSource.Function(function.get());
+        } else {
+            return new ColumnSource.Constant(constantValue(constant.get()));
+        }
+    }
+
+    /**
+     * The constant's Java type follows the JSON literal: string, number (as
+     * {@link java.math.BigDecimal}, exact) or boolean.
+     */
+    private static Object constantValue(JsonValue value) {
+        return value.string().map(Object.class::cast)
+                .or(() -> value.bool().map(Object.class::cast))
+                .or(() -> value.decimal().map(Object.class::cast))
+                .orElseThrow(() -> new IllegalArgumentException(
+                        "constant must be a string, number or boolean: " + value));
     }
 
     private static RecordSelectorSpec recordSelectorSpec(JsonValue rs) {
