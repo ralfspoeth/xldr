@@ -20,7 +20,11 @@
         <module>spec</module>
         <module>ia</module>
         <module>ldr</module>
+        <module>csv</module>
+        <module>xml</module>
+        <module>xlsx</module>
         <module>app</module>
+        <module>it</module>
     </modules>
     <artifactId>xldr</artifactId>
 

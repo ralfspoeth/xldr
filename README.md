@@ -10,14 +10,18 @@ of JPMS.
 
 ### Modules and building
 
-The core - `spec`, `ia`, `ldr` and `app` - is the reactor of the `xldr` parent POM and builds with a single
-`mvn install`. The application depends on no adapter: adapters are discovered at runtime through `ServiceLoader`, so a
-concrete one need not be on the compile path.
+The whole toolkit is one reactor under the `xldr` parent POM and builds with a single `mvn install`, which orders the
+modules by their dependencies:
 
-The input adapters (`csv`, `xml`, `xlsx`) and the integration-test module (`it`) share the `xldr` parent for
-configuration and version, but are *not* part of the core reactor - they sit on top of the core and are built on their
-own. So the order is: `mvn install` the core, then build each adapter, then `it` (which exercises the whole pipeline
-end to end against a local H2 database and therefore depends on `app` and the concrete adapters).
+* `spec`, `ia`, `ldr` - the core: the mapping-spec model and readers, the input-adapter SPI, and the JDBC loader;
+* `csv`, `xml`, `xlsx` - the input adapters, each an `InputAdapterFactory` provider discovered through `ServiceLoader`;
+* `app` - the server. It does not `requires` any adapter; the adapters are `provided` dependencies, so they are on the
+  module path (JPMS service binding then pulls them into the graph via the `uses` in `app` and the `provides` in each
+  adapter) without being bundled into `app`'s own runtime footprint. A deployment supplies the adapter set it needs;
+* `it` - integration tests exercising the whole pipeline end to end against a local H2 database.
+
+`revision` is a CI-friendly version property resolved by the `flatten-maven-plugin`, so the installed and deployed POMs
+carry the concrete version rather than a literal `${revision}`.
 
 Loading data from a file into one or more database tables is guarded by a *mapping specification* which comprises an
 *input specification*, a *mapping*, and a *load specification*. The *input specification* tells the engine how to
