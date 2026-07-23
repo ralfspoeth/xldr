@@ -30,10 +30,6 @@ public class LoadJob {
     private final ConnectionSource connectionSource;
     private final Properties adapterProperties;
 
-    public LoadJob(MappingSpec mappingSpec, ConnectionSource connectionSource) {
-        this(mappingSpec, connectionSource, new Properties());
-    }
-
     /**
      * @param adapterProperties format specific settings handed to the input
      *                          adapter factory, e.g. {@code fieldSeparator} for CSV
@@ -50,8 +46,6 @@ public class LoadJob {
     public int load(Path file) throws IOException, SQLException {
         var adapter = createInputAdapter(mappingSpec.inputSpec());
 
-        // the loader closes the connection; the outer resource only guards the
-        // case of the Loader constructor itself failing - closing twice is a no-op
         try (var connection = connectionSource.getConnection();
              var loader = new Loader(mappingSpec, connection)) {
             int total = 0;

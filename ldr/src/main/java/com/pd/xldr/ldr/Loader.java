@@ -48,9 +48,6 @@ public class Loader implements AutoCloseable {
             Objects.requireNonNull(table);
             table = normalizeIdentifier(table);
             columns = columns.stream().map(Loader::normalizeIdentifier).toList();
-            // verbatim: "?" for a bound parameter, or a raw SQL expression for a
-            // function or lookup column - never normalized, and part of the cache
-            // identity so two mappings that differ only there do not collide
             valueExprs = List.copyOf(valueExprs);
         }
 
@@ -106,8 +103,6 @@ public class Loader implements AutoCloseable {
             throw new IllegalArgumentException("mapping is not part of this loader's mapping spec: " + mapping);
         }
         try {
-            // column order is driven by the field mappings, not by the order in
-            // which the adapter happens to report its fields
             var fieldMappings = mapping.fieldMappings()
                     .stream()
                     .filter(fm -> fm.source() != null && fm.databaseColumnName() != null)
@@ -117,12 +112,8 @@ public class Loader implements AutoCloseable {
             }
 
             var columns = new ArrayList<String>(fieldMappings.size());
-            // one value expression per column: "?", a function's raw SQL, or a
-            // lookup subquery, parallel to columns
             var valueExprs = new ArrayList<String>(fieldMappings.size());
-            // one binder per "?" placeholder, in left-to-right placeholder order
             var binders = new ArrayList<Function<Row, Object>>();
-            // only field sources need the adapter to resolve anything
             var fieldNames = new LinkedHashSet<String>();
             for (var fm : fieldMappings) {
                 columns.add(fm.databaseColumnName());
@@ -130,27 +121,29 @@ public class Loader implements AutoCloseable {
             }
 
             var result = adapter.parse(source, mapping.recordSelector(), Set.copyOf(fieldNames));
-            var ps = prepareInsert(new TabCol(mapping.databaseTable(), columns, valueExprs));
+            int count;
+            try (var ps = prepareInsert(new TabCol(mapping.databaseTable(), columns, valueExprs))) {
 
-            var rowStream = result.rows();
-            if (mapping.limit() != null) {
-                rowStream = rowStream.limit(mapping.limit());
-            }
-            int count = 0;
-            try (var rows = rowStream) {
-                var it = rows.iterator();
-                while (it.hasNext()) {
-                    var row = it.next();
-                    ps.clearParameters();
-                    for (int i = 0; i < binders.size(); i++) {
-                        var value = binders.get(i).apply(row);
-                        if (value == null) {
-                            ps.setNull(i + 1, Types.VARCHAR);
-                        } else {
-                            ps.setObject(i + 1, value);
+                var rowStream = result.rows();
+                if (mapping.limit() != null) {
+                    rowStream = rowStream.limit(mapping.limit());
+                }
+                count = 0;
+                try (var rows = rowStream) {
+                    var it = rows.iterator();
+                    while (it.hasNext()) {
+                        var row = it.next();
+                        ps.clearParameters();
+                        for (int i = 0; i < binders.size(); i++) {
+                            var value = binders.get(i).apply(row);
+                            if (value == null) {
+                                ps.setNull(i + 1, Types.VARCHAR);
+                            } else {
+                                ps.setObject(i + 1, value);
+                            }
                         }
+                        count += ps.executeUpdate();
                     }
-                    count += ps.executeUpdate();
                 }
             }
             if (mappingSpec.loadSpec().commitPolicy() == CommitPolicy.PER_MAPPING) {
@@ -188,11 +181,11 @@ public class Loader implements AutoCloseable {
                 yield "?";
             }
             case ColumnSource.Constant c -> {
-                binders.add(row -> c.value());
+                binders.add(_ -> c.value());
                 yield "?";
             }
             case ColumnSource.Lookup lk -> {
-                var keyExpr = plan(lk.key(), binders, fieldNames); // key is field/constant/function
+                var keyExpr = plan(lk.key(), binders, fieldNames);
                 yield "(select " + normalizeIdentifier(lk.column())
                         + " from " + normalizeIdentifier(lk.table())
                         + " where " + normalizeIdentifier(lk.keyColumn()) + " = " + keyExpr + ")";
@@ -200,73 +193,22 @@ public class Loader implements AutoCloseable {
         };
     }
 
-
-    /*
-
-    void generateImportHeader(String lfnr, boolean exec) throws SQLException {
-        generateImportHeader(lfnr, exec, Optional.empty(), Optional.empty());
-    }
-
-
-    void generateImportHeader(String lfnr, boolean exec, Optional<String> sndef, Optional<String> inst) throws SQLException {
-        var psImp = statementCache.computeIfAbsent(normalizeName("snlieferung"), (key) -> {
-            try {
-                return connection.prepareStatement("insert into snlieferung" +
-                        "(lieferung_nr, schnittstelle_cd, institut_nr, neu_dat, syssnliefart_cd, syssnliefstatus_cd)" +
-                        "values(?,?,?,?,?,?)");
-            } catch (SQLException e) {
-                throw new AssertionError(e);
-            }
-        });
-        psImp.clearParameters();
-        psImp.setString(1, Objects.requireNonNull(lfnr));
-        psImp.setString(2, sndef.orElse(defaultSnDef()));
-        psImp.setString(3, inst.orElse(defaultInstitut()));
-        psImp.setDate(4, new Date(System.currentTimeMillis()));
-        psImp.setString(5, "IMP");
-        if (exec) {
-            psImp.setString(6, "REDY");
-        } else {
-            psImp.setString(6, "WAIT");
-        }
-        int rows = psImp.executeUpdate();
-        assert rows == 1;
-    }
-
-    void triggerImport(String lfnr, Optional<String> trigger) throws SQLException {
-        var psEvent = statementCache.computeIfAbsent(normalizeName("snjobevent"), (key) -> {
-            try {
-                return connection.prepareStatement("insert into snjobevent(snjobevent_txt, par2_txt) values(?,?)");
-            } catch (SQLException e) {
-                throw new AssertionError(e);
-            }
-        });
-        psEvent.clearParameters();
-        psEvent.setString(1, trigger.orElse(defaultJobDef()));
-        psEvent.setString(2, Objects.requireNonNull(lfnr));
-        int rows = psEvent.executeUpdate();
-        assert rows == 1;
-    }
-
-    void triggerImport(String lfnr) throws SQLException {
-        triggerImport(lfnr, Optional.empty());
-    } */
-
     public void insert(String table, List<String> cols, List<?> values) throws SQLException {
-        var ps = prepareInsert(new TabCol(table, cols, cols.stream().map(c -> "?").toList()));
-        ps.clearParameters();
-        for (int i = 0; i < values.size(); i++) {
-            var value = values.get(i);
-            if (value == null) {
-                ps.setNull(i + 1, Types.VARCHAR);
-            } else {
-                ps.setObject(i + 1, value);
+        int rows;
+        try (var ps = prepareInsert(new TabCol(table, cols, cols.stream().map(c -> "?").toList()))) {
+            ps.clearParameters();
+            for (int i = 0; i < values.size(); i++) {
+                var value = values.get(i);
+                if (value == null) {
+                    ps.setNull(i + 1, Types.VARCHAR);
+                } else {
+                    ps.setObject(i + 1, value);
+                }
             }
+            rows = ps.executeUpdate();
         }
-        int rows = ps.executeUpdate();
         assert rows == 1;
     }
-
 
     /**
      * Commits the work of this loader - or rolls it back if any {@code loadInput}
@@ -287,63 +229,17 @@ public class Loader implements AutoCloseable {
                     try {
                         ps.close();
                     } catch (SQLException ignored) {
-                        // keep closing the remaining statements
                     }
                 }
                 statementCache.clear();
-                // the connection was borrowed - hand it back as it was found,
-                // a pool would otherwise lend it out with auto-commit still off
                 try {
                     connection.setAutoCommit(autoCommit);
                 } catch (SQLException ignored) {
-                    // closing is more important than restoring
                 }
             } finally {
                 connection.close();
             }
         }
     }
-
-/*
-    String defaultInstitut() throws SQLException {
-        String inr = null;
-        try (var si = connection.createStatement(); var instituts = si.executeQuery("select institut_nr from institut where inaktiv_dat is null")) {
-            if (instituts.next()) {
-                inr = instituts.getString(1);
-            }
-        }
-        return inr;
-    }
-
-
-    String defaultSnDef() throws SQLException {
-        String sndef = null;
-        try (var si = connection.createStatement(); var sndefs = si.executeQuery(
-                "select schnittstelle_cd, default_flag from schnittstelle where inaktiv_dat is null order by nvl(sort_no, 9999)"
-        )) {
-            while (sndefs.next()) {
-                if (1 == sndefs.getInt(2)) {
-                    sndef = sndefs.getString(1);
-                    break;
-                }
-                if (sndef == null) {
-                    sndef = sndefs.getString(1);
-                }
-            }
-        }
-        return sndef;
-    }
-
-    String defaultJobDef() throws SQLException {
-        String jobdef = null;
-        try (var si = connection.createStatement(); var jobdefs = si.executeQuery(
-                "select snjobevent_txt from jobdef where nvl(inaktiv_flag,0) = 0 and SYSJOBFREQ_ID = hextoraw('1051000083000002') and snjobevent_txt is not null"
-        )) {
-            if (jobdefs.next()) {
-                jobdef = jobdefs.getString(1);
-            }
-        }
-        return jobdef;
-    } */
 
 }

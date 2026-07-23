@@ -36,8 +36,6 @@ public class XmlMappingSpecReader implements MappingSpecReader {
 
     @Override
     public MappingSpec readFrom(Reader source) {
-        // the mapping spec is our own format and uses no namespaces, so the
-        // plain parser is the right one here
         var root = Xml.parse(source).getDocumentElement();
         return new MappingSpec(
                 elements("input")
@@ -83,7 +81,6 @@ public class XmlMappingSpecReader implements MappingSpecReader {
         return new FieldSelectorSpec(
                 required(fieldSelector, "name"),
                 required(fieldSelector, "selector"),
-                // absent means STRING, which FieldSelectorSpec applies for null
                 attributeValue("type")
                         .apply(fieldSelector)
                         .map(type -> type.toUpperCase(Locale.ROOT))

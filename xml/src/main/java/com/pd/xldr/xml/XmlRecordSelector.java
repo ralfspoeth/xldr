@@ -21,7 +21,6 @@ public class XmlRecordSelector {
     private final String name;
     private final String selector;
     private final XPathExpression expression;
-    // insertion order, so Result.fields() follows the order of the spec
     private final Map<String, XmlFieldSelector> fieldSelectors = new LinkedHashMap<>();
 
     XmlRecordSelector(String name, String selector, XPathExpression expression) {
@@ -53,8 +52,6 @@ public class XmlRecordSelector {
         try {
             return (NodeList) expression.evaluate(document, XPathConstants.NODESET);
         } catch (XPathExpressionException e) {
-            // typically an expression that yields a string or a number rather
-            // than a node set - it cannot address records
             throw new IllegalStateException(
                     "record selector " + name + " (" + selector + ") does not select a node set", e);
         }

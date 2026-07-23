@@ -36,8 +36,6 @@ public class XmlFileHandlerFactory implements InputAdapterFactory {
 
     @Override
     public InputAdapter createInputAdapter(InputSpec spec) {
-        // a copy, so later configuration of this factory cannot change an
-        // adapter that is already in use
         var settings = new Properties();
         settings.putAll(properties);
         return new XmlFileHandler(spec, settings);

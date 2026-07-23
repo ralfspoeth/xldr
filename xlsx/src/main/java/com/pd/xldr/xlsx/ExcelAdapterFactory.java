@@ -18,7 +18,6 @@ public class ExcelAdapterFactory implements InputAdapterFactory {
 
     @Override
     public void setProperty(String key, String value) {
-        // no adapter properties yet
     }
 
     @Override

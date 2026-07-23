@@ -20,7 +20,6 @@ import java.util.regex.Pattern;
  */
 sealed interface CellRef {
 
-    // both offsets are mandatory, which keeps a column like "RC" unambiguous
     Pattern RELATIVE = Pattern.compile("[Rr]([+-]?\\d+)[Cc]([+-]?\\d+)");
     Pattern LETTERS = Pattern.compile("[A-Za-z]+");
     Pattern DIGITS = Pattern.compile("\\d+");

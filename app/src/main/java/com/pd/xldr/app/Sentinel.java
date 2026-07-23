@@ -82,7 +82,6 @@ public final class Sentinel {
                     ? Optional.of(marker.resolveSibling(m.group(1)))
                     : Optional.empty();
         }
-        // glob, or a group-less regex: strip the last dotted suffix
         var dot = name.lastIndexOf('.');
         return dot > 0
                 ? Optional.of(marker.resolveSibling(name.substring(0, dot)))

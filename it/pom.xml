@@ -11,8 +11,6 @@
 
     <artifactId>it</artifactId>
 
-    <!-- integration only: no production code, the whole pipeline is exercised
-         from the test sources against a local H2 database -->
     <dependencies>
         <dependency>
             <groupId>com.pd.xldr</groupId>
@@ -24,7 +22,6 @@
             <artifactId>ldr</artifactId>
             <version>${project.version}</version>
         </dependency>
-        <!-- the XML input adapter provider, discovered through ServiceLoader -->
         <dependency>
             <groupId>com.pd.xldr</groupId>
             <artifactId>xml</artifactId>

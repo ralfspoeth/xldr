@@ -92,7 +92,6 @@ public class XmlFieldSelector {
         if (dateFormat != null) {
             return LocalDateTime.parse(raw, dateFormat);
         }
-        // accept a full timestamp as well as a plain date, the two common cases
         try {
             return LocalDateTime.parse(raw);
         } catch (RuntimeException e) {

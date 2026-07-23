@@ -93,7 +93,6 @@ public record AppConfig(
             throw new IllegalArgumentException(CONCURRENCY_KEY + " must be at least 1");
         }
 
-        // HikariConfig(Properties) assigns by bean property name
         var pool = new Properties();
         pool.setProperty("jdbcUrl", require(props, URL_KEY));
         copyIfPresent(props, USER_KEY, pool, "username");

@@ -14,19 +14,14 @@
     <artifactId>app</artifactId>
 
     <dependencies>
-        <!-- cli -->
         <dependency>
             <groupId>info.picocli</groupId>
             <artifactId>picocli</artifactId>
         </dependency>
-        <!-- connection pool -->
         <dependency>
             <groupId>com.zaxxer</groupId>
             <artifactId>HikariCP</artifactId>
         </dependency>
-        <!-- routes slf4j (used by HikariCP) into java.util.logging; compile
-             scope because module-info requires it to get the provider module
-             resolved into the module graph -->
         <dependency>
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-jdk14</artifactId>
@@ -46,7 +41,6 @@
             <artifactId>h2</artifactId>
             <scope>provided</scope>
         </dependency>
-        <!-- directory watching -->
         <dependency>
             <groupId>io.github.ralfspoeth</groupId>
             <artifactId>filews</artifactId>

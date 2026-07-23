@@ -80,7 +80,6 @@ public class JsonMappingSpecReader implements MappingSpecReader {
                     PTR.member("table").stringOrThrow(lookup.get()),
                     PTR.member("column").stringOrThrow(lookup.get()),
                     PTR.member("keyColumn").stringOrThrow(lookup.get()),
-                    // the key is one of the three basic sources, keyed the same way
                     basicSource(lookup.get()));
         }
         return basicSource(fm);

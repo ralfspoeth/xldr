@@ -37,16 +37,12 @@ public class Main implements Callable<Integer> {
 
     static void main(String[] args) {
         initLogging();
-        // picocli turns a parse error into usage help and exit code 2, an
-        // exception from call() into a stack trace and exit code 1, and the
-        // value call() returns into the exit code otherwise
         System.exit(new CommandLine(new Main()).execute(args));
     }
 
     @Override
     public Integer call() throws Exception {
         var config = AppConfig.load(configFile);
-        // both belong to the process: the pool is opened once and closed on exit
         try (var pool = new ConnectionPool(config);
              var watcher = new Watcher(config, pool)) {
             watcher.start();

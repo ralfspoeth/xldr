@@ -47,8 +47,6 @@ public class Watcher implements AutoCloseable {
         this.roots = Set.copyOf(config.roots());
         this.scanIntervalSeconds = config.scanIntervalSeconds();
         validate(roots);
-        // a directory is watched automatically exactly when it is a feed, i.e.
-        // an immediate child of one of the roots
         this.watchService = new DirectoryWatchService(
                 this::onEvent, roots, dir -> roots.contains(dir.getParent()));
         this.registry = new FeedRegistry(watchService);
@@ -63,8 +61,6 @@ public class Watcher implements AutoCloseable {
             }
             for (var other : roots) {
                 if (!root.equals(other) && root.startsWith(other)) {
-                    // otherwise a feed of one root is a root of another and the
-                    // level rules stop meaning anything
                     throw new IllegalArgumentException("root " + root + " is nested inside root " + other);
                 }
             }
@@ -74,7 +70,6 @@ public class Watcher implements AutoCloseable {
     public void start() {
         watchThread = Thread.ofVirtual().start(watchService);
         reconcileAll();
-        // anything still in work/ was claimed by a run that died
         registry.active().forEach(processor::recoverWork);
         scanner.scheduleWithFixedDelay(
                 this::reconcileAllQuietly, scanIntervalSeconds, scanIntervalSeconds, TimeUnit.SECONDS);
@@ -85,15 +80,12 @@ public class Watcher implements AutoCloseable {
         try {
             reconcileAll();
         } catch (RuntimeException e) {
-            // a scheduled task that throws is never run again
             LOG.log(WARNING, () -> "reconciliation failed: " + e);
         }
     }
 
     private void reconcileAll() {
         roots.forEach(registry::reconcileRoot);
-        // catches files whose event was lost, and anything that arrived before
-        // its in/ directory was registered
         registry.active().forEach(processor::scanInbox);
     }
 
@@ -104,29 +96,21 @@ public class Watcher implements AutoCloseable {
         try {
             var dir = event.dir();
             if (roots.contains(dir)) {
-                // a feed directory appeared; look for its spec straight away
-                // rather than waiting for a spec event - a subtree moved in
-                // complete with spec announces only its top level
                 if (Files.isDirectory(event.path())) {
                     registry.reconcile(event.path());
                 }
             } else if (roots.contains(dir.getParent())) {
-                // something changed inside a feed directory: spec added, changed
-                // or removed, or the working directories were created
                 registry.reconcile(dir);
             } else {
                 onInboxEvent(event);
             }
         } catch (RuntimeException e) {
-            // never let a callback failure escape into the watch loop
             LOG.log(WARNING, () -> "error handling " + event.path() + ": " + e);
         }
     }
 
     private void onInboxEvent(PathEvent event) {
         if (!ENTRY_CREATE.equals(event.event().kind())) {
-            // deletes are our own claims moving out; modifies are covered by the
-            // delivery contract (atomic move, or the sentinel marker)
             return;
         }
         registry.feedOfInbox(event.dir())

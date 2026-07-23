@@ -1,6 +1,5 @@
 package com.pd.xldr.csv;
 
-
 import com.pd.xldr.ia.Field;
 import com.pd.xldr.ia.InputAdapter;
 import com.pd.xldr.ia.Result;
@@ -14,7 +13,6 @@ import java.nio.charset.Charset;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.ToIntFunction;
@@ -27,19 +25,15 @@ class CsvFileHandler implements InputAdapter {
 
     private final String rowSeparator;
     private final String fieldSeparator;
-    private final String textEnclosingQuotes;
     private final Charset charset;
-    private final Locale locale;
     private final boolean header;
 
     private final InputSpec inputSpec;
 
-    CsvFileHandler(String rowSeparator, String fieldSeparator, String textEnclosingQuotes, Charset charset, Locale locale, boolean header, InputSpec spec) {
+    CsvFileHandler(String rowSeparator, String fieldSeparator, Charset charset, boolean header, InputSpec spec) {
         this.rowSeparator = rowSeparator;
         this.fieldSeparator = fieldSeparator;
-        this.textEnclosingQuotes = textEnclosingQuotes;
         this.charset = charset;
-        this.locale = locale;
         this.header = header;
         this.inputSpec = spec;
     }
@@ -51,7 +45,6 @@ class CsvFileHandler implements InputAdapter {
             return i >= 0 && i < values.length ? values[i] : null;
         }
     }
-
 
     @Override
     public Result parse(InputStream source, String recordSelector, Set<String> fieldSelectors) throws IOException {
@@ -68,8 +61,6 @@ class CsvFileHandler implements InputAdapter {
             return new Result(fields, Stream.empty());
         }
         var fieldSep = Pattern.quote(fieldSeparator);
-        // with a header the first line maps names to positions; without one the
-        // field name itself is the 1-based column number ("1" -> 0, "2" -> 1, ...)
         var index = header ? indexOfHeader(lines[0]) : positionalIndex();
         var rows = Arrays.stream(lines)
                 .skip(header ? 1 : 0)

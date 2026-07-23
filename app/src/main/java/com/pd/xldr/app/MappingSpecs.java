@@ -38,8 +38,6 @@ final class MappingSpecs {
         return switch (candidates.size()) {
             case 0 -> Optional.empty();
             case 1 -> Optional.of(candidates.getFirst());
-            // picking one by precedence would silently load through the wrong
-            // spec, which is worse than refusing to start the feed
             default -> throw new IllegalStateException(
                     "ambiguous mapping spec in " + feedDir + ": " + candidates);
         };

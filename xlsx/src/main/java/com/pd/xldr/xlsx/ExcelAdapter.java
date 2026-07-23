@@ -6,7 +6,6 @@ import com.pd.xldr.ia.Result;
 import com.pd.xldr.ia.Row;
 import com.pd.xldr.spec.DataType;
 import com.pd.xldr.spec.InputSpec;
-import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.CellType;
 import org.apache.poi.ss.usermodel.DataFormatter;
 import org.apache.poi.ss.usermodel.DateUtil;
@@ -19,7 +18,6 @@ import java.io.InputStream;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -68,7 +66,6 @@ public class ExcelAdapter implements InputAdapter {
             throw new IllegalArgumentException("record selector " + recordSelector
                     + " declares no field selector(s) " + unknown);
         }
-        // in spec order, restricted to what was asked for
         var selected = record.refs().keySet().stream().filter(fieldSelectors::contains).toList();
 
         try (var workbook = WorkbookFactory.create(source)) {
@@ -88,7 +85,6 @@ public class ExcelAdapter implements InputAdapter {
                     values.put(name, value);
                     allNull &= isEmpty(value);
                 }
-                // a wholly empty row is a gap, not a record
                 if (!allNull) {
                     rows.add(values::get);
                 }
@@ -131,7 +127,7 @@ public class ExcelAdapter implements InputAdapter {
             return effective == CellType.NUMERIC ? BigDecimal.valueOf(cell.getNumericCellValue())
                     : effective == CellType.STRING ? new BigDecimal(cell.getStringCellValue().strip())
                     : null;
-        } else { // LocalDateTime
+        } else {
             return effective == CellType.NUMERIC && DateUtil.isCellDateFormatted(cell)
                     ? cell.getLocalDateTimeCellValue()
                     : null;

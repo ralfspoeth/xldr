@@ -66,7 +66,6 @@ public class FileProcessor {
                     data -> processSignalled(feed, file, data),
                     () -> discardMarker(feed, file, "names no data file"));
         }
-        // otherwise a data file waiting for its marker: do nothing
     }
 
     /**
@@ -90,7 +89,6 @@ public class FileProcessor {
      */
     private void processSignalled(Feed feed, Path sentinel, Path dataFile) {
         var claimed = claimOrLog(feed, dataFile);
-        // the marker has done its job whether or not the data was still there
         deleteQuietly(sentinel);
         if (claimed != null) {
             runLoad(feed, claimed, dataFile.getFileName().toString());
@@ -115,8 +113,6 @@ public class FileProcessor {
             loadPermits.acquire();
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            // nothing was loaded, so hand the file back rather than leave a
-            // stale claim for the next startup to send to the hospital
             unclaim(feed, claimed);
             return;
         }
@@ -126,8 +122,6 @@ public class FileProcessor {
             LOG.log(INFO, () -> "loaded " + rows + " row(s) from " + originalName
                     + " [" + feed.name() + "] -> " + target);
         } catch (Exception e) {
-            // the load itself rolled back; the file goes to the hospital so an
-            // operator can look at it and drop it back into in/ if appropriate
             LOG.log(ERROR, () -> "load failed for " + originalName + " [" + feed.name() + "]: " + e);
             try {
                 hospitalise(feed, claimed, e);
@@ -175,15 +169,12 @@ public class FileProcessor {
         try {
             return Files.move(file, target, ATOMIC_MOVE);
         } catch (NoSuchFileException e) {
-            // someone else got there first
             return null;
         }
     }
 
     private Path archive(Feed feed, Path claimed) throws IOException {
         var today = LocalDate.now();
-        // date partitioned: a single flat directory degrades badly once it holds
-        // six figures of entries
         var dir = feed.archive()
                 .resolve(String.valueOf(today.getYear()))
                 .resolve("%02d".formatted(today.getMonthValue()))
@@ -257,15 +248,12 @@ public class FileProcessor {
         List<Path> pending;
         try (var files = Files.list(feed.in())) {
             pending = files.filter(Files::isRegularFile)
-                    .filter(sentinel == null ? file -> true : sentinel::isMarker)
+                    .filter(sentinel == null ? _ -> true : sentinel::isMarker)
                     .toList();
         } catch (IOException e) {
             LOG.log(WARNING, () -> "cannot list " + feed.in() + ": " + e);
             return;
         }
-        // a virtual thread each, exactly as the watch events arrive, so a
-        // backlog is governed by the same semaphore instead of trickling
-        // through one at a time; close() waits for them
         try (var exec = Executors.newVirtualThreadPerTaskExecutor()) {
             for (var file : pending) {
                 if (sentinel == null) {
@@ -285,7 +273,6 @@ public class FileProcessor {
 
     private static boolean isIgnored(Path file) {
         var name = file.getFileName().toString();
-        // editor swap files, .DS_Store, partial uploads
         return name.startsWith(".") || name.endsWith(".tmp") || name.endsWith(".part");
     }
 

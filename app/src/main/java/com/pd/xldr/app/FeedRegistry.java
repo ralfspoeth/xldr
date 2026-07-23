@@ -57,7 +57,6 @@ public class FeedRegistry {
             }
             var specFile = MappingSpecs.find(feedDir).orElse(null);
             if (specFile == null) {
-                // not a feed, or the spec was removed to switch it off
                 deactivate(feedDir, "no mapping spec");
                 return;
             }
@@ -66,14 +65,11 @@ public class FeedRegistry {
             if (current != null
                     && current.specFile().equals(specFile)
                     && current.specModified().equals(modified)) {
-                // unchanged; make sure the plumbing is still in place
                 ensureDirectoriesAndWatch(current);
                 return;
             }
 
             var mappingSpec = MappingSpecs.read(specFile);
-            // a bad sentinel pattern fails here, which deactivates the feed with
-            // a logged reason rather than surfacing per file
             var sentinelSpec = mappingSpec.inputSpec().sentinel();
             var sentinel = sentinelSpec == null ? null : Sentinel.parse(sentinelSpec);
             var feed = new Feed(feedDir, specFile, modified, mappingSpec, adapterProperties(feedDir), sentinel);
@@ -83,10 +79,8 @@ public class FeedRegistry {
             LOG.log(INFO, () -> (current == null ? "feed activated: " : "feed reloaded: ")
                     + feed.name() + " (" + specFile.getFileName() + ")");
         } catch (IllegalStateException e) {
-            // more than one spec file - refuse rather than guess
             deactivate(feedDir, e.getMessage());
         } catch (IOException | RuntimeException e) {
-            // a spec still being written parses badly; the periodic scan retries
             deactivate(feedDir, "cannot read mapping spec: " + e);
         }
     }
@@ -106,7 +100,6 @@ public class FeedRegistry {
         for (var name : Feed.SUBDIRECTORIES) {
             Files.createDirectories(feed.directory().resolve(name));
         }
-        // register is idempotent, so this is safe to repeat on every reconcile
         watchService.register(feed.in());
     }
 

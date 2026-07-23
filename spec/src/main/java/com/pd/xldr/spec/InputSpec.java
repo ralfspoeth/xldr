@@ -6,7 +6,6 @@ import java.util.List;
 
 import static java.util.Objects.requireNonNullElse;
 
-
 /**
  * How some input file is turned into a stream of records and how the fields are
  * extracted from them.

@@ -70,7 +70,7 @@ public class XmlFileHandler implements InputAdapter {
                         dateFormat));
             }
         }
-        this.parsers = newParserFactory(!namespaces.isEmpty());
+        this.parsers = newParserFactory();
     }
 
     @Override
@@ -85,8 +85,6 @@ public class XmlFileHandler implements InputAdapter {
         try {
             var document = parsers.newDocumentBuilder().parse(source);
             var nodes = record.records(document);
-            // IntStream rather than a hand written Spliterator: it is lazy,
-            // correctly sized, and an empty node set yields no rows at all
             var rows = IntStream.range(0, nodes.getLength())
                     .mapToObj(nodes::item)
                     .map(node -> (Row) new XmlRow(node, record));
@@ -104,8 +102,6 @@ public class XmlFileHandler implements InputAdapter {
     private static List<XmlFieldSelector> selected(XmlRecordSelector record, Set<String> wanted) {
         var unknown = wanted.stream().filter(name -> !record.fieldSelectors().containsKey(name)).toList();
         if (!unknown.isEmpty()) {
-            // a mapping referring to a field the input spec does not declare is
-            // a broken spec; saying so beats returning empty columns
             throw new IllegalArgumentException("record selector " + record.name()
                     + " declares no field selector(s) " + unknown);
         }
@@ -120,13 +116,11 @@ public class XmlFileHandler implements InputAdapter {
         @Override
         public Object get(String name) {
             var selector = record.fieldSelectors().get(name);
-            // unknown name -> null, which the loader binds as SQL NULL
             return selector == null ? null : selector.evaluate(node);
         }
     }
 
     private static XPath newXPath(Namespaces namespaces) {
-        // a fresh factory per adapter: neither XPathFactory nor XPath is thread safe
         var xpath = XPathFactory.newDefaultInstance().newXPath();
         if (!namespaces.isEmpty()) {
             xpath.setNamespaceContext(namespaces);
@@ -142,10 +136,8 @@ public class XmlFileHandler implements InputAdapter {
         }
     }
 
-    private static DocumentBuilderFactory newParserFactory(boolean namespaceAware) {
+    private static DocumentBuilderFactory newParserFactory() {
         var factory = DocumentBuilderFactory.newDefaultInstance();
-        // input arrives from a watched directory, so it is not trusted: no
-        // doctype means no external entity resolution and no billion laughs
         try {
             factory.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
             factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
@@ -154,8 +146,7 @@ public class XmlFileHandler implements InputAdapter {
         }
         factory.setXIncludeAware(false);
         factory.setExpandEntityReferences(false);
-        // only worth paying for when the selectors actually use prefixes
-        factory.setNamespaceAware(namespaceAware);
+        factory.setNamespaceAware(true);
         return factory;
     }
 }

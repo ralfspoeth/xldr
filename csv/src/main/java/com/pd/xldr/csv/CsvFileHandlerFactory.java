@@ -6,7 +6,6 @@ import com.pd.xldr.spec.InputSpec;
 
 import java.nio.charset.Charset;
 import java.util.List;
-import java.util.Locale;
 import java.util.Properties;
 
 public class CsvFileHandlerFactory implements InputAdapterFactory {
@@ -29,11 +28,8 @@ public class CsvFileHandlerFactory implements InputAdapterFactory {
         return new CsvFileHandler(
                 csvFileHandlerProperties.getProperty("rowSeparator", System.lineSeparator()),
                 csvFileHandlerProperties.getProperty("fieldSeparator", "\t"),
-                csvFileHandlerProperties.getProperty("textEnclosingQuotes", "\""),
                 csvFileHandlerProperties.containsKey("encoding")?
                         Charset.forName(csvFileHandlerProperties.getProperty("encoding")):Charset.defaultCharset(),
-                csvFileHandlerProperties.containsKey("locale")?
-                        Locale.of(csvFileHandlerProperties.getProperty("locale")):Locale.getDefault(),
                 Boolean.parseBoolean(csvFileHandlerProperties.getProperty("header", "true")),
                 spec
         );

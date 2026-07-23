@@ -85,35 +85,8 @@ Example:
         "commitPolicy": "ON_CLOSE"
     }
 
-The application is configured separately with the target database. Connections are pooled with HikariCP; every
-`pool.*` key is handed to `HikariConfig` under its own name, so the full pool configuration is available without the
-application having to mirror it.
-
-    xldr.roots              = /var/lib/xldr:/mnt/feeds
-    xldr.scanInterval       = 30
-    xldr.maxConcurrentLoads = 4
-    jdbc.url      = jdbc:oracle:thin:@//host:1521/sid
-    jdbc.user     = dbuser
-    jdbc.password = secret
-    pool.maximumPoolSize = 4
-
-Each file is loaded on a virtual thread of its own; `xldr.maxConcurrentLoads` is a semaphore bounding how many loads
-run at once. Keep it at or below `pool.maximumPoolSize` - otherwise the pool becomes the real limit and the surplus
-threads merely queue inside `getConnection()`, which is far harder to reason about than a permit count.
-
-The JDBC drivers for Oracle and PostgreSQL are `provided` dependencies: the deployment supplies the driver matching its
-target database.
-
-### Logging
-
-HikariCP logs through SLF4J. The application binds `slf4j-jdk14`, so everything ends up in `java.util.logging` and a
-single JUL configuration covers the whole process; no second logging framework is involved. The application module
-`requires org.slf4j.jul` because a service provider module is otherwise never resolved into the module graph.
-
-A default `logging.properties` is bundled and applied at startup unless the deployment sets one of the standard system
-properties itself:
-
-    java -Djava.util.logging.config.file=/etc/xldr/logging.properties ...
+Which database is fed, and how it is pooled, is configured on the application rather than in the mapping - see
+[Configuration](#configuration).
 
 ### The Record Mapping Specification
 
@@ -249,3 +222,70 @@ watches as it grows.
 Watch events only reduce latency. The guarantee is `xldr.scanInterval`, a periodic reconciliation that re-derives the
 whole state from the file system, so a lost event, an event overflow or a subtree moved in complete with content
 costs a few seconds rather than a feed that never comes up.
+
+## Configuration
+
+There are three places to configure, at decreasing scope: the server (one file per process), each feed (its spec and
+an optional adapter-properties file), and the mapping spec itself (covered above).
+
+### Server configuration
+
+A single properties file, passed as the sole argument to the application. Connection settings live here, not in the
+mapping specs, so a spec can be promoted between environments unchanged and no credentials sit in the watched tree.
+
+| Key | Required | Default | Meaning |
+|-----|----------|---------|---------|
+| `xldr.roots` | yes | – | The directories in which feeds may be created, separated by the platform path separator (`:` on Unix, `;` on Windows). Each must exist at startup and none may be nested in another. |
+| `xldr.scanInterval` | no | `30` | Seconds between full reconciliations of the tree; watch events only react sooner. |
+| `xldr.maxConcurrentLoads` | no | `4` | Upper bound on files loaded at once. Keep it at or below `pool.maximumPoolSize`, or the pool becomes the real limit and surplus loads queue in `getConnection()`. |
+| `jdbc.url` | yes | – | JDBC URL of the one target database. |
+| `jdbc.user`, `jdbc.password` | no | – | Credentials, if the URL does not carry them. |
+| `pool.*` | no | – | Passed through to HikariCP's `HikariConfig` under the key without the `pool.` prefix, e.g. `pool.maximumPoolSize`, `pool.connectionTimeout`. |
+
+    xldr.roots              = /var/lib/xldr:/mnt/feeds
+    xldr.scanInterval       = 30
+    xldr.maxConcurrentLoads = 4
+    jdbc.url      = jdbc:oracle:thin:@//host:1521/sid
+    jdbc.user     = dbuser
+    jdbc.password = secret
+    pool.maximumPoolSize = 4
+
+The JDBC drivers for Oracle and PostgreSQL are `provided` dependencies: the deployment supplies the one matching its
+target database.
+
+### Feed configuration
+
+A feed directory holds a mapping spec - `spec.json`, `spec.xml` or `spec.properties`, exactly one - and, optionally,
+an `adapter.properties` file with format-specific settings handed to the input adapter. The recognised keys depend on
+the input spec's MIME type.
+
+**CSV** (`text/csv`):
+
+| Key | Default | Meaning |
+|-----|---------|---------|
+| `fieldSeparator` | tab | Column separator. |
+| `rowSeparator` | platform line separator | Record separator. |
+| `header` | `true` | Whether the first row names the columns. With `false`, field selectors are 1-based column positions (`"1"` → first column). |
+| `textEnclosingQuotes` | `"` | Quote character. |
+| `encoding` | platform default | Character set, e.g. `UTF-8`. |
+| `locale` | platform default | Locale for number and date parsing. |
+
+**XML** (`text/xml`, `application/xml`):
+
+| Key | Default | Meaning |
+|-----|---------|---------|
+| `ns.<prefix>` | – | Binds a namespace prefix for the selectors, e.g. `ns.f = http://example.com/funds` to make `//f:fund` match. XPath 1.0 has no default namespace, so a document with one is reachable only through a bound prefix. |
+| `dateFormat` | ISO | Pattern for `DATE` fields; without it an ISO timestamp and a plain ISO date are both accepted. |
+
+**Excel** (`application/vnd.ms-excel`, `application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`): no
+properties.
+
+### Logging
+
+HikariCP logs through SLF4J. The application binds `slf4j-jdk14`, so everything ends up in `java.util.logging` and a
+single JUL configuration covers the whole process; no second logging framework is involved.
+
+A default `logging.properties` is bundled and applied at startup unless the deployment points `java.util.logging` at a
+configuration of its own:
+
+    java -Djava.util.logging.config.file=/etc/xldr/logging.properties -p <module-path> -m com.pd.xldr.app config.properties

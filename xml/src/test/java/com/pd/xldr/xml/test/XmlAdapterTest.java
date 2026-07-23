@@ -7,7 +7,6 @@ import com.pd.xldr.spec.DataType;
 import com.pd.xldr.spec.FieldSelectorSpec;
 import com.pd.xldr.spec.InputSpec;
 import com.pd.xldr.spec.RecordSelectorSpec;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
@@ -147,7 +146,6 @@ public class XmlAdapterTest {
      * mode worth knowing about when a spec "silently returns no rows".
      */
     @Test
-    @Disabled
     public void findsNothingWithoutTheNamespaceBinding() throws IOException {
         var spec = new InputSpec("text/xml", List.of(
                 new RecordSelectorSpec("fund", "/portfolio/fund", List.of(
