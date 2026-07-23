@@ -11,6 +11,11 @@
 
     <artifactId>it</artifactId>
 
+    <properties>
+        <!-- integration tests only: nothing to publish -->
+        <maven.deploy.skip>true</maven.deploy.skip>
+    </properties>
+
     <dependencies>
         <dependency>
             <groupId>com.pd.xldr</groupId>

@@ -23,6 +23,30 @@ modules by their dependencies:
 `revision` is a CI-friendly version property resolved by the `flatten-maven-plugin`, so the installed and deployed POMs
 carry the concrete version rather than a literal `${revision}`.
 
+### Distribution
+
+`mvn package` on `app` builds a runnable distribution (`app/target/xldr-<version>-dist.{tar.gz,zip}`) via the
+`maven-assembly-plugin`. Unpacked, it is
+
+    xldr-<version>/
+        bin/xldr, bin/xldr.bat   launchers
+        lib/                     the application and every module jar it needs
+        conf/                    sample xldr.properties and logging.properties
+        README.md
+
+and runs with
+
+    bin/xldr conf/xldr.properties
+
+The launcher puts `lib/` on the module path (`java -p lib -m com.pd.xldr.app/...`); JPMS service binding then resolves
+the input adapters (via the `uses`/`provides` of `InputAdapterFactory`) and the JDBC driver (via `java.sql`'s
+`uses java.sql.Driver`) straight from `lib/`. The adapters and all three drivers are `provided` dependencies bundled
+into `lib/` so the package is self-contained; drop the drivers you do not target.
+
+`jlink` is deliberately not used: several runtime dependencies - the Oracle JDBC driver, HikariCP, picocli, SLF4J, POI
+- are automatic modules, which `jlink` cannot link into an image. The module-path distribution sidesteps that while
+keeping the modular layout and its service binding intact.
+
 Loading data from a file into one or more database tables is guarded by a *mapping specification* which comprises an
 *input specification*, a *mapping*, and a *load specification*. The *input specification* tells the engine how to
 parse a given file and to load *records* and *fields*. The *mapping* provides - as its name implies - a mapping from
@@ -284,6 +308,20 @@ the input spec's MIME type.
 | `textEnclosingQuotes` | `"` | Quote character. |
 | `encoding` | platform default | Character set, e.g. `UTF-8`. |
 | `locale` | platform default | Locale for number and date parsing. |
+
+For CSV a record selector's `selector` is a *first-column discriminator*. Headerless feeds often interleave several
+record types in one file, the first column naming the type and the columns that follow varying in number, meaning and
+type per type. A line belongs to a record selector only when its first column equals that selector's `selector`; an
+absent or empty `selector` matches every line, which is the single-record-type case. Positions stay absolute, so `"1"`
+is the discriminator column itself and a type's payload fields usually start at `"2"`. Several record selectors thus
+partition one file, each mapping its own type to its own table:
+
+    "recordSelectors": [
+        { "name": "orders", "selector": "O",
+          "fieldSelectors": [ {"name": "2", ...}, {"name": "3", ...}, {"name": "4", ...} ] },
+        { "name": "lines",  "selector": "L",
+          "fieldSelectors": [ {"name": "2", ...}, {"name": "3", ...}, {"name": "4", ...}, {"name": "5", ...} ] }
+    ]
 
 **XML** (`text/xml`, `application/xml`):
 

@@ -4,7 +4,6 @@ module com.pd.xldr.app {
 
     requires com.pd.xldr.ia;
     requires com.pd.xldr.ldr;
-    requires com.pd.xldr.spec;
     requires java.sql;
     requires java.logging;
     requires com.zaxxer.hikari;

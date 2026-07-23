@@ -48,13 +48,15 @@ class CsvFileHandler implements InputAdapter {
 
     @Override
     public Result parse(InputStream source, String recordSelector, Set<String> fieldSelectors) throws IOException {
-        var fields = fields(recordSelector, fieldSelectors);
-        var selected = inputSpec.recordSelectors()
+        var record = inputSpec.recordSelectors()
                 .stream()
-                .anyMatch(rss -> rss.name().equals(recordSelector));
-        if (!selected) {
-            return new Result(fields, Stream.empty());
+                .filter(rss -> rss.name().equals(recordSelector))
+                .findFirst()
+                .orElse(null);
+        if (record == null) {
+            return new Result(List.of(), Stream.empty());
         }
+        var fields = fields(recordSelector, fieldSelectors);
         var content = new String(source.readAllBytes(), charset);
         var lines = content.split(rowSeparator, -1);
         if (lines.length == 0) {
@@ -62,12 +64,22 @@ class CsvFileHandler implements InputAdapter {
         }
         var fieldSep = Pattern.quote(fieldSeparator);
         var index = header ? indexOfHeader(lines[0]) : positionalIndex();
+        // the record selector's selector, if set, is the value the first column
+        // must equal for a line to belong to this record type - the discriminator
+        // of an interleaved, headerless file; absent means every line matches
+        var discriminator = record.selector();
         var rows = Arrays.stream(lines)
                 .skip(header ? 1 : 0)
                 .filter(line -> !line.isEmpty())
                 .map(line -> line.split(fieldSep, -1))
+                .filter(values -> matches(discriminator, values))
                 .map(values -> (Row) new Line(values, index));
         return new Result(fields, rows);
+    }
+
+    private static boolean matches(String discriminator, String[] values) {
+        return discriminator == null || discriminator.isBlank()
+                || (values.length > 0 && discriminator.strip().equals(values[0].strip()));
     }
 
     private List<Field> fields(String recordSelector, Set<String> fieldSelectors) {

@@ -1,0 +1,12 @@
+#!/bin/sh
+# xldr server launcher.
+#
+# Runs the application off the module path in lib/. JPMS service binding
+# resolves the input adapters (uses/provides InputAdapterFactory) and the JDBC
+# driver (java.sql uses Driver) from lib/, so no --add-modules is needed.
+#
+# JAVA_OPTS may carry extra VM options, e.g.
+#   JAVA_OPTS=-Djava.util.logging.config.file=conf/logging.properties bin/xldr conf/xldr.properties
+set -e
+here=$(cd "$(dirname "$0")/.." && pwd)
+exec java ${JAVA_OPTS:-} -p "$here/lib" -m com.pd.xldr.app/com.pd.xldr.app.Main "$@"
