@@ -72,7 +72,11 @@ public class FeedRegistry {
             }
 
             var mappingSpec = MappingSpecs.read(specFile);
-            var feed = new Feed(feedDir, specFile, modified, mappingSpec, adapterProperties(feedDir));
+            // a bad sentinel pattern fails here, which deactivates the feed with
+            // a logged reason rather than surfacing per file
+            var sentinelSpec = mappingSpec.inputSpec().sentinel();
+            var sentinel = sentinelSpec == null ? null : Sentinel.parse(sentinelSpec);
+            var feed = new Feed(feedDir, specFile, modified, mappingSpec, adapterProperties(feedDir), sentinel);
             ensureDirectoriesAndWatch(feed);
             feeds.put(feedDir, feed);
             byInbox.put(feed.in(), feed);

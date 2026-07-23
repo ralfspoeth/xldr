@@ -49,20 +49,68 @@ public class FileProcessor {
     }
 
     /**
+     * Reacts to one file appearing in {@code in/}.
+     * <p>
+     * With no sentinel the producer delivers atomically, so the arriving file is
+     * ready and is loaded directly. With a sentinel it is the marker's arrival
+     * that matters: the marker names the data file (its own name minus the
+     * suffix), that file is loaded, and the marker is consumed. A data file
+     * arriving on its own is ignored until its marker follows.
+     */
+    public void onArrival(Feed feed, Path file) {
+        var sentinel = feed.sentinel();
+        if (sentinel == null) {
+            process(feed, file);
+        } else if (sentinel.isMarker(file)) {
+            sentinel.dataFileOf(file).ifPresentOrElse(
+                    data -> processSignalled(feed, file, data),
+                    () -> discardMarker(feed, file, "names no data file"));
+        }
+        // otherwise a data file waiting for its marker: do nothing
+    }
+
+    /**
      * Claims {@code file} and loads it. Does nothing if the file has already
      * been claimed by someone else or has disappeared.
      */
     public void process(Feed feed, Path file) {
-        Path claimed;
+        var claimed = claimOrLog(feed, file);
+        if (claimed != null) {
+            runLoad(feed, claimed, file.getFileName().toString());
+        }
+    }
+
+    /**
+     * Loads the data file a sentinel marker points at, then consumes the marker.
+     * <p>
+     * The data file is claimed first - that move is the lock - and only then is
+     * the marker deleted, so a crash in between leaves the data safely in
+     * {@code work/} (recovered at startup) and at worst an orphaned marker
+     * (cleaned by the next scan), never a data file that is loaded twice.
+     */
+    private void processSignalled(Feed feed, Path sentinel, Path dataFile) {
+        var claimed = claimOrLog(feed, dataFile);
+        // the marker has done its job whether or not the data was still there
+        deleteQuietly(sentinel);
+        if (claimed != null) {
+            runLoad(feed, claimed, dataFile.getFileName().toString());
+        }
+    }
+
+    private Path claimOrLog(Feed feed, Path file) {
         try {
-            claimed = claim(feed, file);
+            return claim(feed, file);
         } catch (IOException e) {
             LOG.log(WARNING, () -> "could not claim " + file + ": " + e);
-            return;
+            return null;
         }
-        if (claimed == null) {
-            return;
-        }
+    }
+
+    /**
+     * Loads an already-claimed file, under the concurrency permit, and files it
+     * away afterwards.
+     */
+    private void runLoad(Feed feed, Path claimed, String originalName) {
         try {
             loadPermits.acquire();
         } catch (InterruptedException e) {
@@ -75,12 +123,12 @@ public class FileProcessor {
         try {
             var rows = new LoadJob(feed.mappingSpec(), connectionSource, feed.adapterProperties()).load(claimed);
             var target = archive(feed, claimed);
-            LOG.log(INFO, () -> "loaded " + rows + " row(s) from " + file.getFileName()
+            LOG.log(INFO, () -> "loaded " + rows + " row(s) from " + originalName
                     + " [" + feed.name() + "] -> " + target);
         } catch (Exception e) {
             // the load itself rolled back; the file goes to the hospital so an
             // operator can look at it and drop it back into in/ if appropriate
-            LOG.log(ERROR, () -> "load failed for " + file.getFileName() + " [" + feed.name() + "]: " + e);
+            LOG.log(ERROR, () -> "load failed for " + originalName + " [" + feed.name() + "]: " + e);
             try {
                 hospitalise(feed, claimed, e);
             } catch (IOException io) {
@@ -88,6 +136,19 @@ public class FileProcessor {
             }
         } finally {
             loadPermits.release();
+        }
+    }
+
+    private void discardMarker(Feed feed, Path marker, String why) {
+        LOG.log(WARNING, () -> "sentinel " + marker.getFileName() + " [" + feed.name() + "] " + why);
+        deleteQuietly(marker);
+    }
+
+    private static void deleteQuietly(Path path) {
+        try {
+            Files.deleteIfExists(path);
+        } catch (IOException e) {
+            LOG.log(WARNING, () -> "could not delete " + path + ": " + e);
         }
     }
 
@@ -183,12 +244,21 @@ public class FileProcessor {
 
     /**
      * Processes everything already sitting in {@code in/} - files that arrived
-     * before the directory was watched, or whose event was lost.
+     * before the directory was watched, or whose event was lost. This is the
+     * contract; watch events only make the reaction quicker.
+     * <p>
+     * With no sentinel every file is ready and is loaded. With a sentinel only
+     * the markers act: each is matched to its data file, or, if that file is
+     * gone, cleaned up as an orphan. Data files without a marker are left where
+     * they are.
      */
     public void scanInbox(Feed feed) {
+        var sentinel = feed.sentinel();
         List<Path> pending;
         try (var files = Files.list(feed.in())) {
-            pending = files.filter(Files::isRegularFile).toList();
+            pending = files.filter(Files::isRegularFile)
+                    .filter(sentinel == null ? file -> true : sentinel::isMarker)
+                    .toList();
         } catch (IOException e) {
             LOG.log(WARNING, () -> "cannot list " + feed.in() + ": " + e);
             return;
@@ -197,7 +267,19 @@ public class FileProcessor {
         // backlog is governed by the same semaphore instead of trickling
         // through one at a time; close() waits for them
         try (var exec = Executors.newVirtualThreadPerTaskExecutor()) {
-            pending.forEach(file -> exec.submit(() -> process(feed, file)));
+            for (var file : pending) {
+                if (sentinel == null) {
+                    exec.submit(() -> process(feed, file));
+                } else {
+                    sentinel.dataFileOf(file).ifPresentOrElse(data -> {
+                        if (Files.exists(data)) {
+                            exec.submit(() -> processSignalled(feed, file, data));
+                        } else {
+                            discardMarker(feed, file, "orphaned, no " + data.getFileName());
+                        }
+                    }, () -> discardMarker(feed, file, "names no data file"));
+                }
+            }
         }
     }
 

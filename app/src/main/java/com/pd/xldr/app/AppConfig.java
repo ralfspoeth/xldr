@@ -72,7 +72,7 @@ public record AppConfig(
 
     public static AppConfig of(Properties props) {
         var roots = Stream.of(require(props, ROOTS_KEY).split(Pattern.quote(File.pathSeparator)))
-                .map(String::trim)
+                .map(String::strip)
                 .filter(s -> !s.isEmpty())
                 .map(Path::of)
                 .map(Path::toAbsolutePath)
@@ -82,11 +82,11 @@ public record AppConfig(
             throw new IllegalArgumentException(ROOTS_KEY + " names no directory");
         }
         var scanInterval = Optional.ofNullable(props.getProperty(SCAN_KEY))
-                .map(String::trim)
+                .map(String::strip)
                 .map(Long::parseLong)
                 .orElse(DEFAULT_SCAN_INTERVAL);
-        var maxConcurrentLoads = Optional.ofNullable(props.getProperty(CONCURRENCY_KEY))
-                .map(String::trim)
+        int maxConcurrentLoads = Optional.ofNullable(props.getProperty(CONCURRENCY_KEY))
+                .map(String::strip)
                 .map(Integer::parseInt)
                 .orElse(DEFAULT_MAX_CONCURRENT_LOADS);
         if (maxConcurrentLoads < 1) {

@@ -85,7 +85,7 @@ public class XmlFieldSelector {
     }
 
     private static <T> T nullOr(String raw, Function<String, T> convert) {
-        return raw == null || raw.isBlank() ? null : convert.apply(raw.trim());
+        return raw == null || raw.isBlank() ? null : convert.apply(raw.strip());
     }
 
     private LocalDateTime toDateTime(String raw) {

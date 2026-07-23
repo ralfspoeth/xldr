@@ -126,11 +126,11 @@ public class Watcher implements AutoCloseable {
     private void onInboxEvent(PathEvent event) {
         if (!ENTRY_CREATE.equals(event.event().kind())) {
             // deletes are our own claims moving out; modifies are covered by the
-            // atomic-move contract for producers
+            // delivery contract (atomic move, or the sentinel marker)
             return;
         }
         registry.feedOfInbox(event.dir())
-                .ifPresent(feed -> processor.process(feed, event.path()));
+                .ifPresent(feed -> processor.onArrival(feed, event.path()));
     }
 
     @Override

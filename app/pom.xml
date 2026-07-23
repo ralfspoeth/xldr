@@ -14,6 +14,11 @@
     <artifactId>app</artifactId>
 
     <dependencies>
+        <!-- cli -->
+        <dependency>
+            <groupId>info.picocli</groupId>
+            <artifactId>picocli</artifactId>
+        </dependency>
         <!-- connection pool -->
         <dependency>
             <groupId>com.zaxxer</groupId>

@@ -159,6 +159,40 @@ public class ServerIT {
     }
 
     /**
+     * A feed configured with a sentinel does nothing until the marker arrives,
+     * then loads the data file the marker names and consumes the marker.
+     */
+    @Test
+    @Timeout(60)
+    void waitsForTheSentinelBeforeLoading() throws Exception {
+        var feed = Files.createDirectory(root.resolve("signalled"));
+        Files.writeString(feed.resolve("spec.json"), SPEC.replace(
+                "\"mimeType\": \"text/csv\"",
+                "\"mimeType\": \"text/csv\", \"sentinel\": \"glob:*.done\""));
+        Files.writeString(feed.resolve("adapter.properties"), "fieldSeparator=,\nrowSeparator=\\n\n");
+        await("in/ to be created", () -> Files.isDirectory(feed.resolve("in")));
+
+        // the data file alone must not be loaded, even non-atomically
+        var in = feed.resolve("in");
+        Files.writeString(in.resolve("people-1.csv"), """
+                id,name
+                1,Alice
+                2,Bob
+                """);
+        Thread.sleep(Duration.ofSeconds(3));
+        assertEquals(List.of(), selectPersons(), "no load before the sentinel");
+        assertTrue(Files.exists(in.resolve("people-1.csv")), "data file still waiting");
+
+        // the marker releases it
+        Files.writeString(in.resolve("people-1.csv.done"), "");
+        await("rows to arrive", () -> selectPersons().size() == 2);
+        assertEquals(List.of("1:Alice", "2:Bob"), selectPersons());
+        await("the marker to be consumed", () -> !Files.exists(in.resolve("people-1.csv.done")));
+        assertTrue(archived(feed).stream()
+                .anyMatch(p -> p.getFileName().toString().startsWith("people-1.csv")));
+    }
+
+    /**
      * Producers hand a file over by an atomic move, never by writing into in/.
      */
     private void deliver(Path feed, String name, String content) throws IOException {

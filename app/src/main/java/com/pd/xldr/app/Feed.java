@@ -29,7 +29,8 @@ public record Feed(
         Path specFile,
         FileTime specModified,
         MappingSpec mappingSpec,
-        Properties adapterProperties
+        Properties adapterProperties,
+        Sentinel sentinel
 ) {
 
     /**

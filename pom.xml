@@ -108,6 +108,11 @@
                 <!-- 0.4 adds register/unregister and the autoRegister predicate -->
                 <version>0.4</version>
             </dependency>
+            <dependency>
+                <groupId>info.picocli</groupId>
+                <artifactId>picocli</artifactId>
+                <version>4.7.7</version>
+            </dependency>
         </dependencies>
     </dependencyManagement>
 

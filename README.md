@@ -149,6 +149,25 @@ The mapping specification as a whole is specified by the three elements input, l
 
 The order of the elements is unspecified.
 
+### The XML Format
+
+The same specification in XML. Everything is carried in attributes and the element names are those of the JSON
+format, so a spec can be transliterated between the two without renaming anything. `type` and the whole `load`
+element are optional.
+
+    <mappingSpec>
+        <input mimeType="text/xml">
+            <recordSelector name="fund" selector="/root/fund">
+                <fieldSelector name="id" selector="@id" type="STRING"/>
+                <fieldSelector name="nav" selector="nav" type="DECIMAL"/>
+            </recordSelector>
+        </input>
+        <mapping recordSelector="fund" databaseTable="snmandat">
+            <fieldMapping fieldSelector="id" databaseColumn="ident1_txt"/>
+        </mapping>
+        <load commitPolicy="ON_CLOSE"/>
+    </mappingSpec>
+
 ## The Server
 
 The application runs as a server watching a number of configured *roots*. A root is the only place in which feeds may
@@ -169,9 +188,30 @@ than not loading at all.
 
 ### Delivering files
 
-Producers must place input files in `in/` by an **atomic move** - writing directly into `in/` risks the file being
-picked up while it is still being written. The server claims a file by moving it to `work/`, which is also what stops
-two threads, or two server processes on the same tree, from loading it twice.
+A file must not be read while it is still being written. The server does not guess at this with size or timeout
+heuristics - the producer states when a file is complete, in one of two ways chosen per feed by the input spec's
+`sentinel` setting.
+
+**Atomic delivery** (no `sentinel`). The appearance of the file *is* the signal that it is complete, so it must appear
+atomically: write it under an ignored name (`*.part`, `*.tmp`, or a dot-file) and rename it in place, or write it
+outside `in/` and move it in. A same-filesystem rename is atomic; a plain write into `in/` is not, and risks a
+truncated load.
+
+**Sentinel delivery** (`"sentinel": "glob:*.done"`). The producer writes the data file at leisure, then a marker file
+matching the pattern. Only the marker's arrival triggers the load; the data file's own arrival is ignored. The pattern
+uses the `glob:` or `regex:` prefixes of Java's `FileSystem.getPathMatcher`, matched against the file name, and names
+the data file in one of two ways:
+
+- `glob:*.{ok,ready,done}` — the data file is the marker name minus its last dotted suffix, so `report.csv.done` loads
+  `report.csv`. (Glob alternation is comma-separated.)
+- `regex:(x.*\.xml)\.done` — the data file is capturing group 1, so `x123.xml.done` loads `x123.xml`. A regex with no
+  capturing group falls back to the suffix rule.
+
+The data file is claimed first and the marker deleted after, so a crash in between leaves the data safely in `work/`
+and at worst an orphaned marker, which the next scan cleans up.
+
+The server claims a file by moving it to `work/`, which is also what stops two threads, or two server processes on the
+same tree, from loading it twice.
 
 Files left in `work/` at startup were claimed by a run that died. Whether their transaction committed is unknown, so
 they are moved to `hospital/` for inspection rather than retried - a blind retry could duplicate rows, the loader

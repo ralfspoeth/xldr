@@ -101,7 +101,7 @@ class CsvFileHandler implements InputAdapter {
     private static ToIntFunction<String> positionalIndex() {
         return name -> {
             try {
-                return Integer.parseInt(name.trim()) - 1;
+                return Integer.parseInt(name.strip()) - 1;
             } catch (NumberFormatException e) {
                 return -1;
             }
