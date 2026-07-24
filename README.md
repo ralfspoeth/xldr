@@ -49,28 +49,21 @@ keeping the modular layout and its service binding intact.
 
 ### Releasing
 
-Only the library modules are published to Maven Central: `spec`, `ia`, `ldr`, `csv`, `xml`, `xlsx`, plus the `xldr`
-parent POM they inherit from. `app` (an executable, not a library) and `it` (integration tests) are deliberately not
-published.
+Publishing goes through the Central Portal via the `central-publishing-maven-plugin`, inherited from the `plumbum`
+parent. The plugin bundles the whole reactor into a single deployment, so the `xldr` parent POM and the six library
+modules - `spec`, `ia`, `ldr`, `csv`, `xml`, `xlsx` - are published together. `app` (an executable, not a library)
+and `it` (integration tests) each set `skipPublishing` on the plugin, so they are left out of the bundle.
 
-The deploy is scoped with `-pl`, listing the parent and the six libraries by `:artifactId`:
+A plain deploy therefore publishes everything in one go:
 
-    mvn clean deploy -pl :xldr,:spec,:ia,:ldr,:csv,:xml,:xlsx
+    mvn deploy
 
-Two constraints make this exact list necessary:
+or as a tagged release, which additionally builds and tests everything first:
 
-* the `xldr` parent POM (`:xldr`) must be in the deployment - the child POMs inherit their `url`, `scm`, licence and
-  developer metadata from it, and on a first release it exists nowhere else for Central to resolve;
-* `app` and `it` must be excluded rather than skipped. The `nexus-staging` plugin defers the upload-and-close to the
-  last module in the reactor, and both would sort last (they depend on the libraries); skipping the last module
-  suppresses the upload for the whole build. Excluding them from the reactor leaves a library module last, which
-  finalises the staging repository correctly.
+    mvn release:prepare release:perform
 
-A tagged release drives the same deploy through `maven-release-plugin`; `prepare` still builds and tests everything,
-and only the `perform` deploy is scoped:
-
-    mvn release:prepare
-    mvn release:perform -Darguments="-pl :xldr,:spec,:ia,:ldr,:csv,:xml,:xlsx"
+Publishing needs a Central Portal user token in `settings.xml` under the server id `central` (generate it at
+https://central.sonatype.com/account). `autoPublish` is on, so a valid deployment is released without a manual step.
 
 Loading data from a file into one or more database tables is guarded by a *mapping specification* which comprises an
 *input specification*, a *mapping*, and a *load specification*. The *input specification* tells the engine how to
