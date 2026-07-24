@@ -21,8 +21,7 @@ public class JsonMappingSpecReader implements MappingSpecReader {
         return Greyson.readValue(src)
                 .map(v -> new MappingSpec(
                         PTR.member("input").apply(v).map(JsonMappingSpecReader::inputSpec).orElseThrow(),
-                        PTR.member("mapping").select(Selector.all()).apply(v).map(JsonMappingSpecReader::recordMappingSpec).toList(),
-                        PTR.member("load").apply(v).map(JsonMappingSpecReader::loadSpec).orElseGet(LoadSpec::new)
+                        PTR.member("mapping").select(Selector.all()).apply(v).map(JsonMappingSpecReader::recordMappingSpec).toList()
                 ))
                 .orElseThrow();
     }
@@ -37,16 +36,6 @@ public class JsonMappingSpecReader implements MappingSpecReader {
                         .apply(is)
                         .map(JsonMappingSpecReader::recordSelectorSpec)
                         .toList()
-        );
-    }
-
-    private static LoadSpec loadSpec(JsonValue ls) {
-        return new LoadSpec(
-                PTR.member("commitPolicy")
-                        .stringValue(ls)
-                        .map(String::toUpperCase)
-                        .map(CommitPolicy::valueOf)
-                        .orElse(null)
         );
     }
 

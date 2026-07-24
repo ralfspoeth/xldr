@@ -9,7 +9,6 @@ import io.github.ralfspoeth.xldr.spec.ColumnSource;
 import io.github.ralfspoeth.xldr.spec.FieldMappingSpec;
 import io.github.ralfspoeth.xldr.spec.InputSpec;
 import io.github.ralfspoeth.xldr.spec.MappingSpec;
-import io.github.ralfspoeth.xldr.spec.LoadSpec;
 import io.github.ralfspoeth.xldr.spec.RecordMappingSpec;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -31,7 +30,6 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 public class LoaderTest {
 
-    private LoadSpec loadSpec;
     private String jdbcUrl;
 
 /*
@@ -81,9 +79,6 @@ public class LoaderTest {
     @BeforeEach
     public void prepareConn() throws SQLException {
         jdbcUrl = ResourceBundle.getBundle("h2").getString("url");
-        // the loader is handed a connection; the load spec only says when to
-        // commit, which defaults to ON_CLOSE
-        loadSpec = new LoadSpec();
         try (var conn = DriverManager.getConnection(jdbcUrl);
              var stmt = conn.createStatement()) {
             stmt.execute("drop table if exists person");
@@ -110,8 +105,7 @@ public class LoaderTest {
         ));
         var spec = new MappingSpec(
                 new InputSpec("text/csv", List.of()),
-                List.of(people, visitors),
-                loadSpec
+                List.of(people, visitors)
         );
 
         var adapter = adapterFor(Map.of(
@@ -157,8 +151,7 @@ public class LoaderTest {
         ));
         var spec = new MappingSpec(
                 new InputSpec("text/csv", List.of()),
-                List.of(good, broken),
-                loadSpec
+                List.of(good, broken)
         );
         var adapter = adapterFor(Map.of("people", List.of(Map.of("id", "1"))));
 
@@ -186,8 +179,7 @@ public class LoaderTest {
         ));
         var spec = new MappingSpec(
                 new InputSpec("text/csv", List.of()),
-                List.of(known),
-                loadSpec
+                List.of(known)
         );
         var adapter = adapterFor(Map.of());
 
@@ -214,7 +206,7 @@ public class LoaderTest {
                 new FieldMappingSpec(new ColumnSource.Constant("PD"), "source"),
                 new FieldMappingSpec(new ColumnSource.Function("current_timestamp"), "loaded_at")
         ));
-        var spec = new MappingSpec(new InputSpec("text/csv", List.of()), List.of(mapping), loadSpec);
+        var spec = new MappingSpec(new InputSpec("text/csv", List.of()), List.of(mapping));
         var adapter = adapterFor(Map.of("events", List.of(Map.of("id", "1"), Map.of("id", "2"))));
 
         try (var loader = new Loader(spec, DriverManager.getConnection(jdbcUrl))) {
@@ -259,7 +251,7 @@ public class LoaderTest {
                         new ColumnSource.Lookup("country", "id", "iso", new ColumnSource.Field("c")),
                         "country_id")
         ));
-        var spec = new MappingSpec(new InputSpec("text/csv", List.of()), List.of(mapping), loadSpec);
+        var spec = new MappingSpec(new InputSpec("text/csv", List.of()), List.of(mapping));
         var adapter = adapterFor(Map.of("holders", List.of(
                 Map.of("name", "Alice", "c", "DE"),
                 Map.of("name", "Bob", "c", "US"),
@@ -294,7 +286,7 @@ public class LoaderTest {
                 new FieldMappingSpec("id", "id"),
                 new FieldMappingSpec("name", "name")
         ), 2);
-        var spec = new MappingSpec(new InputSpec("text/csv", List.of()), List.of(mapping), loadSpec);
+        var spec = new MappingSpec(new InputSpec("text/csv", List.of()), List.of(mapping));
         var adapter = adapterFor(Map.of("people", List.of(
                 Map.of("id", "1", "name", "Alice"),
                 Map.of("id", "2", "name", "Bob"),

@@ -24,13 +24,12 @@ import static io.github.ralfspoeth.xmls.XmlFunctions.elements;
  *     &lt;mapping recordSelector="fund" databaseTable="snmandat"&gt;
  *         &lt;fieldMapping fieldSelector="id" databaseColumn="ident1_txt"/&gt;
  *     &lt;/mapping&gt;
- *     &lt;load commitPolicy="ON_CLOSE"/&gt;
  * &lt;/mappingSpec&gt;
  * </pre>
  *
  * The element and attribute names are those of the JSON format, so a spec can
- * be transliterated between the two without renaming anything. {@code type} and
- * the whole {@code load} element are optional.
+ * be transliterated between the two without renaming anything. {@code type} is
+ * optional.
  */
 public class XmlMappingSpecReader implements MappingSpecReader {
 
@@ -46,12 +45,7 @@ public class XmlMappingSpecReader implements MappingSpecReader {
                 elements("mapping")
                         .apply(root)
                         .map(XmlMappingSpecReader::recordMappingSpec)
-                        .toList(),
-                elements("load")
-                        .apply(root)
-                        .findFirst()
-                        .map(XmlMappingSpecReader::loadSpec)
-                        .orElseGet(LoadSpec::new)
+                        .toList()
         );
     }
 
@@ -146,16 +140,6 @@ public class XmlMappingSpecReader implements MappingSpecReader {
         } else {
             return new ColumnSource.Constant(constant.get());
         }
-    }
-
-    private static LoadSpec loadSpec(Element load) {
-        return new LoadSpec(
-                attributeValue("commitPolicy")
-                        .apply(load)
-                        .map(policy -> policy.toUpperCase(Locale.ROOT))
-                        .map(CommitPolicy::valueOf)
-                        .orElse(null)
-        );
     }
 
     /**

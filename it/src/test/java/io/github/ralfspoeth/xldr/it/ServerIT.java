@@ -262,8 +262,7 @@ public class ServerIT {
                     {"fieldSelector": "name", "databaseColumn": "name"}
                   ]
                 }
-              ],
-              "load": {"commitPolicy": "ON_CLOSE"}
+              ]
             }
             """;
 }

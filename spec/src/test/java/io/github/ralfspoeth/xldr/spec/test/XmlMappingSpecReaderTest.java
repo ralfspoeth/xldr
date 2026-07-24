@@ -1,12 +1,10 @@
 package io.github.ralfspoeth.xldr.spec.test;
 
 import io.github.ralfspoeth.xldr.spec.ColumnSource;
-import io.github.ralfspoeth.xldr.spec.CommitPolicy;
 import io.github.ralfspoeth.xldr.spec.DataType;
 import io.github.ralfspoeth.xldr.spec.FieldMappingSpec;
 import io.github.ralfspoeth.xldr.spec.FieldSelectorSpec;
 import io.github.ralfspoeth.xldr.spec.InputSpec;
-import io.github.ralfspoeth.xldr.spec.LoadSpec;
 import io.github.ralfspoeth.xldr.spec.MappingSpec;
 import io.github.ralfspoeth.xldr.spec.RecordMappingSpec;
 import io.github.ralfspoeth.xldr.spec.RecordSelectorSpec;
@@ -46,7 +44,6 @@ public class XmlMappingSpecReaderTest {
                     <mapping recordSelector="position" databaseTable="snposition" limit="500">
                         <fieldMapping fieldSelector="fund" databaseColumn="mandat_nr"/>
                     </mapping>
-                    <load commitPolicy="PER_MAPPING"/>
                 </mappingSpec>
                 """;
 
@@ -74,25 +71,23 @@ public class XmlMappingSpecReaderTest {
                         new RecordMappingSpec("position", "snposition", List.of(
                                 new FieldMappingSpec("fund", "mandat_nr")
                         ), 500)
-                ),
-                new LoadSpec(CommitPolicy.PER_MAPPING)
+                )
         );
 
         assertEquals(expected, new XmlMappingSpecReader().readFrom(new StringReader(source)));
     }
 
     /**
-     * The load element is optional and defaults to ON_CLOSE, as in JSON.
+     * A spec carrying only an input parses, with no record selectors or mappings.
      */
     @Test
-    public void defaultsTheLoadSpec() throws IOException {
+    public void parsesAnInputOnlySpec() throws IOException {
         var source = """
                 <mappingSpec>
                     <input mimeType="text/csv"/>
                 </mappingSpec>
                 """;
         var spec = new XmlMappingSpecReader().readFrom(new StringReader(source));
-        assertEquals(new LoadSpec(CommitPolicy.ON_CLOSE), spec.loadSpec());
         assertEquals(List.of(), List.copyOf(spec.inputSpec().recordSelectors()));
         assertEquals(List.of(), List.copyOf(spec.recordMappingSpecs()));
     }

@@ -3,7 +3,6 @@ package io.github.ralfspoeth.xldr.ldr;
 import io.github.ralfspoeth.xldr.ia.InputAdapter;
 import io.github.ralfspoeth.xldr.ia.Row;
 import io.github.ralfspoeth.xldr.spec.ColumnSource;
-import io.github.ralfspoeth.xldr.spec.CommitPolicy;
 import io.github.ralfspoeth.xldr.spec.MappingSpec;
 import io.github.ralfspoeth.xldr.spec.RecordMappingSpec;
 
@@ -20,9 +19,9 @@ import java.util.regex.Pattern;
  * The connection is supplied by the caller - which database is fed is a
  * deployment concern of the application, not part of the mapping. The loader
  * borrows the connection: it switches auto-commit off for the duration of the
- * load, commits according to {@code ms.loadSpec().commitPolicy()}, and on
- * {@link #close()} restores the previous auto-commit setting and closes the
- * connection - which returns it to its pool. Intent is insert only.
+ * load, commits the whole input on {@link #close()} - or rolls it all back if
+ * any record mapping failed - then restores the previous auto-commit setting and
+ * closes the connection, which returns it to its pool. Intent is insert only.
  */
 public class Loader implements AutoCloseable {
     private static final Pattern QS_PATTERN = Pattern.compile("\".*\"");
@@ -146,9 +145,6 @@ public class Loader implements AutoCloseable {
                     }
                 }
             }
-            if (mappingSpec.loadSpec().commitPolicy() == CommitPolicy.PER_MAPPING) {
-                connection.commit();
-            }
             return count;
         } catch (IOException | SQLException | RuntimeException e) {
             failed = true;
@@ -191,23 +187,6 @@ public class Loader implements AutoCloseable {
                         + " where " + normalizeIdentifier(lk.keyColumn()) + " = " + keyExpr + ")";
             }
         };
-    }
-
-    public void insert(String table, List<String> cols, List<?> values) throws SQLException {
-        int rows;
-        try (var ps = prepareInsert(new TabCol(table, cols, cols.stream().map(c -> "?").toList()))) {
-            ps.clearParameters();
-            for (int i = 0; i < values.size(); i++) {
-                var value = values.get(i);
-                if (value == null) {
-                    ps.setNull(i + 1, Types.VARCHAR);
-                } else {
-                    ps.setObject(i + 1, value);
-                }
-            }
-            rows = ps.executeUpdate();
-        }
-        assert rows == 1;
     }
 
     /**

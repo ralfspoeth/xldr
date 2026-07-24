@@ -18,8 +18,7 @@ public class SpecIOTest {
     public void testIO() throws IOException {
         var spec = new MappingSpec(
                 new InputSpec("text/xml", List.of(new RecordSelectorSpec("root", "/", List.of(new FieldSelectorSpec("id", "@id", DataType.STRING))))),
-                List.of(new RecordMappingSpec("root", "sntrx", List.of(new FieldMappingSpec("id", "id_txt")))),
-                new LoadSpec(CommitPolicy.PER_MAPPING)
+                List.of(new RecordMappingSpec("root", "sntrx", List.of(new FieldMappingSpec("id", "id_txt"))))
         );
         var of = File.createTempFile("spec", ".ser");
         try (var oo = new ObjectOutputStream(new FileOutputStream(of))) {
@@ -40,10 +39,7 @@ public class SpecIOTest {
                             "fieldSelectors":[{"name": "id", "selector": "@id"}]
                         }]
                     },
-                    "mapping":[],
-                    "load": {
-                        "commitPolicy": "PER_MAPPING"
-                    }
+                    "mapping":[]
                 }""";
 
         var mappingSpecReader = new JsonMappingSpecReader();
@@ -54,8 +50,7 @@ public class SpecIOTest {
                                 new FieldSelectorSpec("id", "@id", null)
                         )))
                 ),
-                List.of(),
-                new LoadSpec(CommitPolicy.PER_MAPPING)
+                List.of()
         );
         assertAll(
                 () -> assertEquals(expected, result)
@@ -99,10 +94,6 @@ public class SpecIOTest {
                         ]
                     },
                     "liliput": true,
-                    "load": {
-                        "commitPolicy": "on_close",
-                        "looser": true
-                    },
                     "mapping": [
                         {
                             "recordSelector": "fund",

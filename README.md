@@ -66,10 +66,11 @@ Publishing needs a Central Portal user token in `settings.xml` under the server 
 https://central.sonatype.com/account). `autoPublish` is on, so a valid deployment is released without a manual step.
 
 Loading data from a file into one or more database tables is guarded by a *mapping specification* which comprises an
-*input specification*, a *mapping*, and a *load specification*. The *input specification* tells the engine how to
-parse a given file and to load *records* and *fields*. The *mapping* provides - as its name implies - a mapping from
-records to database tables and from fields to database columns. The *load specification* says how the load is carried
-out; the target database itself is configured on the application, not in the mapping.
+*input specification* and a *mapping*. The *input specification* tells the engine how to parse a given file and to
+load *records* and *fields*. The *mapping* provides - as its name implies - a mapping from records to database tables
+and from fields to database columns. The whole input is loaded in one transaction, committed when the file has been
+read in full or rolled back entirely if any record mapping fails; the target database itself is configured on the
+application, not in the mapping.
 
 The mapping specification can be constructed programmatically or can be provided through some source text in one of the
 following formats:
@@ -126,24 +127,15 @@ Example:
         ]
     }
 
-### The Load Specification
+### Committing
 
-The load specification says *how* a load is carried out, currently only when it is committed. It deliberately carries no
-connection information: which database is fed is a deployment concern configured on the application, so that the same
-mapping specification can be promoted from test to production unchanged and no credentials live in the input tree.
-
-`commitPolicy` is either `ON_CLOSE` - one transaction for the whole input, rolled back entirely if any record mapping
-fails - or `PER_MAPPING`, which commits after each record mapping that succeeded. The element as a whole is optional and
-defaults to `ON_CLOSE`.
-
-Example:
-
-    "load": {
-        "commitPolicy": "ON_CLOSE"
-    }
+The whole input is one transaction: the loader commits when the file has been read in full, or rolls everything back
+if any record mapping fails - all or nothing. This keeps the file the unit of work, so a failed load leaves the target
+tables untouched and the file can be corrected and retried.
 
 Which database is fed, and how it is pooled, is configured on the application rather than in the mapping - see
-[Configuration](#configuration).
+[Configuration](#configuration). No connection information lives in the spec, so the same mapping can be promoted from
+test to production unchanged.
 
 ### The Record Mapping Specification
 
@@ -216,7 +208,6 @@ element are optional.
         <mapping recordSelector="fund" databaseTable="snmandat">
             <fieldMapping fieldSelector="id" databaseColumn="ident1_txt"/>
         </mapping>
-        <load commitPolicy="ON_CLOSE"/>
     </mappingSpec>
 
 ## The Server
