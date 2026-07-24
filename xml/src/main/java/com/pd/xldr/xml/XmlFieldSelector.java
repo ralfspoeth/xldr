@@ -23,7 +23,7 @@ import java.util.function.Function;
  * A literal such as {@code 'PD'} is a perfectly good selector too, which is how
  * a constant column is expressed.
  */
-public class XmlFieldSelector {
+class XmlFieldSelector {
 
     private final String name;
     private final XPathExpression expression;

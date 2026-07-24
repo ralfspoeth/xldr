@@ -37,7 +37,7 @@ import java.util.stream.IntStream;
  * {@code DocumentBuilderFactory} are not thread safe. That matches how the
  * application uses it, one adapter per file being loaded.
  */
-public class XmlFileHandler implements InputAdapter {
+class XmlFileHandler implements InputAdapter {
 
     /**
      * Optional adapter property naming the pattern for {@code DATE} fields;

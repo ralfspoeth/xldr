@@ -16,7 +16,7 @@ import java.util.Objects;
  * set - {@code /root/fund} or {@code //position}. Each node of that set becomes
  * one row, and the field selectors are evaluated against it.
  */
-public class XmlRecordSelector {
+class XmlRecordSelector {
 
     private final String name;
     private final String selector;

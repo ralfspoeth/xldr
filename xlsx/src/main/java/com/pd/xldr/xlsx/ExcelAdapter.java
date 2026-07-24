@@ -32,7 +32,7 @@ import java.util.Set;
  * cell without keeping it open past the parse - which suits loading a file into
  * a database.
  */
-public class ExcelAdapter implements InputAdapter {
+class ExcelAdapter implements InputAdapter {
 
     private record RecordDef(Range range, Map<String, Field> fields, Map<String, CellRef> refs) {}
 
