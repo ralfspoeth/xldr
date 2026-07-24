@@ -11,6 +11,8 @@
     </parent>
 
     <artifactId>ia</artifactId>
+    <name>xldr ia</name>
+    <description>Input adapter SPI for xldr: the InputAdapterFactory service and row/field abstractions.</description>
 
     <dependencies>
         <dependency>

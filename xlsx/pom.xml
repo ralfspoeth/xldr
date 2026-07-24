@@ -11,6 +11,8 @@
     <modelVersion>4.0.0</modelVersion>
 
     <artifactId>xlsx</artifactId>
+    <name>xldr xlsx</name>
+    <description>Excel input adapter for xldr, reading .xls and .xlsx ranges via Apache POI.</description>
 
     <dependencies>
         <dependency>

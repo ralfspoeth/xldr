@@ -10,6 +10,8 @@
     </parent>
 
     <artifactId>spec</artifactId>
+    <name>xldr spec</name>
+    <description>Mapping specification model for xldr: input, record, field and load specs.</description>
 
     <dependencies>
         <dependency>

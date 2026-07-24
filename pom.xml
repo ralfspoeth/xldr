@@ -6,7 +6,7 @@
 
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <revision>1.0.0-SNAPSHOT</revision>
+        <revision>0.1-SNAPSHOT</revision>
     </properties>
 
     <parent>
@@ -30,6 +30,16 @@
 
     <version>${revision}</version>
     <packaging>pom</packaging>
+
+    <name>xldr</name>
+    <description>A modular toolkit that loads CSV, XML and Excel files into database tables from a mapping specification.</description>
+    <url>https://github.com/ralfspoeth/xldr</url>
+
+    <scm>
+        <url>scm:git:https://github.com/ralfspoeth/xldr</url>
+        <developerConnection>scm:git:https://github.com/ralfspoeth/xldr.git</developerConnection>
+        <tag>HEAD</tag>
+    </scm>
 
     <dependencyManagement>
         <dependencies>
@@ -189,6 +199,14 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-jar-plugin</artifactId>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-source-plugin</artifactId>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-javadoc-plugin</artifactId>
             </plugin>
             <plugin>
                 <groupId>org.codehaus.mojo</groupId>

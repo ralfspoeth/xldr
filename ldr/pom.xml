@@ -10,6 +10,8 @@
     <modelVersion>4.0.0</modelVersion>
 
     <artifactId>ldr</artifactId>
+    <name>xldr ldr</name>
+    <description>The loader for xldr: turns mapped records into prepared inserts against a JDBC connection.</description>
 
     <dependencies>
         <dependency>
