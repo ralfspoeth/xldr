@@ -47,6 +47,31 @@ into `lib/` so the package is self-contained; drop the drivers you do not target
 - are automatic modules, which `jlink` cannot link into an image. The module-path distribution sidesteps that while
 keeping the modular layout and its service binding intact.
 
+### Releasing
+
+Only the library modules are published to Maven Central: `spec`, `ia`, `ldr`, `csv`, `xml`, `xlsx`, plus the `xldr`
+parent POM they inherit from. `app` (an executable, not a library) and `it` (integration tests) are deliberately not
+published.
+
+The deploy is scoped with `-pl`, listing the parent and the six libraries by `:artifactId`:
+
+    mvn clean deploy -pl :xldr,:spec,:ia,:ldr,:csv,:xml,:xlsx
+
+Two constraints make this exact list necessary:
+
+* the `xldr` parent POM (`:xldr`) must be in the deployment - the child POMs inherit their `url`, `scm`, licence and
+  developer metadata from it, and on a first release it exists nowhere else for Central to resolve;
+* `app` and `it` must be excluded rather than skipped. The `nexus-staging` plugin defers the upload-and-close to the
+  last module in the reactor, and both would sort last (they depend on the libraries); skipping the last module
+  suppresses the upload for the whole build. Excluding them from the reactor leaves a library module last, which
+  finalises the staging repository correctly.
+
+A tagged release drives the same deploy through `maven-release-plugin`; `prepare` still builds and tests everything,
+and only the `perform` deploy is scoped:
+
+    mvn release:prepare
+    mvn release:perform -Darguments="-pl :xldr,:spec,:ia,:ldr,:csv,:xml,:xlsx"
+
 Loading data from a file into one or more database tables is guarded by a *mapping specification* which comprises an
 *input specification*, a *mapping*, and a *load specification*. The *input specification* tells the engine how to
 parse a given file and to load *records* and *fields*. The *mapping* provides - as its name implies - a mapping from
