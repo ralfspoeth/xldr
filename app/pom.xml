@@ -14,8 +14,8 @@
     <artifactId>app</artifactId>
 
     <properties>
-        <!-- an executable application, not a library: keep it off Maven Central -->
         <maven.deploy.skip>true</maven.deploy.skip>
+        <skipNexusStagingDeployMojo>true</skipNexusStagingDeployMojo>
     </properties>
 
     <dependencies>

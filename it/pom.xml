@@ -12,8 +12,8 @@
     <artifactId>it</artifactId>
 
     <properties>
-        <!-- integration tests only: nothing to publish -->
         <maven.deploy.skip>true</maven.deploy.skip>
+        <skipNexusStagingDeployMojo>true</skipNexusStagingDeployMojo>
     </properties>
 
     <dependencies>
