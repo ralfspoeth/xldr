@@ -261,6 +261,11 @@ the data file in one of two ways:
 The data file is claimed first and the marker deleted after, so a crash in between leaves the data safely in `work/`
 and at worst an orphaned marker, which the next scan cleans up.
 
+**Selecting files** (optional `accepts`). By default a feed claims every data file that arrives. An `accepts` pattern
+restricts it to files whose name matches, using the same `glob:` / `regex:` prefixes as `sentinel` - for example
+`"accepts": "glob:abc*.xml"`. A file that does not match is left in `in/` untouched (it is neither loaded nor moved).
+This only gates which files the feed claims; the `mimeType` still selects the adapter that parses them.
+
 The server claims a file by moving it to `work/`, which is also what stops two threads, or two server processes on the
 same tree, from loading it twice.
 

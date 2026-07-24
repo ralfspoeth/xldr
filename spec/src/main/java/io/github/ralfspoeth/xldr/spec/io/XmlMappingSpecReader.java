@@ -59,6 +59,7 @@ public class XmlMappingSpecReader implements MappingSpecReader {
         return new InputSpec(
                 required(input, "mimeType"),
                 attributeValue("sentinel").apply(input).orElse(null),
+                attributeValue("accepts").apply(input).orElse(null),
                 elements("recordSelector")
                         .apply(input)
                         .map(XmlMappingSpecReader::recordSelectorSpec)

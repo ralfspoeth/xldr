@@ -3,13 +3,16 @@ package io.github.ralfspoeth.xldr.app;
 import io.github.ralfspoeth.filews.DirectoryWatchService;
 
 import java.io.IOException;
+import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.PathMatcher;
 import java.util.Collection;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Properties;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.regex.PatternSyntaxException;
 
 import static java.lang.System.Logger.Level.DEBUG;
 import static java.lang.System.Logger.Level.INFO;
@@ -72,7 +75,9 @@ public class FeedRegistry {
             var mappingSpec = MappingSpecs.read(specFile);
             var sentinelSpec = mappingSpec.inputSpec().sentinel();
             var sentinel = sentinelSpec == null ? null : Sentinel.parse(sentinelSpec);
-            var feed = new Feed(feedDir, specFile, modified, mappingSpec, adapterProperties(feedDir), sentinel);
+            var acceptMatcher = acceptMatcher(mappingSpec.inputSpec().accepts());
+            var feed = new Feed(feedDir, specFile, modified, mappingSpec,
+                    adapterProperties(feedDir), sentinel, acceptMatcher);
             ensureDirectoriesAndWatch(feed);
             feeds.put(feedDir, feed);
             byInbox.put(feed.in(), feed);
@@ -82,6 +87,29 @@ public class FeedRegistry {
             deactivate(feedDir, e.getMessage());
         } catch (IOException | RuntimeException e) {
             deactivate(feedDir, "cannot read mapping spec: " + e);
+        }
+    }
+
+    /**
+     * Builds the accept matcher for a feed. The pattern uses the same
+     * {@code glob:} / {@code regex:} prefixes as the sentinel.
+     *
+     * @throws IllegalArgumentException if the pattern lacks a known prefix or
+     *                                  does not compile - caught by reconcile,
+     *                                  which then leaves the feed inactive
+     */
+    private static PathMatcher acceptMatcher(String pattern) {
+        if (pattern == null) {
+            return null;
+        }
+        if (!pattern.startsWith("glob:") && !pattern.startsWith("regex:")) {
+            throw new IllegalArgumentException(
+                    "accepts must start with 'glob:' or 'regex:', was: " + pattern);
+        }
+        try {
+            return FileSystems.getDefault().getPathMatcher(pattern);
+        } catch (PatternSyntaxException | UnsupportedOperationException e) {
+            throw new IllegalArgumentException("invalid accepts pattern: " + pattern, e);
         }
     }
 

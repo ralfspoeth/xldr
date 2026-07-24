@@ -19,7 +19,7 @@ public class CsvFileHandlerFactory implements InputAdapterFactory {
     }
 
     @Override
-    public boolean accepts(String mimeType) {
+    public boolean reads(String mimeType) {
         return ACCEPT.contains(mimeType);
     }
 

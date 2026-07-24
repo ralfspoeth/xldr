@@ -22,9 +22,17 @@ import static java.util.Objects.requireNonNullElse;
  *                        {@code glob:*.{ok,ready,done}} loads the marker name
  *                        minus its last suffix; {@code regex:(x.*\.xml)\.done}
  *                        loads capturing group 1.
+ * @param accepts         which data files in {@code in/} this feed claims,
+ *                        matched against the file <em>name</em> in the same
+ *                        {@code glob:} / {@code regex:} form as {@code sentinel}
+ *                        (for example {@code glob:abc*.xml}). When {@code null}
+ *                        the feed claims every file. A file that does not match
+ *                        is left in {@code in/} untouched. This gates files; the
+ *                        {@code mimeType} still selects the adapter.
  * @param recordSelectors the record selectors of the input
  */
-public record InputSpec(String mimeType, String sentinel, Collection<RecordSelectorSpec> recordSelectors)
+public record InputSpec(String mimeType, String sentinel, String accepts,
+                        Collection<RecordSelectorSpec> recordSelectors)
         implements Serializable {
 
     public InputSpec {
@@ -32,9 +40,9 @@ public record InputSpec(String mimeType, String sentinel, Collection<RecordSelec
     }
 
     /**
-     * Atomic-delivery input: no sentinel.
+     * Atomic-delivery input claiming every file: no sentinel, no accept pattern.
      */
     public InputSpec(String mimeType, Collection<RecordSelectorSpec> recordSelectors) {
-        this(mimeType, null, recordSelectors);
+        this(mimeType, null, null, recordSelectors);
     }
 }

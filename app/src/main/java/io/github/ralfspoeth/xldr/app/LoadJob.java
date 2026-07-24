@@ -67,7 +67,7 @@ public class LoadJob {
         var factory = ServiceLoader.load(InputAdapterFactory.class)
                 .stream()
                 .map(ServiceLoader.Provider::get)
-                .filter(iaf -> iaf.accepts(inputSpec))
+                .filter(iaf -> iaf.reads(inputSpec))
                 .findFirst()
                 .orElseThrow(() -> new IllegalStateException(
                         "no input adapter for mime type " + inputSpec.mimeType()));

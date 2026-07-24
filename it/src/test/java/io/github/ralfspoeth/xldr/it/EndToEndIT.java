@@ -88,7 +88,7 @@ public class EndToEndIT {
         var factory = ServiceLoader.load(InputAdapterFactory.class)
                 .stream()
                 .map(ServiceLoader.Provider::get)
-                .filter(f -> f.accepts(inputSpec))
+                .filter(f -> f.reads(inputSpec))
                 .findFirst()
                 .orElseThrow(() -> new IllegalStateException("no adapter for " + inputSpec.mimeType()));
         return factory.createInputAdapter(inputSpec);

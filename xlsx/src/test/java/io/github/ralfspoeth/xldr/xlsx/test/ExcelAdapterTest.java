@@ -32,7 +32,7 @@ public class ExcelAdapterTest {
         var factory = ServiceLoader.load(InputAdapterFactory.class)
                 .stream()
                 .map(ServiceLoader.Provider::get)
-                .filter(f -> f.accepts(spec))
+                .filter(f -> f.reads(spec))
                 .findFirst()
                 .orElseThrow();
         return factory.createInputAdapter(spec);

@@ -31,6 +31,7 @@ public class JsonMappingSpecReader implements MappingSpecReader {
         return new InputSpec(
                 PTR.member("mimeType").stringOrThrow(is),
                 PTR.member("sentinel").stringValue(is).orElse(null),
+                PTR.member("accepts").stringValue(is).orElse(null),
                 PTR.member("recordSelectors")
                         .select(Selector.all())
                         .apply(is)

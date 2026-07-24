@@ -3,6 +3,7 @@ package io.github.ralfspoeth.xldr.app;
 import io.github.ralfspoeth.xldr.spec.MappingSpec;
 
 import java.nio.file.Path;
+import java.nio.file.PathMatcher;
 import java.nio.file.attribute.FileTime;
 import java.util.List;
 import java.util.Properties;
@@ -21,8 +22,10 @@ import java.util.Properties;
  *     hospital/           failed, together with an error log
  * </pre>
  *
- * @param specModified stamp of the spec file when it was parsed; lets the
- *                     registry re-read it only when it actually changed
+ * @param specModified  stamp of the spec file when it was parsed; lets the
+ *                      registry re-read it only when it actually changed
+ * @param acceptMatcher which files in {@code in/} this feed claims, or
+ *                      {@code null} to claim every file
  */
 public record Feed(
         Path directory,
@@ -30,8 +33,17 @@ public record Feed(
         FileTime specModified,
         MappingSpec mappingSpec,
         Properties adapterProperties,
-        Sentinel sentinel
+        Sentinel sentinel,
+        PathMatcher acceptMatcher
 ) {
+
+    /**
+     * Whether this feed claims {@code file}, matched against its name only. A
+     * feed with no accept pattern claims every file.
+     */
+    public boolean accepts(Path file) {
+        return acceptMatcher == null || acceptMatcher.matches(file.getFileName());
+    }
 
     /**
      * Created below a feed directory when the feed becomes active.

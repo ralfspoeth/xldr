@@ -5,10 +5,10 @@ import io.github.ralfspoeth.xldr.spec.InputSpec;
 import java.util.Properties;
 
 public interface InputAdapterFactory {
-    boolean accepts(String mimeType);
+    boolean reads(String mimeType);
 
-    default boolean accepts(InputSpec spec) {
-        return accepts(spec.mimeType());
+    default boolean reads(InputSpec spec) {
+        return reads(spec.mimeType());
     }
 
     void setProperty(String property, String value);

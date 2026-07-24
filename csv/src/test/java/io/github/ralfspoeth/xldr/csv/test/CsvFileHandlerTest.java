@@ -59,7 +59,7 @@ public class CsvFileHandlerTest {
         return ServiceLoader.load(InputAdapterFactory.class)
                 .stream()
                 .map(ServiceLoader.Provider::get)
-                .filter(iaf -> iaf.accepts(spec))
+                .filter(iaf -> iaf.reads(spec))
                 .findFirst().orElseThrow();
     }
 

@@ -56,14 +56,23 @@ public class FileProcessor {
      * that matters: the marker names the data file (its own name minus the
      * suffix), that file is loaded, and the marker is consumed. A data file
      * arriving on its own is ignored until its marker follows.
+     * <p>
+     * A data file the feed does not {@link Feed#accepts accept} is left in
+     * {@code in/} untouched.
      */
     public void onArrival(Feed feed, Path file) {
         var sentinel = feed.sentinel();
         if (sentinel == null) {
-            process(feed, file);
+            if (feed.accepts(file)) {
+                process(feed, file);
+            }
         } else if (sentinel.isMarker(file)) {
             sentinel.dataFileOf(file).ifPresentOrElse(
-                    data -> processSignalled(feed, file, data),
+                    data -> {
+                        if (feed.accepts(data)) {
+                            processSignalled(feed, file, data);
+                        }
+                    },
                     () -> discardMarker(feed, file, "names no data file"));
         }
     }
@@ -257,14 +266,19 @@ public class FileProcessor {
         try (var exec = Executors.newVirtualThreadPerTaskExecutor()) {
             for (var file : pending) {
                 if (sentinel == null) {
-                    exec.submit(() -> process(feed, file));
+                    if (feed.accepts(file)) {
+                        exec.submit(() -> process(feed, file));
+                    }
                 } else {
                     sentinel.dataFileOf(file).ifPresentOrElse(data -> {
-                        if (Files.exists(data)) {
-                            exec.submit(() -> processSignalled(feed, file, data));
-                        } else {
-                            discardMarker(feed, file, "orphaned, no " + data.getFileName());
+                        if (feed.accepts(data)) {
+                            if (Files.exists(data)) {
+                                exec.submit(() -> processSignalled(feed, file, data));
+                            } else {
+                                discardMarker(feed, file, "orphaned, no " + data.getFileName());
+                            }
                         }
+                        // else: the data file is not this feed's; leave it in in/
                     }, () -> discardMarker(feed, file, "names no data file"));
                 }
             }
