@@ -250,13 +250,9 @@ truncated load.
 
 **Sentinel delivery** (`"sentinel": "glob:*.done"`). The producer writes the data file at leisure, then a marker file
 matching the pattern. Only the marker's arrival triggers the load; the data file's own arrival is ignored. The pattern
-uses the `glob:` or `regex:` prefixes of Java's `FileSystem.getPathMatcher`, matched against the file name, and names
-the data file in one of two ways:
-
-- `glob:*.{ok,ready,done}` — the data file is the marker name minus its last dotted suffix, so `report.csv.done` loads
-  `report.csv`. (Glob alternation is comma-separated.)
-- `regex:(x.*\.xml)\.done` — the data file is capturing group 1, so `x123.xml.done` loads `x123.xml`. A regex with no
-  capturing group falls back to the suffix rule.
+is passed straight to Java's `FileSystem.getPathMatcher`, so it carries its own `glob:` or `regex:` prefix and is
+matched against the file name. The data file is always the marker name minus its last dotted suffix, so
+`report.csv.done` loads `report.csv` (glob alternation, as in `glob:*.{ok,ready,done}`, is comma-separated).
 
 The data file is claimed first and the marker deleted after, so a crash in between leaves the data safely in `work/`
 and at worst an orphaned marker, which the next scan cleans up.

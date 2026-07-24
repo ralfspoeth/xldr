@@ -18,10 +18,10 @@ import static java.util.Objects.requireNonNullElse;
  *                        {@code glob:} or {@code regex:} form (as understood by
  *                        {@code FileSystem.getPathMatcher}): the producer writes
  *                        the data file, then a marker file matching the pattern;
- *                        only the marker's arrival triggers the load. Examples:
- *                        {@code glob:*.{ok,ready,done}} loads the marker name
- *                        minus its last suffix; {@code regex:(x.*\.xml)\.done}
- *                        loads capturing group 1.
+ *                        only the marker's arrival triggers the load. The data
+ *                        file is always the marker name minus its last dotted
+ *                        suffix, so {@code glob:*.{ok,ready,done}} loads
+ *                        {@code report.csv} from {@code report.csv.done}.
  * @param accepts         which data files in {@code in/} this feed claims,
  *                        matched against the file <em>name</em> in the same
  *                        {@code glob:} / {@code regex:} form as {@code sentinel}
