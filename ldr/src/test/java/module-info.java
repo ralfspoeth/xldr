@@ -1,6 +1,6 @@
-open module com.pd.xldr.ldr.test {
-    requires com.pd.xldr.ldr;
-    requires com.pd.xldr.ia;
+open module io.github.ralfspoeth.xldr.ldr.test {
+    requires io.github.ralfspoeth.xldr.ldr;
+    requires io.github.ralfspoeth.xldr.ia;
     requires org.junit.jupiter.api;
     requires java.sql;
 }

@@ -1,5 +1,5 @@
-module com.pd.xldr.ldr {
-    exports com.pd.xldr.ldr;
-    requires transitive com.pd.xldr.ia;
+module io.github.ralfspoeth.xldr.ldr {
+    exports io.github.ralfspoeth.xldr.ldr;
+    requires transitive io.github.ralfspoeth.xldr.ia;
     requires transitive java.sql;
 }

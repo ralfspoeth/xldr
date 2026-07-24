@@ -1,4 +1,4 @@
-open module com.pd.xldr.app.test {
-    requires com.pd.xldr.app;
+open module io.github.ralfspoeth.xldr.app.test {
+    requires io.github.ralfspoeth.xldr.app;
     requires org.junit.jupiter.api;
 }

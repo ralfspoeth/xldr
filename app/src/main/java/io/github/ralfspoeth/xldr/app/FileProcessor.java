@@ -1,0 +1,290 @@
+package io.github.ralfspoeth.xldr.app;
+
+import java.io.IOException;
+import java.io.PrintWriter;
+import java.io.StringWriter;
+import java.nio.file.Files;
+import java.nio.file.NoSuchFileException;
+import java.nio.file.Path;
+import java.util.List;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Semaphore;
+
+import static java.lang.System.Logger.Level.ERROR;
+import static java.lang.System.Logger.Level.INFO;
+import static java.lang.System.Logger.Level.WARNING;
+import static java.nio.file.StandardCopyOption.ATOMIC_MOVE;
+
+/**
+ * Runs one input file through its feed and files it away afterwards.
+ * <p>
+ * A file is claimed by moving it out of {@code in/} into {@code work/} with an
+ * atomic move. That move is the lock: whoever wins it owns the file, so two
+ * event callbacks - or two server processes on the same tree - cannot both load
+ * it. It also means a crash leaves the file in {@code work/}, where it is a
+ * known-ambiguous case rather than something that gets loaded twice.
+ * <p>
+ * Every caller arrives on a virtual thread of its own - one per watch event -
+ * so the number of loads running at once is bounded here rather than by the
+ * connection pool: a semaphore is a limit one can reason about, whereas
+ * exhausting the pool merely turns into threads parked in
+ * {@code getConnection()}. Claiming and filing away are not counted, only the
+ * load itself.
+ */
+public class FileProcessor {
+
+    private static final System.Logger LOG = System.getLogger(FileProcessor.class.getName());
+    private static final DateTimeFormatter STAMP = DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss-SSS");
+
+    private final ConnectionSource connectionSource;
+    /** fair, so a file cannot be starved by a steady stream of newer arrivals */
+    private final Semaphore loadPermits;
+
+    public FileProcessor(ConnectionSource connectionSource, int maxConcurrentLoads) {
+        this.connectionSource = connectionSource;
+        this.loadPermits = new Semaphore(maxConcurrentLoads, true);
+    }
+
+    /**
+     * Reacts to one file appearing in {@code in/}.
+     * <p>
+     * With no sentinel the producer delivers atomically, so the arriving file is
+     * ready and is loaded directly. With a sentinel it is the marker's arrival
+     * that matters: the marker names the data file (its own name minus the
+     * suffix), that file is loaded, and the marker is consumed. A data file
+     * arriving on its own is ignored until its marker follows.
+     */
+    public void onArrival(Feed feed, Path file) {
+        var sentinel = feed.sentinel();
+        if (sentinel == null) {
+            process(feed, file);
+        } else if (sentinel.isMarker(file)) {
+            sentinel.dataFileOf(file).ifPresentOrElse(
+                    data -> processSignalled(feed, file, data),
+                    () -> discardMarker(feed, file, "names no data file"));
+        }
+    }
+
+    /**
+     * Claims {@code file} and loads it. Does nothing if the file has already
+     * been claimed by someone else or has disappeared.
+     */
+    public void process(Feed feed, Path file) {
+        var claimed = claimOrLog(feed, file);
+        if (claimed != null) {
+            runLoad(feed, claimed, file.getFileName().toString());
+        }
+    }
+
+    /**
+     * Loads the data file a sentinel marker points at, then consumes the marker.
+     * <p>
+     * The data file is claimed first - that move is the lock - and only then is
+     * the marker deleted, so a crash in between leaves the data safely in
+     * {@code work/} (recovered at startup) and at worst an orphaned marker
+     * (cleaned by the next scan), never a data file that is loaded twice.
+     */
+    private void processSignalled(Feed feed, Path sentinel, Path dataFile) {
+        var claimed = claimOrLog(feed, dataFile);
+        deleteQuietly(sentinel);
+        if (claimed != null) {
+            runLoad(feed, claimed, dataFile.getFileName().toString());
+        }
+    }
+
+    private Path claimOrLog(Feed feed, Path file) {
+        try {
+            return claim(feed, file);
+        } catch (IOException e) {
+            LOG.log(WARNING, () -> "could not claim " + file + ": " + e);
+            return null;
+        }
+    }
+
+    /**
+     * Loads an already-claimed file, under the concurrency permit, and files it
+     * away afterwards.
+     */
+    private void runLoad(Feed feed, Path claimed, String originalName) {
+        try {
+            loadPermits.acquire();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            unclaim(feed, claimed);
+            return;
+        }
+        try {
+            var rows = new LoadJob(feed.mappingSpec(), connectionSource, feed.adapterProperties()).load(claimed);
+            var target = archive(feed, claimed);
+            LOG.log(INFO, () -> "loaded " + rows + " row(s) from " + originalName
+                    + " [" + feed.name() + "] -> " + target);
+        } catch (Exception e) {
+            LOG.log(ERROR, () -> "load failed for " + originalName + " [" + feed.name() + "]: " + e);
+            try {
+                hospitalise(feed, claimed, e);
+            } catch (IOException io) {
+                LOG.log(ERROR, () -> "could not move " + claimed + " to the hospital: " + io);
+            }
+        } finally {
+            loadPermits.release();
+        }
+    }
+
+    private void discardMarker(Feed feed, Path marker, String why) {
+        LOG.log(WARNING, () -> "sentinel " + marker.getFileName() + " [" + feed.name() + "] " + why);
+        deleteQuietly(marker);
+    }
+
+    private static void deleteQuietly(Path path) {
+        try {
+            Files.deleteIfExists(path);
+        } catch (IOException e) {
+            LOG.log(WARNING, () -> "could not delete " + path + ": " + e);
+        }
+    }
+
+    /**
+     * Undoes a claim that was never acted upon - only safe because no load has
+     * been attempted yet.
+     */
+    private void unclaim(Feed feed, Path claimed) {
+        try {
+            Files.move(claimed, unique(feed.in(), claimed.getFileName().toString()), ATOMIC_MOVE);
+        } catch (IOException e) {
+            LOG.log(WARNING, () -> "could not return " + claimed + " to " + feed.in() + ": " + e);
+        }
+    }
+
+    /**
+     * @return the file in {@code work/}, or {@code null} if it was not ours to claim
+     */
+    private Path claim(Feed feed, Path file) throws IOException {
+        if (!Files.isRegularFile(file) || isIgnored(file)) {
+            return null;
+        }
+        var target = unique(feed.work(), file.getFileName().toString());
+        try {
+            return Files.move(file, target, ATOMIC_MOVE);
+        } catch (NoSuchFileException e) {
+            return null;
+        }
+    }
+
+    private Path archive(Feed feed, Path claimed) throws IOException {
+        var today = LocalDate.now();
+        var dir = feed.archive()
+                .resolve(String.valueOf(today.getYear()))
+                .resolve("%02d".formatted(today.getMonthValue()))
+                .resolve("%02d".formatted(today.getDayOfMonth()));
+        Files.createDirectories(dir);
+        var target = unique(dir, claimed.getFileName().toString());
+        Files.move(claimed, target);
+        return target;
+    }
+
+    private void hospitalise(Feed feed, Path claimed, Exception failure) throws IOException {
+        Files.createDirectories(feed.hospital());
+        var name = claimed.getFileName().toString();
+        var target = unique(feed.hospital(), name);
+        Files.move(claimed, target);
+        var log = feed.hospital().resolve(target.getFileName() + "." + LocalDateTime.now().format(STAMP) + ".log");
+        var trace = new StringWriter();
+        try (var out = new PrintWriter(trace)) {
+            out.println("feed:    " + feed.name());
+            out.println("spec:    " + feed.specFile());
+            out.println("input:   " + name);
+            out.println("failed:  " + LocalDateTime.now());
+            out.println();
+            failure.printStackTrace(out);
+        }
+        Files.writeString(log, trace.toString());
+    }
+
+    /**
+     * Anything left in {@code work/} was claimed by a process that then died. It
+     * is unknown whether the load committed, so it is not retried automatically -
+     * that could duplicate rows - but handed to an operator.
+     */
+    public void recoverWork(Feed feed) {
+        try (var stale = Files.list(feed.work())) {
+            stale.filter(Files::isRegularFile).forEach(file -> {
+                try {
+                    var target = unique(feed.hospital(), file.getFileName().toString());
+                    Files.createDirectories(feed.hospital());
+                    Files.move(file, target);
+                    Files.writeString(
+                            feed.hospital().resolve(target.getFileName() + ".recovered.log"),
+                            """
+                                    Found in work/ at startup. A previous run claimed this file and did not finish.
+                                    Whether its transaction committed is unknown - check the target tables
+                                    before moving it back into in/.
+                                    """);
+                    LOG.log(WARNING, () -> "recovered stale claim " + file.getFileName()
+                            + " [" + feed.name() + "] -> hospital");
+                } catch (IOException e) {
+                    LOG.log(ERROR, () -> "could not recover " + file + ": " + e);
+                }
+            });
+        } catch (IOException e) {
+            LOG.log(WARNING, () -> "cannot list " + feed.work() + ": " + e);
+        }
+    }
+
+    /**
+     * Processes everything already sitting in {@code in/} - files that arrived
+     * before the directory was watched, or whose event was lost. This is the
+     * contract; watch events only make the reaction quicker.
+     * <p>
+     * With no sentinel every file is ready and is loaded. With a sentinel only
+     * the markers act: each is matched to its data file, or, if that file is
+     * gone, cleaned up as an orphan. Data files without a marker are left where
+     * they are.
+     */
+    public void scanInbox(Feed feed) {
+        var sentinel = feed.sentinel();
+        List<Path> pending;
+        try (var files = Files.list(feed.in())) {
+            pending = files.filter(Files::isRegularFile)
+                    .filter(sentinel == null ? _ -> true : sentinel::isMarker)
+                    .toList();
+        } catch (IOException e) {
+            LOG.log(WARNING, () -> "cannot list " + feed.in() + ": " + e);
+            return;
+        }
+        try (var exec = Executors.newVirtualThreadPerTaskExecutor()) {
+            for (var file : pending) {
+                if (sentinel == null) {
+                    exec.submit(() -> process(feed, file));
+                } else {
+                    sentinel.dataFileOf(file).ifPresentOrElse(data -> {
+                        if (Files.exists(data)) {
+                            exec.submit(() -> processSignalled(feed, file, data));
+                        } else {
+                            discardMarker(feed, file, "orphaned, no " + data.getFileName());
+                        }
+                    }, () -> discardMarker(feed, file, "names no data file"));
+                }
+            }
+        }
+    }
+
+    private static boolean isIgnored(Path file) {
+        var name = file.getFileName().toString();
+        return name.startsWith(".") || name.endsWith(".tmp") || name.endsWith(".part");
+    }
+
+    private static Path unique(Path dir, String name) {
+        var candidate = dir.resolve(name);
+        if (!Files.exists(candidate)) {
+            return candidate;
+        }
+        var stamp = LocalDateTime.now().format(STAMP);
+        var dot = name.lastIndexOf('.');
+        return dir.resolve(dot > 0
+                ? name.substring(0, dot) + "." + stamp + name.substring(dot)
+                : name + "." + stamp);
+    }
+}

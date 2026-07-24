@@ -1,5 +1,5 @@
-open module com.pd.xldr.xml.test {
-    uses com.pd.xldr.ia.InputAdapterFactory;
-    requires com.pd.xldr.xml;
+open module io.github.ralfspoeth.xldr.xml.test {
+    uses io.github.ralfspoeth.xldr.ia.InputAdapterFactory;
+    requires io.github.ralfspoeth.xldr.xml;
     requires org.junit.jupiter.api;
 }

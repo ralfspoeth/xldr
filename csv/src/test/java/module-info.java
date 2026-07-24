@@ -1,5 +1,5 @@
-open module com.pd.xldr.csv.test {
-    uses com.pd.xldr.ia.InputAdapterFactory;
-    requires com.pd.xldr.csv;
+open module io.github.ralfspoeth.xldr.csv.test {
+    uses io.github.ralfspoeth.xldr.ia.InputAdapterFactory;
+    requires io.github.ralfspoeth.xldr.csv;
     requires org.junit.jupiter.api;
 }

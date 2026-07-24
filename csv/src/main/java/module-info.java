@@ -1,9 +1,9 @@
-import com.pd.xldr.ia.InputAdapterFactory;
+import io.github.ralfspoeth.xldr.ia.InputAdapterFactory;
 
-module com.pd.xldr.csv {
-    requires transitive com.pd.xldr.ia;
+module io.github.ralfspoeth.xldr.csv {
+    requires transitive io.github.ralfspoeth.xldr.ia;
     requires io.github.ralfspoeth.basix;
 
     provides InputAdapterFactory
-            with com.pd.xldr.csv.CsvFileHandlerFactory;
+            with io.github.ralfspoeth.xldr.csv.CsvFileHandlerFactory;
 }

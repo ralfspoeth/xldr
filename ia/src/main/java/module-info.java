@@ -1,4 +1,4 @@
-module com.pd.xldr.ia {
-    requires transitive com.pd.xldr.spec;
-    exports com.pd.xldr.ia;
+module io.github.ralfspoeth.xldr.ia {
+    requires transitive io.github.ralfspoeth.xldr.spec;
+    exports io.github.ralfspoeth.xldr.ia;
 }

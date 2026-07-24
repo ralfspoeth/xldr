@@ -38,7 +38,7 @@ and runs with
 
     bin/xldr conf/xldr.properties
 
-The launcher puts `lib/` on the module path (`java -p lib -m com.pd.xldr.app/...`); JPMS service binding then resolves
+The launcher puts `lib/` on the module path (`java -p lib -m io.github.ralfspoeth.xldr.app/...`); JPMS service binding then resolves
 the input adapters (via the `uses`/`provides` of `InputAdapterFactory`) and the JDBC driver (via `java.sql`'s
 `uses java.sql.Driver`) straight from `lib/`. The adapters and all three drivers are `provided` dependencies bundled
 into `lib/` so the package is self-contained; drop the drivers you do not target.
@@ -341,4 +341,4 @@ single JUL configuration covers the whole process; no second logging framework i
 A default `logging.properties` is bundled and applied at startup unless the deployment points `java.util.logging` at a
 configuration of its own:
 
-    java -Djava.util.logging.config.file=/etc/xldr/logging.properties -p <module-path> -m com.pd.xldr.app config.properties
+    java -Djava.util.logging.config.file=/etc/xldr/logging.properties -p <module-path> -m io.github.ralfspoeth.xldr.app config.properties

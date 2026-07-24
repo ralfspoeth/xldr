@@ -1,11 +1,11 @@
-open module com.pd.xldr.it.test {
-    requires com.pd.xldr.app;
-    requires com.pd.xldr.spec;
-    requires com.pd.xldr.ldr;
-    requires com.pd.xldr.xml;
-    requires com.pd.xldr.csv;
+open module io.github.ralfspoeth.xldr.it.test {
+    requires io.github.ralfspoeth.xldr.app;
+    requires io.github.ralfspoeth.xldr.spec;
+    requires io.github.ralfspoeth.xldr.ldr;
+    requires io.github.ralfspoeth.xldr.xml;
+    requires io.github.ralfspoeth.xldr.csv;
     requires java.sql;
     requires org.junit.jupiter.api;
 
-    uses com.pd.xldr.ia.InputAdapterFactory;
+    uses io.github.ralfspoeth.xldr.ia.InputAdapterFactory;
 }

@@ -1,11 +1,11 @@
-import com.pd.xldr.xlsx.ExcelAdapterFactory;
+import io.github.ralfspoeth.xldr.xlsx.ExcelAdapterFactory;
 
-module com.pd.xldr.xlsx {
-    requires transitive com.pd.xldr.ia;
+module io.github.ralfspoeth.xldr.xlsx {
+    requires transitive io.github.ralfspoeth.xldr.ia;
     requires org.apache.poi.poi;
     requires org.apache.poi.ooxml;
     requires org.slf4j.jul;
-    provides com.pd.xldr.ia.InputAdapterFactory
+    provides io.github.ralfspoeth.xldr.ia.InputAdapterFactory
             with ExcelAdapterFactory;
 
 }

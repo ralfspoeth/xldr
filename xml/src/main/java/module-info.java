@@ -1,7 +1,7 @@
-module com.pd.xldr.xml {
+module io.github.ralfspoeth.xldr.xml {
     requires java.xml;
-    requires transitive com.pd.xldr.ia;
+    requires transitive io.github.ralfspoeth.xldr.ia;
 
-    provides com.pd.xldr.ia.InputAdapterFactory
-            with com.pd.xldr.xml.XmlFileHandlerFactory;
+    provides io.github.ralfspoeth.xldr.ia.InputAdapterFactory
+            with io.github.ralfspoeth.xldr.xml.XmlFileHandlerFactory;
 }

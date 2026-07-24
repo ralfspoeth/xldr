@@ -1,2 +1,2 @@
-module com.pd.xldr.it {
+module io.github.ralfspoeth.xldr.it {
 }

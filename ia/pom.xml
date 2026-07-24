@@ -5,7 +5,7 @@
     <modelVersion>4.0.0</modelVersion>
 
     <parent>
-        <groupId>com.pd.xldr</groupId>
+        <groupId>io.github.ralfspoeth.xldr</groupId>
         <artifactId>xldr</artifactId>
         <version>${revision}</version>
     </parent>
@@ -16,7 +16,7 @@
 
     <dependencies>
         <dependency>
-            <groupId>com.pd.xldr</groupId>
+            <groupId>io.github.ralfspoeth.xldr</groupId>
             <artifactId>spec</artifactId>
             <version>${project.version}</version>
         </dependency>

@@ -1,9 +1,9 @@
-module com.pd.xldr.app {
-    exports com.pd.xldr.app;
-    opens com.pd.xldr.app to info.picocli;
+module io.github.ralfspoeth.xldr.app {
+    exports io.github.ralfspoeth.xldr.app;
+    opens io.github.ralfspoeth.xldr.app to info.picocli;
 
-    requires com.pd.xldr.ia;
-    requires com.pd.xldr.ldr;
+    requires io.github.ralfspoeth.xldr.ia;
+    requires io.github.ralfspoeth.xldr.ldr;
     requires java.sql;
     requires java.logging;
     requires com.zaxxer.hikari;
@@ -11,5 +11,5 @@ module com.pd.xldr.app {
     requires info.picocli;
     requires org.slf4j.jul;
 
-    uses com.pd.xldr.ia.InputAdapterFactory;
+    uses io.github.ralfspoeth.xldr.ia.InputAdapterFactory;
 }

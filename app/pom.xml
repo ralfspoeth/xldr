@@ -7,7 +7,7 @@
 
     <parent>
         <artifactId>xldr</artifactId>
-        <groupId>com.pd.xldr</groupId>
+        <groupId>io.github.ralfspoeth.xldr</groupId>
         <version>${revision}</version>
     </parent>
 
@@ -51,35 +51,35 @@
             <artifactId>filews</artifactId>
         </dependency>
         <dependency>
-            <groupId>com.pd.xldr</groupId>
+            <groupId>io.github.ralfspoeth.xldr</groupId>
             <artifactId>ia</artifactId>
             <version>${project.version}</version>
         </dependency>
         <dependency>
-            <groupId>com.pd.xldr</groupId>
+            <groupId>io.github.ralfspoeth.xldr</groupId>
             <artifactId>spec</artifactId>
             <version>${project.version}</version>
         </dependency>
         <dependency>
-            <groupId>com.pd.xldr</groupId>
+            <groupId>io.github.ralfspoeth.xldr</groupId>
             <artifactId>ldr</artifactId>
             <version>${project.version}</version>
         </dependency>
         <!-- input adapters -->
         <dependency>
-            <groupId>com.pd.xldr</groupId>
+            <groupId>io.github.ralfspoeth.xldr</groupId>
             <artifactId>csv</artifactId>
             <version>${project.version}</version>
             <scope>provided</scope>
         </dependency>
         <dependency>
-            <groupId>com.pd.xldr</groupId>
+            <groupId>io.github.ralfspoeth.xldr</groupId>
             <artifactId>xml</artifactId>
             <version>${project.version}</version>
             <scope>provided</scope>
         </dependency>
         <dependency>
-            <groupId>com.pd.xldr</groupId>
+            <groupId>io.github.ralfspoeth.xldr</groupId>
             <artifactId>xlsx</artifactId>
             <version>${project.version}</version>
             <scope>provided</scope>
@@ -100,7 +100,7 @@
                 <configuration>
                     <archive>
                         <manifest>
-                            <mainClass>com.pd.xldr.app.Main</mainClass>
+                            <mainClass>io.github.ralfspoeth.xldr.app.Main</mainClass>
                         </manifest>
                     </archive>
                 </configuration>

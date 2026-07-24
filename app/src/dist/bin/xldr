@@ -9,4 +9,4 @@
 #   JAVA_OPTS=-Djava.util.logging.config.file=conf/logging.properties bin/xldr conf/xldr.properties
 set -e
 here=$(cd "$(dirname "$0")/.." && pwd)
-exec java ${JAVA_OPTS:-} -p "$here/lib" -m com.pd.xldr.app/com.pd.xldr.app.Main "$@"
+exec java ${JAVA_OPTS:-} -p "$here/lib" -m io.github.ralfspoeth.xldr.app/io.github.ralfspoeth.xldr.app.Main "$@"

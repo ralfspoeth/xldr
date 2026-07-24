@@ -5,7 +5,7 @@
 
     <parent>
         <artifactId>xldr</artifactId>
-        <groupId>com.pd.xldr</groupId>
+        <groupId>io.github.ralfspoeth.xldr</groupId>
         <version>${revision}</version>
     </parent>
     <modelVersion>4.0.0</modelVersion>
@@ -24,7 +24,7 @@
             <artifactId>slf4j-jdk14</artifactId>
         </dependency>
         <dependency>
-            <groupId>com.pd.xldr</groupId>
+            <groupId>io.github.ralfspoeth.xldr</groupId>
             <artifactId>ia</artifactId>
             <version>${project.version}</version>
         </dependency>

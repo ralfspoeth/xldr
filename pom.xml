@@ -15,7 +15,7 @@
         <version>2.0.8</version>
     </parent>
 
-    <groupId>com.pd.xldr</groupId>
+    <groupId>io.github.ralfspoeth.xldr</groupId>
     <modules>
         <module>spec</module>
         <module>ia</module>
