@@ -167,8 +167,8 @@ public class ServerIT {
     void waitsForTheSentinelBeforeLoading() throws Exception {
         var feed = Files.createDirectory(root.resolve("signalled"));
         Files.writeString(feed.resolve("spec.json"), SPEC.replace(
-                "\"mimeType\": \"text/csv\"",
-                "\"mimeType\": \"text/csv\", \"sentinel\": \"glob:*.done\""));
+                "\"accepts\": \"glob:*.csv\"",
+                "\"sentinel\": \"glob:*.done\""));
         Files.writeString(feed.resolve("adapter.properties"), "fieldSeparator=,\nrowSeparator=\\n\n");
         await("in/ to be created", () -> Files.isDirectory(feed.resolve("in")));
 
@@ -190,6 +190,28 @@ public class ServerIT {
         await("the marker to be consumed", () -> !Files.exists(in.resolve("people-1.csv.done")));
         assertTrue(archived(feed).stream()
                 .anyMatch(p -> p.getFileName().toString().startsWith("people-1.csv")));
+    }
+
+    /**
+     * A feed must declare exactly one of {@code accepts} or {@code sentinel};
+     * one that declares neither, or both, is not activated at all - so its
+     * working directories are never even created.
+     */
+    @Test
+    @Timeout(60)
+    void refusesAfeedThatIsNotExactlyOneDeliveryRule() throws Exception {
+        var neither = Files.createDirectory(root.resolve("neither"));
+        Files.writeString(neither.resolve("spec.json"), SPEC.replace("\"accepts\": \"glob:*.csv\",", ""));
+
+        var both = Files.createDirectory(root.resolve("both"));
+        Files.writeString(both.resolve("spec.json"), SPEC.replace(
+                "\"accepts\": \"glob:*.csv\",",
+                "\"accepts\": \"glob:*.csv\", \"sentinel\": \"glob:*.done\","));
+
+        // let the watcher and a scan interval try (and refuse) both
+        Thread.sleep(Duration.ofSeconds(3));
+        assertTrue(Files.notExists(neither.resolve("in")), "a feed with no delivery rule must not activate");
+        assertTrue(Files.notExists(both.resolve("in")), "a feed with both delivery rules must not activate");
     }
 
     /**
@@ -242,6 +264,7 @@ public class ServerIT {
             {
               "input": {
                 "mimeType": "text/csv",
+                "accepts": "glob:*.csv",
                 "recordSelectors": [
                   {
                     "name": "people",

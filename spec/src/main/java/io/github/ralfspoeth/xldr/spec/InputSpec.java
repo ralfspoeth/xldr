@@ -11,24 +11,24 @@ import static java.util.Objects.requireNonNullElse;
  * extracted from them.
  *
  * @param mimeType        selects the input adapter
- * @param sentinel        how the server knows a file has arrived complete. When
- *                        {@code null} the producer delivers atomically - stage
- *                        under an ignored name and rename, or move in from
- *                        outside {@code in/}. When set, it is a marker pattern in
- *                        {@code glob:} or {@code regex:} form (as understood by
+ * @param sentinel        marker-file delivery. A marker pattern in {@code glob:}
+ *                        or {@code regex:} form (as understood by
  *                        {@code FileSystem.getPathMatcher}): the producer writes
- *                        the data file, then a marker file matching the pattern;
- *                        only the marker's arrival triggers the load. The data
- *                        file is always the marker name minus its last dotted
+ *                        the data file, then a marker file matching the pattern,
+ *                        and only the marker's arrival triggers the load. The
+ *                        data file is the marker name minus its last dotted
  *                        suffix, so {@code glob:*.{ok,ready,done}} loads
- *                        {@code report.csv} from {@code report.csv.done}.
- * @param accepts         which data files in {@code in/} this feed claims,
- *                        matched against the file <em>name</em> in the same
- *                        {@code glob:} / {@code regex:} form as {@code sentinel}
- *                        (for example {@code glob:abc*.xml}). When {@code null}
- *                        the feed claims every file. A file that does not match
- *                        is left in {@code in/} untouched. This gates files; the
- *                        {@code mimeType} still selects the adapter.
+ *                        {@code report.csv} from {@code report.csv.done}. A feed
+ *                        declares exactly one of {@code sentinel} or {@code accepts}.
+ * @param accepts         atomic delivery. A data file whose <em>name</em> matches
+ *                        this pattern (same {@code glob:} / {@code regex:} form as
+ *                        {@code sentinel}, for example {@code glob:abc*.xml})
+ *                        triggers the load on its own, so it must be delivered
+ *                        atomically - staged under an ignored name and renamed, or
+ *                        moved in from outside {@code in/}. A file that does not
+ *                        match is left in {@code in/} untouched. A feed declares
+ *                        exactly one of {@code accepts} or {@code sentinel}; the
+ *                        server does not activate one that declares both or neither.
  * @param recordSelectors the record selectors of the input
  * @param vars            input-level variables, each evaluated once per load and
  *                        referenced from a field mapping by a {@link
@@ -46,8 +46,9 @@ public record InputSpec(String mimeType, String sentinel, String accepts,
     }
 
     /**
-     * Atomic-delivery input claiming every file: no sentinel, no accept pattern,
-     * no variables.
+     * A spec with neither delivery rule and no variables - for constructing an
+     * input programmatically (adapter and loader use). Not a server feed: a feed
+     * must declare exactly one of {@code sentinel} or {@code accepts}.
      */
     public InputSpec(String mimeType, Collection<RecordSelectorSpec> recordSelectors) {
         this(mimeType, null, null, recordSelectors, List.of());

@@ -293,30 +293,24 @@ than not loading at all.
 ### Delivering files
 
 A file must not be read while it is still being written. The server does not guess at this with size or timeout
-heuristics - the producer states when a file is complete, in one of two ways chosen per feed by the input spec's
-`sentinel` setting.
+heuristics - the producer states when a file is complete. Each feed declares **exactly one** of two delivery rules,
+`accepts` or `sentinel`; a spec with both, or neither, does not activate a feed at all. Both patterns are passed
+straight to Java's `FileSystem.getPathMatcher`, so each carries its own `glob:` or `regex:` prefix and matches against
+the file name.
 
-**Atomic delivery** (no `sentinel`). The appearance of the file *is* the signal that it is complete, so it must appear
-atomically: write it under an ignored name (`*.part`, `*.tmp`, or a dot-file) and rename it in place, or write it
-outside `in/` and move it in. A same-filesystem rename is atomic; a plain write into `in/` is not, and risks a
-truncated load.
+**Atomic delivery** (`"accepts": "glob:abc*.csv"`). A file whose name matches the pattern *is* the trigger, so it must
+appear atomically: write it under an ignored name (`*.part`, `*.tmp`, or a dot-file) and rename it in place, or write it
+outside `in/` and move it in. A same-filesystem rename is atomic; a plain write into `in/` is not, and risks a truncated
+load. A file that does not match is left in `in/` untouched.
 
 **Sentinel delivery** (`"sentinel": "glob:*.done"`). The producer writes the data file at leisure, then a marker file
-matching the pattern. Only the marker's arrival triggers the load; the data file's own arrival is ignored. The pattern
-is passed straight to Java's `FileSystem.getPathMatcher`, so it carries its own `glob:` or `regex:` prefix and is
-matched against the file name. The data file is always the marker name minus its last dotted suffix, so
-`report.csv.done` loads `report.csv` (glob alternation, as in `glob:*.{ok,ready,done}`, is comma-separated).
+matching the pattern. Only the marker's arrival triggers the load; the data file's own arrival is ignored. The data
+file is the marker name minus its last dotted suffix, so `report.csv.done` loads `report.csv` (glob alternation, as in
+`glob:*.{ok,ready,done}`, is comma-separated). The data file is claimed first and the marker deleted after, so a crash
+in between leaves the data safely in `work/` and at worst an orphaned marker, which the next scan cleans up.
 
-The data file is claimed first and the marker deleted after, so a crash in between leaves the data safely in `work/`
-and at worst an orphaned marker, which the next scan cleans up.
-
-**Selecting files** (optional `accepts`). By default a feed claims every data file that arrives. An `accepts` pattern
-restricts it to files whose name matches, using the same `glob:` / `regex:` prefixes as `sentinel` - for example
-`"accepts": "glob:abc*.xml"`. A file that does not match is left in `in/` untouched (it is neither loaded nor moved).
-This only gates which files the feed claims; the `mimeType` still selects the adapter that parses them.
-
-The server claims a file by moving it to `work/`, which is also what stops two threads, or two server processes on the
-same tree, from loading it twice.
+Either way the `mimeType` still selects the adapter. The server claims a file by moving it to `work/`, which is also
+what stops two threads, or two server processes on the same tree, from loading it twice.
 
 Files left in `work/` at startup were claimed by a run that died. Whether their transaction committed is unknown, so
 they are moved to `hospital/` for inspection rather than retried - a blind retry could duplicate rows, the loader

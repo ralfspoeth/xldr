@@ -74,8 +74,13 @@ class FeedRegistry {
 
             var mappingSpec = MappingSpecs.read(specFile);
             var sentinelSpec = mappingSpec.inputSpec().sentinel();
+            var acceptsSpec = mappingSpec.inputSpec().accepts();
+            if ((sentinelSpec == null) == (acceptsSpec == null)) {
+                throw new IllegalStateException("input must declare exactly one of 'sentinel' or 'accepts', found "
+                        + (sentinelSpec == null ? "neither" : "both"));
+            }
             var sentinel = sentinelSpec == null ? null : Sentinel.parse(sentinelSpec);
-            var acceptMatcher = acceptMatcher(mappingSpec.inputSpec().accepts());
+            var acceptMatcher = acceptMatcher(acceptsSpec);
             var feed = new Feed(feedDir, specFile, modified, mappingSpec,
                     adapterProperties(feedDir), sentinel, acceptMatcher);
             ensureDirectoriesAndWatch(feed);

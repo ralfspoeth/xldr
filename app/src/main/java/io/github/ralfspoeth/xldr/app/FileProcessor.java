@@ -68,11 +68,7 @@ class FileProcessor {
             }
         } else if (sentinel.isMarker(file)) {
             sentinel.dataFileOf(file).ifPresentOrElse(
-                    data -> {
-                        if (feed.accepts(data)) {
-                            processSignalled(feed, file, data);
-                        }
-                    },
+                    data -> processSignalled(feed, file, data),
                     () -> discardMarker(feed, file, "names no data file"));
         }
     }
@@ -271,14 +267,11 @@ class FileProcessor {
                     }
                 } else {
                     sentinel.dataFileOf(file).ifPresentOrElse(data -> {
-                        if (feed.accepts(data)) {
-                            if (Files.exists(data)) {
-                                exec.submit(() -> processSignalled(feed, file, data));
-                            } else {
-                                discardMarker(feed, file, "orphaned, no " + data.getFileName());
-                            }
+                        if (Files.exists(data)) {
+                            exec.submit(() -> processSignalled(feed, file, data));
+                        } else {
+                            discardMarker(feed, file, "orphaned, no " + data.getFileName());
                         }
-                        // else: the data file is not this feed's; leave it in in/
                     }, () -> discardMarker(feed, file, "names no data file"));
                 }
             }
