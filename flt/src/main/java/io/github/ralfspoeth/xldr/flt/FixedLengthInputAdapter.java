@@ -11,10 +11,12 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.math.BigDecimal;
 import java.nio.charset.Charset;
-import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Gatherer;
+
+import static java.lang.Math.min;
 
 class FixedLengthInputAdapter implements InputAdapter {
     record Bounds(int left, int right, DataType type) {}
@@ -42,7 +44,12 @@ class FixedLengthInputAdapter implements InputAdapter {
                         .gather(Gatherer.ofSequential(
                                 LineAccu::new,
                                 (l, s, ds) ->
-                                        l.add(s) && ds.push(new FLRow(l.getAndReset()))
+                                        l.add(s) || ds.push(new FLRow(l.getAndReset())),
+                                (l, ds)->{
+                                    if(l.count>0 && !ds.isRejecting()) {
+                                        throw new IllegalArgumentException("incomplete final record");
+                                    }
+                                }
                         ))
         );
     }
@@ -57,9 +64,11 @@ class FixedLengthInputAdapter implements InputAdapter {
         @Override
         public Object get(String name) {
             var bds = bounds.get(name);
-            var part = text.substring(bds.left, bds.right);
+            if(bds.left>=text.length()) return null;
+            int right = min(bds.right, text.length());
+            var part = text.substring(bds.left, right).strip();
             return switch (bds.type) {
-                case DATE -> LocalDate.parse(part);
+                case DATE -> LocalDateTime.parse(part);
                 case FLOAT -> Double.parseDouble(part);
                 case DECIMAL -> new BigDecimal(part);
                 case INTEGER -> Long.parseLong(part);
