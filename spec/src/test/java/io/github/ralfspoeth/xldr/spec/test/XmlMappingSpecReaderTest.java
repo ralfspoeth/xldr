@@ -1,6 +1,6 @@
 package io.github.ralfspoeth.xldr.spec.test;
 
-import io.github.ralfspoeth.xldr.spec.ColumnSource;
+import io.github.ralfspoeth.xldr.spec.ValueSource;
 import io.github.ralfspoeth.xldr.spec.DataType;
 import io.github.ralfspoeth.xldr.spec.FieldMappingSpec;
 import io.github.ralfspoeth.xldr.spec.FieldSelectorSpec;
@@ -8,6 +8,7 @@ import io.github.ralfspoeth.xldr.spec.InputSpec;
 import io.github.ralfspoeth.xldr.spec.MappingSpec;
 import io.github.ralfspoeth.xldr.spec.RecordMappingSpec;
 import io.github.ralfspoeth.xldr.spec.RecordSelectorSpec;
+import io.github.ralfspoeth.xldr.spec.VarSpec;
 import io.github.ralfspoeth.xldr.spec.io.XmlMappingSpecReader;
 import org.junit.jupiter.api.Test;
 
@@ -39,7 +40,6 @@ public class XmlMappingSpecReaderTest {
                         <fieldMapping fieldSelector="id" databaseColumn="ident1_txt"/>
                         <fieldMapping fieldSelector="desc" databaseColumn="kbez_txt"/>
                         <fieldMapping constant="PD" databaseColumn="syssnmut_cd"/>
-                        <fieldMapping function="sysdate" databaseColumn="mut_dat"/>
                     </mapping>
                     <mapping recordSelector="position" databaseTable="snposition" limit="500">
                         <fieldMapping fieldSelector="fund" databaseColumn="mandat_nr"/>
@@ -59,17 +59,16 @@ public class XmlMappingSpecReaderTest {
                         new RecordSelectorSpec("position", "//position", List.of(
                                 new FieldSelectorSpec("fund", "../../../fund/@id", null)
                         ))
-                )),
+                ), List.of()),
                 List.of(
                         new RecordMappingSpec("fund", "snmandat", List.of(
-                                new FieldMappingSpec("id", "ident1_txt"),
-                                new FieldMappingSpec("desc", "kbez_txt"),
-                                // XML constants are strings; sysdate is a raw function
-                                new FieldMappingSpec(new ColumnSource.Constant("PD"), "syssnmut_cd"),
-                                new FieldMappingSpec(new ColumnSource.Function("sysdate"), "mut_dat")
+                                new FieldMappingSpec(new ValueSource.Field("id"), "ident1_txt"),
+                                new FieldMappingSpec(new ValueSource.Field("desc"), "kbez_txt"),
+                                // XML constants are always strings - attributes carry no type
+                                new FieldMappingSpec(new ValueSource.Constant("PD"), "syssnmut_cd")
                         )),
                         new RecordMappingSpec("position", "snposition", List.of(
-                                new FieldMappingSpec("fund", "mandat_nr")
+                                new FieldMappingSpec(new ValueSource.Field("fund"), "mandat_nr")
                         ), 500)
                 )
         );
@@ -90,6 +89,37 @@ public class XmlMappingSpecReaderTest {
         var spec = new XmlMappingSpecReader().readFrom(new StringReader(source));
         assertEquals(List.of(), List.copyOf(spec.inputSpec().recordSelectors()));
         assertEquals(List.of(), List.copyOf(spec.recordMappingSpecs()));
+    }
+
+    /**
+     * Vars are parsed as input-level named sources, and a field mapping refers to
+     * one with a {@code var} attribute.
+     */
+    @Test
+    public void parsesVarsAndAVarReference() throws IOException {
+        var source = """
+                <mappingSpec>
+                    <input mimeType="text/csv">
+                        <var name="batchId" constant="B1"/>
+                        <var name="src" constant="PD"/>
+                    </input>
+                    <mapping recordSelector="r" databaseTable="t">
+                        <fieldMapping var="batchId" databaseColumn="batch_id"/>
+                    </mapping>
+                </mappingSpec>
+                """;
+        var spec = new XmlMappingSpecReader().readFrom(new StringReader(source));
+
+        assertEquals(
+                List.of(
+                        new VarSpec("batchId", new ValueSource.Constant("B1")),
+                        new VarSpec("src", new ValueSource.Constant("PD"))
+                ),
+                List.copyOf(spec.inputSpec().vars()));
+
+        var mapping = List.copyOf(spec.recordMappingSpecs()).getFirst();
+        var fm = List.copyOf(mapping.fieldMappings()).getFirst();
+        assertEquals(new ValueSource.Var("batchId"), fm.source());
     }
 
     /**

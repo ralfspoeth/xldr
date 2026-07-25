@@ -20,14 +20,12 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.sql.DriverManager.getConnection;
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 /**
  * The whole toolkit end to end against a local H2 database: a JSON mapping spec
  * is read, the XML input adapter is discovered through {@code ServiceLoader},
  * {@code test1.xml} is parsed with XPath selectors, and the records are inserted
- * by the {@code Loader} - fields, a spec constant and a database function all in
- * one insert.
+ * by the {@code Loader} - input fields and a spec constant in one insert.
  */
 public class EndToEndIT {
 
@@ -44,8 +42,7 @@ public class EndToEndIT {
                     create table fund(
                         id_txt    varchar(20),
                         desc_txt  varchar(100),
-                        source_cd varchar(10),
-                        loaded_at timestamp
+                        source_cd varchar(10)
                     )""");
         }
 
@@ -64,12 +61,11 @@ public class EndToEndIT {
         try (var conn = getConnection(JDBC_URL);
              var stmt = conn.createStatement();
              var rs = stmt.executeQuery(
-                     "select id_txt, desc_txt, source_cd, loaded_at from fund order by id_txt, desc_txt")) {
+                     "select id_txt, desc_txt, source_cd from fund order by id_txt, desc_txt")) {
             while (rs.next()) {
                 rows.add(List.of(rs.getString(1), rs.getString(2)));
-                // every row carries the constant and the function-populated column
+                // every row carries the spec constant
                 assertEquals("PD", rs.getString(3));
-                assertNotNull(rs.getTimestamp(4));
             }
         }
 

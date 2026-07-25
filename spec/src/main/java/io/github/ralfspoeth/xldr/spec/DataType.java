@@ -3,6 +3,9 @@ package io.github.ralfspoeth.xldr.spec;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
+/**
+ * The types a field value may be delivered as, each mapped to its Java class.
+ */
 public enum DataType {
 
     DATE(LocalDateTime.class),
@@ -17,6 +20,9 @@ public enum DataType {
         this.clazz = clazz;
     }
 
+    /**
+     * The Java class values of this type are delivered as.
+     */
     public Class<?> clazz() {
         return clazz;
     }

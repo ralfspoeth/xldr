@@ -5,11 +5,12 @@ import io.github.ralfspoeth.xldr.ia.InputAdapter;
 import io.github.ralfspoeth.xldr.ia.Result;
 import io.github.ralfspoeth.xldr.ia.Row;
 import io.github.ralfspoeth.xldr.ldr.Loader;
-import io.github.ralfspoeth.xldr.spec.ColumnSource;
+import io.github.ralfspoeth.xldr.spec.ValueSource;
 import io.github.ralfspoeth.xldr.spec.FieldMappingSpec;
 import io.github.ralfspoeth.xldr.spec.InputSpec;
 import io.github.ralfspoeth.xldr.spec.MappingSpec;
 import io.github.ralfspoeth.xldr.spec.RecordMappingSpec;
+import io.github.ralfspoeth.xldr.spec.VarSpec;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -24,7 +25,6 @@ import java.util.ResourceBundle;
 
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 
@@ -95,13 +95,13 @@ public class LoaderTest {
     public void loadsSeveralMappingsIntoTheSameTable() throws Exception {
         // column order deliberately differs from the natural one: name before id
         var people = new RecordMappingSpec("people", "person", List.of(
-                new FieldMappingSpec("name", "name"),
-                new FieldMappingSpec("id", "id")
+                new FieldMappingSpec(new ValueSource.Field("name"), "name"),
+                new FieldMappingSpec(new ValueSource.Field("id"), "id")
         ));
         // same table, spelled in upper case, and a different set of columns
         var visitors = new RecordMappingSpec("visitors", "PERSON", List.of(
-                new FieldMappingSpec("id", "id"),
-                new FieldMappingSpec("city", "city")
+                new FieldMappingSpec(new ValueSource.Field("id"), "id"),
+                new FieldMappingSpec(new ValueSource.Field("city"), "city")
         ));
         var spec = new MappingSpec(
                 new InputSpec("text/csv", List.of()),
@@ -144,10 +144,10 @@ public class LoaderTest {
     @Test
     public void rollsBackWhenAMappingFails() throws Exception {
         var good = new RecordMappingSpec("people", "person", List.of(
-                new FieldMappingSpec("id", "id")
+                new FieldMappingSpec(new ValueSource.Field("id"), "id")
         ));
         var broken = new RecordMappingSpec("people", "no_such_table", List.of(
-                new FieldMappingSpec("id", "id")
+                new FieldMappingSpec(new ValueSource.Field("id"), "id")
         ));
         var spec = new MappingSpec(
                 new InputSpec("text/csv", List.of()),
@@ -172,10 +172,10 @@ public class LoaderTest {
     @Test
     public void rejectsForeignMapping() throws Exception {
         var known = new RecordMappingSpec("people", "person", List.of(
-                new FieldMappingSpec("id", "id")
+                new FieldMappingSpec(new ValueSource.Field("id"), "id")
         ));
         var foreign = new RecordMappingSpec("elsewhere", "person", List.of(
-                new FieldMappingSpec("id", "id")
+                new FieldMappingSpec(new ValueSource.Field("id"), "id")
         ));
         var spec = new MappingSpec(
                 new InputSpec("text/csv", List.of()),
@@ -190,21 +190,19 @@ public class LoaderTest {
     }
 
     /**
-     * A field value, a spec constant and a database function share one insert:
-     * the function is emitted inline in the values list (not bound), the constant
-     * and the field are bound.
+     * A field value and a spec constant share one insert: the field is bound from
+     * the row, the constant from the spec, and every row carries it.
      */
     @Test
-    public void insertsConstantsAndFunctions() throws Exception {
+    public void insertsFieldsAndConstants() throws Exception {
         try (var conn = DriverManager.getConnection(jdbcUrl);
              var stmt = conn.createStatement()) {
             stmt.execute("drop table if exists event");
-            stmt.execute("create table event(id varchar(10), source varchar(10), loaded_at timestamp)");
+            stmt.execute("create table event(id varchar(10), source varchar(10))");
         }
         var mapping = new RecordMappingSpec("events", "event", List.of(
-                new FieldMappingSpec("id", "id"),
-                new FieldMappingSpec(new ColumnSource.Constant("PD"), "source"),
-                new FieldMappingSpec(new ColumnSource.Function("current_timestamp"), "loaded_at")
+                new FieldMappingSpec(new ValueSource.Field("id"), "id"),
+                new FieldMappingSpec(new ValueSource.Constant("PD"), "source")
         ));
         var spec = new MappingSpec(new InputSpec("text/csv", List.of()), List.of(mapping));
         var adapter = adapterFor(Map.of("events", List.of(Map.of("id", "1"), Map.of("id", "2"))));
@@ -215,19 +213,166 @@ public class LoaderTest {
 
         try (var conn = DriverManager.getConnection(jdbcUrl);
              var stmt = conn.createStatement();
-             var rs = stmt.executeQuery("select id, source, loaded_at from event order by id")) {
+             var rs = stmt.executeQuery("select id, source from event order by id")) {
             var rows = new ArrayList<List<Object>>();
             while (rs.next()) {
-                rows.add(Arrays.asList(rs.getString(1), rs.getString(2), rs.getObject(3)));
+                rows.add(Arrays.asList(rs.getString(1), rs.getString(2)));
             }
             assertEquals(2, rows.size());
             assertAll(
                     () -> assertEquals("1", rows.get(0).get(0)),
                     () -> assertEquals("PD", rows.get(0).get(1)),
-                    // the function ran on the database, so the column is populated
-                    () -> assertNotNull(rows.get(0).get(2)),
+                    () -> assertEquals("2", rows.get(1).get(0)),
                     () -> assertEquals("PD", rows.get(1).get(1))
             );
+        }
+    }
+
+    /**
+     * A var is evaluated once per load and shared by every row - here a value
+     * looked up from a reference table and stamped onto each row.
+     */
+    @Test
+    public void bindsALookupVarToEveryRow() throws Exception {
+        try (var conn = DriverManager.getConnection(jdbcUrl);
+             var stmt = conn.createStatement()) {
+            stmt.execute("drop table if exists batch");
+            stmt.execute("drop table if exists batch_src");
+            stmt.execute("create table batch_src(k int, v bigint)");
+            stmt.execute("insert into batch_src values (1, 42)");
+            stmt.execute("create table batch(id varchar(10), batch_id bigint)");
+        }
+        var vars = List.of(new VarSpec("bid",
+                new ValueSource.Lookup("batch_src", "v", "k", new ValueSource.Constant(1))));
+        var mapping = new RecordMappingSpec("rows", "batch", List.of(
+                new FieldMappingSpec(new ValueSource.Field("id"), "id"),
+                new FieldMappingSpec(new ValueSource.Var("bid"), "batch_id")
+        ));
+        var spec = new MappingSpec(
+                new InputSpec("text/csv", null, null, List.of(), vars),
+                List.of(mapping));
+        var adapter = adapterFor(Map.of("rows", List.of(
+                Map.of("id", "1"), Map.of("id", "2"), Map.of("id", "3"))));
+
+        try (var loader = new Loader(spec, DriverManager.getConnection(jdbcUrl))) {
+            assertEquals(3, loader.loadInput(adapter, InputStream.nullInputStream(), mapping));
+        }
+
+        try (var conn = DriverManager.getConnection(jdbcUrl);
+             var stmt = conn.createStatement();
+             var rs = stmt.executeQuery("select batch_id from batch")) {
+            var ids = new ArrayList<Long>();
+            while (rs.next()) {
+                ids.add(rs.getLong(1));
+            }
+            // the looked-up value is shared by all three rows
+            assertEquals(List.of(42L, 42L, 42L), ids);
+        }
+    }
+
+    /**
+     * An expression var interpolates an ambient value and an in-memory sequence,
+     * evaluated once, so every row carries the same generated id.
+     */
+    @Test
+    public void expressionGeneratesAnIdOncePerLoad() throws Exception {
+        try (var conn = DriverManager.getConnection(jdbcUrl);
+             var stmt = conn.createStatement()) {
+            stmt.execute("drop table if exists doc");
+            stmt.execute("create table doc(id varchar(10), gen varchar(40))");
+        }
+        var vars = List.of(new VarSpec("gid",
+                new ValueSource.Expr("${xldr.filename}-${nextval('batch')}")));
+        var mapping = new RecordMappingSpec("rows", "doc", List.of(
+                new FieldMappingSpec(new ValueSource.Field("id"), "id"),
+                new FieldMappingSpec(new ValueSource.Var("gid"), "gen")
+        ));
+        var spec = new MappingSpec(
+                new InputSpec("text/csv", null, null, List.of(), vars),
+                List.of(mapping));
+        var adapter = adapterFor(Map.of("rows", List.of(Map.of("id", "1"), Map.of("id", "2"))));
+
+        try (var loader = new Loader(spec, DriverManager.getConnection(jdbcUrl),
+                Map.of("xldr.filename", "orders.csv"))) {
+            loader.loadInput(adapter, InputStream.nullInputStream(), mapping);
+        }
+
+        try (var conn = DriverManager.getConnection(jdbcUrl);
+             var stmt = conn.createStatement();
+             var rs = stmt.executeQuery("select gen from doc")) {
+            var gens = new ArrayList<String>();
+            while (rs.next()) {
+                gens.add(rs.getString(1));
+            }
+            assertEquals(List.of("orders.csv-1", "orders.csv-1"), gens);
+        }
+    }
+
+    /**
+     * A per-row expression draws a fresh sequence value for each record; a single
+     * {@code nextval} placeholder keeps its integer type.
+     */
+    @Test
+    public void expressionNumbersRowsWithNextval() throws Exception {
+        try (var conn = DriverManager.getConnection(jdbcUrl);
+             var stmt = conn.createStatement()) {
+            stmt.execute("drop table if exists seq_rows");
+            stmt.execute("create table seq_rows(id varchar(10), n integer)");
+        }
+        var mapping = new RecordMappingSpec("rows", "seq_rows", List.of(
+                new FieldMappingSpec(new ValueSource.Field("id"), "id"),
+                new FieldMappingSpec(new ValueSource.Expr("${nextval('r', 10)}"), "n")
+        ));
+        var spec = new MappingSpec(new InputSpec("text/csv", List.of()), List.of(mapping));
+        var adapter = adapterFor(Map.of("rows", List.of(
+                Map.of("id", "a"), Map.of("id", "b"), Map.of("id", "c"))));
+
+        try (var loader = new Loader(spec, DriverManager.getConnection(jdbcUrl))) {
+            assertEquals(3, loader.loadInput(adapter, InputStream.nullInputStream(), mapping));
+        }
+
+        try (var conn = DriverManager.getConnection(jdbcUrl);
+             var stmt = conn.createStatement();
+             var rs = stmt.executeQuery("select n from seq_rows order by n")) {
+            var ns = new ArrayList<Integer>();
+            while (rs.next()) {
+                ns.add(rs.getInt(1));
+            }
+            assertEquals(List.of(10, 11, 12), ns);
+        }
+    }
+
+    /**
+     * The optional increment steps the sequence by more than one, while the
+     * start still governs the first draw.
+     */
+    @Test
+    public void expressionSequenceHonoursStartAndIncrement() throws Exception {
+        try (var conn = DriverManager.getConnection(jdbcUrl);
+             var stmt = conn.createStatement()) {
+            stmt.execute("drop table if exists inc_rows");
+            stmt.execute("create table inc_rows(id varchar(10), n integer)");
+        }
+        var mapping = new RecordMappingSpec("rows", "inc_rows", List.of(
+                new FieldMappingSpec(new ValueSource.Field("id"), "id"),
+                new FieldMappingSpec(new ValueSource.Expr("${nextval('r', 100, 5)}"), "n")
+        ));
+        var spec = new MappingSpec(new InputSpec("text/csv", List.of()), List.of(mapping));
+        var adapter = adapterFor(Map.of("rows", List.of(
+                Map.of("id", "a"), Map.of("id", "b"), Map.of("id", "c"), Map.of("id", "d"))));
+
+        try (var loader = new Loader(spec, DriverManager.getConnection(jdbcUrl))) {
+            assertEquals(4, loader.loadInput(adapter, InputStream.nullInputStream(), mapping));
+        }
+
+        try (var conn = DriverManager.getConnection(jdbcUrl);
+             var stmt = conn.createStatement();
+             var rs = stmt.executeQuery("select n from inc_rows order by n")) {
+            var ns = new ArrayList<Integer>();
+            while (rs.next()) {
+                ns.add(rs.getInt(1));
+            }
+            assertEquals(List.of(100, 105, 110, 115), ns);
         }
     }
 
@@ -246,9 +391,9 @@ public class LoaderTest {
             stmt.execute("create table holder(name varchar(20), country_id int)");
         }
         var mapping = new RecordMappingSpec("holders", "holder", List.of(
-                new FieldMappingSpec("name", "name"),
+                new FieldMappingSpec(new ValueSource.Field("name"), "name"),
                 new FieldMappingSpec(
-                        new ColumnSource.Lookup("country", "id", "iso", new ColumnSource.Field("c")),
+                        new ValueSource.Lookup("country", "id", "iso", new ValueSource.Field("c")),
                         "country_id")
         ));
         var spec = new MappingSpec(new InputSpec("text/csv", List.of()), List.of(mapping));
@@ -283,8 +428,8 @@ public class LoaderTest {
     @Test
     public void honoursTheRowLimit() throws Exception {
         var mapping = new RecordMappingSpec("people", "person", List.of(
-                new FieldMappingSpec("id", "id"),
-                new FieldMappingSpec("name", "name")
+                new FieldMappingSpec(new ValueSource.Field("id"), "id"),
+                new FieldMappingSpec(new ValueSource.Field("name"), "name")
         ), 2);
         var spec = new MappingSpec(new InputSpec("text/csv", List.of()), List.of(mapping));
         var adapter = adapterFor(Map.of("people", List.of(

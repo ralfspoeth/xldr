@@ -27,7 +27,7 @@ import java.util.Properties;
  * @param acceptMatcher which files in {@code in/} this feed claims, or
  *                      {@code null} to claim every file
  */
-public record Feed(
+record Feed(
         Path directory,
         Path specFile,
         FileTime specModified,

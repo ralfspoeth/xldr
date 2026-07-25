@@ -10,6 +10,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.SQLException;
+import java.util.Map;
 import java.util.Properties;
 import java.util.ServiceLoader;
 
@@ -24,7 +25,7 @@ import java.util.ServiceLoader;
  * The whole file is one transaction: {@link Loader#close()} commits, or rolls
  * back if any mapping failed.
  */
-public class LoadJob {
+class LoadJob {
 
     private final MappingSpec mappingSpec;
     private final ConnectionSource connectionSource;
@@ -45,9 +46,10 @@ public class LoadJob {
      */
     public int load(Path file) throws IOException, SQLException {
         var adapter = createInputAdapter(mappingSpec.inputSpec());
+        var ambient = Map.<String, Object>of("xldr.filename", file.getFileName().toString());
 
         try (var connection = connectionSource.getConnection();
-             var loader = new Loader(mappingSpec, connection)) {
+             var loader = new Loader(mappingSpec, connection, ambient)) {
             int total = 0;
             for (var mapping : mappingSpec.recordMappingSpecs()) {
                 try (var in = Files.newInputStream(file)) {

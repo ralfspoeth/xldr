@@ -75,9 +75,14 @@ application, not in the mapping.
 The mapping specification can be constructed programmatically or can be provided through some source text in one of the
 following formats:
 
-* .properties: Java's standard properties format
-* .xml: well-formed XML complying to a schema described below
 * .json: JSON format
+* .xml: well-formed XML complying to a schema described below
+
+A spec may carry more than the members the reader consumes. Anything a reader does not recognise - a JSON member, an
+XML element or attribute, at any level - is ignored, so an author is free to annotate a spec with, say, a
+`"comments": "..."` member without deviating from the format. The one exception is `load`: that name is **reserved**.
+It carried the commit policy in an earlier version and may return, so it must not be repurposed for the author's own
+data; a spec that still contains an old `load` block is simply ignored today.
 
 Reading different file types is supported by providing a specific adapter per MIME type. There may be more than one
 adapter per MIME type on the module path; it's then however unspecified which one will be selected. A future enhancement
@@ -127,6 +132,62 @@ Example:
         ]
     }
 
+### Variables
+
+Alongside the record selectors, an input may declare `vars`: named values evaluated **once per load** and then
+referenced from any field mapping by `{"var": "name"}`. A value looked up from a reference table is read a single
+time and stamped onto every row of every table in the file, rather than re-resolved per row; a constant can be named
+once and reused across mappings.
+
+A var is row-independent by construction, so its source is a `constant`, `lookup`, or another `var` declared earlier -
+never a `fieldSelector`. Vars are evaluated in declaration order.
+
+    "input": {
+        "mimeType": "text/csv",
+        "vars": [
+            {"name": "source", "constant": "PD"},
+            {"name": "batchId", "lookup": {"table": "load_batch", "column": "id",
+                                           "keyColumn": "feed", "constant": "funds"}}
+        ],
+        "recordSelectors": [ ... ]
+    }
+
+    "mapping": [
+        {
+            "recordSelector": "rows",
+            "databaseTable": "t",
+            "fieldMapping": [
+                {"var": "source",  "databaseColumn": "source_cd"},
+                {"var": "batchId", "databaseColumn": "batch_id"}
+            ]
+        }
+    ]
+
+### Expressions
+
+An `expr` source is a `${...}` template, evaluated in the JVM and bound as a parameter - it never emits SQL. It is
+interpolation plus a small set of functions, with no operators. Each `${...}` hole is either a name or a function
+call, and adjacent holes concatenate:
+
+    {"generated-id": {"expr": "${xldr.filename}-${nextval('doc')}"}}
+    {"expr": "${now()}",           "databaseColumn": "loaded_at"}
+    {"expr": "${nextval('rownum')}", "databaseColumn": "line_no"}
+
+A **name** resolves in order: `${xldr.*}` for the application-provided ambient values (currently just
+`xldr.filename`), then a declared `var`, then - in a field mapping - a field of the record. The two **functions** are:
+
+* `nextval('name'[, start[, inc]])` - the next value of an in-memory sequence that lives for the one load, shared by
+  name. The first draw is `start` (default 1), each later one adds `inc` (default 1). Sequences never touch the
+  database;
+* `now()` - the current instant (`java.time.Instant`).
+
+**Typing:** a template that is a single hole keeps that value's native type - `${nextval('r')}` binds an integer,
+`${now()}` a timestamp; anything with literal text or several holes concatenates to a string.
+
+Where it is used decides how often it runs: as a `var` it is evaluated **once per load** (one generated id for the
+whole file, one sequence draw); as a field mapping it is evaluated **per row** (so `${nextval('rownum')}` numbers the
+rows). A `var` expression has no record in scope, so it may not reference a field.
+
 ### Committing
 
 The whole input is one transaction: the loader commits when the file has been read in full, or rolls everything back
@@ -141,16 +202,18 @@ test to production unchanged.
 
 The record mapping specification is an array of record mappings, each naming a record selector from the input
 specification, the target table, and an array of field mappings from a source to a target column. Every field mapping
-carries exactly one of three sources:
+carries exactly one of these sources:
 
 * `fieldSelector` - a field of the record, resolved by the adapter and bound as a parameter (the ordinary case);
 * `constant` - a fixed value from the spec, bound as a parameter. In JSON its type follows the literal (string, number,
   boolean); in XML, an attribute, it is always a string;
-* `function` - a raw SQL expression such as `sysdate` or `myseq.nextval`, emitted inline in the `values(...)` list
-  rather than bound. The text is spec-authored and trusted;
 * `lookup` - a value read from a reference table, emitted as an inline scalar subquery
-  `(select column from table where keyColumn = key)`. The `key` is itself a `fieldSelector`, `constant` or
-  `function`; a key that matches no row yields NULL.
+  `(select column from table where keyColumn = key)`. The `key` is itself a `fieldSelector`, `constant` or `var`;
+  a key that matches no row yields NULL;
+* `var` - a reference by name to an input [variable](#variables), bound as a parameter;
+* `expr` - a [`${...}` template](#expressions) evaluated in the JVM, bound as a parameter.
+
+Every value reaches the database as a bound parameter or a normalized identifier; a spec never contributes raw SQL.
 
 A record mapping may also carry a `limit`, the maximum number of records inserted for it.
 
@@ -175,8 +238,7 @@ Example:
             "limit": 1000,
             "fieldMapping": [
                 { "fieldSelector": "id", "databaseColumn": "col_id" },
-                { "constant": "PD",      "databaseColumn": "source_cd" },
-                { "function": "sysdate", "databaseColumn": "loaded_at" }
+                { "constant": "PD",      "databaseColumn": "source_cd" }
             ]
         },
         ...
@@ -216,7 +278,7 @@ The application runs as a server watching a number of configured *roots*. A root
 be created; a feed is a directory exactly one level below a root that contains a mapping spec.
 
     <root>/<feed>/
-        spec.json           one of spec.json | spec.xml | spec.properties; its presence activates the feed
+        spec.json           one of spec.json | spec.xml; its presence activates the feed
         adapter.properties  optional, input adapter settings such as fieldSeparator for CSV
         in/                 producers move input files in here
         work/               claimed, currently being loaded
@@ -304,7 +366,7 @@ target database.
 
 ### Feed configuration
 
-A feed directory holds a mapping spec - `spec.json`, `spec.xml` or `spec.properties`, exactly one - and, optionally,
+A feed directory holds a mapping spec - `spec.json` or `spec.xml`, exactly one - and, optionally,
 an `adapter.properties` file with format-specific settings handed to the input adapter. The recognised keys depend on
 the input spec's MIME type.
 

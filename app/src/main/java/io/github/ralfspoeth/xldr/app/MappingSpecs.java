@@ -3,7 +3,6 @@ package io.github.ralfspoeth.xldr.app;
 import io.github.ralfspoeth.xldr.spec.MappingSpec;
 import io.github.ralfspoeth.xldr.spec.io.JsonMappingSpecReader;
 import io.github.ralfspoeth.xldr.spec.io.MappingSpecReader;
-import io.github.ralfspoeth.xldr.spec.io.PropertiesMappingSpecReader;
 import io.github.ralfspoeth.xldr.spec.io.XmlMappingSpecReader;
 
 import java.io.IOException;
@@ -21,7 +20,7 @@ final class MappingSpecs {
      * The accepted spec file names. A feed directory must contain exactly one of
      * them; zero means "not a feed (yet)", more than one is ambiguous.
      */
-    static final List<String> SPEC_NAMES = List.of("spec.json", "spec.xml", "spec.properties");
+    static final List<String> SPEC_NAMES = List.of("spec.json", "spec.xml");
 
     private MappingSpecs() {
     }
@@ -64,8 +63,6 @@ final class MappingSpecs {
             return new JsonMappingSpecReader();
         } else if (name.endsWith(".xml")) {
             return new XmlMappingSpecReader();
-        } else if (name.endsWith(".properties")) {
-            return new PropertiesMappingSpecReader();
         } else {
             throw new IllegalArgumentException("unsupported mapping spec format: " + specFile);
         }

@@ -30,6 +30,12 @@ import static io.github.ralfspoeth.xmls.XmlFunctions.elements;
  * The element and attribute names are those of the JSON format, so a spec can
  * be transliterated between the two without renaming anything. {@code type} is
  * optional.
+ * <p>
+ * Elements and attributes the reader does not recognise are ignored at every
+ * level, so an author may annotate a spec - for instance with a
+ * {@code <comments>} element - without breaking it. The name {@code load} is
+ * reserved (it carried the commit policy once and may return) and must not be
+ * repurposed.
  */
 public class XmlMappingSpecReader implements MappingSpecReader {
 
@@ -57,8 +63,20 @@ public class XmlMappingSpecReader implements MappingSpecReader {
                 elements("recordSelector")
                         .apply(input)
                         .map(XmlMappingSpecReader::recordSelectorSpec)
+                        .toList(),
+                elements("var")
+                        .apply(input)
+                        .map(XmlMappingSpecReader::varSpec)
                         .toList()
         );
+    }
+
+    private static VarSpec varSpec(Element element) {
+        var source = valueSource(element);
+        if (source instanceof ValueSource.Field) {
+            throw new IllegalArgumentException("a var must be row-independent, not a fieldSelector");
+        }
+        return new VarSpec(required(element, "name"), source);
     }
 
     private static RecordSelectorSpec recordSelectorSpec(Element recordSelector) {
@@ -90,7 +108,7 @@ public class XmlMappingSpecReader implements MappingSpecReader {
                 required(mapping, "databaseTable"),
                 elements("fieldMapping")
                         .apply(mapping)
-                        .map(fm -> new FieldMappingSpec(columnSource(fm), required(fm, "databaseColumn")))
+                        .map(fm -> new FieldMappingSpec(valueSource(fm), required(fm, "databaseColumn")))
                         .toList(),
                 attributeValue("limit").apply(mapping).map(Integer::valueOf).orElse(null)
         );
@@ -98,18 +116,18 @@ public class XmlMappingSpecReader implements MappingSpecReader {
 
     /**
      * A field mapping carries exactly one source: a {@code fieldSelector},
-     * {@code constant} or {@code function} attribute, or a child {@code <lookup>}
-     * element. A constant in XML is always a string - attribute values carry no
-     * type.
+     * {@code constant}, {@code var} or {@code expr} attribute, or a child
+     * {@code <lookup>} element. A constant in XML is always a string - attribute
+     * values carry no type.
      */
-    private static ColumnSource columnSource(Element fm) {
+    private static ValueSource valueSource(Element fm) {
         var lookup = elements("lookup").apply(fm).findFirst();
         if (lookup.isPresent()) {
             if (hasBasicSource(fm)) {
                 throw new IllegalArgumentException("a <lookup> field mapping must carry no source attribute");
             }
             var lk = lookup.get();
-            return new ColumnSource.Lookup(
+            return new ValueSource.Lookup(
                     required(lk, "table"),
                     required(lk, "column"),
                     required(lk, "keyColumn"),
@@ -120,25 +138,30 @@ public class XmlMappingSpecReader implements MappingSpecReader {
 
     private static boolean hasBasicSource(Element e) {
         return attributeValue("fieldSelector").apply(e).isPresent()
-                || attributeValue("function").apply(e).isPresent()
-                || attributeValue("constant").apply(e).isPresent();
+                || attributeValue("constant").apply(e).isPresent()
+                || attributeValue("var").apply(e).isPresent()
+                || attributeValue("expr").apply(e).isPresent();
     }
 
-    private static ColumnSource basicSource(Element e) {
+    private static ValueSource basicSource(Element e) {
         var field = attributeValue("fieldSelector").apply(e);
-        var function = attributeValue("function").apply(e);
         var constant = attributeValue("constant").apply(e);
+        var varRef = attributeValue("var").apply(e);
+        var expr = attributeValue("expr").apply(e);
 
-        var present = (field.isPresent() ? 1 : 0) + (function.isPresent() ? 1 : 0) + (constant.isPresent() ? 1 : 0);
+        var present = (field.isPresent() ? 1 : 0) + (constant.isPresent() ? 1 : 0)
+                + (varRef.isPresent() ? 1 : 0) + (expr.isPresent() ? 1 : 0);
         if (present != 1) {
-            throw new IllegalArgumentException("needs exactly one of fieldSelector, constant, function");
+            throw new IllegalArgumentException("needs exactly one of fieldSelector, constant, var, expr");
         }
         if (field.isPresent()) {
-            return new ColumnSource.Field(field.get());
-        } else if (function.isPresent()) {
-            return new ColumnSource.Function(function.get());
+            return new ValueSource.Field(field.get());
+        } else if (varRef.isPresent()) {
+            return new ValueSource.Var(varRef.get());
+        } else if (expr.isPresent()) {
+            return new ValueSource.Expr(expr.get());
         } else {
-            return new ColumnSource.Constant(constant.get());
+            return new ValueSource.Constant(constant.get());
         }
     }
 

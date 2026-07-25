@@ -10,9 +10,13 @@ import java.io.IOException;
 import java.io.Reader;
 
 /**
- * Reads a JSON mapping specification; the spec by example is given below.
- *
- *
+ * Reads a JSON mapping specification from an {@code input}, its {@code vars},
+ * and an array of {@code mapping}s.
+ * <p>
+ * Members beyond those are ignored at every level, so an author may annotate a
+ * spec - for instance with a {@code "comments"} member - without breaking it.
+ * The name {@code load} is reserved (it carried the commit policy once and may
+ * return) and must not be repurposed.
  */
 public class JsonMappingSpecReader implements MappingSpecReader {
 
@@ -35,8 +39,21 @@ public class JsonMappingSpecReader implements MappingSpecReader {
                         .select(Selector.all())
                         .apply(is)
                         .map(JsonMappingSpecReader::recordSelectorSpec)
+                        .toList(),
+                PTR.member("vars")
+                        .select(Selector.all())
+                        .apply(is)
+                        .map(JsonMappingSpecReader::varSpec)
                         .toList()
         );
+    }
+
+    private static VarSpec varSpec(JsonValue v) {
+        var source = valueSource(v);
+        if (source instanceof ValueSource.Field) {
+            throw new IllegalArgumentException("a var must be row-independent, not a fieldSelector: " + v);
+        }
+        return new VarSpec(PTR.member("name").stringOrThrow(v), source);
     }
 
     private static RecordMappingSpec recordMappingSpec(JsonValue element) {
@@ -53,20 +70,20 @@ public class JsonMappingSpecReader implements MappingSpecReader {
     }
 
     private static FieldMappingSpec fieldMappingSpec(JsonValue fm) {
-        return new FieldMappingSpec(columnSource(fm), PTR.member("databaseColumn").stringOrThrow(fm));
+        return new FieldMappingSpec(valueSource(fm), PTR.member("databaseColumn").stringOrThrow(fm));
     }
 
     /**
      * A field mapping carries exactly one source: {@code fieldSelector},
-     * {@code constant}, {@code function}, or a {@code lookup} object.
+     * {@code constant}, {@code var}, {@code expr}, or a {@code lookup} object.
      */
-    private static ColumnSource columnSource(JsonValue fm) {
+    private static ValueSource valueSource(JsonValue fm) {
         var lookup = PTR.member("lookup").apply(fm);
         if (lookup.isPresent()) {
             if (hasBasicSource(fm)) {
                 throw new IllegalArgumentException("a lookup mapping must carry no other source: " + fm);
             }
-            return new ColumnSource.Lookup(
+            return new ValueSource.Lookup(
                     PTR.member("table").stringOrThrow(lookup.get()),
                     PTR.member("column").stringOrThrow(lookup.get()),
                     PTR.member("keyColumn").stringOrThrow(lookup.get()),
@@ -77,29 +94,35 @@ public class JsonMappingSpecReader implements MappingSpecReader {
 
     private static boolean hasBasicSource(JsonValue v) {
         return PTR.member("fieldSelector").stringValue(v).isPresent()
-                || PTR.member("function").stringValue(v).isPresent()
-                || PTR.member("constant").apply(v).isPresent();
+                || PTR.member("constant").apply(v).isPresent()
+                || PTR.member("var").stringValue(v).isPresent()
+                || PTR.member("expr").stringValue(v).isPresent();
     }
 
     /**
-     * Exactly one of {@code fieldSelector}, {@code constant} or {@code function}.
+     * Exactly one of {@code fieldSelector}, {@code constant}, {@code var} or
+     * {@code expr}.
      */
-    private static ColumnSource basicSource(JsonValue v) {
+    private static ValueSource basicSource(JsonValue v) {
         var field = PTR.member("fieldSelector").stringValue(v);
-        var function = PTR.member("function").stringValue(v);
         var constant = PTR.member("constant").apply(v);
+        var varRef = PTR.member("var").stringValue(v);
+        var expr = PTR.member("expr").stringValue(v);
 
-        var present = (field.isPresent() ? 1 : 0) + (function.isPresent() ? 1 : 0) + (constant.isPresent() ? 1 : 0);
+        var present = (field.isPresent() ? 1 : 0) + (constant.isPresent() ? 1 : 0)
+                + (varRef.isPresent() ? 1 : 0) + (expr.isPresent() ? 1 : 0);
         if (present != 1) {
             throw new IllegalArgumentException(
-                    "needs exactly one of fieldSelector, constant, function: " + v);
+                    "needs exactly one of fieldSelector, constant, var, expr: " + v);
         }
         if (field.isPresent()) {
-            return new ColumnSource.Field(field.get());
-        } else if (function.isPresent()) {
-            return new ColumnSource.Function(function.get());
+            return new ValueSource.Field(field.get());
+        } else if (varRef.isPresent()) {
+            return new ValueSource.Var(varRef.get());
+        } else if (expr.isPresent()) {
+            return new ValueSource.Expr(expr.get());
         } else {
-            return new ColumnSource.Constant(constantValue(constant.get()));
+            return new ValueSource.Constant(constantValue(constant.get()));
         }
     }
 

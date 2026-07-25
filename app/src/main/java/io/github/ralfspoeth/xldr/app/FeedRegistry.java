@@ -32,7 +32,7 @@ import static java.lang.System.Logger.Level.WARNING;
  * an unparseable spec deactivates that one feed and is logged, it never
  * propagates to a sibling or to the watcher.
  */
-public class FeedRegistry {
+class FeedRegistry {
 
     private static final System.Logger LOG = System.getLogger(FeedRegistry.class.getName());
 

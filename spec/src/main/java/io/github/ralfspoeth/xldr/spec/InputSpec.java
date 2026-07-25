@@ -30,19 +30,26 @@ import static java.util.Objects.requireNonNullElse;
  *                        is left in {@code in/} untouched. This gates files; the
  *                        {@code mimeType} still selects the adapter.
  * @param recordSelectors the record selectors of the input
+ * @param vars            input-level variables, each evaluated once per load and
+ *                        referenced from a field mapping by a {@link
+ *                        ValueSource.Var}. Evaluated in declaration order, so a
+ *                        variable may reference an earlier one.
  */
 public record InputSpec(String mimeType, String sentinel, String accepts,
-                        Collection<RecordSelectorSpec> recordSelectors)
+                        Collection<RecordSelectorSpec> recordSelectors,
+                        Collection<VarSpec> vars)
         implements Serializable {
 
     public InputSpec {
         recordSelectors = List.copyOf(requireNonNullElse(recordSelectors, List.of()));
+        vars = List.copyOf(requireNonNullElse(vars, List.of()));
     }
 
     /**
-     * Atomic-delivery input claiming every file: no sentinel, no accept pattern.
+     * Atomic-delivery input claiming every file: no sentinel, no accept pattern,
+     * no variables.
      */
     public InputSpec(String mimeType, Collection<RecordSelectorSpec> recordSelectors) {
-        this(mimeType, null, null, recordSelectors);
+        this(mimeType, null, null, recordSelectors, List.of());
     }
 }

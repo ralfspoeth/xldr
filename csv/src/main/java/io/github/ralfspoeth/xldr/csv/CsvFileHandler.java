@@ -4,7 +4,6 @@ import io.github.ralfspoeth.xldr.ia.Field;
 import io.github.ralfspoeth.xldr.ia.InputAdapter;
 import io.github.ralfspoeth.xldr.ia.Result;
 import io.github.ralfspoeth.xldr.ia.Row;
-import io.github.ralfspoeth.xldr.spec.FieldSelectorSpec;
 import io.github.ralfspoeth.xldr.spec.InputSpec;
 
 import java.io.IOException;
@@ -18,8 +17,6 @@ import java.util.Set;
 import java.util.function.ToIntFunction;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
-
-import static io.github.ralfspoeth.basix.fn.Predicates.in;
 
 class CsvFileHandler implements InputAdapter {
 
@@ -87,7 +84,7 @@ class CsvFileHandler implements InputAdapter {
                 .stream()
                 .filter(rs -> rs.name().equals(recordSelector))
                 .flatMap(rs -> rs.fieldSelectors().stream())
-                .filter(in(fieldSelectors, FieldSelectorSpec::name))
+                .filter(fs -> fieldSelectors.contains(fs.name()))
                 .map(fs -> new Field(fs.name(), String.class))
                 .toList();
     }

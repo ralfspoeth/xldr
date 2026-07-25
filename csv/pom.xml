@@ -13,10 +13,6 @@
 
     <dependencies>
         <dependency>
-            <groupId>io.github.ralfspoeth</groupId>
-            <artifactId>basix</artifactId>
-        </dependency>
-        <dependency>
             <groupId>io.github.ralfspoeth.xldr</groupId>
             <artifactId>ia</artifactId>
             <version>${project.version}</version>

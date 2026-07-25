@@ -17,12 +17,10 @@
       "recordSelector": "fund",
       "databaseTable": "fund",
       "fieldMapping": [
-        { "fieldSelector": "id",           "databaseColumn": "id_txt" },
-        { "fieldSelector": "desc",         "databaseColumn": "desc_txt" },
-        { "constant": "PD",                "databaseColumn": "source_cd" },
-        { "function": "current_timestamp", "databaseColumn": "loaded_at" }
+        { "fieldSelector": "id",   "databaseColumn": "id_txt" },
+        { "fieldSelector": "desc", "databaseColumn": "desc_txt" },
+        { "constant": "PD",        "databaseColumn": "source_cd" }
       ]
     }
-  ],
-  "load": { "commitPolicy": "ON_CLOSE" }
+  ]
 }

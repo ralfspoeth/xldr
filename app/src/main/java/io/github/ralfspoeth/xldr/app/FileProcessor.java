@@ -34,7 +34,7 @@ import static java.nio.file.StandardCopyOption.ATOMIC_MOVE;
  * {@code getConnection()}. Claiming and filing away are not counted, only the
  * load itself.
  */
-public class FileProcessor {
+class FileProcessor {
 
     private static final System.Logger LOG = System.getLogger(FileProcessor.class.getName());
     private static final DateTimeFormatter STAMP = DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss-SSS");
