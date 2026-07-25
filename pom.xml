@@ -19,6 +19,7 @@
         <module>ia</module>
         <module>ldr</module>
         <module>csv</module>
+        <module>flt</module>
         <module>xml</module>
         <module>xlsx</module>
         <module>app</module>
