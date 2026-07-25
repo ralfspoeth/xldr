@@ -20,15 +20,14 @@ import java.util.regex.Pattern;
  * deployment concern of the application, not part of the mapping. The loader
  * borrows the connection: it switches auto-commit off for the duration of the
  * load, commits the whole input on {@link #close()} - or rolls it all back if
- * any record mapping failed - then restores the previous auto-commit setting and
- * closes the connection, which returns it to its pool. Intent is insert only.
+ * any record mapping failed - then closes the connection, which returns it to
+ * its pool (the pool owns its state). Intent is insert only.
  */
 public class Loader implements AutoCloseable {
     private static final Pattern QS_PATTERN = Pattern.compile("\".*\"");
 
     private final MappingSpec mappingSpec;
     private final Connection connection;
-    private final boolean autoCommit;
     private final Map<TabCol, PreparedStatement> statementCache = new HashMap<>();
     private boolean failed = false;
 
@@ -80,7 +79,6 @@ public class Loader implements AutoCloseable {
     public Loader(MappingSpec ms, Connection connection) throws SQLException {
         this.mappingSpec = Objects.requireNonNull(ms);
         this.connection = Objects.requireNonNull(connection);
-        this.autoCommit = connection.getAutoCommit();
         connection.setAutoCommit(false);
     }
 
@@ -207,14 +205,10 @@ public class Loader implements AutoCloseable {
                 for (var ps : statementCache.values()) {
                     try {
                         ps.close();
-                    } catch (SQLException ignored) {
+                    } catch (SQLException _) {
                     }
                 }
                 statementCache.clear();
-                try {
-                    connection.setAutoCommit(autoCommit);
-                } catch (SQLException ignored) {
-                }
             } finally {
                 connection.close();
             }
