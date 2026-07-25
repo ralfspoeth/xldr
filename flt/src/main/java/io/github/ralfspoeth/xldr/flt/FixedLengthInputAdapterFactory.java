@@ -6,12 +6,14 @@ import io.github.ralfspoeth.xldr.ia.InputAdapterFactory;
 import io.github.ralfspoeth.xldr.spec.DataType;
 import io.github.ralfspoeth.xldr.spec.InputSpec;
 
+import java.nio.charset.Charset;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Pattern;
 import java.util.stream.Gatherer;
 
+import static java.util.Optional.ofNullable;
 import static java.util.stream.Collectors.toMap;
 
 public class FixedLengthInputAdapterFactory implements InputAdapterFactory {
@@ -32,6 +34,7 @@ public class FixedLengthInputAdapterFactory implements InputAdapterFactory {
     public InputAdapter createInputAdapter(InputSpec spec) {
         return new FixedLengthInputAdapter(
                 Integer.parseInt(props.getOrDefault("linesPerRecord", "1")),
+                ofNullable(props.get("charset")).map(Charset::forName).orElse(Charset.defaultCharset()),
                 spec.recordSelectors()
                         .stream()
                         .flatMap(rs -> rs.fieldSelectors().stream())
