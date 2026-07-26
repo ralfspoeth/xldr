@@ -2,8 +2,6 @@ package io.github.ralfspoeth.xldr.ia;
 
 import io.github.ralfspoeth.xldr.spec.InputSpec;
 
-import java.util.Properties;
-
 /**
  * Creates {@link InputAdapter}s for a MIME type. Discovered through {@link
  * java.util.ServiceLoader}: each format module provides one, and the application
@@ -27,17 +25,9 @@ public interface InputAdapterFactory {
 
     /**
      * Sets one format-specific setting, e.g. {@code fieldSeparator} for CSV.
+     * The settings of a feed are the {@link InputSpec#properties()} of its input.
      */
     void setProperty(String property, String value);
-
-    /**
-     * Applies every entry in {@code properties} through {@link #setProperty}.
-     */
-    default void setProperties(Properties properties) {
-        for (String p : properties.stringPropertyNames()) {
-            setProperty(p, properties.getProperty(p));
-        }
-    }
 
     /**
      * Creates an adapter for {@code spec}, using the settings applied so far.

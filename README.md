@@ -8,6 +8,10 @@ structure into database tables.
 The toolkit provides adapters for different file types that can be loaded as modules and utilize the service framework
 of JPMS.
 
+> **Pre-1.0.** The API and the mapping-spec format are still settling and may change in any release before `1.0`,
+> including in ways that break existing code and existing specs. Such changes are noted in the release, but no
+> deprecation period is kept. From `1.0` on, breaking changes will be confined to major releases.
+
 ## Getting Started
 
 Java 25 or later is required.
@@ -27,6 +31,7 @@ Then set up a feed - a directory below a root, holding a mapping spec:
       "input": {
         "mimeType": "text/csv",
         "accepts": "glob:*.csv",
+        "fieldSeparator": ",",
         "recordSelectors": [
           { "name": "people", "selector": "people", "fieldSelectors": [
               {"name": "id",   "selector": "id",   "type": "INTEGER"},
@@ -42,7 +47,6 @@ Then set up a feed - a directory below a root, holding a mapping spec:
       ]
     }
     EOF
-    printf 'fieldSeparator=,\n' > /var/lib/xldr/people/adapter.properties
 
 Point the server at the root and start it; it creates the working directories and picks the feed up:
 
@@ -420,7 +424,6 @@ be created; a feed is a directory exactly one level below a root that contains a
 
     <root>/<feed>/
         spec.json           one of spec.json | spec.xml; its presence activates the feed
-        adapter.properties  optional, input adapter settings such as fieldSeparator for CSV
         in/                 producers move input files in here
         work/               claimed, currently being loaded
         archive/2026/07/22/ loaded successfully
@@ -471,8 +474,9 @@ costs a few seconds rather than a feed that never comes up.
 
 ## Configuration
 
-There are three places to configure, at decreasing scope: the server (one file per process), each feed (its spec and
-an optional adapter-properties file), and the mapping spec itself (covered above).
+There are two places to configure: the server, one properties file per process, and each feed, which is its mapping
+spec and nothing else. Everything about an input - which adapter reads it, how that adapter is set up, which files it
+claims, what is extracted and where it goes - is in the one spec document.
 
 ### Server configuration
 
@@ -501,9 +505,25 @@ target database.
 
 ### Feed configuration
 
-A feed directory holds a mapping spec - `spec.json` or `spec.xml`, exactly one - and, optionally,
-an `adapter.properties` file with format-specific settings handed to the input adapter. The recognised keys depend on
-the input spec's MIME type.
+A feed directory holds a mapping spec - `spec.json` or `spec.xml`, exactly one - and nothing else.
+
+The settings of the adapter sit in the input, beside the `mimeType` that chooses it:
+
+    "input": {
+        "mimeType": "text/csv",
+        "accepts": "glob:*.csv",
+        "fieldSeparator": ";",
+        "header": false,
+        "dateFormat": "dd.MM.yyyy",
+        "recordSelectors": [ ... ]
+    }
+
+Anything the input carries beyond `mimeType`, `sentinel`, `accepts`, `recordSelectors` and `vars` is such a setting -
+those five names, and the reserved `load`, are the spec's own. A value is taken as its text, so `false` and `2` are
+fine and arrive as `"false"` and `"2"`. In XML they are attributes of `<input>` and read the same way. Which keys mean
+anything depends on the MIME type, and an adapter ignores what it does not recognise. (Because unknown members of
+`input` are settings rather than annotations, a `"comments"` note belongs at the top level of the spec, not inside
+`input`.)
 
 **Every text adapter** (CSV, XML, fixed length, JSON) understands the same conversion settings. They say how the
 *input* writes its values; the [field type](#field-types) says what the value *is*. Without them values are read in
@@ -524,7 +544,7 @@ Excel needs none of these: a spreadsheet carries typed cells, so a date or a num
 | `fieldSeparator` | tab | Column separator. |
 | `rowSeparator` | platform line separator | Record separator. |
 | `header` | `true` | Whether the first row names the columns. With `false`, field selectors are 1-based column positions (`"1"` → first column). |
-| `encoding` | platform default | Character set, e.g. `UTF-8`. |
+| `charset` | platform default | Character set, e.g. `UTF-8`. |
 
 Quoted fields are not supported yet: a separator inside a value splits it, so a feed whose values may contain the
 separator needs one that does not occur in the data (a tab, say).
@@ -575,11 +595,8 @@ A line that stops short of a field's bounds is not an error: the value is whatev
 beyond the end of the line is null. Together with the stripping every type does, that makes a producer's trailing
 padding irrelevant. The adapter expects exactly one record selector; its name and `selector` are not used.
 
-**JSON** (`application/json`, `text/json`):
-
-| Key | Default | Meaning |
-|-----|---------|---------|
-| `charset` | `UTF-8` | Character set, which JSON is written in. |
+**JSON** (`application/json`, `text/json`): no settings of its own, and deliberately no charset - JSON exchanged
+between systems is UTF-8 by definition (RFC 8259), so a document is always read as such.
 
 Both kinds of selector are pointers in Greyson's syntax: slash separated steps, where a step is a member name, `[n]`
 for the n-th element of an array (`[-1]` counting from the end), or `#regex` to match a member by pattern. The record

@@ -10,7 +10,6 @@ import java.nio.file.PathMatcher;
 import java.util.Collection;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Properties;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.PatternSyntaxException;
 
@@ -81,8 +80,7 @@ class FeedRegistry {
             }
             var sentinel = sentinelSpec == null ? null : Sentinel.parse(sentinelSpec);
             var acceptMatcher = acceptMatcher(acceptsSpec);
-            var feed = new Feed(feedDir, specFile, modified, mappingSpec,
-                    adapterProperties(feedDir), sentinel, acceptMatcher);
+            var feed = new Feed(feedDir, specFile, modified, mappingSpec, sentinel, acceptMatcher);
             ensureDirectoriesAndWatch(feed);
             feeds.put(feedDir, feed);
             byInbox.put(feed.in(), feed);
@@ -145,17 +143,6 @@ class FeedRegistry {
         } else {
             LOG.log(DEBUG, () -> "not a feed: " + feedDir + " - " + reason);
         }
-    }
-
-    private static Properties adapterProperties(Path feedDir) throws IOException {
-        var props = new Properties();
-        var file = feedDir.resolve(Feed.ADAPTER_PROPERTIES);
-        if (Files.isRegularFile(file)) {
-            try (var in = Files.newBufferedReader(file)) {
-                props.load(in);
-            }
-        }
-        return props;
     }
 
     /**

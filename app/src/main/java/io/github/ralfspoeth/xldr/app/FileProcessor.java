@@ -122,7 +122,7 @@ class FileProcessor {
             return;
         }
         try {
-            var rows = new LoadJob(feed.mappingSpec(), connectionSource, feed.adapterProperties()).load(claimed);
+            var rows = new LoadJob(feed.mappingSpec(), connectionSource).load(claimed);
             var target = archive(feed, claimed);
             LOG.log(INFO, () -> "loaded " + rows + " row(s) from " + originalName
                     + " [" + feed.name() + "] -> " + target);

@@ -29,8 +29,8 @@ public class CsvFileHandlerFactory implements InputAdapterFactory {
         return new CsvFileHandler(
                 csvFileHandlerProperties.getProperty("rowSeparator", System.lineSeparator()),
                 csvFileHandlerProperties.getProperty("fieldSeparator", "\t"),
-                csvFileHandlerProperties.containsKey("encoding")?
-                        Charset.forName(csvFileHandlerProperties.getProperty("encoding")):Charset.defaultCharset(),
+                csvFileHandlerProperties.containsKey("charset")?
+                        Charset.forName(csvFileHandlerProperties.getProperty("charset")):Charset.defaultCharset(),
                 Boolean.parseBoolean(csvFileHandlerProperties.getProperty("header", "true")),
                 Formats.of(csvFileHandlerProperties),
                 spec

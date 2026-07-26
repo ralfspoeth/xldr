@@ -5,7 +5,10 @@ import io.github.ralfspoeth.xmls.Xml;
 import org.w3c.dom.Element;
 
 import java.io.Reader;
+import java.util.LinkedHashMap;
 import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
 
 import static io.github.ralfspoeth.xmls.XmlFunctions.attributeValue;
 import static io.github.ralfspoeth.xmls.XmlFunctions.elements;
@@ -67,9 +70,33 @@ public class XmlMappingSpecReader implements MappingSpecReader {
                 elements("var")
                         .apply(input)
                         .map(XmlMappingSpecReader::varSpec)
-                        .toList()
+                        .toList(),
+                properties(input)
         );
     }
+
+    /**
+     * Every attribute of {@code input} beyond its structural ones is a setting of
+     * the adapter it selects - {@code fieldSeparator}, {@code dateFormat},
+     * {@code ns.f}, whatever that adapter understands.
+     */
+    private static Map<String, String> properties(Element input) {
+        Map<String, String> properties = new LinkedHashMap<>();
+        var attributes = input.getAttributes();
+        for (int i = 0; i < attributes.getLength(); i++) {
+            var attribute = attributes.item(i);
+            if (!STRUCTURAL.contains(attribute.getNodeName())) {
+                properties.put(attribute.getNodeName(), attribute.getNodeValue());
+            }
+        }
+        return properties;
+    }
+
+    /**
+     * The attributes of {@code <input>} that are the spec's own, and therefore
+     * not adapter settings.
+     */
+    private static final Set<String> STRUCTURAL = Set.of("mimeType", "sentinel", "accepts");
 
     private static VarSpec varSpec(Element element) {
         var source = valueSource(element);

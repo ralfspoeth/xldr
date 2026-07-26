@@ -84,7 +84,6 @@ public class ServerIT {
     void loadsAFileDroppedIntoAnewFeed() throws Exception {
         var feed = Files.createDirectory(root.resolve("people"));
         Files.writeString(feed.resolve("spec.json"), SPEC);
-        Files.writeString(feed.resolve("adapter.properties"), "fieldSeparator=,\nrowSeparator=\\n\n");
 
         // in/ is created by the server once the spec is seen
         await("in/ to be created", () -> Files.isDirectory(feed.resolve("in")));
@@ -114,7 +113,6 @@ public class ServerIT {
         var feed = Files.createDirectory(root.resolve("broken"));
         // the spec maps onto a table that does not exist
         Files.writeString(feed.resolve("spec.json"), SPEC.replace("\"person\"", "\"no_such_table\""));
-        Files.writeString(feed.resolve("adapter.properties"), "fieldSeparator=,\nrowSeparator=\\n\n");
         await("in/ to be created", () -> Files.isDirectory(feed.resolve("in")));
 
         deliver(feed, "bad.csv", """
@@ -145,7 +143,6 @@ public class ServerIT {
     void deactivatesAfeedWhenTheSpecIsRemoved() throws Exception {
         var feed = Files.createDirectory(root.resolve("transient"));
         Files.writeString(feed.resolve("spec.json"), SPEC);
-        Files.writeString(feed.resolve("adapter.properties"), "fieldSeparator=,\nrowSeparator=\\n\n");
         await("in/ to be created", () -> Files.isDirectory(feed.resolve("in")));
 
         Files.delete(feed.resolve("spec.json"));
@@ -172,7 +169,6 @@ public class ServerIT {
         Files.writeString(feed.resolve("spec.json"), SPEC.replace(
                 "\"accepts\": \"glob:*.csv\"",
                 "\"sentinel\": \"glob:*.done\""));
-        Files.writeString(feed.resolve("adapter.properties"), "fieldSeparator=,\nrowSeparator=\\n\n");
         await("in/ to be created", () -> Files.isDirectory(feed.resolve("in")));
 
         // the data file alone must not be loaded, even non-atomically
@@ -205,7 +201,6 @@ public class ServerIT {
     void loadsAfixedLengthFeed() throws Exception {
         var feed = Files.createDirectory(root.resolve("fixed"));
         Files.writeString(feed.resolve("spec.json"), FIXED_LENGTH_SPEC);
-        Files.writeString(feed.resolve("adapter.properties"), "charset=UTF-8\n");
         await("in/ to be created", () -> Files.isDirectory(feed.resolve("in")));
 
         // columns 0:3 and 3:13; the second line stops early, which is not an error
@@ -387,7 +382,7 @@ public class ServerIT {
     /**
      * The same two columns as {@link #SPEC}, read from a JSON document: the
      * record selector walks into {@code data/people}, and the name is fetched
-     * from a nested object. No adapter properties at all - JSON carries its own
+     * from a nested object. No adapter settings at all - JSON carries its own
      * types, and UTF-8 is the default.
      */
     private static final String JSON_SPEC = """
@@ -430,6 +425,7 @@ public class ServerIT {
               "input": {
                 "mimeType": "text/plain",
                 "accepts": "glob:*.txt",
+                "charset": "UTF-8",
                 "recordSelectors": [
                   {
                     "name": "people",
@@ -463,6 +459,8 @@ public class ServerIT {
               "input": {
                 "mimeType": "text/csv",
                 "accepts": "glob:*.csv",
+                "fieldSeparator": ",",
+                "rowSeparator": "\\n",
                 "recordSelectors": [
                   {
                     "name": "people",

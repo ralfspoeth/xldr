@@ -11,7 +11,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.SQLException;
 import java.util.Map;
-import java.util.Properties;
 import java.util.ServiceLoader;
 
 /**
@@ -29,16 +28,10 @@ class LoadJob {
 
     private final MappingSpec mappingSpec;
     private final ConnectionSource connectionSource;
-    private final Properties adapterProperties;
 
-    /**
-     * @param adapterProperties format specific settings handed to the input
-     *                          adapter factory, e.g. {@code fieldSeparator} for CSV
-     */
-    public LoadJob(MappingSpec mappingSpec, ConnectionSource connectionSource, Properties adapterProperties) {
+    public LoadJob(MappingSpec mappingSpec, ConnectionSource connectionSource) {
         this.mappingSpec = mappingSpec;
         this.connectionSource = connectionSource;
-        this.adapterProperties = adapterProperties;
     }
 
     /**
@@ -73,7 +66,8 @@ class LoadJob {
                 .findFirst()
                 .orElseThrow(() -> new IllegalStateException(
                         "no input adapter for mime type " + inputSpec.mimeType()));
-        factory.setProperties(adapterProperties);
+        // the adapter's settings travel with the input spec
+        inputSpec.properties().forEach(factory::setProperty);
         return factory.createInputAdapter(inputSpec);
     }
 }

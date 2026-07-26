@@ -5,8 +5,6 @@ import io.github.ralfspoeth.xldr.ia.InputAdapter;
 import io.github.ralfspoeth.xldr.ia.InputAdapterFactory;
 import io.github.ralfspoeth.xldr.spec.InputSpec;
 
-import java.nio.charset.Charset;
-import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
@@ -14,14 +12,12 @@ import java.util.Set;
 /**
  * Creates JSON adapters.
  * <p>
- * Recognised properties:
- * <ul>
- *   <li>{@code charset} - how the document is decoded; defaults to UTF-8, which
- *       is what JSON is written in;</li>
- *   <li>{@code dateFormat}, {@code numberFormat}, {@code locale} - the shared
- *       conversion settings, see {@link Formats}. They apply to values carried
- *       as JSON strings; a JSON number is already a number.</li>
- * </ul>
+ * There is no charset setting: JSON exchanged between systems is UTF-8 by
+ * definition (RFC 8259), so the document is always decoded as such.
+ * <p>
+ * Recognised properties are {@code dateFormat}, {@code numberFormat} and
+ * {@code locale}, the shared conversion settings - see {@link Formats}. They
+ * apply to values carried as JSON strings; a JSON number is already a number.
  */
 public class JsonInputAdapterFactory implements InputAdapterFactory {
 
@@ -41,11 +37,6 @@ public class JsonInputAdapterFactory implements InputAdapterFactory {
 
     @Override
     public InputAdapter createInputAdapter(InputSpec spec) {
-        return new JsonInputAdapter(
-                props.containsKey("charset")
-                        ? Charset.forName(props.get("charset"))
-                        : StandardCharsets.UTF_8,
-                Formats.of(props),
-                spec);
+        return new JsonInputAdapter(Formats.of(props), spec);
     }
 }

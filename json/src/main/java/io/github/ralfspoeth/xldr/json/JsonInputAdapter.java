@@ -18,12 +18,13 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.math.BigDecimal;
-import java.nio.charset.Charset;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Stream;
+
+import static java.nio.charset.StandardCharsets.UTF_8;
 
 /**
  * Reads records out of a JSON document, both record and field selectors being
@@ -50,7 +51,6 @@ import java.util.stream.Stream;
  */
 class JsonInputAdapter implements InputAdapter {
 
-    private final Charset charset;
     private final Formats formats;
     private final Map<String, RecordDef> records = new HashMap<>();
 
@@ -61,8 +61,7 @@ class JsonInputAdapter implements InputAdapter {
 
     private record FieldDef(Pointer path, DataType type) {}
 
-    JsonInputAdapter(Charset charset, Formats formats, InputSpec spec) {
-        this.charset = charset;
+    JsonInputAdapter(Formats formats, InputSpec spec) {
         this.formats = formats;
         for (var rs : spec.recordSelectors()) {
             if (records.putIfAbsent(rs.name(), recordDef(rs)) != null) {
@@ -117,7 +116,8 @@ class JsonInputAdapter implements InputAdapter {
                 .map(name -> new Field(name, record.fields().get(name).type().clazz()))
                 .toList();
 
-        var document = Greyson.readValue(new InputStreamReader(source, charset))
+        // RFC 8259: JSON exchanged between systems is UTF-8
+        var document = Greyson.readValue(new InputStreamReader(source, UTF_8))
                 .orElseThrow(() -> new IOException("empty JSON document"));
 
         // the elements of the selected array are the records, in document order

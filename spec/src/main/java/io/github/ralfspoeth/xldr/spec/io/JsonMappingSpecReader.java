@@ -2,12 +2,18 @@ package io.github.ralfspoeth.xldr.spec.io;
 
 import io.github.ralfspoeth.xldr.spec.*;
 import io.github.ralfspoeth.json.Greyson;
+import io.github.ralfspoeth.json.data.JsonObject;
 import io.github.ralfspoeth.json.data.JsonValue;
 import io.github.ralfspoeth.json.query.Pointer;
 import io.github.ralfspoeth.json.query.Selector;
 
 import java.io.IOException;
 import java.io.Reader;
+import java.math.BigDecimal;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
 
 /**
  * Reads a JSON mapping specification from an {@code input}, its {@code vars},
@@ -44,8 +50,41 @@ public class JsonMappingSpecReader implements MappingSpecReader {
                         .select(Selector.all())
                         .apply(is)
                         .map(JsonMappingSpecReader::varSpec)
-                        .toList()
+                        .toList(),
+                properties(is)
         );
+    }
+
+    /**
+     * Everything the input carries beyond its structural members is a setting of
+     * the adapter it selects - {@code fieldSeparator}, {@code dateFormat},
+     * {@code ns.f}, whatever that adapter understands. A scalar is taken as its
+     * text; an object or an array is not a setting and is ignored.
+     */
+    private static Map<String, String> properties(JsonValue is) {
+        if (!(is instanceof JsonObject(var members))) {
+            return Map.of();
+        }
+        Map<String, String> properties = new LinkedHashMap<>();
+        members.forEach((name, value) -> {
+            if (!STRUCTURAL.contains(name)) {
+                text(value).ifPresent(v -> properties.put(name, v));
+            }
+        });
+        return properties;
+    }
+
+    /**
+     * The members of {@code input} that are the spec's own, and therefore not
+     * adapter settings. {@code load} is reserved.
+     */
+    private static final Set<String> STRUCTURAL =
+            Set.of("mimeType", "sentinel", "accepts", "recordSelectors", "vars", "load");
+
+    private static Optional<String> text(JsonValue value) {
+        return value.string()
+                .or(() -> value.decimal().map(BigDecimal::toPlainString))
+                .or(() -> value.bool().map(String::valueOf));
     }
 
     private static VarSpec varSpec(JsonValue v) {

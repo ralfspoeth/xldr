@@ -3,6 +3,7 @@ package io.github.ralfspoeth.xldr.spec;
 import java.io.Serializable;
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 
 import static java.util.Objects.requireNonNullElse;
 
@@ -34,23 +35,41 @@ import static java.util.Objects.requireNonNullElse;
  *                        referenced from a field mapping by a {@link
  *                        ValueSource.Var}. Evaluated in declaration order, so a
  *                        variable may reference an earlier one.
+ * @param properties      the settings of the adapter this input selects - a CSV
+ *                        dialect, a date pattern, an XML namespace binding. They
+ *                        are whatever the chosen adapter understands, which is
+ *                        why they are an open map rather than named components,
+ *                        and they travel with the spec so that an input is
+ *                        described by one document.
  */
 public record InputSpec(String mimeType, String sentinel, String accepts,
                         Collection<RecordSelectorSpec> recordSelectors,
-                        Collection<VarSpec> vars)
+                        Collection<VarSpec> vars,
+                        Map<String, String> properties)
         implements Serializable {
 
     public InputSpec {
         recordSelectors = List.copyOf(requireNonNullElse(recordSelectors, List.of()));
         vars = List.copyOf(requireNonNullElse(vars, List.of()));
+        properties = Map.copyOf(requireNonNullElse(properties, Map.of()));
     }
 
     /**
-     * A spec with neither delivery rule and no variables - for constructing an
-     * input programmatically (adapter and loader use). Not a server feed: a feed
-     * must declare exactly one of {@code sentinel} or {@code accepts}.
+     * An input without adapter settings.
+     */
+    public InputSpec(String mimeType, String sentinel, String accepts,
+                     Collection<RecordSelectorSpec> recordSelectors,
+                     Collection<VarSpec> vars) {
+        this(mimeType, sentinel, accepts, recordSelectors, vars, Map.of());
+    }
+
+    /**
+     * A spec with neither delivery rule, no variables and no adapter settings -
+     * for constructing an input programmatically (adapter and loader use). Not a
+     * server feed: a feed must declare exactly one of {@code sentinel} or
+     * {@code accepts}.
      */
     public InputSpec(String mimeType, Collection<RecordSelectorSpec> recordSelectors) {
-        this(mimeType, null, null, recordSelectors, List.of());
+        this(mimeType, null, null, recordSelectors, List.of(), Map.of());
     }
 }

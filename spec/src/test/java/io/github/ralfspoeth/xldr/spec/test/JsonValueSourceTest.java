@@ -10,9 +10,9 @@ import java.io.IOException;
 import java.io.StringReader;
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Map;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.*;
 
 public class JsonValueSourceTest {
 
@@ -108,7 +108,7 @@ public class JsonValueSourceTest {
                 }
                 """;
         var spec = new JsonMappingSpecReader().readFrom(new StringReader(source));
-        assertEquals(null, List.copyOf(spec.recordMappingSpecs()).getFirst().limit());
+        assertNull(List.copyOf(spec.recordMappingSpecs()).getFirst().limit());
     }
 
     @Test
@@ -180,7 +180,7 @@ public class JsonValueSourceTest {
                 {
                     "comments": "top-level note",
                     "load": { "commitPolicy": "ON_CLOSE" },
-                    "input": { "mimeType": "text/csv", "note": "why this feed exists",
+                    "input": { "mimeType": "text/csv",
                         "recordSelectors": [ { "name": "r", "selector": "//r", "x": 1,
                             "fieldSelectors": [ { "name": "id", "selector": "@id", "unit": "n/a" } ] } ] },
                     "mapping": [
@@ -193,5 +193,38 @@ public class JsonValueSourceTest {
         assertEquals(
                 reader.readFrom(new StringReader(bare)),
                 reader.readFrom(new StringReader(annotated)));
+    }
+
+    /**
+     * Inside {@code input} the rule is the other way round: what the spec does
+     * not claim for itself is a setting of the adapter, whatever that adapter
+     * understands. Scalars keep their text, a nested object or array is not a
+     * setting.
+     */
+    @Test
+    public void readsAdapterSettingsFromTheInput() throws IOException {
+        var source = """
+                {
+                    "input": {
+                        "mimeType": "text/csv",
+                        "accepts": "glob:*.csv",
+                        "fieldSeparator": ";",
+                        "header": false,
+                        "linesPerRecord": 2,
+                        "ns.f": "http://example.com/funds",
+                        "recordSelectors": []
+                    },
+                    "mapping": []
+                }
+                """;
+        var input = new JsonMappingSpecReader().readFrom(new StringReader(source)).inputSpec();
+
+        assertEquals(
+                Map.of("fieldSeparator", ";", "header", "false",
+                        "linesPerRecord", "2", "ns.f", "http://example.com/funds"),
+                input.properties());
+        // the structural members stay where they belong
+        assertEquals("text/csv", input.mimeType());
+        assertEquals("glob:*.csv", input.accepts());
     }
 }
