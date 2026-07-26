@@ -1,17 +1,13 @@
 package io.github.ralfspoeth.xldr.xml;
 
+import io.github.ralfspoeth.xldr.ia.Formats;
 import io.github.ralfspoeth.xldr.spec.DataType;
 import org.w3c.dom.Node;
 
 import javax.xml.xpath.XPathConstants;
 import javax.xml.xpath.XPathExpression;
 import javax.xml.xpath.XPathExpressionException;
-import java.math.BigDecimal;
-import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
 import java.util.Objects;
-import java.util.function.Function;
 
 /**
  * One field of a record, addressed by an XPath expression evaluated relative to
@@ -29,15 +25,15 @@ class XmlFieldSelector {
     private final XPathExpression expression;
     private final String selector;
     private final DataType dataType;
-    private final DateTimeFormatter dateFormat;
+    private final Formats formats;
 
     XmlFieldSelector(String name, String selector, XPathExpression expression, DataType dataType,
-                     DateTimeFormatter dateFormat) {
+                     Formats formats) {
         this.name = Objects.requireNonNull(name);
         this.selector = selector;
         this.expression = Objects.requireNonNull(expression);
         this.dataType = dataType == null ? DataType.STRING : dataType;
-        this.dateFormat = dateFormat;
+        this.formats = formats;
     }
 
     public String name() {
@@ -53,24 +49,24 @@ class XmlFieldSelector {
      * the declared {@link DataType}.
      * <p>
      * Everything but {@code FLOAT} is taken as the string value and converted
-     * from there: XPath 1.0 knows only doubles, so going through
-     * {@code XPathConstants.NUMBER} would round a long integer and turn a
-     * decimal into a binary approximation. An empty result becomes {@code null}
-     * for the typed variants - the loader then binds SQL NULL - while a string
-     * field keeps the empty string, since XPath cannot tell "no such element"
-     * from "an element that is empty".
+     * from there by the shared {@link Formats}: XPath 1.0 knows only doubles, so
+     * going through {@code XPathConstants.NUMBER} would round a long integer and
+     * turn a decimal into a binary approximation. An empty result becomes
+     * {@code null} for the typed variants - the loader then binds SQL NULL -
+     * while a string field keeps the empty string, since XPath cannot tell
+     * "no such element" from "an element that is empty".
      */
     Object evaluate(Node record) {
         try {
             return switch (dataType) {
                 case STRING -> string(record);
-                case INTEGER -> nullOr(string(record), Long::valueOf);
-                case DECIMAL -> nullOr(string(record), BigDecimal::new);
                 case FLOAT -> {
                     var number = (Double) expression.evaluate(record, XPathConstants.NUMBER);
                     yield number == null || number.isNaN() ? null : number;
                 }
-                case DATE -> nullOr(string(record), this::toDateTime);
+                // the shared formats apply the configured numberFormat/dateFormat
+                // and yield null for an empty result
+                case INTEGER, DECIMAL, DATE -> formats.parse(dataType, string(record));
             };
         } catch (XPathExpressionException e) {
             throw new IllegalStateException("cannot evaluate " + selector + " for field " + name, e);
@@ -82,21 +78,6 @@ class XmlFieldSelector {
 
     private String string(Node record) throws XPathExpressionException {
         return (String) expression.evaluate(record, XPathConstants.STRING);
-    }
-
-    private static <T> T nullOr(String raw, Function<String, T> convert) {
-        return raw == null || raw.isBlank() ? null : convert.apply(raw.strip());
-    }
-
-    private LocalDateTime toDateTime(String raw) {
-        if (dateFormat != null) {
-            return LocalDateTime.parse(raw, dateFormat);
-        }
-        try {
-            return LocalDateTime.parse(raw);
-        } catch (RuntimeException e) {
-            return LocalDate.parse(raw).atStartOfDay();
-        }
     }
 
     @Override

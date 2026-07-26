@@ -1,6 +1,7 @@
 package io.github.ralfspoeth.xldr.flt;
 
 import io.github.ralfspoeth.xldr.flt.FixedLengthInputAdapter.Bounds;
+import io.github.ralfspoeth.xldr.ia.Formats;
 import io.github.ralfspoeth.xldr.ia.InputAdapter;
 import io.github.ralfspoeth.xldr.ia.InputAdapterFactory;
 import io.github.ralfspoeth.xldr.spec.DataType;
@@ -35,6 +36,7 @@ public class FixedLengthInputAdapterFactory implements InputAdapterFactory {
         return new FixedLengthInputAdapter(
                 Integer.parseInt(props.getOrDefault("linesPerRecord", "1")),
                 ofNullable(props.get("charset")).map(Charset::forName).orElse(Charset.defaultCharset()),
+                Formats.of(props),
                 spec.recordSelectors()
                         .stream()
                         .flatMap(rs -> rs.fieldSelectors().stream())
@@ -44,21 +46,29 @@ public class FixedLengthInputAdapterFactory implements InputAdapterFactory {
                                 (left, e, ds) ->
                                         ds.push(Map.entry(
                                                 e.getKey(),
-                                                new Bounds(
-                                                        e.getValue().left() < 0 ?
-                                                                left.getAndSet(e.getValue().right()) :
-                                                                left.getAndSet(e.getValue().right()) * 0 + e.getValue().left(),
-                                                        e.getValue().right(),
-                                                        e.getValue().type()))
-                                        )))
+                                                checkLeft(left, e.getValue())
+                                        ))))
                         .collect(toMap(Map.Entry::getKey, Map.Entry::getValue)));
     }
 
+    /**
+     * The type is optional in a spec; an absent one reads the field as text.
+     */
     private static Bounds parse(String s, DataType dt) {
         var m = BOUNDS.matcher(s);
         if (m.matches()) {
-            return new Bounds(m.group(1).isBlank() ? -1 : Integer.parseInt(m.group(1)), Integer.parseInt(m.group(2)), dt);
+            return new Bounds(m.group(1).isBlank() ? -1 : Integer.parseInt(m.group(1)),
+                    Integer.parseInt(m.group(2)),
+                    dt == null ? DataType.STRING : dt);
         } else throw new IllegalArgumentException(s + " doesn't match the pattern " + BOUNDS.pattern());
+    }
+
+    private static Bounds checkLeft(AtomicInteger oldLeft, Bounds parsedBounds) {
+        int old = oldLeft.getAndSet(parsedBounds.right());
+        return parsedBounds.left() < 0 ?
+                new Bounds(old, parsedBounds.right(), parsedBounds.type()) :
+                parsedBounds;
+
     }
 
     private static final Pattern BOUNDS = Pattern.compile("(\\d*):(\\d+)");

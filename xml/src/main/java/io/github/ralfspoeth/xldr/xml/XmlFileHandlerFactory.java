@@ -15,7 +15,8 @@ import java.util.Set;
  *   <li>{@code ns.<prefix>} - binds a namespace prefix for use in the selectors,
  *       for example {@code ns.f=http://example.com/funds} to make
  *       {@code //f:fund} match.</li>
- *   <li>{@code dateFormat} - the pattern for {@code DATE} fields.</li>
+ *   <li>{@code dateFormat}, {@code numberFormat}, {@code locale} - the shared
+ *       conversion settings, see {@link io.github.ralfspoeth.xldr.ia.Formats}.</li>
  * </ul>
  */
 public class XmlFileHandlerFactory implements InputAdapterFactory {

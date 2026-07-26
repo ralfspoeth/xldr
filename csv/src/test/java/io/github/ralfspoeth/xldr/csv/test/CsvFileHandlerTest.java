@@ -9,7 +9,10 @@ import io.github.ralfspoeth.xldr.spec.InputSpec;
 import io.github.ralfspoeth.xldr.spec.RecordSelectorSpec;
 import org.junit.jupiter.api.Test;
 
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.ServiceLoader;
 import java.util.Set;
@@ -134,8 +137,9 @@ public class CsvFileHandlerTest {
                     // incomplete line: missing column 3 -> null
                     () -> assertEquals("Carol", rows.get(2).get("2")),
                     () -> assertNull(rows.get(2).get("3")),
-                    // present but empty column 3 -> "" (distinct from missing/null)
-                    () -> assertEquals("", rows.get(4).get("3")),
+                    // present but empty column 3 -> null as well: a blank value is
+                    // absent, whether the column is missing or merely empty
+                    () -> assertNull(rows.get(4).get("3")),
                     // another incomplete line
                     () -> assertNull(rows.get(6).get("3")),
                     // last line, two-digit position value, missing column 3
@@ -144,6 +148,50 @@ public class CsvFileHandlerTest {
                     () -> assertNull(rows.get(9).get("3"))
             );
         }
+    }
+
+    /**
+     * A field's declared type governs both the exposed {@link Field} type and
+     * the value handed to the loader, so a CSV column can arrive as a number
+     * rather than as text.
+     */
+    @Test
+    public void convertsAccordingToTheDeclaredType() throws IOException {
+        var spec = new InputSpec("text/csv", List.of(
+                new RecordSelectorSpec("people", null, List.of(
+                        new FieldSelectorSpec("id", "id", DataType.INTEGER),
+                        new FieldSelectorSpec("name", "name", DataType.STRING),
+                        new FieldSelectorSpec("rate", "rate", DataType.DECIMAL)
+                ))
+        ));
+        var factory = factory(spec);
+        factory.setProperty("fieldSeparator", ",");
+        factory.setProperty("rowSeparator", "\n");
+        var adapter = factory.createInputAdapter(spec);
+
+        var csv = """
+                id,name,rate
+                1,Alice, 12.50
+                2,Bob,
+                """;
+        var result = adapter.parse(
+                new ByteArrayInputStream(csv.getBytes(StandardCharsets.UTF_8)),
+                "people", Set.of("id", "name", "rate"));
+
+        assertEquals(
+                List.of(Long.class, String.class, BigDecimal.class),
+                result.fields().stream().map(Field::type).toList());
+
+        var rows = result.rows().toList();
+        assertAll(
+                () -> assertEquals(1L, rows.get(0).get("id")),
+                () -> assertEquals("Alice", rows.get(0).get("name")),
+                // padded in the file, still a number
+                () -> assertEquals(new BigDecimal("12.50"), rows.get(0).get("rate")),
+                () -> assertEquals(2L, rows.get(1).get("id")),
+                // an empty column is an absent value
+                () -> assertNull(rows.get(1).get("rate"))
+        );
     }
 
     @Test

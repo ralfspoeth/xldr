@@ -1,5 +1,6 @@
 package io.github.ralfspoeth.xldr.csv;
 
+import io.github.ralfspoeth.xldr.ia.Formats;
 import io.github.ralfspoeth.xldr.ia.InputAdapter;
 import io.github.ralfspoeth.xldr.ia.InputAdapterFactory;
 import io.github.ralfspoeth.xldr.spec.InputSpec;
@@ -31,6 +32,7 @@ public class CsvFileHandlerFactory implements InputAdapterFactory {
                 csvFileHandlerProperties.containsKey("encoding")?
                         Charset.forName(csvFileHandlerProperties.getProperty("encoding")):Charset.defaultCharset(),
                 Boolean.parseBoolean(csvFileHandlerProperties.getProperty("header", "true")),
+                Formats.of(csvFileHandlerProperties),
                 spec
         );
     }

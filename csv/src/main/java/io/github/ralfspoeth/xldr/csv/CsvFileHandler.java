@@ -3,13 +3,17 @@ package io.github.ralfspoeth.xldr.csv;
 import io.github.ralfspoeth.xldr.ia.Field;
 import io.github.ralfspoeth.xldr.ia.InputAdapter;
 import io.github.ralfspoeth.xldr.ia.Result;
+import io.github.ralfspoeth.xldr.ia.Formats;
 import io.github.ralfspoeth.xldr.ia.Row;
+import io.github.ralfspoeth.xldr.spec.DataType;
+import io.github.ralfspoeth.xldr.spec.FieldSelectorSpec;
 import io.github.ralfspoeth.xldr.spec.InputSpec;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.Charset;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -24,22 +28,34 @@ class CsvFileHandler implements InputAdapter {
     private final String fieldSeparator;
     private final Charset charset;
     private final boolean header;
+    private final Formats formats;
 
     private final InputSpec inputSpec;
 
-    CsvFileHandler(String rowSeparator, String fieldSeparator, Charset charset, boolean header, InputSpec spec) {
+    CsvFileHandler(String rowSeparator, String fieldSeparator, Charset charset, boolean header,
+                   Formats formats, InputSpec spec) {
         this.rowSeparator = rowSeparator;
         this.fieldSeparator = fieldSeparator;
         this.charset = charset;
         this.header = header;
+        this.formats = formats;
         this.inputSpec = spec;
     }
 
-    private record Line(String[] values, ToIntFunction<String> index) implements Row {
+    /**
+     * One data line. A column the line does not have at all is null; one it has
+     * is converted according to the field's declared {@link DataType}, which
+     * strips it and treats a blank as absent.
+     */
+    private record Line(String[] values, ToIntFunction<String> index, Map<String, DataType> types,
+                        Formats formats) implements Row {
         @Override
-        public String get(String name) {
+        public Object get(String name) {
             var i = index.applyAsInt(name);
-            return i >= 0 && i < values.length ? values[i] : null;
+            if (i < 0 || i >= values.length) {
+                return null;
+            }
+            return formats.parse(types.get(name), values[i]);
         }
     }
 
@@ -61,6 +77,7 @@ class CsvFileHandler implements InputAdapter {
         }
         var fieldSep = Pattern.quote(fieldSeparator);
         var index = header ? indexOfHeader(lines[0]) : positionalIndex();
+        var types = typesOf(record.fieldSelectors());
         // the record selector's selector, if set, is the value the first column
         // must equal for a line to belong to this record type - the discriminator
         // of an interleaved, headerless file; absent means every line matches
@@ -70,8 +87,24 @@ class CsvFileHandler implements InputAdapter {
                 .filter(line -> !line.isEmpty())
                 .map(line -> line.split(fieldSep, -1))
                 .filter(values -> matches(discriminator, values))
-                .map(values -> (Row) new Line(values, index));
+                .map(values -> (Row) new Line(values, index, types, formats));
         return new Result(fields, rows);
+    }
+
+    /**
+     * The declared type of every field of a record selector; a field without one
+     * is read as text.
+     */
+    private static Map<String, DataType> typesOf(Collection<FieldSelectorSpec> fieldSelectors) {
+        Map<String, DataType> types = new HashMap<>();
+        for (var fs : fieldSelectors) {
+            types.putIfAbsent(fs.name(), typeOf(fs));
+        }
+        return types;
+    }
+
+    private static DataType typeOf(FieldSelectorSpec fs) {
+        return fs.dataType() == null ? DataType.STRING : fs.dataType();
     }
 
     private static boolean matches(String discriminator, String[] values) {
@@ -85,7 +118,7 @@ class CsvFileHandler implements InputAdapter {
                 .filter(rs -> rs.name().equals(recordSelector))
                 .flatMap(rs -> rs.fieldSelectors().stream())
                 .filter(fs -> fieldSelectors.contains(fs.name()))
-                .map(fs -> new Field(fs.name(), String.class))
+                .map(fs -> new Field(fs.name(), typeOf(fs).clazz()))
                 .toList();
     }
 

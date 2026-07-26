@@ -1,6 +1,7 @@
 package io.github.ralfspoeth.xldr.xml;
 
 import io.github.ralfspoeth.xldr.ia.Field;
+import io.github.ralfspoeth.xldr.ia.Formats;
 import io.github.ralfspoeth.xldr.ia.InputAdapter;
 import io.github.ralfspoeth.xldr.ia.Result;
 import io.github.ralfspoeth.xldr.ia.Row;
@@ -16,7 +17,6 @@ import javax.xml.xpath.XPathExpressionException;
 import javax.xml.xpath.XPathFactory;
 import java.io.IOException;
 import java.io.InputStream;
-import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -39,20 +39,13 @@ import java.util.stream.IntStream;
  */
 class XmlFileHandler implements InputAdapter {
 
-    /**
-     * Optional adapter property naming the pattern for {@code DATE} fields;
-     * without it an ISO timestamp and a plain ISO date are both accepted.
-     */
-    static final String DATE_FORMAT = "dateFormat";
-
     private final Map<String, XmlRecordSelector> recordSelectors = new HashMap<>();
     private final DocumentBuilderFactory parsers;
 
     XmlFileHandler(InputSpec spec, Properties properties) {
         var namespaces = Namespaces.of(properties);
-        var dateFormat = properties.containsKey(DATE_FORMAT)
-                ? DateTimeFormatter.ofPattern(properties.getProperty(DATE_FORMAT))
-                : null;
+        // dateFormat / numberFormat / locale, shared with the other adapters
+        var formats = Formats.of(properties);
 
         var xpath = newXPath(namespaces);
         for (var recordSpec : spec.recordSelectors()) {
@@ -67,7 +60,7 @@ class XmlFileHandler implements InputAdapter {
                         fieldSpec.selector(),
                         compile(xpath, fieldSpec.selector()),
                         fieldSpec.dataType(),
-                        dateFormat));
+                        formats));
             }
         }
         this.parsers = newParserFactory();

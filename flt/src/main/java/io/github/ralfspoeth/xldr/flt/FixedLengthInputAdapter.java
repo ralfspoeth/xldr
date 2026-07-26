@@ -1,6 +1,7 @@
 package io.github.ralfspoeth.xldr.flt;
 
 import io.github.ralfspoeth.xldr.ia.Field;
+import io.github.ralfspoeth.xldr.ia.Formats;
 import io.github.ralfspoeth.xldr.ia.InputAdapter;
 import io.github.ralfspoeth.xldr.ia.Result;
 import io.github.ralfspoeth.xldr.ia.Row;
@@ -9,9 +10,7 @@ import io.github.ralfspoeth.xldr.spec.DataType;
 import java.io.BufferedReader;
 import java.io.InputStream;
 import java.io.InputStreamReader;
-import java.math.BigDecimal;
 import java.nio.charset.Charset;
-import java.time.LocalDateTime;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Gatherer;
@@ -23,11 +22,13 @@ class FixedLengthInputAdapter implements InputAdapter {
 
     private final int linesPerRecord;
     private final Charset charset;
+    private final Formats formats;
     private final Map<String, Bounds> bounds;
 
-    FixedLengthInputAdapter(int linesPerRecord, Charset charset, Map<String, Bounds> bounds) {
+    FixedLengthInputAdapter(int linesPerRecord, Charset charset, Formats formats, Map<String, Bounds> bounds) {
         this.linesPerRecord = linesPerRecord;
         this.charset = charset;
+        this.formats = formats;
         this.bounds = bounds;
     }
 
@@ -43,10 +44,15 @@ class FixedLengthInputAdapter implements InputAdapter {
                         .lines()
                         .gather(Gatherer.ofSequential(
                                 LineAccu::new,
-                                (l, s, ds) ->
-                                        l.add(s) || ds.push(new FLRow(l.getAndReset())),
-                                (l, ds)->{
-                                    if(l.count>0 && !ds.isRejecting()) {
+                                (l, s, ds) -> {
+                                    if (l.add(s)) {
+                                        return ds.push(new FLRow(l.getAndReset()));
+                                    } else {
+                                        return true;
+                                    }
+                                },
+                                (l, ds) -> {
+                                    if (l.count > 0 && !ds.isRejecting()) {
                                         throw new IllegalArgumentException("incomplete final record");
                                     }
                                 }
@@ -64,16 +70,9 @@ class FixedLengthInputAdapter implements InputAdapter {
         @Override
         public Object get(String name) {
             var bds = bounds.get(name);
-            if(bds.left>=text.length()) return null;
+            if (bds.left >= text.length()) return null;
             int right = min(bds.right, text.length());
-            var part = text.substring(bds.left, right).strip();
-            return switch (bds.type) {
-                case DATE -> LocalDateTime.parse(part);
-                case FLOAT -> Double.parseDouble(part);
-                case DECIMAL -> new BigDecimal(part);
-                case INTEGER -> Long.parseLong(part);
-                case STRING -> part;
-            };
+            return formats.parse(bds.type, text.substring(bds.left, right));
         }
     }
 
