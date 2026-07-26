@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>io.github.ralfspoeth.xldr</groupId>
+        <artifactId>xldr</artifactId>
+        <version>${revision}</version>
+    </parent>
+
+    <artifactId>bom</artifactId>
+    <packaging>pom</packaging>
+    <name>xldr bom</name>
+    <description>Bill of materials for the published xldr modules</description>
+
+    <!--
+      The published modules, and only those: app is an executable and it holds
+      the integration tests, so neither is on Maven Central. Third-party versions
+      are deliberately not managed here - importing this must not bind a consumer
+      to the POI, HikariCP or driver versions this build happens to use.
+    -->
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>io.github.ralfspoeth.xldr</groupId>
+                <artifactId>spec</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.github.ralfspoeth.xldr</groupId>
+                <artifactId>ia</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.github.ralfspoeth.xldr</groupId>
+                <artifactId>ldr</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.github.ralfspoeth.xldr</groupId>
+                <artifactId>csv</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.github.ralfspoeth.xldr</groupId>
+                <artifactId>flt</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.github.ralfspoeth.xldr</groupId>
+                <artifactId>json</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.github.ralfspoeth.xldr</groupId>
+                <artifactId>xml</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.github.ralfspoeth.xldr</groupId>
+                <artifactId>xlsx</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
+</project>

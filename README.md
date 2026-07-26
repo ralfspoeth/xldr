@@ -55,22 +55,37 @@ file must be *moved* rather than written in place.
 
 ### Using the toolkit as a library
 
-The library modules are published to Maven Central under the group `io.github.ralfspoeth.xldr`. Take the loader plus
-the adapters for the formats you read; each adapter brings `ia` and `spec` with it:
+The library modules are published to Maven Central under the group `io.github.ralfspoeth.xldr`. Import the `bom` to
+fix their versions in one place:
+
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>io.github.ralfspoeth.xldr</groupId>
+                <artifactId>bom</artifactId>
+                <version>0.5</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
+Then take the loader plus the adapters for the formats you read, without repeating the version; each adapter brings
+`ia` and `spec` with it:
 
     <dependency>
         <groupId>io.github.ralfspoeth.xldr</groupId>
         <artifactId>ldr</artifactId>
-        <version>0.5</version>
     </dependency>
     <dependency>
         <groupId>io.github.ralfspoeth.xldr</groupId>
         <artifactId>csv</artifactId>
-        <version>0.5</version>
     </dependency>
 
-The published artifacts are `spec`, `ia`, `ldr` and the adapters `csv`, `xml`, `xlsx`, `flt` and `json`; `app` and
-`it` are not published. An adapter is found through `ServiceLoader`, so it need only be on the module path:
+The `bom` manages exactly the published artifacts - `spec`, `ia`, `ldr` and the adapters `csv`, `xml`, `xlsx`, `flt`
+and `json` - and deliberately no third-party versions, so importing it does not bind you to the POI, HikariCP or JDBC
+driver versions this build happens to use. `app` and `it` are not published at all. An adapter is found through
+`ServiceLoader`, so it need only be on the module path:
 
     var spec = new JsonMappingSpecReader().readFrom(reader);
     var factory = ServiceLoader.load(InputAdapterFactory.class).stream()
@@ -95,6 +110,7 @@ The whole toolkit is one reactor under the `xldr` parent POM and builds with a s
 modules by their dependencies:
 
 * `spec`, `ia`, `ldr` - the core: the mapping-spec model and readers, the input-adapter SPI, and the JDBC loader;
+* `bom` - a bill of materials fixing the versions of the published modules in one import;
 * `csv`, `xml`, `xlsx`, `flt`, `json` - the input adapters, each an `InputAdapterFactory` provider discovered through
   `ServiceLoader`;
 * `app` - the server. It does not `requires` any adapter; the adapters are `provided` dependencies, so they are on the
@@ -132,9 +148,10 @@ keeping the modular layout and its service binding intact.
 ### Releasing
 
 Publishing goes through the Central Portal via the `central-publishing-maven-plugin`, inherited from the `plumbum`
-parent. The plugin bundles the whole reactor into a single deployment, so the `xldr` parent POM and the six library
-modules - `spec`, `ia`, `ldr`, `csv`, `xml`, `xlsx`, `flt`, `json` - are published together. `app` (an executable, not
-a library) and `it` (integration tests) each set `skipPublishing` on the plugin, so they are left out of the bundle.
+parent. The plugin bundles the whole reactor into a single deployment, so the `xldr` parent POM, the `bom` and the
+eight library modules - `spec`, `ia`, `ldr`, `csv`, `xml`, `xlsx`, `flt`, `json` - are published together. `app` (an
+executable, not a library) and `it` (integration tests) each set `skipPublishing` on the plugin, so they are left out
+of the bundle.
 
 A plain deploy therefore publishes everything in one go:
 
