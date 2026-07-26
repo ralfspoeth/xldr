@@ -2,7 +2,9 @@ package io.github.ralfspoeth.xldr.app;
 
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
+import picocli.CommandLine.Model.CommandSpec;
 import picocli.CommandLine.Parameters;
+import picocli.CommandLine.Spec;
 
 import java.io.IOException;
 import java.nio.file.Path;
@@ -15,12 +17,17 @@ import static java.lang.System.Logger.Level.INFO;
 /**
  * Entry point: starts the server and watches the configured roots until the
  * process is asked to stop.
+ * <p>
+ * Running the server is what the command does on its own, so a deployment keeps
+ * invoking {@code xldr <config>}; {@code xldr validate <spec>} checks specs
+ * instead, without a database or a server.
  */
 @Command(
         name = "xldr",
         mixinStandardHelpOptions = true,
         version = "xldr " + Main.VERSION,
-        description = "Watches the configured roots and loads files that appear into the target database."
+        description = "Watches the configured roots and loads files that appear into the target database.",
+        subcommands = Validate.class
 )
 public class Main implements Callable<Integer> {
 
@@ -28,8 +35,16 @@ public class Main implements Callable<Integer> {
 
     private static final System.Logger LOG = System.getLogger(Main.class.getName());
 
+    @Spec
+    private CommandSpec spec;
+
+    /**
+     * Optional only so that a subcommand may be invoked without it; running the
+     * server without a configuration is an error.
+     */
     @Parameters(
             index = "0",
+            arity = "0..1",
             paramLabel = "CONFIG",
             description = "the server configuration properties file (xldr.roots, jdbc.url, ...)"
     )
@@ -42,6 +57,10 @@ public class Main implements Callable<Integer> {
 
     @Override
     public Integer call() throws Exception {
+        if (configFile == null) {
+            spec.commandLine().usage(System.err);
+            return CommandLine.ExitCode.USAGE;
+        }
         var config = AppConfig.load(configFile);
         try (var pool = new ConnectionPool(config);
              var watcher = new Watcher(config, pool)) {

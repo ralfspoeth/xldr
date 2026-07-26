@@ -68,6 +68,12 @@
             <artifactId>poi-ooxml</artifactId>
             <scope>test</scope>
         </dependency>
+        <!-- driving the validate subcommand through the command line -->
+        <dependency>
+            <groupId>info.picocli</groupId>
+            <artifactId>picocli</artifactId>
+            <scope>test</scope>
+        </dependency>
         <dependency>
             <groupId>com.h2database</groupId>
             <artifactId>h2</artifactId>

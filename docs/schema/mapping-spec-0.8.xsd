@@ -1,0 +1,125 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+    The XML form of an xldr mapping specification. Reference it from a spec with
+
+        <mappingSpec xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                     xsi:noNamespaceSchemaLocation="https://ralfspoeth.github.io/xldr/schema/mapping-spec-0.8.xsd">
+
+    which an editor validates against and which the reader ignores, since a spec
+    carries no namespace of its own.
+
+    What this schema cannot express, being XSD 1.0: that a field mapping carries
+    exactly one value source, that a var carries one that is not a fieldSelector,
+    and that an input declares exactly one of accepts or sentinel. Those are
+    checked when the spec is read.
+-->
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" elementFormDefault="qualified">
+
+    <!--
+        The reader ignores elements it does not know, but a wildcard for them
+        cannot be expressed here: XSD 1.0 forbids a content model in which an
+        element could match both a named particle and a wildcard. Annotate an XML
+        spec with XML comments, which are always allowed.
+    -->
+    <xs:element name="mappingSpec">
+        <xs:complexType>
+            <xs:sequence>
+                <xs:element name="input" type="input"/>
+                <xs:element name="mapping" type="recordMapping" minOccurs="0" maxOccurs="unbounded"/>
+            </xs:sequence>
+        </xs:complexType>
+    </xs:element>
+
+    <xs:complexType name="input">
+        <xs:sequence>
+            <xs:element name="properties" type="properties" minOccurs="0"/>
+            <xs:element name="var" type="var" minOccurs="0" maxOccurs="unbounded"/>
+            <xs:element name="recordSelector" type="recordSelector" minOccurs="0" maxOccurs="unbounded"/>
+        </xs:sequence>
+        <xs:attribute name="mimeType" type="xs:string" use="required"/>
+        <!-- exactly one of the two, which XSD 1.0 cannot state -->
+        <xs:attribute name="accepts" type="filePattern"/>
+        <xs:attribute name="sentinel" type="filePattern"/>
+    </xs:complexType>
+
+    <!--
+        The settings of the adapter the mimeType selects, e.g. fieldSeparator,
+        header, charset, dateFormat, numberFormat, locale, linesPerRecord or
+        ns.<prefix>. Which of them mean anything depends on the adapter, so any
+        attribute is allowed here.
+    -->
+    <xs:complexType name="properties">
+        <xs:anyAttribute processContents="skip"/>
+    </xs:complexType>
+
+    <xs:complexType name="recordSelector">
+        <xs:sequence>
+            <xs:element name="fieldSelector" type="fieldSelector" minOccurs="0" maxOccurs="unbounded"/>
+        </xs:sequence>
+        <xs:attribute name="name" type="xs:string" use="required"/>
+        <xs:attribute name="selector" type="xs:string" use="required"/>
+    </xs:complexType>
+
+    <xs:complexType name="fieldSelector">
+        <xs:attribute name="name" type="xs:string" use="required"/>
+        <xs:attribute name="selector" type="xs:string" use="required"/>
+        <xs:attribute name="type" type="dataType"/>
+    </xs:complexType>
+
+    <!-- a var is evaluated with no record in hand, so fieldSelector is not among its sources -->
+    <xs:complexType name="var">
+        <xs:sequence>
+            <xs:element name="lookup" type="lookup" minOccurs="0"/>
+        </xs:sequence>
+        <xs:attribute name="name" type="xs:string" use="required"/>
+        <xs:attribute name="constant" type="xs:string"/>
+        <xs:attribute name="var" type="xs:string"/>
+        <xs:attribute name="expr" type="xs:string"/>
+    </xs:complexType>
+
+    <xs:complexType name="recordMapping">
+        <xs:sequence>
+            <xs:element name="fieldMapping" type="fieldMapping" minOccurs="0" maxOccurs="unbounded"/>
+        </xs:sequence>
+        <xs:attribute name="recordSelector" type="xs:string" use="required"/>
+        <xs:attribute name="databaseTable" type="xs:string" use="required"/>
+        <xs:attribute name="limit" type="xs:nonNegativeInteger"/>
+    </xs:complexType>
+
+    <!-- one target column and exactly one source, the lookup being a child element -->
+    <xs:complexType name="fieldMapping">
+        <xs:sequence>
+            <xs:element name="lookup" type="lookup" minOccurs="0"/>
+        </xs:sequence>
+        <xs:attribute name="databaseColumn" type="xs:string" use="required"/>
+        <xs:attribute name="fieldSelector" type="xs:string"/>
+        <xs:attribute name="constant" type="xs:string"/>
+        <xs:attribute name="var" type="xs:string"/>
+        <xs:attribute name="expr" type="xs:string"/>
+    </xs:complexType>
+
+    <xs:complexType name="lookup">
+        <xs:attribute name="table" type="xs:string" use="required"/>
+        <xs:attribute name="column" type="xs:string" use="required"/>
+        <xs:attribute name="keyColumn" type="xs:string" use="required"/>
+        <xs:attribute name="fieldSelector" type="xs:string"/>
+        <xs:attribute name="constant" type="xs:string"/>
+        <xs:attribute name="var" type="xs:string"/>
+        <xs:attribute name="expr" type="xs:string"/>
+    </xs:complexType>
+
+    <!-- a file name pattern, in the glob: or regex: form of FileSystem.getPathMatcher -->
+    <xs:simpleType name="filePattern">
+        <xs:restriction base="xs:string">
+            <xs:pattern value="(glob|regex):.+"/>
+        </xs:restriction>
+    </xs:simpleType>
+
+    <!-- the Java type the value is delivered as; matched case-insensitively -->
+    <xs:simpleType name="dataType">
+        <xs:restriction base="xs:string">
+            <xs:pattern value="[Ss][Tt][Rr][Ii][Nn][Gg]|[Ii][Nn][Tt][Ee][Gg][Ee][Rr]|[Ff][Ll][Oo][Aa][Tt]|[Dd][Ee][Cc][Ii][Mm][Aa][Ll]|[Dd][Aa][Tt][Ee]"/>
+        </xs:restriction>
+    </xs:simpleType>
+
+</xs:schema>

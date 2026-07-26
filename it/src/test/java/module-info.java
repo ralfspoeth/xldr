@@ -10,6 +10,8 @@ open module io.github.ralfspoeth.xldr.it.test {
     requires java.sql;
     requires org.apache.poi.poi;
     requires org.apache.poi.ooxml;
+    // driving the validate subcommand through the command line
+    requires info.picocli;
     requires org.junit.jupiter.api;
 
     uses io.github.ralfspoeth.xldr.ia.InputAdapterFactory;

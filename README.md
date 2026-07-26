@@ -188,6 +188,46 @@ XML element or attribute, at any level - is ignored, so an author is free to ann
 It carried the commit policy in an earlier version and may return, so it must not be repurposed for the author's own
 data; a spec that still contains an old `load` block is simply ignored today.
 
+### Validating a spec while writing it
+
+Both formats have a published schema, so an editor can check a spec before it ever reaches a server - which otherwise
+only reports a broken spec in its log, by leaving the feed inactive. Point at the schema from the spec itself:
+
+    {
+      "$schema": "https://ralfspoeth.github.io/xldr/schema/mapping-spec-0.8.json",
+      "input": { ... }
+    }
+
+    <mappingSpec xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                 xsi:noNamespaceSchemaLocation="https://ralfspoeth.github.io/xldr/schema/mapping-spec-0.8.xsd">
+
+Both are ignored by the readers - `$schema` is just another unrecognised member, and `xsi:` attributes carry no
+meaning for a spec that has no namespace of its own. IntelliJ and VS Code both validate and autocomplete from them.
+
+The schemas catch what a schema can: missing or misspelled names, a `type` that is not one of the five, a delivery
+pattern without its `glob:`/`regex:` prefix, and - in JSON - an input that declares both `accepts` and `sentinel` or
+neither, a field mapping with no source or several, and a var that reads a field. The rest is checked when the spec
+is read, in particular that every selector compiles.
+
+The XSD is the more permissive of the two, because XSD 1.0 cannot state either of those exactly-one rules. Nor can it
+allow arbitrary extra elements next to the named ones, so annotate an XML spec with XML comments rather than with
+elements of your own; a JSON spec takes an extra member anywhere.
+
+A schema is published per release, since the format is still settling; `mapping-spec-0.8` describes the format of
+release 0.8.
+
+What a schema cannot see is whether the spec makes sense as a whole - whether a mapping names a record selector the
+input actually declares, or whether the adapter accepts the selectors. The distribution checks that:
+
+    bin/xldr validate /var/lib/xldr/people/spec.json
+    bin/xldr validate /var/lib/xldr/*/spec.json
+
+It reads each spec the way the server would, then reports everything wrong with it rather than only the first thing:
+a delivery rule that is missing or doubled, a pattern without its prefix, a MIME type no adapter on the module path
+reads, a selector that adapter refuses to compile, and any record selector, field selector or var a mapping names but
+the input does not declare. Nothing is loaded and no database is touched. The exit code is 0 when every spec is good
+and 1 otherwise, so it fits a CI job or a pre-commit hook for whoever authors the specs.
+
 Reading different file types is supported by providing a specific adapter per MIME type. There may be more than one
 adapter per MIME type on the module path; it's then however unspecified which one will be selected. A future enhancement
 will allow require features to be implemented by the adapter. The adapters shipped with the toolkit are
