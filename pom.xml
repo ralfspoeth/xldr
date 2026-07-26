@@ -23,6 +23,7 @@
         <module>json</module>
         <module>xml</module>
         <module>xlsx</module>
+        <module>bom</module>
         <module>app</module>
         <module>it</module>
     </modules>
