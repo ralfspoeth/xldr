@@ -14,7 +14,8 @@ The whole toolkit is one reactor under the `xldr` parent POM and builds with a s
 modules by their dependencies:
 
 * `spec`, `ia`, `ldr` - the core: the mapping-spec model and readers, the input-adapter SPI, and the JDBC loader;
-* `csv`, `xml`, `xlsx` - the input adapters, each an `InputAdapterFactory` provider discovered through `ServiceLoader`;
+* `csv`, `xml`, `xlsx`, `flt` - the input adapters, each an `InputAdapterFactory` provider discovered through
+  `ServiceLoader`;
 * `app` - the server. It does not `requires` any adapter; the adapters are `provided` dependencies, so they are on the
   module path (JPMS service binding then pulls them into the graph via the `uses` in `app` and the `provides` in each
   adapter) without being bundled into `app`'s own runtime footprint. A deployment supplies the adapter set it needs;
@@ -51,8 +52,8 @@ keeping the modular layout and its service binding intact.
 
 Publishing goes through the Central Portal via the `central-publishing-maven-plugin`, inherited from the `plumbum`
 parent. The plugin bundles the whole reactor into a single deployment, so the `xldr` parent POM and the six library
-modules - `spec`, `ia`, `ldr`, `csv`, `xml`, `xlsx` - are published together. `app` (an executable, not a library)
-and `it` (integration tests) each set `skipPublishing` on the plugin, so they are left out of the bundle.
+modules - `spec`, `ia`, `ldr`, `csv`, `xml`, `xlsx`, `flt` - are published together. `app` (an executable, not a
+library) and `it` (integration tests) each set `skipPublishing` on the plugin, so they are left out of the bundle.
 
 A plain deploy therefore publishes everything in one go:
 
@@ -86,7 +87,14 @@ data; a spec that still contains an old `load` block is simply ignored today.
 
 Reading different file types is supported by providing a specific adapter per MIME type. There may be more than one
 adapter per MIME type on the module path; it's then however unspecified which one will be selected. A future enhancement
-will allow require features to be implemented by the adapter.
+will allow require features to be implemented by the adapter. The adapters shipped with the toolkit are
+
+| MIME type | Adapter | Input |
+|-----------|---------|-------|
+| `text/csv` | `csv` | separated columns, with or without a header row |
+| `text/xml`, `application/xml` | `xml` | XML, selected with XPath |
+| `application/vnd.ms-excel`, `application/vnd.openxmlformats-officedocument.spreadsheetml.sheet` | `xlsx` | Excel, both `.xls` and `.xlsx` |
+| `text/plain` | `flt` | fixed length records, addressed by character position |
 
 Selecting records and fields depends on the type and structure of the input file. An adapter has to provide
 implementations for *record selectors* and *field selectors*.
@@ -131,6 +139,21 @@ Example:
             }
         ]
     }
+
+### Field types
+
+A field selector's `type` is one of `STRING`, `INTEGER`, `FLOAT`, `DECIMAL` or `DATE` (matched case-insensitively),
+and decides the Java type the adapter delivers and therefore what the loader binds: `String`, `Long`, `Double`,
+`BigDecimal` and `LocalDateTime`. It is optional; a field without one is read as text.
+
+Values are read in their canonical form: an ungrouped literal such as `1234.56` for the numeric types, ISO-8601 for
+`DATE` - a plain date (`2026-07-22`) as well as a timestamp (`2026-07-21T14:30`), a plain date being midnight of that
+day. Surrounding whitespace is stripped, so a padded fixed-length column or an indented XML element needs no special
+handling, and **a value that is blank is absent**: it becomes `null` and the loader binds SQL NULL. That holds for the
+numeric types too, where a blank column is a missing value rather than a zero or a parse error.
+
+Input in another notation is a property of the feed rather than of the mapping, and is configured on the adapter with
+`dateFormat`, `numberFormat` and `locale` - see [Feed configuration](#feed-configuration).
 
 ### Variables
 
@@ -364,6 +387,18 @@ A feed directory holds a mapping spec - `spec.json` or `spec.xml`, exactly one -
 an `adapter.properties` file with format-specific settings handed to the input adapter. The recognised keys depend on
 the input spec's MIME type.
 
+**Every text adapter** (CSV, XML, fixed length) understands the same conversion settings. They say how the *input*
+writes its values; the [field type](#field-types) says what the value *is*. Without them values are read in their
+canonical form.
+
+| Key | Default | Meaning |
+|-----|---------|---------|
+| `dateFormat` | ISO-8601 | `DateTimeFormatter` pattern for `DATE` fields, e.g. `yyyyMMdd` or `dd.MM.yyyy HH:mm`. A pattern without a time of day yields midnight. |
+| `numberFormat` | plain literal | `DecimalFormat` pattern for `INTEGER`, `FLOAT` and `DECIMAL`, e.g. `#,##0.00` for grouped input. `DECIMAL` stays exact - it is never rounded through a double. |
+| `locale` | `ROOT` (`1234.56`) | Language tag, e.g. `de-DE`, selecting the decimal and grouping separators of `numberFormat` and the symbols of `dateFormat`. |
+
+Excel needs none of these: a spreadsheet carries typed cells, so a date or a number arrives as one already.
+
 **CSV** (`text/csv`):
 
 | Key | Default | Meaning |
@@ -371,9 +406,10 @@ the input spec's MIME type.
 | `fieldSeparator` | tab | Column separator. |
 | `rowSeparator` | platform line separator | Record separator. |
 | `header` | `true` | Whether the first row names the columns. With `false`, field selectors are 1-based column positions (`"1"` → first column). |
-| `textEnclosingQuotes` | `"` | Quote character. |
 | `encoding` | platform default | Character set, e.g. `UTF-8`. |
-| `locale` | platform default | Locale for number and date parsing. |
+
+Quoted fields are not supported yet: a separator inside a value splits it, so a feed whose values may contain the
+separator needs one that does not occur in the data (a tab, say).
 
 For CSV a record selector's `selector` is a *first-column discriminator*. Headerless feeds often interleave several
 record types in one file, the first column naming the type and the columns that follow varying in number, meaning and
@@ -394,7 +430,32 @@ partition one file, each mapping its own type to its own table:
 | Key | Default | Meaning |
 |-----|---------|---------|
 | `ns.<prefix>` | – | Binds a namespace prefix for the selectors, e.g. `ns.f = http://example.com/funds` to make `//f:fund` match. XPath 1.0 has no default namespace, so a document with one is reachable only through a bound prefix. |
-| `dateFormat` | ISO | Pattern for `DATE` fields; without it an ISO timestamp and a plain ISO date are both accepted. |
+
+XML differs from the other adapters in two deliberate ways. A `STRING` field keeps an empty string rather than
+becoming null, because XPath cannot tell "no such element" from "an element that is empty". And a `FLOAT` is taken
+through XPath's own numeric evaluation rather than from its text - which is why `INTEGER` and `DECIMAL` are not:
+XPath 1.0 knows only doubles, so it would round a long integer and turn a decimal into a binary approximation.
+
+**Fixed length** (`text/plain`):
+
+| Key | Default | Meaning |
+|-----|---------|---------|
+| `linesPerRecord` | `1` | How many lines make up one record. Lines are joined, and the field bounds address the joined text, so a field may sit on the second line. A file that ends mid-record is an error. |
+| `charset` | platform default | Character set, e.g. `UTF-8`. |
+
+A field selector is a half-open character range `left:right` over the record, counted from zero, so `0:3` is the
+first three characters. The left bound may be omitted, in which case the field starts where the previous one ended -
+a layout can therefore be written as a list of end positions:
+
+    "fieldSelectors": [
+        {"name": "id",   "selector": "0:3",  "type": "STRING"},
+        {"name": "name", "selector": ":23",  "type": "STRING"},
+        {"name": "qty",  "selector": ":27",  "type": "INTEGER"}
+    ]
+
+A line that stops short of a field's bounds is not an error: the value is whatever the line still holds, and a field
+beyond the end of the line is null. Together with the stripping every type does, that makes a producer's trailing
+padding irrelevant. The adapter expects exactly one record selector; its name and `selector` are not used.
 
 **Excel** (`application/vnd.ms-excel`, `application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`): no
 properties.
