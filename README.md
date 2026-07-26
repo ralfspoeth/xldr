@@ -110,19 +110,26 @@ record to a database column.
 
 An input specification contains the following pieces of information:
 
-* the MIME type (String)
+* the MIME type, which selects the adapter;
+* exactly one of `accepts` or `sentinel`, the [delivery rule](#delivering-files) saying which arriving file is a
+  complete one - required by the server, and the only part of the spec that is about files rather than about content;
 * record selectors, each of which
     * is identified by a name,
     * has a selector specification, and
     * has related field selectors, which in turn
         * are identified by a name,
         * a selector description,
-        * and some data type.
+        * and, optionally, a [data type](#field-types);
+* optionally [variables](#variables), values computed once per load.
+
+The meaning of a selector is the adapter's: an XPath for XML, a column position or discriminator for CSV, a character
+range for a fixed-length file, a pointer for JSON, a cell range for a spreadsheet.
 
 Example:
 
     "input": {
         "mimeType": "text/xml",
+        "accepts": "glob:*.xml",
         "recordSelectors": [
             {
                 "name": "xx",
@@ -130,7 +137,7 @@ Example:
                 "fieldSelectors": [
                     {
                         "name": "id",
-                        "type": "String", 
+                        "type": "STRING",
                         "selector": "@xxid"
                     }
                 ]
@@ -193,9 +200,11 @@ An `expr` source is a `${...}` template, evaluated in the JVM and bound as a par
 interpolation plus a small set of functions, with no operators. Each `${...}` hole is either a name or a function
 call, and adjacent holes concatenate:
 
-    {"generated-id": {"expr": "${xldr.filename}-${nextval('doc')}"}}
-    {"expr": "${now()}",           "databaseColumn": "loaded_at"}
+    {"name": "generatedId", "expr": "${xldr.filename}-${nextval('doc')}"}
+    {"expr": "${now()}",             "databaseColumn": "loaded_at"}
     {"expr": "${nextval('rownum')}", "databaseColumn": "line_no"}
+
+the first as a `var` in the input, the other two as field mappings.
 
 A **name** resolves in order: `${xldr.*}` for the application-provided ambient values (currently just
 `xldr.filename`), then a declared `var`, then - in a field mapping - a field of the record. The two **functions** are:
@@ -255,7 +264,7 @@ A lookup example - translate an ISO code carried in the input to a surrogate key
 
 Example:
 
-    "recordMapping": [
+    "mapping": [
         {
             "recordSelector": "xx",
             "databaseTable": "tab_xx",
@@ -268,33 +277,43 @@ Example:
         ...
     ]
 
-The mapping specification as a whole is specified by the three elements input, load, and record mapping; example:
+A mapping specification as a whole is therefore an `input` and a `mapping`:
 
     {
-        "input": {...}
-        "load": {...}
-        "recordMapping": []
+        "input": { ... },
+        "mapping": [ ... ]
     }
 
 The order of the elements is unspecified.
 
 ### The XML Format
 
-The same specification in XML. Everything is carried in attributes and the element names are those of the JSON
-format, so a spec can be transliterated between the two without renaming anything. `type` and the whole `load`
-element are optional.
+The same specification in XML. Everything is carried in attributes and the element and attribute names are those of
+the JSON format, so a spec can be transliterated between the two without renaming anything. What is optional in JSON
+is optional here.
 
     <mappingSpec>
-        <input mimeType="text/xml">
+        <input mimeType="text/xml" accepts="glob:*.xml">
+            <var name="source" constant="PD"/>
             <recordSelector name="fund" selector="/root/fund">
                 <fieldSelector name="id" selector="@id" type="STRING"/>
                 <fieldSelector name="nav" selector="nav" type="DECIMAL"/>
             </recordSelector>
         </input>
-        <mapping recordSelector="fund" databaseTable="snmandat">
+        <mapping recordSelector="fund" databaseTable="snmandat" limit="1000">
             <fieldMapping fieldSelector="id" databaseColumn="ident1_txt"/>
+            <fieldMapping var="source" databaseColumn="source_cd"/>
+            <fieldMapping expr="${xldr.filename}" databaseColumn="loaded_from"/>
+            <fieldMapping constant="X" databaseColumn="status_cd"/>
+            <fieldMapping databaseColumn="country_id">
+                <lookup table="country" column="id" keyColumn="iso" fieldSelector="c"/>
+            </fieldMapping>
         </mapping>
     </mappingSpec>
+
+A value source is one attribute of a `fieldMapping` - `fieldSelector`, `constant`, `var` or `expr` - except for a
+`lookup`, which is a child element of the mapping and carries its own source attribute for the key. A constant in XML
+is always a string, since an attribute has no type of its own.
 
 ## The Server
 
@@ -484,12 +503,26 @@ a number - exactly, never rounded through a double - and the shared `dateFormat`
 only to values written as strings.
 
 **Excel** (`application/vnd.ms-excel`, `application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`): no
-properties.
+properties. One adapter serves both `.xls` and `.xlsx`; the format is detected from the file itself.
+
+A record selector is a range, `[Sheet!]ref:ref`, one record per row:
+
+* `A:C` - columns A to C of the first sheet, every data row;
+* `Sheet1!B2:C4` - the cell rectangle rows 2 to 4, columns B to C, of the named sheet. Use this to leave a header row
+  out of the records.
+
+A field selector addresses a cell of the record, either absolutely by column - `A`, `B` - or relatively to the
+record's anchor, the first column of the range: `R-1C+1` is one row up and one column right, which is how a record
+reaches a heading or a neighbouring cell.
+
+A spreadsheet carries typed cells, so no conversion settings apply: a date or a number arrives as one already, and a
+cell that holds text where the spec wants a number is converted from that text.
 
 ### Logging
 
-HikariCP logs through SLF4J. The application binds `slf4j-jdk14`, so everything ends up in `java.util.logging` and a
-single JUL configuration covers the whole process; no second logging framework is involved.
+The application logs through `System.Logger`; HikariCP and POI log through SLF4J, which the distribution binds with
+`slf4j-jdk14`. Everything therefore ends up in `java.util.logging`, and a single JUL configuration covers the whole
+process; no second logging framework is involved.
 
 A default `logging.properties` is bundled and applied at startup unless the deployment points `java.util.logging` at a
 configuration of its own:
