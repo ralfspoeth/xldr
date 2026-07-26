@@ -218,6 +218,30 @@ public class ServerIT {
     }
 
     /**
+     * A JSON feed: the record selector points into the document, the field
+     * selectors read members of each element, and a JSON number reaches the
+     * database as a number rather than as text.
+     */
+    @Test
+    @Timeout(60)
+    void loadsAjsonFeed() throws Exception {
+        var feed = Files.createDirectory(root.resolve("documents"));
+        Files.writeString(feed.resolve("spec.json"), JSON_SPEC);
+        await("in/ to be created", () -> Files.isDirectory(feed.resolve("in")));
+
+        deliver(feed, "people-1.json", """
+                { "data": { "people": [
+                    { "id": 1, "person": { "name": "Alice" } },
+                    { "id": 2, "person": { "name": "Bob" } }
+                ] } }
+                """);
+
+        await("rows to arrive", () -> selectPersons().size() == 2);
+        assertEquals(List.of("1:Alice", "2:Bob"), selectPersons());
+        await("the input to be archived", () -> !archived(feed).isEmpty());
+    }
+
+    /**
      * A feed must declare exactly one of {@code accepts} or {@code sentinel};
      * one that declares neither, or both, is not activated at all - so its
      * working directories are never even created.
@@ -280,6 +304,41 @@ public class ServerIT {
         }
         throw new AssertionError("timed out waiting for " + what);
     }
+
+    /**
+     * The same two columns as {@link #SPEC}, read from a JSON document: the
+     * record selector walks into {@code data/people}, and the name is fetched
+     * from a nested object. No adapter properties at all - JSON carries its own
+     * types, and UTF-8 is the default.
+     */
+    private static final String JSON_SPEC = """
+            {
+              "input": {
+                "mimeType": "application/json",
+                "accepts": "glob:*.json",
+                "recordSelectors": [
+                  {
+                    "name": "people",
+                    "selector": "data/people",
+                    "fieldSelectors": [
+                      {"name": "id", "selector": "id", "type": "INTEGER"},
+                      {"name": "name", "selector": "person/name", "type": "STRING"}
+                    ]
+                  }
+                ]
+              },
+              "mapping": [
+                {
+                  "recordSelector": "people",
+                  "databaseTable": "person",
+                  "fieldMapping": [
+                    {"fieldSelector": "id", "databaseColumn": "id"},
+                    {"fieldSelector": "name", "databaseColumn": "name"}
+                  ]
+                }
+              ]
+            }
+            """;
 
     /**
      * The same two columns as {@link #SPEC}, read from a fixed-length file: a

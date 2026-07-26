@@ -14,7 +14,7 @@ The whole toolkit is one reactor under the `xldr` parent POM and builds with a s
 modules by their dependencies:
 
 * `spec`, `ia`, `ldr` - the core: the mapping-spec model and readers, the input-adapter SPI, and the JDBC loader;
-* `csv`, `xml`, `xlsx`, `flt` - the input adapters, each an `InputAdapterFactory` provider discovered through
+* `csv`, `xml`, `xlsx`, `flt`, `json` - the input adapters, each an `InputAdapterFactory` provider discovered through
   `ServiceLoader`;
 * `app` - the server. It does not `requires` any adapter; the adapters are `provided` dependencies, so they are on the
   module path (JPMS service binding then pulls them into the graph via the `uses` in `app` and the `provides` in each
@@ -52,8 +52,8 @@ keeping the modular layout and its service binding intact.
 
 Publishing goes through the Central Portal via the `central-publishing-maven-plugin`, inherited from the `plumbum`
 parent. The plugin bundles the whole reactor into a single deployment, so the `xldr` parent POM and the six library
-modules - `spec`, `ia`, `ldr`, `csv`, `xml`, `xlsx`, `flt` - are published together. `app` (an executable, not a
-library) and `it` (integration tests) each set `skipPublishing` on the plugin, so they are left out of the bundle.
+modules - `spec`, `ia`, `ldr`, `csv`, `xml`, `xlsx`, `flt`, `json` - are published together. `app` (an executable, not
+a library) and `it` (integration tests) each set `skipPublishing` on the plugin, so they are left out of the bundle.
 
 A plain deploy therefore publishes everything in one go:
 
@@ -95,6 +95,7 @@ will allow require features to be implemented by the adapter. The adapters shipp
 | `text/xml`, `application/xml` | `xml` | XML, selected with XPath |
 | `application/vnd.ms-excel`, `application/vnd.openxmlformats-officedocument.spreadsheetml.sheet` | `xlsx` | Excel, both `.xls` and `.xlsx` |
 | `text/plain` | `flt` | fixed length records, addressed by character position |
+| `application/json`, `text/json` | `json` | JSON, selected with Greyson pointers |
 
 Selecting records and fields depends on the type and structure of the input file. An adapter has to provide
 implementations for *record selectors* and *field selectors*.
@@ -387,9 +388,9 @@ A feed directory holds a mapping spec - `spec.json` or `spec.xml`, exactly one -
 an `adapter.properties` file with format-specific settings handed to the input adapter. The recognised keys depend on
 the input spec's MIME type.
 
-**Every text adapter** (CSV, XML, fixed length) understands the same conversion settings. They say how the *input*
-writes its values; the [field type](#field-types) says what the value *is*. Without them values are read in their
-canonical form.
+**Every text adapter** (CSV, XML, fixed length, JSON) understands the same conversion settings. They say how the
+*input* writes its values; the [field type](#field-types) says what the value *is*. Without them values are read in
+their canonical form.
 
 | Key | Default | Meaning |
 |-----|---------|---------|
@@ -456,6 +457,31 @@ a layout can therefore be written as a list of end positions:
 A line that stops short of a field's bounds is not an error: the value is whatever the line still holds, and a field
 beyond the end of the line is null. Together with the stripping every type does, that makes a producer's trailing
 padding irrelevant. The adapter expects exactly one record selector; its name and `selector` are not used.
+
+**JSON** (`application/json`, `text/json`):
+
+| Key | Default | Meaning |
+|-----|---------|---------|
+| `charset` | `UTF-8` | Character set, which JSON is written in. |
+
+Both kinds of selector are pointers in Greyson's syntax: slash separated steps, where a step is a member name, `[n]`
+for the n-th element of an array (`[-1]` counting from the end), or `#regex` to match a member by pattern. The record
+selector addresses the records - `orders`, or `data/orders` in a nested document, the empty selector being the whole
+document. An array there yields one record per element, a single object exactly one record. A field selector is then
+applied to the record, so `id` reads one of its members, `customer/address/city` reaches into a nested object and
+`tags/[0]` into a nested array:
+
+    "recordSelectors": [
+        { "name": "orders", "selector": "data/orders", "fieldSelectors": [
+            {"name": "id",   "selector": "id",                   "type": "STRING"},
+            {"name": "city", "selector": "customer/address/city", "type": "STRING"},
+            {"name": "net",  "selector": "amounts/net",          "type": "DECIMAL"}
+        ] }
+    ]
+
+A member that is absent, or that holds `null`, is an absent value. JSON carries its own types, so a number arrives as
+a number - exactly, never rounded through a double - and the shared `dateFormat` and `numberFormat` settings apply
+only to values written as strings.
 
 **Excel** (`application/vnd.ms-excel`, `application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`): no
 properties.

@@ -56,7 +56,6 @@
             <groupId>io.github.ralfspoeth.xldr</groupId>
             <artifactId>json</artifactId>
             <version>${project.version}</version>
-            <scope>provided</scope>
         </dependency>
         <dependency>
             <groupId>com.h2database</groupId>

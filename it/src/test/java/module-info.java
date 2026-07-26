@@ -5,6 +5,7 @@ open module io.github.ralfspoeth.xldr.it.test {
     requires io.github.ralfspoeth.xldr.xml;
     requires io.github.ralfspoeth.xldr.csv;
     requires io.github.ralfspoeth.xldr.flt;
+    requires io.github.ralfspoeth.xldr.json;
     requires java.sql;
     requires org.junit.jupiter.api;
 
