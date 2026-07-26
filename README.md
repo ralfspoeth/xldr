@@ -8,6 +8,87 @@ structure into database tables.
 The toolkit provides adapters for different file types that can be loaded as modules and utilize the service framework
 of JPMS.
 
+## Getting Started
+
+Java 25 or later is required.
+
+### Running the server
+
+The server is not published as an artifact; build the distribution from a checkout:
+
+    mvn install
+    tar xzf app/target/xldr-<version>-dist.tar.gz
+
+Then set up a feed - a directory below a root, holding a mapping spec:
+
+    mkdir -p /var/lib/xldr/people
+    cat > /var/lib/xldr/people/spec.json <<'EOF'
+    {
+      "input": {
+        "mimeType": "text/csv",
+        "accepts": "glob:*.csv",
+        "recordSelectors": [
+          { "name": "people", "selector": "people", "fieldSelectors": [
+              {"name": "id",   "selector": "id",   "type": "INTEGER"},
+              {"name": "name", "selector": "name", "type": "STRING"}
+          ] }
+        ]
+      },
+      "mapping": [
+        { "recordSelector": "people", "databaseTable": "person", "fieldMapping": [
+            {"fieldSelector": "id",   "databaseColumn": "id"},
+            {"fieldSelector": "name", "databaseColumn": "name"}
+        ] }
+      ]
+    }
+    EOF
+    printf 'fieldSeparator=,\n' > /var/lib/xldr/people/adapter.properties
+
+Point the server at the root and start it; it creates the working directories and picks the feed up:
+
+    printf 'xldr.roots=/var/lib/xldr\njdbc.url=jdbc:postgresql://localhost:5432/xldr\n' > conf/xldr.properties
+    bin/xldr conf/xldr.properties
+
+A file moved into `/var/lib/xldr/people/in/` is now loaded into `person` and filed away under `archive/`. See
+[Configuration](#configuration) for the full set of settings, and [Delivering files](#delivering-files) for why the
+file must be *moved* rather than written in place.
+
+### Using the toolkit as a library
+
+The library modules are published to Maven Central under the group `io.github.ralfspoeth.xldr`. Take the loader plus
+the adapters for the formats you read; each adapter brings `ia` and `spec` with it:
+
+    <dependency>
+        <groupId>io.github.ralfspoeth.xldr</groupId>
+        <artifactId>ldr</artifactId>
+        <version>0.5</version>
+    </dependency>
+    <dependency>
+        <groupId>io.github.ralfspoeth.xldr</groupId>
+        <artifactId>csv</artifactId>
+        <version>0.5</version>
+    </dependency>
+
+The published artifacts are `spec`, `ia`, `ldr` and the adapters `csv`, `xml`, `xlsx`, `flt` and `json`; `app` and
+`it` are not published. An adapter is found through `ServiceLoader`, so it need only be on the module path:
+
+    var spec = new JsonMappingSpecReader().readFrom(reader);
+    var factory = ServiceLoader.load(InputAdapterFactory.class).stream()
+            .map(ServiceLoader.Provider::get)
+            .filter(f -> f.reads(spec.inputSpec()))
+            .findFirst().orElseThrow();
+    var adapter = factory.createInputAdapter(spec.inputSpec());
+
+    try (var loader = new Loader(spec, connection)) {
+        for (var mapping : spec.recordMappingSpecs()) {
+            try (var in = Files.newInputStream(file)) {
+                loader.loadInput(adapter, in, mapping);
+            }
+        }
+    }   // commits, or rolls back if any mapping failed
+
+## Building and Releasing
+
 ### Modules and building
 
 The whole toolkit is one reactor under the `xldr` parent POM and builds with a single `mvn install`, which orders the
