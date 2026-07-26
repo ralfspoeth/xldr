@@ -143,7 +143,8 @@ and runs with
 The launcher puts `lib/` on the module path (`java -p lib -m io.github.ralfspoeth.xldr.app/...`); JPMS service binding then resolves
 the input adapters (via the `uses`/`provides` of `InputAdapterFactory`) and the JDBC driver (via `java.sql`'s
 `uses java.sql.Driver`) straight from `lib/`. The adapters and all three drivers are `provided` dependencies bundled
-into `lib/` so the package is self-contained; drop the drivers you do not target.
+into `lib/` so the package is self-contained; drop the drivers you do not target. Do that before passing a
+distribution on to anyone else - the Oracle driver is proprietary and not yours to redistribute.
 
 `jlink` is deliberately not used: several runtime dependencies - the Oracle JDBC driver, HikariCP, picocli, SLF4J, POI
 - are automatic modules, which `jlink` cannot link into an image. The module-path distribution sidesteps that while
@@ -648,3 +649,13 @@ A default `logging.properties` is bundled and applied at startup unless the depl
 configuration of its own:
 
     java -Djava.util.logging.config.file=/etc/xldr/logging.properties -p <module-path> -m io.github.ralfspoeth.xldr.app config.properties
+
+## License
+
+XLDR is released under the [MIT License](LICENSE) - use it, embed it, ship it, with or without your own source. The
+libraries it is built on are permissive too: Greyson, filews and SLF4J are MIT, POI, HikariCP and picocli Apache-2.0.
+
+The JDBC drivers are not xldr's to license, and none is pulled in transitively - they are `provided` dependencies, so
+a consumer of the libraries supplies the driver for the database it feeds and accepts that driver's own terms. Note
+that the [distribution](#distribution) does bundle them into `lib/` for convenience; the Oracle driver in particular
+is proprietary, so a distribution you pass on to anyone else should have `lib/ojdbc*.jar` removed.

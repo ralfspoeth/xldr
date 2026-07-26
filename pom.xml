@@ -36,6 +36,16 @@
     <description>A modular toolkit that loads CSV, XML and Excel files into database tables from a mapping specification.</description>
     <url>https://github.com/ralfspoeth/xldr</url>
 
+    <!-- declared here rather than inherited: the terms of an artifact should be
+         readable without resolving its parent -->
+    <licenses>
+        <license>
+            <name>MIT License</name>
+            <url>https://opensource.org/license/mit/</url>
+            <distribution>repo</distribution>
+        </license>
+    </licenses>
+
     <scm>
         <url>scm:git:https://github.com/ralfspoeth/xldr</url>
         <developerConnection>scm:git:https://github.com/ralfspoeth/xldr.git</developerConnection>
