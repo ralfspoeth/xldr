@@ -146,8 +146,8 @@ the input adapters (via the `uses`/`provides` of `InputAdapterFactory`) and the 
 into `lib/` so the package is self-contained; drop the drivers you do not target. Do that before passing a
 distribution on to anyone else - the Oracle driver is proprietary and not yours to redistribute.
 
-`jlink` is deliberately not used: several runtime dependencies - the Oracle JDBC driver, HikariCP, picocli, SLF4J, POI
-- are automatic modules, which `jlink` cannot link into an image. The module-path distribution sidesteps that while
+`jlink` is deliberately not used: several runtime dependencies - the Oracle JDBC driver, 
+HikariCP, picocli, SLF4J, POI - are automatic modules, which `jlink` cannot link into an image. The module-path distribution sidesteps that while
 keeping the modular layout and its service binding intact.
 
 ### Releasing
