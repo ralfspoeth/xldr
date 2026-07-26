@@ -58,6 +58,17 @@
             <version>${project.version}</version>
         </dependency>
         <dependency>
+            <groupId>io.github.ralfspoeth.xldr</groupId>
+            <artifactId>xlsx</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <!-- writing the workbook a fixed-format test feed is delivered as -->
+        <dependency>
+            <groupId>org.apache.poi</groupId>
+            <artifactId>poi-ooxml</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
             <groupId>com.h2database</groupId>
             <artifactId>h2</artifactId>
             <scope>test</scope>

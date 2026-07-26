@@ -3,11 +3,13 @@ package io.github.ralfspoeth.xldr.it;
 import io.github.ralfspoeth.xldr.app.AppConfig;
 import io.github.ralfspoeth.xldr.app.ConnectionPool;
 import io.github.ralfspoeth.xldr.app.Watcher;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -19,6 +21,7 @@ import java.util.List;
 import java.util.Properties;
 import java.util.function.BooleanSupplier;
 
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.nio.file.StandardCopyOption.ATOMIC_MOVE;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -242,6 +245,41 @@ public class ServerIT {
     }
 
     /**
+     * A spreadsheet feed, delivered as the binary a producer would actually
+     * write: the record selector is a column range, the field selectors are
+     * columns of it, and the numeric cells arrive as numbers.
+     */
+    @Test
+    @Timeout(60)
+    void loadsAspreadsheetFeed() throws Exception {
+        var feed = Files.createDirectory(root.resolve("sheets"));
+        Files.writeString(feed.resolve("spec.json"), XLSX_SPEC);
+        await("in/ to be created", () -> Files.isDirectory(feed.resolve("in")));
+
+        byte[] workbook;
+        try (var wb = new XSSFWorkbook(); var out = new ByteArrayOutputStream()) {
+            var sheet = wb.createSheet("people");
+            var header = sheet.createRow(0);
+            header.createCell(0).setCellValue("id");
+            header.createCell(1).setCellValue("name");
+            var first = sheet.createRow(1);
+            first.createCell(0).setCellValue(1d);
+            first.createCell(1).setCellValue("Alice");
+            var second = sheet.createRow(2);
+            second.createCell(0).setCellValue(2d);
+            second.createCell(1).setCellValue("Bob");
+            wb.write(out);
+            workbook = out.toByteArray();
+        }
+        deliver(feed, "people-1.xlsx", workbook);
+
+        await("rows to arrive", () -> selectPersons().size() == 2);
+        // the id cells are numeric, and the spec declares them INTEGER
+        assertEquals(List.of("1:Alice", "2:Bob"), selectPersons());
+        await("the input to be archived", () -> !archived(feed).isEmpty());
+    }
+
+    /**
      * A feed must declare exactly one of {@code accepts} or {@code sentinel};
      * one that declares neither, or both, is not activated at all - so its
      * working directories are never even created.
@@ -267,8 +305,15 @@ public class ServerIT {
      * Producers hand a file over by an atomic move, never by writing into in/.
      */
     private void deliver(Path feed, String name, String content) throws IOException {
+        deliver(feed, name, content.getBytes(UTF_8));
+    }
+
+    /**
+     * The same, for a format that is not text.
+     */
+    private void deliver(Path feed, String name, byte[] content) throws IOException {
         var tmp = staging.resolve(name);
-        Files.writeString(tmp, content);
+        Files.write(tmp, content);
         Files.move(tmp, feed.resolve("in").resolve(name), ATOMIC_MOVE);
     }
 
@@ -304,6 +349,40 @@ public class ServerIT {
         }
         throw new AssertionError("timed out waiting for " + what);
     }
+
+    /**
+     * The same two columns as {@link #SPEC}, read from a spreadsheet: the record
+     * selector is a cell rectangle on the named sheet - rows 2 to 3, so the
+     * header row is not a record - and each field selector is one of its columns.
+     */
+    private static final String XLSX_SPEC = """
+            {
+              "input": {
+                "mimeType": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                "accepts": "glob:*.xlsx",
+                "recordSelectors": [
+                  {
+                    "name": "people",
+                    "selector": "people!A2:B3",
+                    "fieldSelectors": [
+                      {"name": "id", "selector": "A", "type": "INTEGER"},
+                      {"name": "name", "selector": "B", "type": "STRING"}
+                    ]
+                  }
+                ]
+              },
+              "mapping": [
+                {
+                  "recordSelector": "people",
+                  "databaseTable": "person",
+                  "fieldMapping": [
+                    {"fieldSelector": "id", "databaseColumn": "id"},
+                    {"fieldSelector": "name", "databaseColumn": "name"}
+                  ]
+                }
+              ]
+            }
+            """;
 
     /**
      * The same two columns as {@link #SPEC}, read from a JSON document: the
