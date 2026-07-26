@@ -14,6 +14,7 @@ import java.io.IOException;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.Map;
 import java.util.ServiceLoader;
 import java.util.Set;
 
@@ -23,28 +24,40 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 
 public class CsvFileHandlerTest {
 
+    /** comma separated, one record per line */
+    private static final Map<String, String> COMMAS =
+            Map.of("fieldSeparator", ",", "rowSeparator", "\n");
+
+    /** the same, without a header row */
+    private static final Map<String, String> HEADERLESS =
+            Map.of("fieldSeparator", ",", "rowSeparator", "\n", "header", "false");
+
+    private static InputSpec spec(Map<String, String> properties, RecordSelectorSpec... recordSelectors) {
+        return new InputSpec("text/csv", null, null, List.of(recordSelectors), List.of(), properties);
+    }
+
     // input spec mentions only id and name; the file also carries short-name/long-name.
     // no discriminator (selector null): a single-record-type file takes every line.
-    private static final InputSpec SPEC = new InputSpec("text/csv", List.of(
+    private static final InputSpec SPEC = spec(COMMAS,
             new RecordSelectorSpec("people", null, List.of(
                     new FieldSelectorSpec("id", "id", DataType.STRING),
                     new FieldSelectorSpec("name", "name", DataType.STRING)
             ))
-    ));
+    );
 
     // no header: columns are addressed by 1-based position ("1" -> col 0, ...)
-    private static final InputSpec POSITIONAL_SPEC = new InputSpec("text/csv", List.of(
+    private static final InputSpec POSITIONAL_SPEC = spec(HEADERLESS,
             new RecordSelectorSpec("people", null, List.of(
                     new FieldSelectorSpec("1", "1", DataType.STRING),
                     new FieldSelectorSpec("2", "2", DataType.STRING),
                     new FieldSelectorSpec("3", "3", DataType.STRING)
             ))
-    ));
+    );
 
     // one headerless file, two interleaved record types keyed by the first column:
     // the record selector's `selector` is the discriminator the first column must equal.
     // positions stay absolute, so "1" is the discriminator column itself.
-    private static final InputSpec DISCRIMINATED_SPEC = new InputSpec("text/csv", List.of(
+    private static final InputSpec DISCRIMINATED_SPEC = spec(HEADERLESS,
             new RecordSelectorSpec("orders", "O", List.of(
                     new FieldSelectorSpec("2", "2", DataType.STRING),   // order id
                     new FieldSelectorSpec("3", "3", DataType.STRING),   // date
@@ -56,37 +69,27 @@ public class CsvFileHandlerTest {
                     new FieldSelectorSpec("4", "4", DataType.STRING),   // qty
                     new FieldSelectorSpec("5", "5", DataType.STRING)    // price
             ))
-    ));
+    );
 
-    private static InputAdapterFactory factory(InputSpec spec) {
+    private static InputAdapter adapterFor(InputSpec spec) {
         return ServiceLoader.load(InputAdapterFactory.class)
                 .stream()
                 .map(ServiceLoader.Provider::get)
                 .filter(iaf -> iaf.reads(spec))
-                .findFirst().orElseThrow();
+                .findFirst().orElseThrow()
+                .createInputAdapter(spec);
     }
 
     private InputAdapter adapter() {
-        var factory = factory(SPEC);
-        factory.setProperty("fieldSeparator", ",");
-        factory.setProperty("rowSeparator", "\n");
-        return factory.createInputAdapter(SPEC);
+        return adapterFor(SPEC);
     }
 
     private InputAdapter positionalAdapter() {
-        var factory = factory(POSITIONAL_SPEC);
-        factory.setProperty("fieldSeparator", ",");
-        factory.setProperty("rowSeparator", "\n");
-        factory.setProperty("header", "false");
-        return factory.createInputAdapter(POSITIONAL_SPEC);
+        return adapterFor(POSITIONAL_SPEC);
     }
 
     private InputAdapter discriminatedAdapter() {
-        var factory = factory(DISCRIMINATED_SPEC);
-        factory.setProperty("fieldSeparator", ",");
-        factory.setProperty("rowSeparator", "\n");
-        factory.setProperty("header", "false");
-        return factory.createInputAdapter(DISCRIMINATED_SPEC);
+        return adapterFor(DISCRIMINATED_SPEC);
     }
 
     @Test
@@ -157,17 +160,14 @@ public class CsvFileHandlerTest {
      */
     @Test
     public void convertsAccordingToTheDeclaredType() throws IOException {
-        var spec = new InputSpec("text/csv", List.of(
+        var spec = spec(COMMAS,
                 new RecordSelectorSpec("people", null, List.of(
                         new FieldSelectorSpec("id", "id", DataType.INTEGER),
                         new FieldSelectorSpec("name", "name", DataType.STRING),
                         new FieldSelectorSpec("rate", "rate", DataType.DECIMAL)
                 ))
-        ));
-        var factory = factory(spec);
-        factory.setProperty("fieldSeparator", ",");
-        factory.setProperty("rowSeparator", "\n");
-        var adapter = factory.createInputAdapter(spec);
+        );
+        var adapter = adapterFor(spec);
 
         var csv = """
                 id,name,rate

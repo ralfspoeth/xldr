@@ -6,7 +6,6 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.Properties;
 
 /**
  * Prefix to namespace bindings for the XPath expressions of one input.
@@ -34,13 +33,13 @@ final class Namespaces implements NamespaceContext {
     private Namespaces() {
     }
 
-    static Namespaces of(Properties properties) {
+    static Namespaces of(Map<String, String> properties) {
         var namespaces = new Namespaces();
-        for (var name : properties.stringPropertyNames()) {
+        properties.forEach((name, value) -> {
             if (name.startsWith(PREFIX) && name.length() > PREFIX.length()) {
-                namespaces.byPrefix.put(name.substring(PREFIX.length()), properties.getProperty(name));
+                namespaces.byPrefix.put(name.substring(PREFIX.length()), value);
             }
-        }
+        });
         return namespaces;
     }
 

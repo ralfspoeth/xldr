@@ -180,7 +180,7 @@ public class JsonValueSourceTest {
                 {
                     "comments": "top-level note",
                     "load": { "commitPolicy": "ON_CLOSE" },
-                    "input": { "mimeType": "text/csv",
+                    "input": { "mimeType": "text/csv", "note": "why this feed exists",
                         "recordSelectors": [ { "name": "r", "selector": "//r", "x": 1,
                             "fieldSelectors": [ { "name": "id", "selector": "@id", "unit": "n/a" } ] } ] },
                     "mapping": [
@@ -196,10 +196,9 @@ public class JsonValueSourceTest {
     }
 
     /**
-     * Inside {@code input} the rule is the other way round: what the spec does
-     * not claim for itself is a setting of the adapter, whatever that adapter
-     * understands. Scalars keep their text, a nested object or array is not a
-     * setting.
+     * The settings of the adapter are grouped in {@code properties}, since which
+     * of them mean anything depends on the MIME type. A scalar keeps its text,
+     * so a number or a boolean may be written as one.
      */
     @Test
     public void readsAdapterSettingsFromTheInput() throws IOException {
@@ -208,10 +207,13 @@ public class JsonValueSourceTest {
                     "input": {
                         "mimeType": "text/csv",
                         "accepts": "glob:*.csv",
-                        "fieldSeparator": ";",
-                        "header": false,
-                        "linesPerRecord": 2,
-                        "ns.f": "http://example.com/funds",
+                        "comments": "an annotation, not a setting",
+                        "properties": {
+                            "fieldSeparator": ";",
+                            "header": false,
+                            "linesPerRecord": 2,
+                            "ns.f": "http://example.com/funds"
+                        },
                         "recordSelectors": []
                     },
                     "mapping": []
@@ -223,7 +225,6 @@ public class JsonValueSourceTest {
                 Map.of("fieldSeparator", ";", "header", "false",
                         "linesPerRecord", "2", "ns.f", "http://example.com/funds"),
                 input.properties());
-        // the structural members stay where they belong
         assertEquals("text/csv", input.mimeType());
         assertEquals("glob:*.csv", input.accepts());
     }

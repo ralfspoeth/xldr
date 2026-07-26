@@ -425,7 +425,7 @@ public class ServerIT {
               "input": {
                 "mimeType": "text/plain",
                 "accepts": "glob:*.txt",
-                "charset": "UTF-8",
+                "properties": { "charset": "UTF-8" },
                 "recordSelectors": [
                   {
                     "name": "people",
@@ -459,8 +459,7 @@ public class ServerIT {
               "input": {
                 "mimeType": "text/csv",
                 "accepts": "glob:*.csv",
-                "fieldSeparator": ",",
-                "rowSeparator": "\\n",
+                "properties": { "fieldSeparator": ",", "rowSeparator": "\\n" },
                 "recordSelectors": [
                   {
                     "name": "people",

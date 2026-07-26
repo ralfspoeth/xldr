@@ -7,17 +7,18 @@ import io.github.ralfspoeth.xldr.spec.InputSpec;
 
 import java.nio.charset.Charset;
 import java.util.List;
-import java.util.Properties;
 
+/**
+ * Creates CSV adapters.
+ * <p>
+ * Recognised properties: {@code fieldSeparator} (a tab by default),
+ * {@code rowSeparator} (the platform line separator), {@code header} (whether
+ * the first row names the columns, true by default), {@code charset}, and the
+ * shared conversion settings of {@link Formats}.
+ */
 public class CsvFileHandlerFactory implements InputAdapterFactory {
 
     private static final List<String> ACCEPT = List.of("text/csv");
-    private final Properties csvFileHandlerProperties = new Properties();
-
-    @Override
-    public void setProperty(String property, String value) {
-        csvFileHandlerProperties.setProperty(property, value);
-    }
 
     @Override
     public boolean reads(String mimeType) {
@@ -26,13 +27,15 @@ public class CsvFileHandlerFactory implements InputAdapterFactory {
 
     @Override
     public InputAdapter createInputAdapter(InputSpec spec) {
+        var properties = spec.properties();
         return new CsvFileHandler(
-                csvFileHandlerProperties.getProperty("rowSeparator", System.lineSeparator()),
-                csvFileHandlerProperties.getProperty("fieldSeparator", "\t"),
-                csvFileHandlerProperties.containsKey("charset")?
-                        Charset.forName(csvFileHandlerProperties.getProperty("charset")):Charset.defaultCharset(),
-                Boolean.parseBoolean(csvFileHandlerProperties.getProperty("header", "true")),
-                Formats.of(csvFileHandlerProperties),
+                properties.getOrDefault("rowSeparator", System.lineSeparator()),
+                properties.getOrDefault("fieldSeparator", "\t"),
+                properties.containsKey("charset")
+                        ? Charset.forName(properties.get("charset"))
+                        : Charset.defaultCharset(),
+                Boolean.parseBoolean(properties.getOrDefault("header", "true")),
+                Formats.of(properties),
                 spec
         );
     }

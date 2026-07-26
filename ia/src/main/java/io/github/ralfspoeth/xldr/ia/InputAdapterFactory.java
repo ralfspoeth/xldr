@@ -6,8 +6,12 @@ import io.github.ralfspoeth.xldr.spec.InputSpec;
  * Creates {@link InputAdapter}s for a MIME type. Discovered through {@link
  * java.util.ServiceLoader}: each format module provides one, and the application
  * picks the factory whose {@link #reads(String)} accepts the input spec's MIME
- * type. Format-specific settings are handed over as properties before an adapter
- * is created.
+ * type.
+ * <p>
+ * A factory holds no state of its own. Everything an adapter needs is in the
+ * spec it is created from - the format-specific settings among it, as {@link
+ * InputSpec#properties()} - so one factory instance can serve any number of
+ * feeds, in any order and at the same time.
  */
 public interface InputAdapterFactory {
 
@@ -24,13 +28,8 @@ public interface InputAdapterFactory {
     }
 
     /**
-     * Sets one format-specific setting, e.g. {@code fieldSeparator} for CSV.
-     * The settings of a feed are the {@link InputSpec#properties()} of its input.
-     */
-    void setProperty(String property, String value);
-
-    /**
-     * Creates an adapter for {@code spec}, using the settings applied so far.
+     * Creates an adapter reading the input {@code spec} describes, configured
+     * from that spec's {@linkplain InputSpec#properties() properties}.
      */
     InputAdapter createInputAdapter(InputSpec spec);
 }

@@ -31,7 +31,7 @@ Then set up a feed - a directory below a root, holding a mapping spec:
       "input": {
         "mimeType": "text/csv",
         "accepts": "glob:*.csv",
-        "fieldSeparator": ",",
+        "properties": { "fieldSeparator": "," },
         "recordSelectors": [
           { "name": "people", "selector": "people", "fieldSelectors": [
               {"name": "id",   "selector": "id",   "type": "INTEGER"},
@@ -222,7 +222,8 @@ An input specification contains the following pieces of information:
         * are identified by a name,
         * a selector description,
         * and, optionally, a [data type](#field-types);
-* optionally [variables](#variables), values computed once per load.
+* optionally [variables](#variables), values computed once per load;
+* optionally `properties`, the [settings of the adapter](#feed-configuration) the MIME type selects.
 
 The meaning of a selector is the adapter's: an XPath for XML, a column position or discriminator for CSV, a character
 range for a fixed-length file, a pointer for JSON, a cell range for a spreadsheet.
@@ -396,6 +397,7 @@ is optional here.
 
     <mappingSpec>
         <input mimeType="text/xml" accepts="glob:*.xml">
+            <properties ns.f="http://example.com/funds" dateFormat="dd.MM.yyyy"/>
             <var name="source" constant="PD"/>
             <recordSelector name="fund" selector="/root/fund">
                 <fieldSelector name="id" selector="@id" type="STRING"/>
@@ -507,23 +509,26 @@ target database.
 
 A feed directory holds a mapping spec - `spec.json` or `spec.xml`, exactly one - and nothing else.
 
-The settings of the adapter sit in the input, beside the `mimeType` that chooses it:
+The settings of the adapter sit in the input's `properties`, next to the `mimeType` that chooses it - grouped rather
+than spread out, because which of them mean anything depends on that MIME type:
 
     "input": {
         "mimeType": "text/csv",
         "accepts": "glob:*.csv",
-        "fieldSeparator": ";",
-        "header": false,
-        "dateFormat": "dd.MM.yyyy",
+        "properties": {
+            "fieldSeparator": ";",
+            "header": false,
+            "dateFormat": "dd.MM.yyyy"
+        },
         "recordSelectors": [ ... ]
     }
 
-Anything the input carries beyond `mimeType`, `sentinel`, `accepts`, `recordSelectors` and `vars` is such a setting -
-those five names, and the reserved `load`, are the spec's own. A value is taken as its text, so `false` and `2` are
-fine and arrive as `"false"` and `"2"`. In XML they are attributes of `<input>` and read the same way. Which keys mean
-anything depends on the MIME type, and an adapter ignores what it does not recognise. (Because unknown members of
-`input` are settings rather than annotations, a `"comments"` note belongs at the top level of the spec, not inside
-`input`.)
+A value is taken as its text, so `false` and `2` may be written as themselves and arrive as `"false"` and `"2"`. In
+XML the same settings are the attributes of a `<properties>` child of `<input>`:
+
+    <properties fieldSeparator=";" header="false" dateFormat="dd.MM.yyyy"/>
+
+An adapter ignores any setting it does not recognise, so the tables below list what each one reads.
 
 **Every text adapter** (CSV, XML, fixed length, JSON) understands the same conversion settings. They say how the
 *input* writes its values; the [field type](#field-types) says what the value *is*. Without them values are read in

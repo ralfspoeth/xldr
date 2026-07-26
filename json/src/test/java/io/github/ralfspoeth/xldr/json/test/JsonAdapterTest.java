@@ -35,15 +35,20 @@ public class JsonAdapterTest {
                 new RecordSelectorSpec("rec", recordSelector, List.of(fields))));
     }
 
+    /**
+     * The adapter's settings are part of the input spec, so they are added to a
+     * copy of it rather than set on the factory.
+     */
     private static InputAdapter adapter(InputSpec spec, Map<String, String> properties) {
-        var factory = ServiceLoader.load(InputAdapterFactory.class)
+        var configured = new InputSpec(spec.mimeType(), spec.sentinel(), spec.accepts(),
+                spec.recordSelectors(), spec.vars(), properties);
+        return ServiceLoader.load(InputAdapterFactory.class)
                 .stream()
                 .map(ServiceLoader.Provider::get)
-                .filter(f -> f.reads(spec))
+                .filter(f -> f.reads(configured))
                 .findFirst()
-                .orElseThrow(() -> new IllegalStateException("no adapter for " + spec.mimeType()));
-        properties.forEach(factory::setProperty);
-        return factory.createInputAdapter(spec);
+                .orElseThrow(() -> new IllegalStateException("no adapter for " + configured.mimeType()))
+                .createInputAdapter(configured);
     }
 
     private static InputStream in(String json) {

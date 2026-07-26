@@ -12,7 +12,9 @@ import org.junit.jupiter.api.Test;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.ServiceLoader;
 import java.util.Set;
 
@@ -33,12 +35,18 @@ public class XmlAdapterTest {
                 .orElseThrow();
     }
 
+    /**
+     * The adapter's settings are part of the input spec, so they are added to a
+     * copy of it rather than set on the factory.
+     */
     private static InputAdapter adapter(InputSpec spec, String... properties) {
-        var factory = factory(spec);
+        Map<String, String> props = new LinkedHashMap<>();
         for (int i = 0; i < properties.length; i += 2) {
-            factory.setProperty(properties[i], properties[i + 1]);
+            props.put(properties[i], properties[i + 1]);
         }
-        return factory.createInputAdapter(spec);
+        var configured = new InputSpec(spec.mimeType(), spec.sentinel(), spec.accepts(),
+                spec.recordSelectors(), spec.vars(), props);
+        return factory(configured).createInputAdapter(configured);
     }
 
     /**

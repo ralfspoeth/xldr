@@ -48,6 +48,7 @@ public class PipelineIT {
             {
               "input": {
                 "mimeType": "text/csv",
+                "properties": { "fieldSeparator": ",", "rowSeparator": "\\n", "header": false },
                 "vars": [
                   { "name": "loadId", "expr": "${xldr.filename}#${nextval('batch')}" }
                 ],
@@ -133,16 +134,17 @@ public class PipelineIT {
                 rows);
     }
 
+    /**
+     * The dialect is in the spec, so the factory only has to be found - it holds
+     * no state of its own.
+     */
     private static InputAdapter csvAdapterFor(InputSpec inputSpec) {
-        var factory = ServiceLoader.load(InputAdapterFactory.class)
+        return ServiceLoader.load(InputAdapterFactory.class)
                 .stream()
                 .map(ServiceLoader.Provider::get)
                 .filter(f -> f.reads(inputSpec))
                 .findFirst()
-                .orElseThrow(() -> new IllegalStateException("no adapter for " + inputSpec.mimeType()));
-        factory.setProperty("fieldSeparator", ",");
-        factory.setProperty("rowSeparator", "\n");
-        factory.setProperty("header", "false");
-        return factory.createInputAdapter(inputSpec);
+                .orElseThrow(() -> new IllegalStateException("no adapter for " + inputSpec.mimeType()))
+                .createInputAdapter(inputSpec);
     }
 }

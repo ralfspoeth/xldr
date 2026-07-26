@@ -5,8 +5,6 @@ import io.github.ralfspoeth.xldr.ia.InputAdapter;
 import io.github.ralfspoeth.xldr.ia.InputAdapterFactory;
 import io.github.ralfspoeth.xldr.spec.InputSpec;
 
-import java.util.HashMap;
-import java.util.Map;
 import java.util.Set;
 
 /**
@@ -23,20 +21,13 @@ public class JsonInputAdapterFactory implements InputAdapterFactory {
 
     private static final Set<String> ACCEPT = Set.of("text/json", "application/json");
 
-    private final Map<String, String> props = new HashMap<>();
-
     @Override
     public boolean reads(String mimeType) {
         return ACCEPT.contains(mimeType);
     }
 
     @Override
-    public void setProperty(String property, String value) {
-        props.put(property, value);
-    }
-
-    @Override
     public InputAdapter createInputAdapter(InputSpec spec) {
-        return new JsonInputAdapter(Formats.of(props), spec);
+        return new JsonInputAdapter(Formats.of(spec.properties()), spec);
     }
 }

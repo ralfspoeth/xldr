@@ -66,8 +66,6 @@ class LoadJob {
                 .findFirst()
                 .orElseThrow(() -> new IllegalStateException(
                         "no input adapter for mime type " + inputSpec.mimeType()));
-        // the adapter's settings travel with the input spec
-        inputSpec.properties().forEach(factory::setProperty);
         return factory.createInputAdapter(inputSpec);
     }
 }

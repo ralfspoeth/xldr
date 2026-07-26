@@ -12,8 +12,6 @@ import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Properties;
-import java.util.stream.Collectors;
 
 /**
  * How an adapter turns the text of a field into a typed value, where the text is
@@ -84,15 +82,6 @@ public final class Formats {
         } catch (IllegalArgumentException e) {
             throw new IllegalArgumentException("invalid " + DATE_FORMAT + "/" + NUMBER_FORMAT + ": " + e.getMessage(), e);
         }
-    }
-
-    /**
-     * As {@link #of(Map)}, for the {@link Properties} an adapter factory collects.
-     */
-    public static Formats of(Properties properties) {
-        return of(properties.stringPropertyNames()
-                .stream()
-                .collect(Collectors.toMap(k -> k, properties::getProperty)));
     }
 
     private static DecimalFormat decimalFormat(String pattern, Locale locale) {

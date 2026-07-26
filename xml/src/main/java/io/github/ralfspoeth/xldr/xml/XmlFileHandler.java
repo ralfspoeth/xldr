@@ -20,7 +20,6 @@ import java.io.InputStream;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Properties;
 import java.util.Set;
 import java.util.stream.IntStream;
 
@@ -42,7 +41,8 @@ class XmlFileHandler implements InputAdapter {
     private final Map<String, XmlRecordSelector> recordSelectors = new HashMap<>();
     private final DocumentBuilderFactory parsers;
 
-    XmlFileHandler(InputSpec spec, Properties properties) {
+    XmlFileHandler(InputSpec spec) {
+        var properties = spec.properties();
         var namespaces = Namespaces.of(properties);
         // dateFormat / numberFormat / locale, shared with the other adapters
         var formats = Formats.of(properties);

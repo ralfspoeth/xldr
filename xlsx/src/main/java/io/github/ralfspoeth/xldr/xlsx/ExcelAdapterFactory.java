@@ -17,10 +17,6 @@ public class ExcelAdapterFactory implements InputAdapterFactory {
     private static final Set<String> ACCEPT = Set.of(XLSX, XLS);
 
     @Override
-    public void setProperty(String key, String value) {
-    }
-
-    @Override
     public boolean reads(String mimeType) {
         return ACCEPT.contains(mimeType);
     }

@@ -4,7 +4,6 @@ import io.github.ralfspoeth.xldr.ia.InputAdapter;
 import io.github.ralfspoeth.xldr.ia.InputAdapterFactory;
 import io.github.ralfspoeth.xldr.spec.InputSpec;
 
-import java.util.Properties;
 import java.util.Set;
 
 /**
@@ -23,13 +22,6 @@ public class XmlFileHandlerFactory implements InputAdapterFactory {
 
     private static final Set<String> ACCEPT = Set.of("text/xml", "application/xml");
 
-    private final Properties properties = new Properties();
-
-    @Override
-    public void setProperty(String key, String value) {
-        properties.setProperty(key, value);
-    }
-
     @Override
     public boolean reads(String mimeType) {
         return ACCEPT.contains(mimeType);
@@ -37,8 +29,6 @@ public class XmlFileHandlerFactory implements InputAdapterFactory {
 
     @Override
     public InputAdapter createInputAdapter(InputSpec spec) {
-        var settings = new Properties();
-        settings.putAll(properties);
-        return new XmlFileHandler(spec, settings);
+        return new XmlFileHandler(spec);
     }
 }
