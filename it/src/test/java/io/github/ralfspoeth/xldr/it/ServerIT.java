@@ -193,6 +193,31 @@ public class ServerIT {
     }
 
     /**
+     * A second feed, in a different format, alongside the CSV ones: the server
+     * picks the fixed-length adapter by MIME type through {@code ServiceLoader},
+     * and the character ranges of the spec become typed columns.
+     */
+    @Test
+    @Timeout(60)
+    void loadsAfixedLengthFeed() throws Exception {
+        var feed = Files.createDirectory(root.resolve("fixed"));
+        Files.writeString(feed.resolve("spec.json"), FIXED_LENGTH_SPEC);
+        Files.writeString(feed.resolve("adapter.properties"), "charset=UTF-8\n");
+        await("in/ to be created", () -> Files.isDirectory(feed.resolve("in")));
+
+        // columns 0:3 and 3:13; the second line stops early, which is not an error
+        deliver(feed, "people-1.txt", """
+                001Alice
+                002Bob
+                """);
+
+        await("rows to arrive", () -> selectPersons().size() == 2);
+        // the id is declared INTEGER, so "001" arrives as the number 1
+        assertEquals(List.of("1:Alice", "2:Bob"), selectPersons());
+        await("the input to be archived", () -> !archived(feed).isEmpty());
+    }
+
+    /**
      * A feed must declare exactly one of {@code accepts} or {@code sentinel};
      * one that declares neither, or both, is not activated at all - so its
      * working directories are never even created.
@@ -255,6 +280,41 @@ public class ServerIT {
         }
         throw new AssertionError("timed out waiting for " + what);
     }
+
+    /**
+     * The same two columns as {@link #SPEC}, read from a fixed-length file: a
+     * field selector is a character range, and the second one omits its left
+     * bound to continue where the first ended. The id is typed, so the padding
+     * zeroes do not reach the database.
+     */
+    private static final String FIXED_LENGTH_SPEC = """
+            {
+              "input": {
+                "mimeType": "text/plain",
+                "accepts": "glob:*.txt",
+                "recordSelectors": [
+                  {
+                    "name": "people",
+                    "selector": "people",
+                    "fieldSelectors": [
+                      {"name": "id", "selector": "0:3", "type": "INTEGER"},
+                      {"name": "name", "selector": ":13", "type": "STRING"}
+                    ]
+                  }
+                ]
+              },
+              "mapping": [
+                {
+                  "recordSelector": "people",
+                  "databaseTable": "person",
+                  "fieldMapping": [
+                    {"fieldSelector": "id", "databaseColumn": "id"},
+                    {"fieldSelector": "name", "databaseColumn": "name"}
+                  ]
+                }
+              ]
+            }
+            """;
 
     /**
      * Field selector names double as CSV header names; the field mappings then
