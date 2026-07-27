@@ -2,7 +2,7 @@ name: build
 
 on:
   push:
-    branches: [ main ]
+    branches: [ master ]
   pull_request:
   # so a broken dependency or a JDK update is noticed before a release does
   schedule:
