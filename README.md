@@ -9,8 +9,9 @@ The toolkit provides adapters for different file types that can be loaded as mod
 of JPMS.
 
 > **Pre-1.0.** The API and the mapping-spec format are still settling and may change in any release before `1.0`,
-> including in ways that break existing code and existing specs. Such changes are noted in the release, but no
-> deprecation period is kept. From `1.0` on, breaking changes will be confined to major releases.
+> including in ways that break existing code and existing specs. Such changes are listed in the
+> [changelog](CHANGELOG.md) under *Breaking*, but no deprecation period is kept. From `1.0` on, breaking changes will
+> be confined to major releases.
 
 ## Getting Started
 
@@ -33,7 +34,7 @@ Then set up a feed - a directory below a root, holding a mapping spec:
         "accepts": "glob:*.csv",
         "properties": { "fieldSeparator": "," },
         "recordSelectors": [
-          { "name": "people", "selector": "people", "fieldSelectors": [
+          { "name": "people", "fieldSelectors": [
               {"name": "id",   "selector": "id",   "type": "INTEGER"},
               {"name": "name", "selector": "name", "type": "STRING"}
           ] }
@@ -67,7 +68,7 @@ fix their versions in one place:
             <dependency>
                 <groupId>io.github.ralfspoeth.xldr</groupId>
                 <artifactId>bom</artifactId>
-                <version>0.8</version>
+                <version>0.9</version>
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>
@@ -194,12 +195,12 @@ Both formats have a published schema, so an editor can check a spec before it ev
 only reports a broken spec in its log, by leaving the feed inactive. Point at the schema from the spec itself:
 
     {
-      "$schema": "https://ralfspoeth.github.io/xldr/schema/mapping-spec-0.8.json",
+      "$schema": "https://ralfspoeth.github.io/xldr/schema/mapping-spec-0.9.json",
       "input": { ... }
     }
 
     <mappingSpec xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-                 xsi:noNamespaceSchemaLocation="https://ralfspoeth.github.io/xldr/schema/mapping-spec-0.8.xsd">
+                 xsi:noNamespaceSchemaLocation="https://ralfspoeth.github.io/xldr/schema/mapping-spec-0.9.xsd">
 
 Both are ignored by the readers - `$schema` is just another unrecognised member, and `xsi:` attributes carry no
 meaning for a spec that has no namespace of its own. IntelliJ and VS Code both validate and autocomplete from them.
@@ -213,8 +214,9 @@ The XSD is the more permissive of the two, because XSD 1.0 cannot state either o
 allow arbitrary extra elements next to the named ones, so annotate an XML spec with XML comments rather than with
 elements of your own; a JSON spec takes an extra member anywhere.
 
-A schema is published per release, since the format is still settling; `mapping-spec-0.8` describes the format of
-release 0.8.
+A schema is published per release, since the format is still settling: `mapping-spec-0.9` describes the format of
+release 0.9, `mapping-spec-0.8` that of 0.8, and an earlier one stays where it is so that a spec pinned to it keeps
+validating.
 
 What a schema cannot see is whether the spec makes sense as a whole - whether a mapping names a record selector the
 input actually declares, or whether the adapter accepts the selectors. The distribution checks that:
@@ -225,7 +227,9 @@ input actually declares, or whether the adapter accepts the selectors. The distr
 It reads each spec the way the server would, then reports everything wrong with it rather than only the first thing:
 a delivery rule that is missing or doubled, a pattern without its prefix, a MIME type no adapter on the module path
 reads, a selector that adapter refuses to compile, and any record selector, field selector or var a mapping names but
-the input does not declare. Nothing is loaded and no database is touched. The exit code is 0 when every spec is good
+the input does not declare. It also reports the one mistake that would otherwise pass for a healthy load: a CSV
+record selector given a discriminator although the feed has a header, which matches no line and loads nothing.
+Nothing is loaded and no database is touched. The exit code is 0 when every spec is good
 and 1 otherwise, so it fits a CI job or a pre-commit hook for whoever authors the specs.
 
 Reading different file types is supported by providing a specific adapter per MIME type. There may be more than one
@@ -258,7 +262,8 @@ An input specification contains the following pieces of information:
   complete one - required by the server, and the only part of the spec that is about files rather than about content;
 * record selectors, each of which
     * is identified by a name,
-    * has a selector specification, and
+    * has a selector specification - optional, and left out where the whole file holds one kind of record, as in a CSV
+      with a header or a fixed-length file - and
     * has related field selectors, which in turn
         * are identified by a name,
         * a selector description,
@@ -499,6 +504,12 @@ in between leaves the data safely in `work/` and at worst an orphaned marker, wh
 Either way the `mimeType` still selects the adapter. The server claims a file by moving it to `work/`, which is also
 what stops two threads, or two server processes on the same tree, from loading it twice.
 
+A load that fails leaves the input in `hospital/` beside a log naming the feed, the spec, the input, and the record
+the loader was on - `record 7 of 'people' into PERSON: Value too long for column ID`. The record is the seventh the
+*mapping* produced, which is not the seventh line of the file when a discriminator or a `limit` is in play, so it is
+worth reading as "the seventh record this mapping loaded" rather than as a line number. Should a driver decline to
+say which statement of a batch failed, the log names the range the batch covered instead.
+
 Files left in `work/` at startup were claimed by a run that died. Whether their transaction committed is unknown, so
 they are moved to `hospital/` for inspection rather than retried - a blind retry could duplicate rows, the loader
 being insert only. Files in `hospital/` are never retried automatically either; moving one back into `in/` is a
@@ -601,7 +612,8 @@ separator needs one that does not occur in the data (a tab, say).
 For CSV a record selector's `selector` is a *first-column discriminator*. Headerless feeds often interleave several
 record types in one file, the first column naming the type and the columns that follow varying in number, meaning and
 type per type. A line belongs to a record selector only when its first column equals that selector's `selector`; an
-absent or empty `selector` matches every line, which is the single-record-type case. Positions stay absolute, so `"1"`
+absent or empty `selector` matches every line, which is the single-record-type case and what a feed with a header
+almost always wants - giving one a `selector` there quietly loads nothing. Positions stay absolute, so `"1"`
 is the discriminator column itself and a type's payload fields usually start at `"2"`. Several record selectors thus
 partition one file, each mapping its own type to its own table:
 
@@ -642,15 +654,15 @@ a layout can therefore be written as a list of end positions:
 
 A line that stops short of a field's bounds is not an error: the value is whatever the line still holds, and a field
 beyond the end of the line is null. Together with the stripping every type does, that makes a producer's trailing
-padding irrelevant. The adapter expects exactly one record selector; its name and `selector` are not used.
+padding irrelevant. The adapter expects exactly one record selector; its `selector` is not used and is best left out.
 
 **JSON** (`application/json`, `text/json`): no settings of its own, and deliberately no charset - JSON exchanged
 between systems is UTF-8 by definition (RFC 8259), so a document is always read as such.
 
 Both kinds of selector are pointers in Greyson's syntax: slash separated steps, where a step is a member name, `[n]`
 for the n-th element of an array (`[-1]` counting from the end), or `#regex` to match a member by pattern. The record
-selector addresses the records - `orders`, or `data/orders` in a nested document, the empty selector being the whole
-document. An array there yields one record per element, a single object exactly one record. A field selector is then
+selector addresses the records - `orders`, or `data/orders` in a nested document, an absent or empty selector being
+the whole document. An array there yields one record per element, a single object exactly one record. A field selector is then
 applied to the record, so `id` reads one of its members, `customer/address/city` reaches into a nested object and
 `tags/[0]` into a nested array:
 
@@ -681,6 +693,25 @@ reaches a heading or a neighbouring cell.
 
 A spreadsheet carries typed cells, so no conversion settings apply: a date or a number arrives as one already, and a
 cell that holds text where the spec wants a number is converted from that text.
+
+### Monitoring
+
+The server registers an MXBean at `io.github.ralfspoeth.xldr:type=Server`, so what it is doing can be read with
+`jconsole`, VisualVM, or a Prometheus JMX exporter - no agent, no dependency, nothing to enable. Everything on it is
+read-only: the file system remains the way to make the server do anything.
+
+| Attribute | Meaning |
+|-----------|---------|
+| `ActiveFeeds` | How many feeds have a readable spec. A feed that disappears from this number has a spec the server refused. |
+| `LoadsInProgress` | Files being loaded at this moment. Bounded by `xldr.maxConcurrentLoads`. |
+| `LoadsSucceeded`, `LoadsFailed`, `RecordsLoaded` | Counted since the process started, so they are rates to be differenced. |
+| `LastLoad`, `LastFailure` | Instants, or empty. A `LastLoad` that stops advancing on a feed that should be busy is the quiet failure worth catching. |
+| `FilesWaiting` | Files sitting in any `in/`. Should fall back to zero; a number that does not is a feed not claiming what arrives - a delivery rule that matches nothing, say. |
+| `FilesInHospital` | Files a load failed on, not counting the `.log` written beside each. Nothing puts a file there but a failure and nothing removes one but an operator, so this is the alert to raise. |
+| `Feeds` | The same, per feed, so a failing feed can be told from a quiet one. |
+
+HikariCP's own pool statistics are separate and off by default; `pool.registerMbeans = true` in the server
+configuration turns them on, since every `pool.*` key is passed through.
 
 ### Logging
 

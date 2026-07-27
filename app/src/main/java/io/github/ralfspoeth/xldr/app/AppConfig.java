@@ -34,12 +34,15 @@ import java.util.stream.Stream;
  * {@code HikariConfig} under its own name, so the whole pool configuration is
  * reachable without this class having to mirror it.
  *
+ * @param roots                the directories in which feeds may be created
  * @param scanIntervalSeconds  how often the whole tree is reconciled; watch
  *                             events only make the reaction quicker
  * @param maxConcurrentLoads   how many files may be loaded at the same time.
  *                             Keep it at or below the pool size, otherwise the
  *                             pool becomes the real limit and the surplus
  *                             threads merely queue in {@code getConnection()}.
+ * @param poolProperties       the connection pool settings, under the names
+ *                             {@code HikariConfig} knows them by
  */
 public record AppConfig(
         List<Path> roots,
@@ -62,6 +65,13 @@ public record AppConfig(
         roots = List.copyOf(roots);
     }
 
+    /**
+     * @param propertiesFile the server configuration file
+     * @return the configuration it describes
+     * @throws IOException              if the file cannot be read
+     * @throws IllegalArgumentException if a required setting is missing or a
+     *                                  value does not make sense
+     */
     public static AppConfig load(Path propertiesFile) throws IOException {
         var props = new Properties();
         try (var in = Files.newBufferedReader(propertiesFile)) {
@@ -70,6 +80,12 @@ public record AppConfig(
         return of(props);
     }
 
+    /**
+     * @param props the server settings, as they would be read from the file
+     * @return the configuration they describe
+     * @throws IllegalArgumentException if a required setting is missing or a
+     *                                  value does not make sense
+     */
     public static AppConfig of(Properties props) {
         var roots = Stream.of(require(props, ROOTS_KEY).split(Pattern.quote(File.pathSeparator)))
                 .map(String::strip)

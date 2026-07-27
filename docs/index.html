@@ -54,6 +54,11 @@
         <th>XML</th>
     </tr>
     <tr>
+        <td>0.9 (current)</td>
+        <td><a href="schema/mapping-spec-0.9.json">mapping-spec-0.9.json</a></td>
+        <td><a href="schema/mapping-spec-0.9.xsd">mapping-spec-0.9.xsd</a></td>
+    </tr>
+    <tr>
         <td>0.8</td>
         <td><a href="schema/mapping-spec-0.8.json">mapping-spec-0.8.json</a></td>
         <td><a href="schema/mapping-spec-0.8.xsd">mapping-spec-0.8.xsd</a></td>
@@ -62,7 +67,13 @@
 
 <p>
     One schema is published per release: the mapping-spec format is still settling before 1.0, and a spec should be
-    validated against the release that reads it.
+    validated against the release that reads it. An older one stays where it is, so a spec pinned to it keeps
+    validating.
+</p>
+
+<p>
+    In 0.9 a record selector's <code>selector</code> became optional: where a whole file holds one kind of record - a
+    CSV with a header, a fixed-length file - there is nothing to locate. A 0.8 spec remains valid under 0.9.
 </p>
 
 <h2>Using them</h2>
@@ -70,7 +81,7 @@
 <p>In a JSON spec, as a member the reader does not recognise and therefore ignores:</p>
 
 <pre><code>{
-  "$schema": "https://ralfspoeth.github.io/xldr/schema/mapping-spec-0.8.json",
+  "$schema": "https://ralfspoeth.github.io/xldr/schema/mapping-spec-0.9.json",
   "input": {
     "mimeType": "text/csv",
     "accepts": "glob:*.csv",
@@ -83,7 +94,7 @@
 <p>In an XML spec, as the schema location of a document that has no namespace of its own:</p>
 
 <pre><code>&lt;mappingSpec xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-             xsi:noNamespaceSchemaLocation="https://ralfspoeth.github.io/xldr/schema/mapping-spec-0.8.xsd"&gt;
+             xsi:noNamespaceSchemaLocation="https://ralfspoeth.github.io/xldr/schema/mapping-spec-0.9.xsd"&gt;
     &lt;input mimeType="text/xml" accepts="glob:*.xml"&gt;
         ...
     &lt;/input&gt;

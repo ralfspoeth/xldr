@@ -28,6 +28,8 @@ public final class Sentinel {
     }
 
     /**
+     * @param spec the marker pattern, in {@code glob:} or {@code regex:} form
+     * @return the marker convention that pattern describes
      * @throws IllegalArgumentException if the pattern lacks a {@code glob:} or
      *                                  {@code regex:} prefix, or does not compile
      */
@@ -41,7 +43,8 @@ public final class Sentinel {
     }
 
     /**
-     * Whether {@code file} is a marker.
+     * @param file a file that has arrived in {@code in/}
+     * @return whether it is a marker rather than a data file
      */
     public boolean isMarker(Path file) {
         return matcher.matches(file.getFileName());
@@ -49,7 +52,10 @@ public final class Sentinel {
 
     /**
      * The data file the marker names - its own name with the last dotted suffix
-     * removed - or empty if the name has no suffix to strip.
+     * removed.
+     *
+     * @param marker a file for which {@link #isMarker} holds
+     * @return the data file it names, or empty if the name has no suffix to strip
      */
     public Optional<Path> dataFileOf(Path marker) {
         var name = marker.getFileName().toString();

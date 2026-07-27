@@ -22,6 +22,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.ResourceBundle;
+import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -200,6 +201,72 @@ public class LoaderTest {
         assertEquals(
                 List.of(Arrays.asList("1", "Alice", null), Arrays.asList("2", "Bob", null)),
                 selectPersons());
+    }
+
+    /**
+     * A record the database rejects is named in the failure, so the file does
+     * not have to be counted through by hand to find it. The bad record sits
+     * well inside a batch, which is the case that would otherwise only be
+     * locatable to within a thousand records.
+     */
+    @Test
+    public void namesTheRecordThatFailed() throws Exception {
+        try (var conn = DriverManager.getConnection(jdbcUrl);
+             var stmt = conn.createStatement()) {
+            stmt.execute("drop table if exists narrow");
+            stmt.execute("create table narrow(id varchar(3))");
+        }
+        var mapping = new RecordMappingSpec("people", "narrow", List.of(
+                new FieldMappingSpec(new ValueSource.Field("id"), "id")
+        ));
+        var spec = new MappingSpec(new InputSpec("text/csv", List.of()), List.of(mapping));
+
+        // the 7th record is too long for the column; the others fit
+        var people = new ArrayList<Map<String, String>>();
+        for (int i = 1; i <= 20; i++) {
+            people.add(Map.of("id", i == 7 ? "far too long" : String.valueOf(i)));
+        }
+        var adapter = adapterFor(Map.of("people", people));
+
+        var thrown = assertThrows(SQLException.class, () -> {
+            try (var loader = new Loader(spec, DriverManager.getConnection(jdbcUrl))) {
+                loader.loadInput(adapter, InputStream.nullInputStream(), mapping);
+            }
+        });
+        assertTrue(thrown.getMessage().contains("record 7"),
+                "should name the record, was: " + thrown.getMessage());
+        assertTrue(thrown.getMessage().contains("narrow"),
+                "and the mapping, was: " + thrown.getMessage());
+    }
+
+    /**
+     * A record the adapter itself cannot produce - a value that will not convert
+     * - is named just as one the database rejects.
+     */
+    @Test
+    public void namesTheRecordThatCouldNotBeRead() throws Exception {
+        var mapping = new RecordMappingSpec("people", "person", List.of(
+                new FieldMappingSpec(new ValueSource.Field("id"), "id")
+        ));
+        var spec = new MappingSpec(new InputSpec("text/csv", List.of()), List.of(mapping));
+
+        // the adapter throws while producing the third record
+        InputAdapter adapter = (source, recordSelector, fieldSelectors) -> new Result(
+                List.of(new Field("id", String.class)),
+                Stream.of(1, 2, 3).map(i -> (Row) name -> {
+                    if (i == 3) {
+                        throw new IllegalArgumentException("not a number: xyz");
+                    }
+                    return String.valueOf(i);
+                }));
+
+        var thrown = assertThrows(RuntimeException.class, () -> {
+            try (var loader = new Loader(spec, DriverManager.getConnection(jdbcUrl))) {
+                loader.loadInput(adapter, InputStream.nullInputStream(), mapping);
+            }
+        });
+        assertTrue(thrown.getMessage().contains("record 3"),
+                "should name the record, was: " + thrown.getMessage());
     }
 
     /**

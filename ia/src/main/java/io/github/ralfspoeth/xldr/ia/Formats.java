@@ -53,8 +53,8 @@ public final class Formats {
     }
 
     /**
-     * Formats that apply no pattern of their own; every value is read in its
-     * canonical form.
+     * @return formats that apply no pattern of their own, so that every value is
+     * read in its canonical form
      */
     public static Formats defaults() {
         return DEFAULTS;
@@ -64,6 +64,8 @@ public final class Formats {
      * Reads {@code dateFormat}, {@code numberFormat} and {@code locale} from the
      * adapter properties. A property that is absent leaves that part canonical.
      *
+     * @param properties the adapter settings of an input
+     * @return the formats those settings describe
      * @throws IllegalArgumentException if a pattern or language tag is invalid
      */
     public static Formats of(Map<String, String> properties) {
@@ -96,6 +98,9 @@ public final class Formats {
      * falling back to {@link DataType#parse} where none applies. A null or blank
      * value is absent, exactly as there.
      *
+     * @param type the type to convert to; {@code null} reads the value as text
+     * @param raw  the textual form, which may be null
+     * @return the value as that type, or {@code null} if {@code raw} is null or blank
      * @throws RuntimeException if the text is not a valid value of that type
      */
     public Object parse(DataType type, String raw) {

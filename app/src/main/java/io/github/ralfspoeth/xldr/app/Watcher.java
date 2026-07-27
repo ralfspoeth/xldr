@@ -41,7 +41,11 @@ public class Watcher implements AutoCloseable {
     private final FileProcessor processor;
     private final ScheduledExecutorService scanner;
     private final long scanIntervalSeconds;
+    private final Statistics statistics;
     private Thread watchThread;
+    /** unregisters the JMX bean; does nothing if it could not be registered */
+    private AutoCloseable statusBean = () -> {
+    };
 
     public Watcher(AppConfig config, ConnectionSource connectionSource) throws IOException {
         this.roots = Set.copyOf(config.roots());
@@ -50,7 +54,8 @@ public class Watcher implements AutoCloseable {
         this.watchService = new DirectoryWatchService(
                 this::onEvent, roots, dir -> roots.contains(dir.getParent()));
         this.registry = new FeedRegistry(watchService);
-        this.processor = new FileProcessor(connectionSource, config.maxConcurrentLoads());
+        this.statistics = new Statistics();
+        this.processor = new FileProcessor(connectionSource, config.maxConcurrentLoads(), statistics);
         this.scanner = Executors.newSingleThreadScheduledExecutor(Thread.ofVirtual().factory());
     }
 
@@ -68,6 +73,7 @@ public class Watcher implements AutoCloseable {
     }
 
     public void start() {
+        statusBean = ServerStatus.register(registry, statistics);
         watchThread = Thread.ofVirtual().start(watchService);
         reconcileAll();
         registry.active().forEach(processor::recoverWork);
@@ -119,6 +125,11 @@ public class Watcher implements AutoCloseable {
 
     @Override
     public void close() throws IOException {
+        try {
+            statusBean.close();
+        } catch (Exception e) {
+            LOG.log(WARNING, () -> "could not unregister the JMX bean: " + e);
+        }
         scanner.shutdownNow();
         watchService.close();
         if (watchThread != null) {

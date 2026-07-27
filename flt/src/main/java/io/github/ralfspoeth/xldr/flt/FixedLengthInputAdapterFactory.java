@@ -16,6 +16,17 @@ import java.util.stream.Gatherer;
 import static java.util.Optional.ofNullable;
 import static java.util.stream.Collectors.toMap;
 
+/**
+ * Creates fixed-length adapters.
+ * <p>
+ * Recognised properties: {@code linesPerRecord} (one by default; the lines of a
+ * record are joined and the field bounds address the joined text),
+ * {@code charset}, and the shared conversion settings of {@link Formats}.
+ * <p>
+ * A field selector is a half-open character range {@code left:right} counted
+ * from zero. The left bound may be omitted, in which case the field starts where
+ * the previous one ended, so a layout can be written as a list of end positions.
+ */
 public class FixedLengthInputAdapterFactory implements InputAdapterFactory {
 
     @Override

@@ -8,6 +8,8 @@ open module io.github.ralfspoeth.xldr.it.test {
     requires io.github.ralfspoeth.xldr.json;
     requires io.github.ralfspoeth.xldr.xlsx;
     requires java.sql;
+    // reading the server's JMX statistics
+    requires java.management;
     requires org.apache.poi.poi;
     requires org.apache.poi.ooxml;
     // driving the validate subcommand through the command line

@@ -103,10 +103,15 @@ public class XmlMappingSpecReader implements MappingSpecReader {
         return new VarSpec(required(element, "name"), source);
     }
 
+    /**
+     * The {@code selector} is optional: an adapter that reads a single kind of
+     * record from a whole file - a CSV with a header, a fixed-length file - has
+     * nothing to locate, and omitting it says so.
+     */
     private static RecordSelectorSpec recordSelectorSpec(Element recordSelector) {
         return new RecordSelectorSpec(
                 required(recordSelector, "name"),
-                required(recordSelector, "selector"),
+                attributeValue("selector").apply(recordSelector).orElse(null),
                 elements("fieldSelector")
                         .apply(recordSelector)
                         .map(XmlMappingSpecReader::fieldSelectorSpec)

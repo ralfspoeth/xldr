@@ -80,8 +80,34 @@ class Validate implements Callable<Integer> {
         var input = spec.inputSpec();
         checkDelivery(input, problems);
         checkAdapter(input, problems);
+        checkCsvDiscriminator(input, problems);
         checkReferences(spec, problems);
         return problems;
+    }
+
+    /**
+     * A CSV record selector's {@code selector} is a first-column discriminator,
+     * which belongs to a headerless file interleaving several record types. Given
+     * one alongside a header it is almost always a misreading of what a selector
+     * is here, and the file loads without a single row: no line's first column
+     * equals it, nothing matches, and the load reports success over zero records.
+     * That is the quietest way a spec can be wrong, so it is worth a word even
+     * though the combination is not strictly illegal - a headered file may carry
+     * a type column, in which case the fix is to say {@code header=false} or to
+     * drop the selector.
+     */
+    private static void checkCsvDiscriminator(InputSpec input, List<String> problems) {
+        if (!"text/csv".equals(input.mimeType())
+                || !Boolean.parseBoolean(input.properties().getOrDefault("header", "true"))) {
+            return;
+        }
+        input.recordSelectors().stream()
+                .filter(rs -> rs.selector() != null && !rs.selector().isBlank())
+                .forEach(rs -> problems.add("record selector '" + rs.name() + "': a CSV selector is a"
+                        + " first-column discriminator, and with a header no line's first column will equal '"
+                        + rs.selector() + "', so nothing would load. Drop the selector, or set the"
+                        + " 'header' property to false if the file really does name its record type in"
+                        + " the first column."));
     }
 
     /**

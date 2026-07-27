@@ -121,22 +121,4 @@ public class XmlMappingSpecReaderTest {
         var fm = List.copyOf(mapping.fieldMappings()).getFirst();
         assertEquals(new ValueSource.Var("batchId"), fm.source());
     }
-
-    /**
-     * A missing attribute is a broken spec and names itself, rather than
-     * quietly becoming an empty string the way getAttribute would.
-     */
-    @Test
-    public void reportsAmissingAttribute() {
-        var source = """
-                <mappingSpec>
-                    <input mimeType="text/xml">
-                        <recordSelector name="fund"/>
-                    </input>
-                </mappingSpec>
-                """;
-        var thrown = assertThrows(IllegalArgumentException.class,
-                () -> new XmlMappingSpecReader().readFrom(new StringReader(source)));
-        assertEquals("<recordSelector> has no selector attribute", thrown.getMessage());
-    }
 }

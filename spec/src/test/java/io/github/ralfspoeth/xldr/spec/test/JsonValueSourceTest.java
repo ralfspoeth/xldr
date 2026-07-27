@@ -228,4 +228,31 @@ public class JsonValueSourceTest {
         assertEquals("text/csv", input.mimeType());
         assertEquals("glob:*.csv", input.accepts());
     }
+
+    /**
+     * A record selector may omit its selector: a CSV with a header holds one
+     * kind of record, so there is nothing to locate, and the CSV adapter reads
+     * an absent selector as "every line". An adapter that cannot do without one
+     * says so when it is asked for it.
+     */
+    @Test
+    public void readsARecordSelectorWithoutASelector() throws IOException {
+        var source = """
+                {
+                    "input": {
+                        "mimeType": "text/csv",
+                        "accepts": "glob:*.csv",
+                        "recordSelectors": [
+                            { "name": "people", "fieldSelectors": [ {"name": "id", "selector": "id"} ] }
+                        ]
+                    },
+                    "mapping": []
+                }
+                """;
+        var input = new JsonMappingSpecReader().readFrom(new StringReader(source)).inputSpec();
+        var recordSelector = List.copyOf(input.recordSelectors()).getFirst();
+
+        assertNull(recordSelector.selector());
+        assertThrows(IllegalArgumentException.class, recordSelector::requireSelector);
+    }
 }

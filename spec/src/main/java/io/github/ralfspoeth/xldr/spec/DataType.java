@@ -23,7 +23,7 @@ public enum DataType {
     }
 
     /**
-     * The Java class values of this type are delivered as.
+     * @return the Java class values of this type are delivered as
      */
     public Class<?> clazz() {
         return clazz;
@@ -43,6 +43,8 @@ public enum DataType {
      * numeric types. Input in another notation is the business of
      * {@code Formats}, which applies the feed's configured patterns.
      *
+     * @param raw the textual form, which may be null
+     * @return the value as this type, or {@code null} if {@code raw} is null or blank
      * @throws RuntimeException if the text is not a valid value of this type
      */
     public Object parse(String raw) {

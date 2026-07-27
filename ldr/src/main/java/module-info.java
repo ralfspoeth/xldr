@@ -1,3 +1,7 @@
+/**
+ * The loader: inserts the records of one input into the target database, the
+ * whole input being one transaction.
+ */
 module io.github.ralfspoeth.xldr.ldr {
     exports io.github.ralfspoeth.xldr.ldr;
     requires transitive io.github.ralfspoeth.xldr.ia;

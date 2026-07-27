@@ -27,19 +27,38 @@ import java.io.Serializable;
  */
 public sealed interface ValueSource extends Serializable {
 
+    /**
+     * A field of the input record.
+     *
+     * @param fieldName the name of a field selector of the record selector being
+     *                  mapped
+     */
     record Field(String fieldName) implements ValueSource {}
 
+    /**
+     * A fixed value from the spec.
+     *
+     * @param value the value, whose Java type follows the literal it was read
+     *              from: a {@code String}, a {@code BigDecimal} or a {@code Boolean}
+     */
     record Constant(Object value) implements ValueSource {}
 
     /**
-     * @param key the value matched against {@code keyColumn}; a {@code Field},
-     *            {@code Constant} or {@code Var}, never a nested {@code Lookup}
+     * A value read from a reference table.
+     *
+     * @param table     the table to read from
+     * @param column    the column whose value is taken
+     * @param keyColumn the column the key is matched against
+     * @param key       the value matched against {@code keyColumn}; a {@code Field},
+     *                  {@code Constant} or {@code Var}, never a nested {@code Lookup}
      */
     record Lookup(String table, String column, String keyColumn, ValueSource key) implements ValueSource {}
 
     /**
      * A reference to an input {@link VarSpec} by name; resolves to that
      * variable's value, which is computed once at the start of the load.
+     *
+     * @param name the name of a variable the input declares
      */
     record Var(String name) implements ValueSource {}
 
@@ -50,6 +69,8 @@ public sealed interface ValueSource extends Serializable {
      * {@code ${now()}}). A template that is a single hole yields that hole's
      * value with its native type; anything else yields the pieces concatenated
      * as a string.
+     *
+     * @param template the template text, holes and all
      */
     record Expr(String template) implements ValueSource {}
 }

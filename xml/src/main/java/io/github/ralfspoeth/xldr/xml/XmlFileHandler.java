@@ -49,8 +49,10 @@ class XmlFileHandler implements InputAdapter {
 
         var xpath = newXPath(namespaces);
         for (var recordSpec : spec.recordSelectors()) {
+            // an XPath has to point somewhere, so this input cannot omit it
+            var path = recordSpec.requireSelector();
             var record = new XmlRecordSelector(
-                    recordSpec.name(), recordSpec.selector(), compile(xpath, recordSpec.selector()));
+                    recordSpec.name(), path, compile(xpath, path));
             if (recordSelectors.putIfAbsent(recordSpec.name(), record) != null) {
                 throw new IllegalArgumentException("duplicate record selector " + recordSpec.name());
             }

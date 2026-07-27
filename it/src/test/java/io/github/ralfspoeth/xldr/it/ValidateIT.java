@@ -44,7 +44,7 @@ public class ValidateIT {
                     "properties": { "fieldSeparator": "," },
                     "vars": [ { "name": "source", "constant": "PD" } ],
                     "recordSelectors": [
-                      { "name": "people", "selector": "people", "fieldSelectors": [
+                      { "name": "people", "fieldSelectors": [
                           { "name": "id", "selector": "id", "type": "INTEGER" }
                       ] }
                     ]
@@ -82,22 +82,47 @@ public class ValidateIT {
     void rejectsNamesTheInputDoesNotDeclare() throws IOException {
         assertEquals(1, validate("record.json", """
                 { "input": { "mimeType": "text/csv", "accepts": "glob:*.csv",
-                    "recordSelectors": [ { "name": "people", "selector": "people" } ] },
+                    "recordSelectors": [ { "name": "people" } ] },
                   "mapping": [ { "recordSelector": "persons", "databaseTable": "t",
                                  "fieldMapping": [ { "constant": "x", "databaseColumn": "c" } ] } ] }
                 """));
         assertEquals(1, validate("field.json", """
                 { "input": { "mimeType": "text/csv", "accepts": "glob:*.csv",
-                    "recordSelectors": [ { "name": "people", "selector": "people",
+                    "recordSelectors": [ { "name": "people",
                         "fieldSelectors": [ { "name": "id", "selector": "id" } ] } ] },
                   "mapping": [ { "recordSelector": "people", "databaseTable": "t",
                                  "fieldMapping": [ { "fieldSelector": "nope", "databaseColumn": "c" } ] } ] }
                 """));
         assertEquals(1, validate("var.json", """
                 { "input": { "mimeType": "text/csv", "accepts": "glob:*.csv",
-                    "recordSelectors": [ { "name": "people", "selector": "people" } ] },
+                    "recordSelectors": [ { "name": "people" } ] },
                   "mapping": [ { "recordSelector": "people", "databaseTable": "t",
                                  "fieldMapping": [ { "var": "nope", "databaseColumn": "c" } ] } ] }
+                """));
+    }
+
+    /**
+     * The quietest mistake a spec can make: a CSV selector is a first-column
+     * discriminator, so giving one to a feed that has a header loads no row at
+     * all and still reports success. Saying so with a header is worth reporting;
+     * saying so without one is the interleaved-file case and is fine.
+     */
+    @Test
+    void rejectsAcsvDiscriminatorBesideAheader() throws IOException {
+        assertEquals(1, validate("discriminator.json", """
+                { "input": { "mimeType": "text/csv", "accepts": "glob:*.csv",
+                    "recordSelectors": [ { "name": "people", "selector": "people",
+                        "fieldSelectors": [ { "name": "id", "selector": "id" } ] } ] },
+                  "mapping": [ { "recordSelector": "people", "databaseTable": "t",
+                                 "fieldMapping": [ { "fieldSelector": "id", "databaseColumn": "c" } ] } ] }
+                """));
+        assertEquals(0, validate("headerless.json", """
+                { "input": { "mimeType": "text/csv", "accepts": "glob:*.csv",
+                    "properties": { "header": false },
+                    "recordSelectors": [ { "name": "people", "selector": "people",
+                        "fieldSelectors": [ { "name": "id", "selector": "2" } ] } ] },
+                  "mapping": [ { "recordSelector": "people", "databaseTable": "t",
+                                 "fieldMapping": [ { "fieldSelector": "id", "databaseColumn": "c" } ] } ] }
                 """));
     }
 

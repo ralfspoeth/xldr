@@ -113,6 +113,8 @@
                     <archive>
                         <manifest>
                             <mainClass>io.github.ralfspoeth.xldr.app.Main</mainClass>
+                            <!-- Implementation-Version, which `xldr &dash;-version` reports -->
+                            <addDefaultImplementationEntries>true</addDefaultImplementationEntries>
                         </manifest>
                     </archive>
                 </configuration>

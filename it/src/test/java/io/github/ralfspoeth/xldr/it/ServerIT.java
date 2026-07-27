@@ -2,6 +2,7 @@ package io.github.ralfspoeth.xldr.it;
 
 import io.github.ralfspoeth.xldr.app.AppConfig;
 import io.github.ralfspoeth.xldr.app.ConnectionPool;
+import io.github.ralfspoeth.xldr.app.ServerMXBean;
 import io.github.ralfspoeth.xldr.app.Watcher;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.junit.jupiter.api.AfterEach;
@@ -9,8 +10,11 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 
+import javax.management.JMX;
+import javax.management.ObjectName;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.lang.management.ManagementFactory;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.DriverManager;
@@ -275,6 +279,61 @@ public class ServerIT {
     }
 
     /**
+     * The server counts what it does and offers it over JMX, so that a load can
+     * be watched without reading the log - and, for the numbers that matter, so
+     * that a monitor can alert on them.
+     */
+    @Test
+    @Timeout(60)
+    void reportsWhatItHasDoneOverJmx() throws Exception {
+        var mbeans = ManagementFactory.getPlatformMBeanServer();
+        var name = new ObjectName("io.github.ralfspoeth.xldr:type=Server");
+        var status = JMX.newMXBeanProxy(mbeans, name, ServerMXBean.class);
+
+        var feed = Files.createDirectory(root.resolve("counted"));
+        Files.writeString(feed.resolve("spec.json"), SPEC);
+        await("the feed to become active", () -> status.getActiveFeeds() == 1);
+
+        deliver(feed, "people-1.csv", """
+                id,name
+                1,Alice
+                2,Bob
+                """);
+        await("the load to be counted", () -> status.getLoadsSucceeded() == 1);
+
+        assertEquals(2, status.getRecordsLoaded());
+        assertEquals(0, status.getLoadsFailed());
+        assertEquals(0, status.getFilesInHospital());
+        assertTrue(status.getLastLoad().startsWith("20"), "an instant: " + status.getLastLoad());
+
+        var counted = status.getFeeds().get("counted");
+        assertEquals(1, counted.loadsSucceeded());
+        assertEquals(2, counted.recordsLoaded());
+
+        // A failing load moves the numbers the other way and leaves the file
+        // where a monitor would see it. A second feed rather than a rewritten
+        // spec: rewriting one would race the registry's reload against the
+        // delivery, and the load would fail or succeed by timing.
+        var broken = Files.createDirectory(root.resolve("broken"));
+        Files.writeString(broken.resolve("spec.json"), SPEC.replace("\"person\"", "\"no_such_table\""));
+        await("the second feed to become active", () -> status.getActiveFeeds() == 2);
+
+        deliver(broken, "bad.csv", """
+                id,name
+                9,Nobody
+                """);
+        await("the failure to be counted", () -> status.getLoadsFailed() == 1);
+        // the hospital holds the input and a log explaining it; one file is sick
+        await("the file to reach the hospital", () -> status.getFilesInHospital() == 1);
+
+        var feeds = status.getFeeds();
+        assertEquals(1, feeds.get("broken").filesInHospital());
+        assertEquals(1, feeds.get("broken").loadsFailed());
+        assertEquals(0, feeds.get("counted").filesInHospital());
+        assertEquals(1, feeds.get("counted").loadsSucceeded(), "the healthy feed is untouched by it");
+    }
+
+    /**
      * A feed must declare exactly one of {@code accepts} or {@code sentinel};
      * one that declares neither, or both, is not activated at all - so its
      * working directories are never even created.
@@ -463,7 +522,6 @@ public class ServerIT {
                 "recordSelectors": [
                   {
                     "name": "people",
-                    "selector": "people",
                     "fieldSelectors": [
                       {"name": "id", "selector": "id", "type": "STRING"},
                       {"name": "name", "selector": "name", "type": "STRING"}

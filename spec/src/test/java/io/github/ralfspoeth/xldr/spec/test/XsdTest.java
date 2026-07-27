@@ -12,8 +12,10 @@ import java.io.File;
 import java.io.StringReader;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -27,7 +29,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 public class XsdTest {
 
-    private static final Path SCHEMA = Path.of("..", "docs", "schema", "mapping-spec-0.8.xsd");
+    private static final Path SCHEMA = Path.of("..", "docs", "schema", "mapping-spec-0.9.xsd");
 
     /**
      * Every element and attribute the reader knows, in one document.
@@ -93,6 +95,31 @@ public class XsdTest {
                     <input mimeType="text/csv" sentinel="glob:*.done"/>
                 </mappingSpec>
                 """));
+    }
+
+    /**
+     * A record selector may omit its selector, and the schema has to allow that
+     * or an editor would flag a spec the server loads happily: a CSV with a
+     * header and a fixed-length file each hold one kind of record, so there is
+     * nothing to locate. The adapters that do need one say so themselves.
+     */
+    @Test
+    public void aRecordSelectorMayOmitItsSelector() throws Exception {
+        var xml = """
+                <mappingSpec>
+                    <input mimeType="text/csv" accepts="glob:*.csv">
+                        <recordSelector name="people">
+                            <fieldSelector name="id" selector="id" type="INTEGER"/>
+                        </recordSelector>
+                    </input>
+                </mappingSpec>
+                """;
+        assertDoesNotThrow(() -> validate(xml));
+
+        var spec = new XmlMappingSpecReader().readFrom(new StringReader(xml));
+        var recordSelector = List.copyOf(spec.inputSpec().recordSelectors()).getFirst();
+        assertNull(recordSelector.selector());
+        assertThrows(IllegalArgumentException.class, recordSelector::requireSelector);
     }
 
     /**

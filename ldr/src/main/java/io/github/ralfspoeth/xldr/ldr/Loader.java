@@ -239,7 +239,13 @@ public class Loader implements AutoCloseable {
      * caller supplies a freshly opened stream per call since a stream is read
      * only once.
      *
+     * @param adapter the adapter for the input's MIME type
+     * @param source  the input, read once by this call
+     * @param mapping one of the record mappings of this loader's spec
      * @return the number of rows inserted
+     * @throws IOException  if the input cannot be read
+     * @throws SQLException if the database rejects a record, the message naming
+     *                      which one
      */
     public int loadInput(InputAdapter adapter, InputStream source, RecordMappingSpec mapping)
             throws IOException, SQLException {
@@ -277,27 +283,38 @@ public class Loader implements AutoCloseable {
             }
             int count = 0;
             int pending = 0;
+            // the records read so far, so that a failure can name the one that
+            // caused it rather than leaving it to be counted out of the file
+            int read = 0;
             try (var rows = rowStream) {
                 var it = rows.iterator();
                 while (it.hasNext()) {
-                    var row = it.next();
-                    ps.clearParameters();
-                    for (int i = 0; i < binders.size(); i++) {
-                        var value = binders.get(i).apply(row);
-                        if (value == null) {
-                            ps.setNull(i + 1, Types.VARCHAR);
-                        } else {
-                            ps.setObject(i + 1, value);
+                    try {
+                        var row = it.next();
+                        ps.clearParameters();
+                        for (int i = 0; i < binders.size(); i++) {
+                            var value = binders.get(i).apply(row);
+                            if (value == null) {
+                                ps.setNull(i + 1, Types.VARCHAR);
+                            } else {
+                                ps.setObject(i + 1, value);
+                            }
                         }
+                        ps.addBatch();
+                    } catch (SQLException e) {
+                        // reading or converting this one record, so it is known exactly
+                        throw at(e, "record " + (read + 1), mapping);
+                    } catch (RuntimeException e) {
+                        throw at(e, "record " + (read + 1), mapping);
                     }
-                    ps.addBatch();
+                    read++;
                     if (++pending == BATCH_SIZE) {
-                        count += executeBatch(ps);
+                        count += flush(ps, read - pending, pending, mapping);
                         pending = 0;
                     }
                 }
                 if (pending > 0) {
-                    count += executeBatch(ps);
+                    count += flush(ps, read - pending, pending, mapping);
                 }
             }
             return count;
@@ -305,6 +322,77 @@ public class Loader implements AutoCloseable {
             failed = true;
             throw e;
         }
+    }
+
+    /**
+     * Sends a batch, naming the record that failed if the driver says which one.
+     * <p>
+     * A {@link BatchUpdateException} reports one update count per statement it
+     * got to: the failure is where {@link Statement#EXECUTE_FAILED} appears, or,
+     * for a driver that stops at the first failure, one past the last count it
+     * returned. A driver that says neither leaves only the range the batch
+     * covered, which still beats searching the whole file.
+     *
+     * @param firstRecord the number of records read before this batch began
+     * @param batched     how many records this batch carries
+     */
+    private static int flush(PreparedStatement ps, int firstRecord, int batched, RecordMappingSpec mapping)
+            throws SQLException {
+        try {
+            return executeBatch(ps);
+        } catch (BatchUpdateException e) {
+            var failed = failedIndex(e);
+            throw at(e, failed < 0
+                            ? range(firstRecord, batched)
+                            : "record " + (firstRecord + failed + 1),
+                    mapping);
+        } catch (SQLException e) {
+            // the batch failed as a whole, without saying where
+            throw at(e, range(firstRecord, batched), mapping);
+        }
+    }
+
+    private static String range(int firstRecord, int batched) {
+        return batched == 1
+                ? "record " + (firstRecord + 1)
+                : "records " + (firstRecord + 1) + " to " + (firstRecord + batched);
+    }
+
+    /**
+     * The position of the failing statement within the batch, or -1 if the
+     * driver did not say.
+     */
+    private static int failedIndex(BatchUpdateException e) {
+        var counts = e.getUpdateCounts();
+        if (counts == null) {
+            return -1;
+        }
+        for (int i = 0; i < counts.length; i++) {
+            if (counts[i] == Statement.EXECUTE_FAILED) {
+                return i;
+            }
+        }
+        // no failure marker: the driver stopped where its counts stop
+        return counts.length;
+    }
+
+    /**
+     * The same failure, saying which record and which mapping it happened in.
+     * The kind is preserved where it carries meaning - a {@link SQLException}
+     * keeps its SQL state and vendor code - so a caller that distinguishes them
+     * still can.
+     */
+    private static RuntimeException at(RuntimeException e, String record, RecordMappingSpec mapping) {
+        return new IllegalStateException(where(record, mapping) + ": " + e, e);
+    }
+
+    private static SQLException at(SQLException e, String record, RecordMappingSpec mapping) {
+        return new SQLException(where(record, mapping) + ": " + e.getMessage(),
+                e.getSQLState(), e.getErrorCode(), e);
+    }
+
+    private static String where(String record, RecordMappingSpec mapping) {
+        return record + " of '" + mapping.recordSelector() + "' into " + mapping.databaseTable();
     }
 
     /**
@@ -316,10 +404,13 @@ public class Loader implements AutoCloseable {
      * as an individual insert would have.
      */
     private static int executeBatch(PreparedStatement ps) throws SQLException {
+        var counts = ps.executeBatch();
         int inserted = 0;
-        for (var updated : ps.executeBatch()) {
+        for (var updated : counts) {
             if (updated == Statement.EXECUTE_FAILED) {
-                throw new SQLException("an insert in the batch failed");
+                // a driver may report the failure in the counts rather than by
+                // throwing; carry them so the record can still be named
+                throw new BatchUpdateException("an insert in the batch failed", counts);
             }
             inserted += updated == Statement.SUCCESS_NO_INFO ? 1 : updated;
         }

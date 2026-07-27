@@ -25,15 +25,26 @@ import static java.lang.System.Logger.Level.INFO;
 @Command(
         name = "xldr",
         mixinStandardHelpOptions = true,
-        version = "xldr " + Main.VERSION,
+        versionProvider = Main.ManifestVersion.class,
         description = "Watches the configured roots and loads files that appear into the target database.",
         subcommands = Validate.class
 )
 public class Main implements Callable<Integer> {
 
-    static final String VERSION = "1.0";
-
     private static final System.Logger LOG = System.getLogger(Main.class.getName());
+
+    /**
+     * The version the jar was built as, rather than one written down twice and
+     * kept in step by hand. It is absent when the classes are run from a build
+     * directory, which is exactly when there is no release to name.
+     */
+    static class ManifestVersion implements CommandLine.IVersionProvider {
+        @Override
+        public String[] getVersion() {
+            var version = Main.class.getPackage().getImplementationVersion();
+            return new String[]{"xldr " + (version == null ? "(development build)" : version)};
+        }
+    }
 
     @Spec
     private CommandSpec spec;

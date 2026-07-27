@@ -42,10 +42,12 @@ class FileProcessor {
     private final ConnectionSource connectionSource;
     /** fair, so a file cannot be starved by a steady stream of newer arrivals */
     private final Semaphore loadPermits;
+    private final Statistics statistics;
 
-    public FileProcessor(ConnectionSource connectionSource, int maxConcurrentLoads) {
+    public FileProcessor(ConnectionSource connectionSource, int maxConcurrentLoads, Statistics statistics) {
         this.connectionSource = connectionSource;
         this.loadPermits = new Semaphore(maxConcurrentLoads, true);
+        this.statistics = statistics;
     }
 
     /**
@@ -121,12 +123,15 @@ class FileProcessor {
             unclaim(feed, claimed);
             return;
         }
+        statistics.loadStarted();
         try {
             var rows = new LoadJob(feed.mappingSpec(), connectionSource).load(claimed);
             var target = archive(feed, claimed);
+            statistics.loaded(feed.name(), rows);
             LOG.log(INFO, () -> "loaded " + rows + " row(s) from " + originalName
                     + " [" + feed.name() + "] -> " + target);
         } catch (Exception e) {
+            statistics.failed(feed.name());
             LOG.log(ERROR, () -> "load failed for " + originalName + " [" + feed.name() + "]: " + e);
             try {
                 hospitalise(feed, claimed, e);
@@ -134,6 +139,7 @@ class FileProcessor {
                 LOG.log(ERROR, () -> "could not move " + claimed + " to the hospital: " + io);
             }
         } finally {
+            statistics.loadFinished();
             loadPermits.release();
         }
     }
@@ -202,6 +208,9 @@ class FileProcessor {
             out.println("spec:    " + feed.specFile());
             out.println("input:   " + name);
             out.println("failed:  " + LocalDateTime.now());
+            // the loader names the record it was on, which is the line an
+            // operator wants first; the trace below is for everything after that
+            out.println("cause:   " + failure.getMessage());
             out.println();
             failure.printStackTrace(out);
         }

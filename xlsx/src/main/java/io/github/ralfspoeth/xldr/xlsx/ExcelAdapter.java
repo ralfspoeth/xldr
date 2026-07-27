@@ -40,7 +40,8 @@ class ExcelAdapter implements InputAdapter {
 
     ExcelAdapter(InputSpec spec) {
         for (var rss : spec.recordSelectors()) {
-            var range = Range.parse(rss.selector());
+            // a sheet range has to point somewhere, so this input cannot omit it
+            var range = Range.parse(rss.requireSelector());
             var fields = new LinkedHashMap<String, Field>();
             var refs = new LinkedHashMap<String, CellRef>();
             for (var fss : rss.fieldSelectors()) {

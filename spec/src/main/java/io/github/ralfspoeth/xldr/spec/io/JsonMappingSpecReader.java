@@ -166,10 +166,15 @@ public class JsonMappingSpecReader implements MappingSpecReader {
                         "constant must be a string, number or boolean: " + value));
     }
 
+    /**
+     * The {@code selector} is optional: an adapter that reads a single kind of
+     * record from a whole file - a CSV with a header, a fixed-length file - has
+     * nothing to locate, and omitting it says so.
+     */
     private static RecordSelectorSpec recordSelectorSpec(JsonValue rs) {
         return new RecordSelectorSpec(
                 PTR.member("name").stringOrThrow(rs),
-                PTR.member("selector").stringOrThrow(rs),
+                PTR.member("selector").stringValue(rs).orElse(null),
                 PTR.member("fieldSelectors")
                         .select(Selector.all())
                         .apply(rs)
