@@ -1,9 +1,120 @@
 <!doctype html>
 <html lang="en">
-    <head>
-        <title>Empty</title>
-    </head>
-    <body>
-        Empty page.
-    </body>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>XLDR schemas</title>
+    <style>
+        body {
+            max-width: 46rem;
+            margin: 3rem auto;
+            padding: 0 1rem 4rem;
+            font: 16px/1.6 system-ui, -apple-system, "Segoe UI", Helvetica, Arial, sans-serif;
+            color: #1a1a1a;
+        }
+        h1 { font-size: 1.6rem; margin-bottom: .2rem; }
+        h2 { font-size: 1.15rem; margin-top: 2.4rem; }
+        .sub { color: #555; margin-top: 0; }
+        pre {
+            background: #f5f5f5;
+            border-left: 3px solid #ccc;
+            padding: .8rem 1rem;
+            overflow-x: auto;
+            font-size: .875rem;
+        }
+        code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+        table { border-collapse: collapse; width: 100%; margin: 1rem 0; }
+        th, td { text-align: left; padding: .4rem .6rem; border-bottom: 1px solid #e5e5e5; }
+        th { font-weight: 600; }
+        footer { margin-top: 3rem; color: #555; font-size: .9rem; }
+        a { color: #0b5fff; }
+    </style>
+</head>
+<body>
+
+<h1>XLDR schemas</h1>
+<p class="sub">
+    Schemas for the mapping specification of
+    <a href="https://github.com/ralfspoeth/xldr">XLDR</a>, a modular toolkit that loads CSV, XML, JSON,
+    fixed-length and Excel files into database tables.
+</p>
+
+<p>
+    A spec that points at one of these is validated and autocompleted as you write it, in IntelliJ, VS Code and
+    anything else that understands JSON Schema or XSD. Both references are ignored by XLDR itself, so a spec that
+    carries one loads exactly as it would without.
+</p>
+
+<h2>Schemas</h2>
+
+<table>
+    <tr>
+        <th>Release</th>
+        <th>JSON</th>
+        <th>XML</th>
+    </tr>
+    <tr>
+        <td>0.8</td>
+        <td><a href="schema/mapping-spec-0.8.json">mapping-spec-0.8.json</a></td>
+        <td><a href="schema/mapping-spec-0.8.xsd">mapping-spec-0.8.xsd</a></td>
+    </tr>
+</table>
+
+<p>
+    One schema is published per release: the mapping-spec format is still settling before 1.0, and a spec should be
+    validated against the release that reads it.
+</p>
+
+<h2>Using them</h2>
+
+<p>In a JSON spec, as a member the reader does not recognise and therefore ignores:</p>
+
+<pre><code>{
+  "$schema": "https://ralfspoeth.github.io/xldr/schema/mapping-spec-0.8.json",
+  "input": {
+    "mimeType": "text/csv",
+    "accepts": "glob:*.csv",
+    "properties": { "fieldSeparator": "," },
+    "recordSelectors": [ ... ]
+  },
+  "mapping": [ ... ]
+}</code></pre>
+
+<p>In an XML spec, as the schema location of a document that has no namespace of its own:</p>
+
+<pre><code>&lt;mappingSpec xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+             xsi:noNamespaceSchemaLocation="https://ralfspoeth.github.io/xldr/schema/mapping-spec-0.8.xsd"&gt;
+    &lt;input mimeType="text/xml" accepts="glob:*.xml"&gt;
+        ...
+    &lt;/input&gt;
+&lt;/mappingSpec&gt;</code></pre>
+
+<h2>What they catch, and what they do not</h2>
+
+<p>
+    A schema checks the shape of a spec: names that are missing or misspelled, a field type that is not one of the
+    five, a delivery pattern without its <code>glob:</code> or <code>regex:</code> prefix. The JSON schema also states
+    the rules that XSD 1.0 cannot - that an input declares exactly one of <code>accepts</code> and
+    <code>sentinel</code>, that a field mapping carries exactly one value source, and that a variable reads no field -
+    so it is the stricter of the two.
+</p>
+
+<p>
+    What no schema can see is whether the spec makes sense as a whole. The toolkit checks that:
+</p>
+
+<pre><code>bin/xldr validate /var/lib/xldr/*/spec.json</code></pre>
+
+<p>
+    which reports a MIME type no adapter reads, a selector the adapter refuses to compile, and every record selector,
+    field selector or variable a mapping names but the input does not declare - without a database and without
+    starting a server.
+</p>
+
+<footer>
+    <a href="https://github.com/ralfspoeth/xldr">Source and documentation on GitHub</a> &middot;
+    MIT licensed
+</footer>
+
+</body>
 </html>
