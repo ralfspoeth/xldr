@@ -9,10 +9,11 @@ import io.github.ralfspoeth.xldr.spec.DataType;
 import io.github.ralfspoeth.xldr.spec.FieldSelectorSpec;
 import io.github.ralfspoeth.xldr.spec.InputSpec;
 
+import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.nio.charset.Charset;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
@@ -22,9 +23,16 @@ import java.util.function.ToIntFunction;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
+/**
+ * Reads records out of a separated-value file, one record per line.
+ * <p>
+ * A record is a line as {@link BufferedReader} sees one, so a file may be
+ * terminated with {@code \n}, {@code \r\n} or {@code \r} and is read the same
+ * way whatever platform it was written on. The lines are read lazily, so a file
+ * is never held in memory as a whole; only the current record is.
+ */
 class CsvFileHandler implements InputAdapter {
 
-    private final String rowSeparator;
     private final String fieldSeparator;
     private final Charset charset;
     private final boolean header;
@@ -32,9 +40,8 @@ class CsvFileHandler implements InputAdapter {
 
     private final InputSpec inputSpec;
 
-    CsvFileHandler(String rowSeparator, String fieldSeparator, Charset charset, boolean header,
+    CsvFileHandler(String fieldSeparator, Charset charset, boolean header,
                    Formats formats, InputSpec spec) {
-        this.rowSeparator = rowSeparator;
         this.fieldSeparator = fieldSeparator;
         this.charset = charset;
         this.header = header;
@@ -70,20 +77,28 @@ class CsvFileHandler implements InputAdapter {
             return new Result(List.of(), Stream.empty());
         }
         var fields = fields(recordSelector, fieldSelectors);
-        var content = new String(source.readAllBytes(), charset);
-        var lines = content.split(rowSeparator, -1);
-        if (lines.length == 0) {
-            return new Result(fields, Stream.empty());
+        // the reader is not closed here: the stream belongs to the caller, who
+        // closes it once every record mapping of the file has been read
+        var lines = new BufferedReader(new InputStreamReader(source, charset));
+
+        ToIntFunction<String> index;
+        if (header) {
+            var headerLine = lines.readLine();
+            if (headerLine == null) {
+                return new Result(fields, Stream.empty());
+            }
+            index = indexOfHeader(headerLine);
+        } else {
+            index = positionalIndex();
         }
+
         var fieldSep = Pattern.quote(fieldSeparator);
-        var index = header ? indexOfHeader(lines[0]) : positionalIndex();
         var types = typesOf(record.fieldSelectors());
         // the record selector's selector, if set, is the value the first column
         // must equal for a line to belong to this record type - the discriminator
         // of an interleaved, headerless file; absent means every line matches
         var discriminator = record.selector();
-        var rows = Arrays.stream(lines)
-                .skip(header ? 1 : 0)
+        var rows = lines.lines()
                 .filter(line -> !line.isEmpty())
                 .map(line -> line.split(fieldSep, -1))
                 .filter(values -> matches(discriminator, values))

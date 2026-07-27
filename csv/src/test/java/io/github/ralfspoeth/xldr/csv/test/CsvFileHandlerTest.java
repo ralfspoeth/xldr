@@ -26,11 +26,11 @@ public class CsvFileHandlerTest {
 
     /** comma separated, one record per line */
     private static final Map<String, String> COMMAS =
-            Map.of("fieldSeparator", ",", "rowSeparator", "\n");
+            Map.of("fieldSeparator", ",");
 
     /** the same, without a header row */
     private static final Map<String, String> HEADERLESS =
-            Map.of("fieldSeparator", ",", "rowSeparator", "\n", "header", "false");
+            Map.of("fieldSeparator", ",", "header", "false");
 
     private static InputSpec spec(Map<String, String> properties, RecordSelectorSpec... recordSelectors) {
         return new InputSpec("text/csv", null, null, List.of(recordSelectors), List.of(), properties);
@@ -149,6 +149,32 @@ public class CsvFileHandlerTest {
                     () -> assertEquals("10", rows.get(9).get("1")),
                     () -> assertEquals("Judy", rows.get(9).get("2")),
                     () -> assertNull(rows.get(9).get("3"))
+            );
+        }
+    }
+
+    /**
+     * A record is a line however the file terminates its lines, so a file
+     * written on one platform reads on another. With a configurable row
+     * separator this was the common way to get silently wrong results: splitting
+     * a CRLF file on {@code \n} left a stray return on the last column of every
+     * line, and in header mode that column then matched no field at all.
+     */
+    @Test
+    public void readsEveryLineEndingTheSameWay() throws IOException {
+        for (var terminator : List.of("\n", "\r\n", "\r")) {
+            var csv = String.join(terminator, "id,name", "1,Alice", "2,Bob") + terminator;
+            var result = adapter().parse(
+                    new ByteArrayInputStream(csv.getBytes(StandardCharsets.UTF_8)),
+                    "people", Set.of("id", "name"));
+
+            var rows = result.rows().toList();
+            var terminatorName = terminator.replace("\r", "\\r").replace("\n", "\\n");
+            assertAll(
+                    () -> assertEquals(2, rows.size(), terminatorName),
+                    // the last column of the line: where a stray \r would land
+                    () -> assertEquals("Alice", rows.getFirst().get("name"), terminatorName),
+                    () -> assertEquals("1", rows.getFirst().get("id"), terminatorName)
             );
         }
     }

@@ -26,6 +26,7 @@ import java.util.ResourceBundle;
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 
 public class LoaderTest {
@@ -135,6 +136,70 @@ public class LoaderTest {
                 ),
                 selectPersons()
         );
+    }
+
+    /**
+     * More records than fit in one batch: every row still arrives, exactly once,
+     * and the reported count is the number of rows rather than the number of
+     * batches. The count deliberately straddles a batch boundary so that a
+     * dropped or double-sent final partial batch would show.
+     */
+    @Test
+    public void loadsMoreRecordsThanOneBatch() throws Exception {
+        var mapping = new RecordMappingSpec("people", "person", List.of(
+                new FieldMappingSpec(new ValueSource.Field("id"), "id"),
+                new FieldMappingSpec(new ValueSource.Field("name"), "name")
+        ));
+        var spec = new MappingSpec(new InputSpec("text/csv", List.of()), List.of(mapping));
+
+        int records = 2_500;
+        var people = new ArrayList<Map<String, String>>(records);
+        for (int i = 0; i < records; i++) {
+            people.add(Map.of("id", String.valueOf(i), "name", "p" + i));
+        }
+        var adapter = adapterFor(Map.of("people", people));
+
+        int inserted;
+        try (var loader = new Loader(spec, DriverManager.getConnection(jdbcUrl))) {
+            inserted = loader.loadInput(adapter, InputStream.nullInputStream(), mapping);
+        }
+        assertEquals(records, inserted);
+
+        try (var conn = DriverManager.getConnection(jdbcUrl);
+             var stmt = conn.createStatement();
+             var rs = stmt.executeQuery("select count(*), count(distinct id) from person")) {
+            assertTrue(rs.next());
+            assertEquals(records, rs.getInt(1), "every record inserted");
+            assertEquals(records, rs.getInt(2), "and none of them twice");
+        }
+    }
+
+    /**
+     * Two mappings with the same target table and the same columns share one
+     * prepared statement, which the loader caches - so the first must not leave
+     * it closed behind it.
+     */
+    @Test
+    public void reusesTheStatementOfTwoIdenticalMappings() throws Exception {
+        var columns = List.of(
+                new FieldMappingSpec(new ValueSource.Field("id"), "id"),
+                new FieldMappingSpec(new ValueSource.Field("name"), "name"));
+        var first = new RecordMappingSpec("people", "person", columns);
+        var second = new RecordMappingSpec("visitors", "person", columns);
+        var spec = new MappingSpec(new InputSpec("text/csv", List.of()), List.of(first, second));
+
+        var adapter = adapterFor(Map.of(
+                "people", List.of(Map.of("id", "1", "name", "Alice")),
+                "visitors", List.of(Map.of("id", "2", "name", "Bob"))));
+
+        try (var loader = new Loader(spec, DriverManager.getConnection(jdbcUrl))) {
+            assertEquals(1, loader.loadInput(adapter, InputStream.nullInputStream(), first));
+            assertEquals(1, loader.loadInput(adapter, InputStream.nullInputStream(), second));
+        }
+
+        assertEquals(
+                List.of(Arrays.asList("1", "Alice", null), Arrays.asList("2", "Bob", null)),
+                selectPersons());
     }
 
     /**

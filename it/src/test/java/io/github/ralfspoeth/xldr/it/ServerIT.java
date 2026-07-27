@@ -459,7 +459,7 @@ public class ServerIT {
               "input": {
                 "mimeType": "text/csv",
                 "accepts": "glob:*.csv",
-                "properties": { "fieldSeparator": ",", "rowSeparator": "\\n" },
+                "properties": { "fieldSeparator": "," },
                 "recordSelectors": [
                   {
                     "name": "people",

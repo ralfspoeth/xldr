@@ -588,9 +588,12 @@ Excel needs none of these: a spreadsheet carries typed cells, so a date or a num
 | Key | Default | Meaning |
 |-----|---------|---------|
 | `fieldSeparator` | tab | Column separator. |
-| `rowSeparator` | platform line separator | Record separator. |
 | `header` | `true` | Whether the first row names the columns. With `false`, field selectors are 1-based column positions (`"1"` → first column). |
 | `charset` | platform default | Character set, e.g. `UTF-8`. |
+
+A record is a line, and there is nothing to configure about that: a file may end its lines with `\n`, `\r\n` or `\r`
+and is read the same way, so a file written on Windows loads on Linux unchanged. The lines are read as the loader
+consumes them, so the size of a file is not the size of the memory it needs.
 
 Quoted fields are not supported yet: a separator inside a value splits it, so a feed whose values may contain the
 separator needs one that does not occur in the data (a tab, say).

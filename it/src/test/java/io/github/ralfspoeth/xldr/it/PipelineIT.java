@@ -48,7 +48,7 @@ public class PipelineIT {
             {
               "input": {
                 "mimeType": "text/csv",
-                "properties": { "fieldSeparator": ",", "rowSeparator": "\\n", "header": false },
+                "properties": { "fieldSeparator": ",", "header": false },
                 "vars": [
                   { "name": "loadId", "expr": "${xldr.filename}#${nextval('batch')}" }
                 ],

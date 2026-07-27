@@ -4,7 +4,7 @@
 
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <revision>0.9-SNAPSHOT</revision>
+        <revision>0.8.1-SNAPSHOT</revision>
     </properties>
 
     <parent>

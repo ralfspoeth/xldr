@@ -29,9 +29,22 @@ import java.util.regex.Pattern;
  * Expression sources ({@code ${...}} templates) draw on application-provided
  * ambient variables and in-memory, per-load sequences; they never touch the
  * database.
+ * <p>
+ * The inserts are batched, which changes nothing about what a load means - the
+ * transaction is still the whole input - but spares a round trip per row. The
+ * records themselves are consumed as the adapter produces them, so neither the
+ * input nor the batch grows with the size of the file.
  */
 public class Loader implements AutoCloseable {
     private static final Pattern QS_PATTERN = Pattern.compile("\".*\"");
+
+    /**
+     * How many inserts are sent in one round trip. The point of batching is the
+     * round trips, not the batch: against a remote database one statement per
+     * row is dominated by latency. A few thousand is where the gain flattens out
+     * while the driver's buffer stays modest.
+     */
+    private static final int BATCH_SIZE = 1_000;
 
     private final MappingSpec mappingSpec;
     private final Connection connection;
@@ -254,29 +267,37 @@ public class Loader implements AutoCloseable {
             }
 
             var result = adapter.parse(source, mapping.recordSelector(), Set.copyOf(fieldNames));
-            int count;
-            try (var ps = prepareInsert(new TabCol(mapping.databaseTable(), columns, valueExprs))) {
+            // the statement is not closed here - the cache owns it, and close()
+            // closes them all once the load is over
+            var ps = prepareInsert(new TabCol(mapping.databaseTable(), columns, valueExprs));
 
-                var rowStream = result.rows();
-                if (mapping.limit() != null) {
-                    rowStream = rowStream.limit(mapping.limit());
-                }
-                count = 0;
-                try (var rows = rowStream) {
-                    var it = rows.iterator();
-                    while (it.hasNext()) {
-                        var row = it.next();
-                        ps.clearParameters();
-                        for (int i = 0; i < binders.size(); i++) {
-                            var value = binders.get(i).apply(row);
-                            if (value == null) {
-                                ps.setNull(i + 1, Types.VARCHAR);
-                            } else {
-                                ps.setObject(i + 1, value);
-                            }
+            var rowStream = result.rows();
+            if (mapping.limit() != null) {
+                rowStream = rowStream.limit(mapping.limit());
+            }
+            int count = 0;
+            int pending = 0;
+            try (var rows = rowStream) {
+                var it = rows.iterator();
+                while (it.hasNext()) {
+                    var row = it.next();
+                    ps.clearParameters();
+                    for (int i = 0; i < binders.size(); i++) {
+                        var value = binders.get(i).apply(row);
+                        if (value == null) {
+                            ps.setNull(i + 1, Types.VARCHAR);
+                        } else {
+                            ps.setObject(i + 1, value);
                         }
-                        count += ps.executeUpdate();
                     }
+                    ps.addBatch();
+                    if (++pending == BATCH_SIZE) {
+                        count += executeBatch(ps);
+                        pending = 0;
+                    }
+                }
+                if (pending > 0) {
+                    count += executeBatch(ps);
                 }
             }
             return count;
@@ -284,6 +305,25 @@ public class Loader implements AutoCloseable {
             failed = true;
             throw e;
         }
+    }
+
+    /**
+     * Sends the rows collected so far and reports how many were inserted.
+     * <p>
+     * A driver may answer {@link Statement#SUCCESS_NO_INFO} rather than a count;
+     * one insert is one row, so that counts as one. The batch is not the unit of
+     * durability - the transaction is - so a failure here fails the whole load,
+     * as an individual insert would have.
+     */
+    private static int executeBatch(PreparedStatement ps) throws SQLException {
+        int inserted = 0;
+        for (var updated : ps.executeBatch()) {
+            if (updated == Statement.EXECUTE_FAILED) {
+                throw new SQLException("an insert in the batch failed");
+            }
+            inserted += updated == Statement.SUCCESS_NO_INFO ? 1 : updated;
+        }
+        return inserted;
     }
 
     private PreparedStatement prepareInsert(TabCol tabCol) throws SQLException {

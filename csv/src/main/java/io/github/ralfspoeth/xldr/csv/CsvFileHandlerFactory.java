@@ -12,9 +12,9 @@ import java.util.List;
  * Creates CSV adapters.
  * <p>
  * Recognised properties: {@code fieldSeparator} (a tab by default),
- * {@code rowSeparator} (the platform line separator), {@code header} (whether
- * the first row names the columns, true by default), {@code charset}, and the
- * shared conversion settings of {@link Formats}.
+ * {@code header} (whether the first row names the columns, true by default),
+ * {@code charset}, and the shared conversion settings of {@link Formats}. A
+ * record is a line, so there is no row separator to configure.
  */
 public class CsvFileHandlerFactory implements InputAdapterFactory {
 
@@ -29,7 +29,6 @@ public class CsvFileHandlerFactory implements InputAdapterFactory {
     public InputAdapter createInputAdapter(InputSpec spec) {
         var properties = spec.properties();
         return new CsvFileHandler(
-                properties.getOrDefault("rowSeparator", System.lineSeparator()),
                 properties.getOrDefault("fieldSeparator", "\t"),
                 properties.containsKey("charset")
                         ? Charset.forName(properties.get("charset"))
