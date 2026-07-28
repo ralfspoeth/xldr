@@ -1,5 +1,7 @@
 package io.github.ralfspoeth.xldr.spec;
 
+import org.jspecify.annotations.Nullable;
+
 import java.io.Serializable;
 
 /**
@@ -44,7 +46,7 @@ public sealed interface ValueSource extends Serializable {
      *              a SQL NULL. An XML spec carries constants as attributes and
      *              so cannot express one
      */
-    record Constant(Object value) implements ValueSource {}
+    record Constant(@Nullable Object value) implements ValueSource {}
 
     /**
      * A value read from a reference table.
