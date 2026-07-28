@@ -6,6 +6,7 @@ import io.github.ralfspoeth.xldr.ia.InputAdapter;
 import io.github.ralfspoeth.xldr.ia.InputAdapterFactory;
 import io.github.ralfspoeth.xldr.spec.DataType;
 import io.github.ralfspoeth.xldr.spec.InputSpec;
+import org.jspecify.annotations.Nullable;
 
 import java.nio.charset.Charset;
 import java.util.Map;
@@ -58,7 +59,7 @@ public class FixedLengthInputAdapterFactory implements InputAdapterFactory {
     /**
      * The type is optional in a spec; an absent one reads the field as text.
      */
-    private static Bounds parse(String s, DataType dt) {
+    private static Bounds parse(String s, @Nullable DataType dt) {
         var m = BOUNDS.matcher(s);
         if (m.matches()) {
             return new Bounds(m.group(1).isBlank() ? -1 : Integer.parseInt(m.group(1)),
