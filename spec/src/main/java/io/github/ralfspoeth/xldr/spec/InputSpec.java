@@ -59,14 +59,4 @@ public record InputSpec(
         vars = List.copyOf(vars);
         properties = Map.copyOf(properties);
     }
-
-    /**
-     * A spec with neither delivery rule, no variables and no adapter settings -
-     * for constructing an input programmatically (adapter and loader use). Not a
-     * server feed: a feed must declare exactly one of {@code sentinel} or
-     * {@code accepts}.
-     */
-    public InputSpec(String mimeType, Collection<RecordSelectorSpec> recordSelectors) {
-        this(mimeType, null, null, recordSelectors, List.of(), Map.of());
-    }
 }

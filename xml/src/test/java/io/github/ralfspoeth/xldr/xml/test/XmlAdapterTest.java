@@ -12,17 +12,9 @@ import org.junit.jupiter.api.Test;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.ServiceLoader;
-import java.util.Set;
+import java.util.*;
 
-import static org.junit.jupiter.api.Assertions.assertAll;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.*;
 
 public class XmlAdapterTest {
 
@@ -57,7 +49,7 @@ public class XmlAdapterTest {
      */
     @Test
     public void evaluatesRelativeAbsoluteAndConstantSelectors() throws IOException {
-        var spec = new InputSpec("text/xml", List.of(
+        var spec = new InputSpec("text/xml", null, null, List.of(
                 new RecordSelectorSpec("row", "/simple1/row", List.of(
                         new FieldSelectorSpec("cola", "col[@name='a']", DataType.INTEGER),
                         new FieldSelectorSpec("colb", "col[@name='b']", DataType.INTEGER),
@@ -65,8 +57,10 @@ public class XmlAdapterTest {
                         new FieldSelectorSpec("lastcow", "/simple1/cow[last()]/sound", DataType.STRING),
                         new FieldSelectorSpec("source", "'simple1'", DataType.STRING),
                         new FieldSelectorSpec("missing", "col[@name='zzz']", DataType.STRING)
-                ))
-        ));
+                ))),
+                List.of(),
+                Map.of()
+        );
         var wanted = Set.of("cola", "colb", "firstcow", "lastcow", "source", "missing");
 
         try (var in = getClass().getResourceAsStream("simple1.xml")) {
@@ -104,11 +98,11 @@ public class XmlAdapterTest {
      */
     @Test
     public void yieldsNoRowsWhenNothingMatches() throws IOException {
-        var spec = new InputSpec("text/xml", List.of(
+        var spec = new InputSpec("text/xml", null, null, List.of(
                 new RecordSelectorSpec("none", "/simple1/nothing", List.of(
                         new FieldSelectorSpec("cola", "col[@name='a']", DataType.STRING)
                 ))
-        ));
+        ), List.of(), Map.of());
         try (var in = getClass().getResourceAsStream("simple1.xml")) {
             var result = adapter(spec).parse(in, "none", Set.of("cola"));
             assertEquals(List.of(), result.rows().toList());
@@ -121,7 +115,7 @@ public class XmlAdapterTest {
      */
     @Test
     public void resolvesNamespacePrefixes() throws IOException {
-        var spec = new InputSpec("text/xml", List.of(
+        var spec = new InputSpec("text/xml", null, null, List.of(
                 new RecordSelectorSpec("fund", "/f:portfolio/f:fund", List.of(
                         new FieldSelectorSpec("id", "@id", DataType.STRING),
                         new FieldSelectorSpec("name", "f:name", DataType.STRING),
@@ -129,7 +123,7 @@ public class XmlAdapterTest {
                         new FieldSelectorSpec("asOf", "f:asOf", DataType.DATE),
                         new FieldSelectorSpec("version", "/f:portfolio/@version", DataType.INTEGER)
                 ))
-        ));
+        ), List.of(), Map.of());
         var wanted = Set.of("id", "name", "nav", "asOf", "version");
 
         try (var in = getClass().getResourceAsStream("funds.xml")) {
@@ -155,11 +149,11 @@ public class XmlAdapterTest {
      */
     @Test
     public void findsNothingWithoutTheNamespaceBinding() throws IOException {
-        var spec = new InputSpec("text/xml", List.of(
+        var spec = new InputSpec("text/xml", null, null, List.of(
                 new RecordSelectorSpec("fund", "/portfolio/fund", List.of(
                         new FieldSelectorSpec("id", "@id", DataType.STRING)
                 ))
-        ));
+        ), List.of(), Map.of());
         try (var in = getClass().getResourceAsStream("funds.xml")) {
             assertEquals(List.of(), adapter(spec).parse(in, "fund", Set.of("id")).rows().toList());
         }
@@ -171,9 +165,9 @@ public class XmlAdapterTest {
      */
     @Test
     public void rejectsAmalformedExpressionOnCreation() {
-        var spec = new InputSpec("text/xml", List.of(
+        var spec = new InputSpec("text/xml", null, null, List.of(
                 new RecordSelectorSpec("row", "/simple1/row[", List.of())
-        ));
+        ), List.of(), Map.of());
         var thrown = assertThrows(IllegalArgumentException.class, () -> adapter(spec));
         assertTrue(thrown.getMessage().contains("/simple1/row["), thrown.getMessage());
     }
@@ -184,11 +178,11 @@ public class XmlAdapterTest {
      */
     @Test
     public void rejectsAnUndeclaredFieldSelector() throws IOException {
-        var spec = new InputSpec("text/xml", List.of(
+        var spec = new InputSpec("text/xml", null, null, List.of(
                 new RecordSelectorSpec("row", "/simple1/row", List.of(
                         new FieldSelectorSpec("cola", "col[@name='a']", DataType.STRING)
                 ))
-        ));
+        ), List.of(), Map.of());
         try (var in = getClass().getResourceAsStream("simple1.xml")) {
             var adapter = adapter(spec);
             assertThrows(IllegalArgumentException.class,

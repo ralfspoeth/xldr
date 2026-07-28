@@ -30,11 +30,4 @@ public record RecordMappingSpec(
             throw new IllegalArgumentException("limit must not be negative: " + limit);
         }
     }
-
-    /**
-     * No row limit.
-     */
-    public RecordMappingSpec(String recordSelector, String table, List<FieldMappingSpec> fieldMappings) {
-        this(recordSelector, table, fieldMappings, null);
-    }
 }

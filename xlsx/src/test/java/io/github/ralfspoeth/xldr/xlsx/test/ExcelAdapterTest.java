@@ -16,13 +16,12 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Map;
 import java.util.ServiceLoader;
 import java.util.Set;
 
 import static java.util.Objects.requireNonNull;
-import static org.junit.jupiter.api.Assertions.assertAll;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.*;
 
 public class ExcelAdapterTest {
 
@@ -50,7 +49,7 @@ public class ExcelAdapterTest {
             dataRow(sheet, 2, 2d, "Bob", 2.5d);
         });
 
-        var spec = new InputSpec(XLSX, List.of(
+        var spec = new InputSpec(XLSX, null, null, List.of(
                 new RecordSelectorSpec("rows", "data!A2:C3", List.of(
                         new FieldSelectorSpec("id", "A", DataType.INTEGER),
                         new FieldSelectorSpec("name", "B", DataType.STRING),
@@ -58,7 +57,7 @@ public class ExcelAdapterTest {
                         // one row up, one column right of the anchor (column A)
                         new FieldSelectorSpec("above", "R-1C+1", DataType.STRING)
                 ))
-        ));
+        ), List.of(), Map.of());
         var wanted = Set.of("id", "name", "amount", "above");
 
         var result = adapter(spec).parse(new ByteArrayInputStream(xlsx), "rows", wanted);
@@ -94,12 +93,12 @@ public class ExcelAdapterTest {
             dataRow(sheet, 3, 30d, null);
         });
 
-        var spec = new InputSpec(XLSX, List.of(
+        var spec = new InputSpec(XLSX, null, null, List.of(
                 new RecordSelectorSpec("all", "data!A:B", List.of(
                         new FieldSelectorSpec("v", "1", DataType.INTEGER),
                         new FieldSelectorSpec("label", "2", DataType.STRING)
                 ))
-        ));
+        ), List.of(), Map.of());
 
         var rows = adapter(spec).parse(new ByteArrayInputStream(xlsx), "all", Set.of("v", "label"))
                 .rows().toList();
@@ -117,9 +116,9 @@ public class ExcelAdapterTest {
 
     @Test
     public void rejectsAmalformedRange() {
-        var spec = new InputSpec(XLSX, List.of(
+        var spec = new InputSpec(XLSX, null, null, List.of(
                 new RecordSelectorSpec("bad", "A2:C", List.of())
-        ));
+        ), List.of(), Map.of());
         assertThrows(IllegalArgumentException.class, () -> adapter(spec));
     }
 

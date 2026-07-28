@@ -21,18 +21,19 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
-import static org.junit.jupiter.api.Assertions.assertAll;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.*;
 
 public class JsonAdapterTest {
 
     private static final String MIME = "application/json";
 
     private static InputSpec spec(String recordSelector, FieldSelectorSpec... fields) {
-        return new InputSpec(MIME, List.of(
-                new RecordSelectorSpec("rec", recordSelector, List.of(fields))));
+        return new InputSpec(MIME, null, null,
+                List.of(
+                        new RecordSelectorSpec("rec", recordSelector, List.of(fields)))
+                ,
+                List.of(),
+                Map.of());
     }
 
     /**

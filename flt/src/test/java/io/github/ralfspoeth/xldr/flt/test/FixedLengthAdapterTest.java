@@ -28,7 +28,7 @@ public class FixedLengthAdapterTest {
     private static final String MIME = "text/plain";
 
     private static InputSpec spec(FieldSelectorSpec... fields) {
-        return new InputSpec(MIME, List.of(new RecordSelectorSpec("rec", "rec", List.of(fields))));
+        return new InputSpec(MIME, null, null, List.of(new RecordSelectorSpec("rec", "rec", List.of(fields))), List.of(), Map.of());
     }
 
     /**

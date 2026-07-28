@@ -58,7 +58,7 @@ public class XmlMappingSpecReaderTest {
                                 new FieldMappingSpec("kbez_txt", new ValueSource.Field("desc")),
                                 // XML constants are always strings - attributes carry no type
                                 new FieldMappingSpec("syssnmut_cd", new ValueSource.Constant("PD"))
-                        )),
+                        ), null),
                         new RecordMappingSpec("position", "snposition", List.of(
                                 new FieldMappingSpec("mandat_nr", new ValueSource.Field("fund"))
                         ), 500)

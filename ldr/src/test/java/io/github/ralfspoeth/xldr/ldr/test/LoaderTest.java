@@ -5,12 +5,7 @@ import io.github.ralfspoeth.xldr.ia.InputAdapter;
 import io.github.ralfspoeth.xldr.ia.Result;
 import io.github.ralfspoeth.xldr.ia.Row;
 import io.github.ralfspoeth.xldr.ldr.Loader;
-import io.github.ralfspoeth.xldr.spec.ValueSource;
-import io.github.ralfspoeth.xldr.spec.FieldMappingSpec;
-import io.github.ralfspoeth.xldr.spec.InputSpec;
-import io.github.ralfspoeth.xldr.spec.MappingSpec;
-import io.github.ralfspoeth.xldr.spec.RecordMappingSpec;
-import io.github.ralfspoeth.xldr.spec.VarSpec;
+import io.github.ralfspoeth.xldr.spec.*;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -19,17 +14,10 @@ import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Map;
-import java.util.ResourceBundle;
+import java.util.*;
 import java.util.stream.Stream;
 
-import static org.junit.jupiter.api.Assertions.assertAll;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.*;
 
 
 public class LoaderTest {
@@ -58,14 +46,14 @@ public class LoaderTest {
         var people = new RecordMappingSpec("people", "person", List.of(
                 new FieldMappingSpec("name", new ValueSource.Field("name")),
                 new FieldMappingSpec("id", new ValueSource.Field("id"))
-        ));
+        ), null);
         // same table, spelled in upper case, and a different set of columns
         var visitors = new RecordMappingSpec("visitors", "PERSON", List.of(
                 new FieldMappingSpec("id", new ValueSource.Field("id")),
                 new FieldMappingSpec("city", new ValueSource.Field("city"))
-        ));
+        ), null);
         var spec = new MappingSpec(
-                new InputSpec("text/csv", List.of()),
+                new InputSpec("text/csv", null, null, List.of(), List.of(), Map.of()),
                 List.of(people, visitors)
         );
 
@@ -109,8 +97,11 @@ public class LoaderTest {
         var mapping = new RecordMappingSpec("people", "person", List.of(
                 new FieldMappingSpec("id", new ValueSource.Field("id")),
                 new FieldMappingSpec("name", new ValueSource.Field("name"))
-        ));
-        var spec = new MappingSpec(new InputSpec("text/csv", List.of()), List.of(mapping));
+        ), null);
+        var spec = new MappingSpec(
+                new InputSpec("text/csv", null, null, List.of(), List.of(), Map.of()),
+                List.of(mapping)
+        );
 
         int records = 2_500;
         var people = new ArrayList<Map<String, String>>(records);
@@ -144,9 +135,12 @@ public class LoaderTest {
         var columns = List.of(
                 new FieldMappingSpec("id", new ValueSource.Field("id")),
                 new FieldMappingSpec("name", new ValueSource.Field("name")));
-        var first = new RecordMappingSpec("people", "person", columns);
-        var second = new RecordMappingSpec("visitors", "person", columns);
-        var spec = new MappingSpec(new InputSpec("text/csv", List.of()), List.of(first, second));
+        var first = new RecordMappingSpec("people", "person", columns, null);
+        var second = new RecordMappingSpec("visitors", "person", columns, null);
+        var spec = new MappingSpec(
+                new InputSpec("text/csv", null, null, List.of(), List.of(), Map.of()),
+                List.of(first, second)
+        );
 
         var adapter = adapterFor(Map.of(
                 "people", List.of(Map.of("id", "1", "name", "Alice")),
@@ -177,8 +171,8 @@ public class LoaderTest {
         }
         var mapping = new RecordMappingSpec("people", "narrow", List.of(
                 new FieldMappingSpec("id", new ValueSource.Field("id"))
-        ));
-        var spec = new MappingSpec(new InputSpec("text/csv", List.of()), List.of(mapping));
+        ), null);
+        var spec = new MappingSpec(new InputSpec("text/csv", null, null, List.of(), List.of(), Map.of()), List.of(mapping));
 
         // the 7th record is too long for the column; the others fit
         var people = new ArrayList<Map<String, String>>();
@@ -206,8 +200,8 @@ public class LoaderTest {
     public void namesTheRecordThatCouldNotBeRead() throws Exception {
         var mapping = new RecordMappingSpec("people", "person", List.of(
                 new FieldMappingSpec("id", new ValueSource.Field("id"))
-        ));
-        var spec = new MappingSpec(new InputSpec("text/csv", List.of()), List.of(mapping));
+        ), null);
+        var spec = new MappingSpec(new InputSpec("text/csv", null, null, List.of(), List.of(), Map.of()), List.of(mapping));
 
         // the adapter throws while producing the third record
         InputAdapter adapter = (source, recordSelector, fieldSelectors) -> new Result(
@@ -236,12 +230,12 @@ public class LoaderTest {
     public void rollsBackWhenAMappingFails() throws Exception {
         var good = new RecordMappingSpec("people", "person", List.of(
                 new FieldMappingSpec("id", new ValueSource.Field("id"))
-        ));
+        ), null);
         var broken = new RecordMappingSpec("people", "no_such_table", List.of(
                 new FieldMappingSpec("id", new ValueSource.Field("id"))
-        ));
+        ), null);
         var spec = new MappingSpec(
-                new InputSpec("text/csv", List.of()),
+                new InputSpec("text/csv", null, null, List.of(), List.of(), Map.of()),
                 List.of(good, broken)
         );
         var adapter = adapterFor(Map.of("people", List.of(Map.of("id", "1"))));
@@ -264,12 +258,12 @@ public class LoaderTest {
     public void rejectsForeignMapping() throws Exception {
         var known = new RecordMappingSpec("people", "person", List.of(
                 new FieldMappingSpec("id", new ValueSource.Field("id"))
-        ));
+        ), null);
         var foreign = new RecordMappingSpec("elsewhere", "person", List.of(
                 new FieldMappingSpec("id", new ValueSource.Field("id"))
-        ));
+        ), null);
         var spec = new MappingSpec(
-                new InputSpec("text/csv", List.of()),
+                new InputSpec("text/csv", null, null, List.of(), List.of(), Map.of()),
                 List.of(known)
         );
         var adapter = adapterFor(Map.of());
@@ -294,8 +288,8 @@ public class LoaderTest {
         var mapping = new RecordMappingSpec("events", "event", List.of(
                 new FieldMappingSpec("id", new ValueSource.Field("id")),
                 new FieldMappingSpec("source", new ValueSource.Constant("PD"))
-        ));
-        var spec = new MappingSpec(new InputSpec("text/csv", List.of()), List.of(mapping));
+        ), null);
+        var spec = new MappingSpec(new InputSpec("text/csv", null, null, List.of(), List.of(), Map.of()), List.of(mapping));
         var adapter = adapterFor(Map.of("events", List.of(Map.of("id", "1"), Map.of("id", "2"))));
 
         try (var loader = new Loader(spec, DriverManager.getConnection(jdbcUrl))) {
@@ -338,7 +332,7 @@ public class LoaderTest {
         var mapping = new RecordMappingSpec("rows", "batch", List.of(
                 new FieldMappingSpec("id", new ValueSource.Field("id")),
                 new FieldMappingSpec("batch_id", new ValueSource.Var("bid"))
-        ));
+        ), null);
         var spec = new MappingSpec(
                 new InputSpec("text/csv", null, null, List.of(), vars, Map.of()),
                 List.of(mapping));
@@ -377,7 +371,7 @@ public class LoaderTest {
         var mapping = new RecordMappingSpec("rows", "doc", List.of(
                 new FieldMappingSpec("id", new ValueSource.Field("id")),
                 new FieldMappingSpec("gen", new ValueSource.Var("gid"))
-        ));
+        ), null);
         var spec = new MappingSpec(
                 new InputSpec("text/csv", null, null, List.of(), vars, Map.of()),
                 List.of(mapping));
@@ -413,8 +407,8 @@ public class LoaderTest {
         var mapping = new RecordMappingSpec("rows", "seq_rows", List.of(
                 new FieldMappingSpec("id", new ValueSource.Field("id")),
                 new FieldMappingSpec("n", new ValueSource.Expr("${nextval('r', 10)}"))
-        ));
-        var spec = new MappingSpec(new InputSpec("text/csv", List.of()), List.of(mapping));
+        ), null);
+        var spec = new MappingSpec(new InputSpec("text/csv", null, null, List.of(), List.of(), Map.of()), List.of(mapping));
         var adapter = adapterFor(Map.of("rows", List.of(
                 Map.of("id", "a"), Map.of("id", "b"), Map.of("id", "c"))));
 
@@ -454,8 +448,8 @@ public class LoaderTest {
                 new FieldMappingSpec("loaded_at", new ValueSource.Expr("${format(now(), 'yyyy-MM-dd')}")),
                 // a comma inside the pattern is the pattern's, not an argument separator
                 new FieldMappingSpec("weekday", new ValueSource.Expr("${format(now(), 'EEE, dd MMM yyyy')}"))
-        ));
-        var spec = new MappingSpec(new InputSpec("text/csv", List.of()), List.of(mapping));
+        ), null);
+        var spec = new MappingSpec(new InputSpec("text/csv", null, null, List.of(), List.of(), Map.of()), List.of(mapping));
         var adapter = adapterFor(Map.of("rows", List.of(Map.of("id", "1"))));
 
         try (var loader = new Loader(spec, DriverManager.getConnection(jdbcUrl))) {
@@ -487,8 +481,8 @@ public class LoaderTest {
         var mapping = new RecordMappingSpec("rows", "dated", List.of(
                 new FieldMappingSpec("id", new ValueSource.Field("id")),
                 new FieldMappingSpec("born", new ValueSource.Expr("${parse(birthdate, 'dd.MM.yyyy')}"))
-        ));
-        var spec = new MappingSpec(new InputSpec("text/csv", List.of()), List.of(mapping));
+        ), null);
+        var spec = new MappingSpec(new InputSpec("text/csv", null, null, List.of(), List.of(), Map.of()), List.of(mapping));
         var adapter = adapterFor(Map.of("rows", List.of(
                 Map.of("id", "1", "birthdate", "07.03.1975"))));
 
@@ -518,8 +512,8 @@ public class LoaderTest {
         var mapping = new RecordMappingSpec("rows", "inc_rows", List.of(
                 new FieldMappingSpec("id", new ValueSource.Field("id")),
                 new FieldMappingSpec("n", new ValueSource.Expr("${nextval('r', 100, 5)}"))
-        ));
-        var spec = new MappingSpec(new InputSpec("text/csv", List.of()), List.of(mapping));
+        ), null);
+        var spec = new MappingSpec(new InputSpec("text/csv", null, null, List.of(), List.of(), Map.of()), List.of(mapping));
         var adapter = adapterFor(Map.of("rows", List.of(
                 Map.of("id", "a"), Map.of("id", "b"), Map.of("id", "c"), Map.of("id", "d"))));
 
@@ -557,8 +551,8 @@ public class LoaderTest {
                 new FieldMappingSpec(
                         "country_id", new ValueSource.Lookup("country", "id", "iso", new ValueSource.Field("c"))
                 )
-        ));
-        var spec = new MappingSpec(new InputSpec("text/csv", List.of()), List.of(mapping));
+        ), null);
+        var spec = new MappingSpec(new InputSpec("text/csv", null, null, List.of(), List.of(), Map.of()), List.of(mapping));
         var adapter = adapterFor(Map.of("holders", List.of(
                 Map.of("name", "Alice", "c", "DE"),
                 Map.of("name", "Bob", "c", "US"),
@@ -593,7 +587,7 @@ public class LoaderTest {
                 new FieldMappingSpec("id", new ValueSource.Field("id")),
                 new FieldMappingSpec("name", new ValueSource.Field("name"))
         ), 2);
-        var spec = new MappingSpec(new InputSpec("text/csv", List.of()), List.of(mapping));
+        var spec = new MappingSpec(new InputSpec("text/csv", null, null, List.of(), List.of(), Map.of()), List.of(mapping));
         var adapter = adapterFor(Map.of("people", List.of(
                 Map.of("id", "1", "name", "Alice"),
                 Map.of("id", "2", "name", "Bob"),
