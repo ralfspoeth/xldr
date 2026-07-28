@@ -2,6 +2,7 @@ package io.github.ralfspoeth.xldr.spec.io;
 
 import io.github.ralfspoeth.xldr.spec.*;
 import io.github.ralfspoeth.json.Greyson;
+import io.github.ralfspoeth.json.data.JsonNull;
 import io.github.ralfspoeth.json.data.JsonObject;
 import io.github.ralfspoeth.json.data.JsonValue;
 import io.github.ralfspoeth.json.query.Pointer;
@@ -85,9 +86,10 @@ public class JsonMappingSpecReader implements MappingSpecReader {
     }
 
     private static RecordMappingSpec recordMappingSpec(JsonValue element) {
+        renamed(element, "databaseTable", "table");
         return new RecordMappingSpec(
                 PTR.member("recordSelector").stringOrThrow(element),
-                PTR.member("databaseTable").stringOrThrow(element),
+                PTR.member("table").stringOrThrow(element),
                 PTR.member("fieldMapping")
                         .select(Selector.all())
                         .apply(element)
@@ -98,7 +100,21 @@ public class JsonMappingSpecReader implements MappingSpecReader {
     }
 
     private static FieldMappingSpec fieldMappingSpec(JsonValue fm) {
-        return new FieldMappingSpec(valueSource(fm), PTR.member("databaseColumn").stringOrThrow(fm));
+        renamed(fm, "databaseColumn", "column");
+        return new FieldMappingSpec(valueSource(fm), PTR.member("column").stringOrThrow(fm));
+    }
+
+    /**
+     * Says so when a spec uses a member by the name it had before 0.10, rather
+     * than letting it be reported as the new one simply missing - which is what
+     * an author would otherwise be told about a member their spec plainly has.
+     * Can go once specs from before 0.10 are out of circulation.
+     */
+    private static void renamed(JsonValue owner, String was, String now) {
+        if (PTR.member(was).apply(owner).isPresent()) {
+            throw new IllegalArgumentException(
+                    "'" + was + "' was renamed to '" + now + "' in 0.10: " + owner);
+        }
     }
 
     /**
@@ -156,14 +172,18 @@ public class JsonMappingSpecReader implements MappingSpecReader {
 
     /**
      * The constant's Java type follows the JSON literal: string, number (as
-     * {@link java.math.BigDecimal}, exact) or boolean.
+     * {@link java.math.BigDecimal}, exact), boolean, or {@code null} for the JSON
+     * null literal, which loads a SQL NULL into the column.
      */
     private static Object constantValue(JsonValue value) {
+        if (value instanceof JsonNull) {
+            return null;
+        }
         return value.string().map(Object.class::cast)
                 .or(() -> value.bool().map(Object.class::cast))
                 .or(() -> value.decimal().map(Object.class::cast))
                 .orElseThrow(() -> new IllegalArgumentException(
-                        "constant must be a string, number or boolean: " + value));
+                        "constant must be a string, number, boolean or null: " + value));
     }
 
     /**

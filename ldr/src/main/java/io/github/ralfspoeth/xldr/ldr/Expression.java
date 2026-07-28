@@ -22,6 +22,12 @@ final class Expression {
 
     record VarRef(String name) implements Segment {}
 
+    /**
+     * @param function the function name
+     * @param args     its arguments: a {@code String} or {@code Integer} for a
+     *                 literal, or a {@link Segment} - a name or a nested call -
+     *                 to be resolved when the call is evaluated
+     */
     record Call(String function, List<Object> args) implements Segment {}
 
     /**
@@ -41,16 +47,24 @@ final class Expression {
 
     /**
      * The names this template references, in order of first appearance - used to
-     * discover which of them are fields the adapter must resolve.
+     * discover which of them are fields the adapter must resolve. A name inside
+     * a function call counts: {@code ${format(birthdate, 'dd.MM.yyyy')}} reads
+     * the field {@code birthdate} as surely as {@code ${birthdate}} does.
      */
     Set<String> variableNames() {
         var names = new LinkedHashSet<String>();
-        for (var s : segments) {
-            if (s instanceof VarRef(String name)) {
-                names.add(name);
+        segments.forEach(s -> collectNames(s, names));
+        return names;
+    }
+
+    private static void collectNames(Object o, Set<String> names) {
+        switch (o) {
+            case VarRef(String name) -> names.add(name);
+            case Call c -> c.args().forEach(a -> collectNames(a, names));
+            case null, default -> {
+                // a literal, a string or an integer argument names nothing
             }
         }
-        return names;
     }
 
     Object eval(Bindings bindings) {
@@ -69,7 +83,12 @@ final class Expression {
         return switch (s) {
             case Literal l -> l.text();
             case VarRef v -> b.variable(v.name());
-            case Call c -> b.function(c.function(), c.args());
+            // arguments are resolved before the call, innermost first, so a
+            // function sees values and never a fragment of the template
+            case Call c -> b.function(c.function(), c.args()
+                    .stream()
+                    .map(a -> a instanceof Segment inner ? valueOf(inner, b) : a)
+                    .toList());
         };
     }
 
@@ -118,24 +137,63 @@ final class Expression {
         return new Call(function, args(content.substring(paren + 1, content.length() - 1).strip()));
     }
 
+    /**
+     * An argument is a quoted string, an integer, a name, or another call, so
+     * that {@code format(now(), 'dd.MM.yyyy')} and
+     * {@code format(birthdate, 'yyyy')} both say what they look like.
+     */
     private static List<Object> args(String s) {
         if (s.isBlank()) {
             return List.of();
         }
-        var out = new ArrayList<Object>();
-        for (var raw : s.split(",")) {
+        var out = new ArrayList<>();
+        for (var raw : split(s)) {
             var arg = raw.strip();
             if (arg.length() >= 2 && arg.charAt(0) == '\'' && arg.charAt(arg.length() - 1) == '\'') {
                 out.add(arg.substring(1, arg.length() - 1));
-            } else {
-                try {
-                    out.add(Integer.valueOf(arg));
-                } catch (NumberFormatException e) {
-                    throw new IllegalArgumentException(
-                            "expression argument must be a quoted string or an integer: " + arg);
-                }
+                continue;
+            }
+            try {
+                out.add(Integer.valueOf(arg));
+            } catch (NumberFormatException _) {
+                // not a literal, so a name or a nested call, resolved at eval time
+                out.add(hole(arg));
             }
         }
         return out;
+    }
+
+    /**
+     * Splits an argument list at the commas that separate arguments - not at
+     * those inside a quoted string, where a date pattern may well have one
+     * ({@code 'EEE, dd MMM yyyy'}), nor at those inside a nested call.
+     */
+    private static List<String> split(String s) {
+        var parts = new ArrayList<String>();
+        var current = new StringBuilder();
+        int depth = 0;
+        boolean quoted = false;
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            if (c == '\'') {
+                quoted = !quoted;
+            } else if (!quoted) {
+                if (c == '(') {
+                    depth++;
+                } else if (c == ')') {
+                    depth--;
+                } else if (c == ',' && depth == 0) {
+                    parts.add(current.toString());
+                    current.setLength(0);
+                    continue;
+                }
+            }
+            current.append(c);
+        }
+        if (quoted) {
+            throw new IllegalArgumentException("unterminated quote in expression arguments: " + s);
+        }
+        parts.add(current.toString());
+        return parts;
     }
 }

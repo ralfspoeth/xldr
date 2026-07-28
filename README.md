@@ -41,9 +41,9 @@ Then set up a feed - a directory below a root, holding a mapping spec:
         ]
       },
       "mapping": [
-        { "recordSelector": "people", "databaseTable": "person", "fieldMapping": [
-            {"fieldSelector": "id",   "databaseColumn": "id"},
-            {"fieldSelector": "name", "databaseColumn": "name"}
+        { "recordSelector": "people", "table": "person", "fieldMapping": [
+            {"fieldSelector": "id",   "column": "id"},
+            {"fieldSelector": "name", "column": "name"}
         ] }
       ]
     }
@@ -195,12 +195,12 @@ Both formats have a published schema, so an editor can check a spec before it ev
 only reports a broken spec in its log, by leaving the feed inactive. Point at the schema from the spec itself:
 
     {
-      "$schema": "https://ralfspoeth.github.io/xldr/schema/mapping-spec-0.9.json",
+      "$schema": "https://ralfspoeth.github.io/xldr/schema/mapping-spec-0.10.json",
       "input": { ... }
     }
 
     <mappingSpec xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-                 xsi:noNamespaceSchemaLocation="https://ralfspoeth.github.io/xldr/schema/mapping-spec-0.9.xsd">
+                 xsi:noNamespaceSchemaLocation="https://ralfspoeth.github.io/xldr/schema/mapping-spec-0.10.xsd">
 
 Both are ignored by the readers - `$schema` is just another unrecognised member, and `xsi:` attributes carry no
 meaning for a spec that has no namespace of its own. IntelliJ and VS Code both validate and autocomplete from them.
@@ -214,9 +214,9 @@ The XSD is the more permissive of the two, because XSD 1.0 cannot state either o
 allow arbitrary extra elements next to the named ones, so annotate an XML spec with XML comments rather than with
 elements of your own; a JSON spec takes an extra member anywhere.
 
-A schema is published per release, since the format is still settling: `mapping-spec-0.9` describes the format of
-release 0.9, `mapping-spec-0.8` that of 0.8, and an earlier one stays where it is so that a spec pinned to it keeps
-validating.
+A schema is published per release, since the format is still settling: `mapping-spec-0.10` describes the format of
+release 0.10, `mapping-spec-0.9` that of 0.9, and so on. An earlier one stays where it is, so a spec pinned to it
+keeps validating.
 
 What a schema cannot see is whether the spec makes sense as a whole - whether a mapping names a record selector the
 input actually declares, or whether the adapter accepts the selectors. The distribution checks that:
@@ -335,10 +335,10 @@ never a `fieldSelector`. Vars are evaluated in declaration order.
     "mapping": [
         {
             "recordSelector": "rows",
-            "databaseTable": "t",
+            "table": "t",
             "fieldMapping": [
-                {"var": "source",  "databaseColumn": "source_cd"},
-                {"var": "batchId", "databaseColumn": "batch_id"}
+                {"var": "source",  "column": "source_cd"},
+                {"var": "batchId", "column": "batch_id"}
             ]
         }
     ]
@@ -350,8 +350,8 @@ interpolation plus a small set of functions, with no operators. Each `${...}` ho
 call, and adjacent holes concatenate:
 
     {"name": "generatedId", "expr": "${xldr.filename}-${nextval('doc')}"}
-    {"expr": "${now()}",             "databaseColumn": "loaded_at"}
-    {"expr": "${nextval('rownum')}", "databaseColumn": "line_no"}
+    {"expr": "${now()}",             "column": "loaded_at"}
+    {"expr": "${nextval('rownum')}", "column": "line_no"}
 
 the first as a `var` in the input, the other two as field mappings.
 
@@ -361,10 +361,27 @@ A **name** resolves in order: `${xldr.*}` for the application-provided ambient v
 * `nextval('name'[, start[, inc]])` - the next value of an in-memory sequence that lives for the one load, shared by
   name. The first draw is `start` (default 1), each later one adds `inc` (default 1). Sequences never touch the
   database;
-* `now()` - the current instant (`java.time.Instant`).
+* `now()` - the current instant (`java.time.Instant`);
+* `format(value, 'pattern')` - a date or timestamp as text, in the pattern language of `DateTimeFormatter`. An
+  instant is rendered at the JVM's zone, having none of its own;
+* `parse(text, 'pattern')` - the reverse: a date or timestamp read from text in a notation no adapter recognises, for
+  the one column that needs it rather than for the whole feed the way the `dateFormat` property does. What the
+  pattern reads decides the type - a date and a time give a `LocalDateTime`, a date alone a `LocalDate`, a time alone
+  a `LocalTime`.
+
+An argument may itself be a name or a call, so `${format(now(), 'yyyy-MM-dd')}` and `${format(birthdate, 'yyyy')}`
+both say what they look like; a name inside a call is resolved exactly as `${name}` would be, fields included. A null
+value formats to null, so an absent date stays a SQL NULL rather than becoming the text `null`.
 
 **Typing:** a template that is a single hole keeps that value's native type - `${nextval('r')}` binds an integer,
-`${now()}` a timestamp; anything with literal text or several holes concatenates to a string.
+`${now()}` a timestamp, `${format(now(), 'yyyy')}` a string; anything with literal text or several holes concatenates
+to a string.
+
+An `Instant` is not one of the `java.time` types JDBC 4.2 requires a driver to accept - an instant carries no calendar
+to write into a column - so the loader binds it as an `OffsetDateTime` at the JVM's zone. Without that, Oracle rejects
+`${now()}` outright, whatever the target column is. Against a *text* column the driver then renders the timestamp its
+own way, which under Oracle follows the session's NLS settings rather than ISO-8601 - so where a timestamp goes into a
+text column, `${format(now(), 'yyyy-MM-dd HH:mm:ss')}` says what will be stored, and nothing else does.
 
 Where it is used decides how often it runs: as a `var` it is evaluated **once per load** (one generated id for the
 whole file, one sequence draw); as a field mapping it is evaluated **per row** (so `${nextval('rownum')}` numbers the
@@ -388,10 +405,11 @@ carries exactly one of these sources:
 
 * `fieldSelector` - a field of the record, resolved by the adapter and bound as a parameter (the ordinary case);
 * `constant` - a fixed value from the spec, bound as a parameter. In JSON its type follows the literal (string, number,
-  boolean); in XML, an attribute, it is always a string;
+  boolean), and `null` loads a SQL NULL; in XML, an attribute, it is always a string and there is no way to write a
+  null;
 * `lookup` - a value read from a reference table, emitted as an inline scalar subquery
   `(select column from table where keyColumn = key)`. The `key` is itself a `fieldSelector`, `constant` or `var`;
-  a key that matches no row yields NULL;
+  a key that matches no row, or a key that is null, yields NULL;
 * `var` - a reference by name to an input [variable](#variables), bound as a parameter;
 * `expr` - a [`${...}` template](#expressions) evaluated in the JVM, bound as a parameter.
 
@@ -408,19 +426,22 @@ A lookup example - translate an ISO code carried in the input to a surrogate key
             "keyColumn": "iso",
             "fieldSelector": "country_code"
         },
-        "databaseColumn": "country_id"
+        "column": "country_id"
     }
+
+The two `column`s are at different levels and mean what their level says: the inner one is the column read *from* the
+reference table, the outer one the column of the target table written *to*.
 
 Example:
 
     "mapping": [
         {
             "recordSelector": "xx",
-            "databaseTable": "tab_xx",
+            "table": "tab_xx",
             "limit": 1000,
             "fieldMapping": [
-                { "fieldSelector": "id", "databaseColumn": "col_id" },
-                { "constant": "PD",      "databaseColumn": "source_cd" }
+                { "fieldSelector": "id", "column": "col_id" },
+                { "constant": "PD",      "column": "source_cd" }
             ]
         },
         ...
@@ -450,12 +471,12 @@ is optional here.
                 <fieldSelector name="nav" selector="nav" type="DECIMAL"/>
             </recordSelector>
         </input>
-        <mapping recordSelector="fund" databaseTable="snmandat" limit="1000">
-            <fieldMapping fieldSelector="id" databaseColumn="ident1_txt"/>
-            <fieldMapping var="source" databaseColumn="source_cd"/>
-            <fieldMapping expr="${xldr.filename}" databaseColumn="loaded_from"/>
-            <fieldMapping constant="X" databaseColumn="status_cd"/>
-            <fieldMapping databaseColumn="country_id">
+        <mapping recordSelector="fund" table="snmandat" limit="1000">
+            <fieldMapping fieldSelector="id" column="ident1_txt"/>
+            <fieldMapping var="source" column="source_cd"/>
+            <fieldMapping expr="${xldr.filename}" column="loaded_from"/>
+            <fieldMapping constant="X" column="status_cd"/>
+            <fieldMapping column="country_id">
                 <lookup table="country" column="id" keyColumn="iso" fieldSelector="c"/>
             </fieldMapping>
         </mapping>
@@ -463,7 +484,9 @@ is optional here.
 
 A value source is one attribute of a `fieldMapping` - `fieldSelector`, `constant`, `var` or `expr` - except for a
 `lookup`, which is a child element of the mapping and carries its own source attribute for the key. A constant in XML
-is always a string, since an attribute has no type of its own.
+is always a string, since an attribute has no type of its own; the `null` a JSON spec can write has no XML form. Where
+a column must be given a NULL from an XML spec, leave the mapping out - an unmapped column keeps whatever default the
+table gives it.
 
 ## The Server
 
@@ -541,10 +564,10 @@ mapping specs, so a spec can be promoted between environments unchanged and no c
 |-----|----------|---------|---------|
 | `xldr.roots` | yes | – | The directories in which feeds may be created, separated by the platform path separator (`:` on Unix, `;` on Windows). Each must exist at startup and none may be nested in another. |
 | `xldr.scanInterval` | no | `30` | Seconds between full reconciliations of the tree; watch events only react sooner. |
-| `xldr.maxConcurrentLoads` | no | `4` | Upper bound on files loaded at once. Keep it at or below `pool.maximumPoolSize`, or the pool becomes the real limit and surplus loads queue in `getConnection()`. |
+| `xldr.maxConcurrentLoads` | no | `4` | Upper bound on files loaded at once, and the size of the connection pool: a load borrows exactly one connection for one file, so the pool is sized to match and never becomes a second, lower limit. |
 | `jdbc.url` | yes | – | JDBC URL of the one target database. |
 | `jdbc.user`, `jdbc.password` | no | – | Credentials, if the URL does not carry them. |
-| `pool.*` | no | – | Passed through to HikariCP's `HikariConfig` under the key without the `pool.` prefix, e.g. `pool.maximumPoolSize`, `pool.connectionTimeout`. |
+| `pool.*` | no | – | Passed through to HikariCP's `HikariConfig` under the key without the `pool.` prefix, e.g. `pool.connectionTimeout`. Setting `pool.maximumPoolSize` overrides the size derived from `xldr.maxConcurrentLoads`, for a database that will not grant that many sessions. |
 
     xldr.roots              = /var/lib/xldr:/mnt/feeds
     xldr.scanInterval       = 30
@@ -552,7 +575,6 @@ mapping specs, so a spec can be promoted between environments unchanged and no c
     jdbc.url      = jdbc:oracle:thin:@//host:1521/sid
     jdbc.user     = dbuser
     jdbc.password = secret
-    pool.maximumPoolSize = 4
 
 The JDBC drivers for Oracle and PostgreSQL are `provided` dependencies: the deployment supplies the one matching its
 target database.

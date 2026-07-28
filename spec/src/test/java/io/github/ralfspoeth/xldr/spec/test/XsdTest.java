@@ -29,7 +29,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 public class XsdTest {
 
-    private static final Path SCHEMA = Path.of("..", "docs", "schema", "mapping-spec-0.9.xsd");
+    private static final Path SCHEMA = Path.of("..", "docs", "schema", "mapping-spec-0.10.xsd");
 
     /**
      * Every element and attribute the reader knows, in one document.
@@ -49,12 +49,12 @@ public class XsdTest {
                         <fieldSelector name="desc" selector="normalize-space(./text())"/>
                     </recordSelector>
                 </input>
-                <mapping recordSelector="fund" databaseTable="snmandat" limit="1000">
-                    <fieldMapping fieldSelector="id" databaseColumn="ident1_txt"/>
-                    <fieldMapping constant="X" databaseColumn="status_cd"/>
-                    <fieldMapping var="source" databaseColumn="source_cd"/>
-                    <fieldMapping expr="${xldr.filename}" databaseColumn="loaded_from"/>
-                    <fieldMapping databaseColumn="country_id">
+                <mapping recordSelector="fund" table="snmandat" limit="1000">
+                    <fieldMapping fieldSelector="id" column="ident1_txt"/>
+                    <fieldMapping constant="X" column="status_cd"/>
+                    <fieldMapping var="source" column="source_cd"/>
+                    <fieldMapping expr="${xldr.filename}" column="loaded_from"/>
+                    <fieldMapping column="country_id">
                         <lookup table="country" column="id" keyColumn="iso" fieldSelector="c"/>
                     </fieldMapping>
                 </mapping>

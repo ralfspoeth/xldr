@@ -17,6 +17,9 @@ public record MappingSpec(
         InputSpec inputSpec,
         Collection<RecordMappingSpec> recordMappingSpecs
 ) implements Serializable {
+    /**
+     * Canonical constructor.
+     */
     public MappingSpec {
         recordMappingSpecs = requireNonNullElse(recordMappingSpecs, List.of());
     }

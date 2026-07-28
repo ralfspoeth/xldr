@@ -54,7 +54,12 @@
         <th>XML</th>
     </tr>
     <tr>
-        <td>0.9 (current)</td>
+        <td>0.10 (current)</td>
+        <td><a href="schema/mapping-spec-0.10.json">mapping-spec-0.10.json</a></td>
+        <td><a href="schema/mapping-spec-0.10.xsd">mapping-spec-0.10.xsd</a></td>
+    </tr>
+    <tr>
+        <td>0.9</td>
         <td><a href="schema/mapping-spec-0.9.json">mapping-spec-0.9.json</a></td>
         <td><a href="schema/mapping-spec-0.9.xsd">mapping-spec-0.9.xsd</a></td>
     </tr>
@@ -72,8 +77,12 @@
 </p>
 
 <p>
-    In 0.9 a record selector's <code>selector</code> became optional: where a whole file holds one kind of record - a
-    CSV with a header, a fixed-length file - there is nothing to locate. A 0.8 spec remains valid under 0.9.
+    In 0.10 <code>databaseTable</code> became <code>table</code> and <code>databaseColumn</code> became
+    <code>column</code>, the names a <code>lookup</code> had used all along; a spec from an earlier release has to be
+    renamed, and is refused with a message saying so rather than silently. Also in 0.10, a <code>constant</code> may
+    be <code>null</code>, which loads a SQL NULL into the column. In 0.9 a record selector's <code>selector</code>
+    became optional: where a whole file holds one kind of record - a CSV with a header, a fixed-length file - there is
+    nothing to locate.
 </p>
 
 <h2>Using them</h2>
@@ -81,7 +90,7 @@
 <p>In a JSON spec, as a member the reader does not recognise and therefore ignores:</p>
 
 <pre><code>{
-  "$schema": "https://ralfspoeth.github.io/xldr/schema/mapping-spec-0.9.json",
+  "$schema": "https://ralfspoeth.github.io/xldr/schema/mapping-spec-0.10.json",
   "input": {
     "mimeType": "text/csv",
     "accepts": "glob:*.csv",
@@ -94,7 +103,7 @@
 <p>In an XML spec, as the schema location of a document that has no namespace of its own:</p>
 
 <pre><code>&lt;mappingSpec xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-             xsi:noNamespaceSchemaLocation="https://ralfspoeth.github.io/xldr/schema/mapping-spec-0.9.xsd"&gt;
+             xsi:noNamespaceSchemaLocation="https://ralfspoeth.github.io/xldr/schema/mapping-spec-0.10.xsd"&gt;
     &lt;input mimeType="text/xml" accepts="glob:*.xml"&gt;
         ...
     &lt;/input&gt;

@@ -15,11 +15,11 @@
   "mapping": [
     {
       "recordSelector": "fund",
-      "databaseTable": "fund",
+      "table": "fund",
       "fieldMapping": [
-        { "fieldSelector": "id",   "databaseColumn": "id_txt" },
-        { "fieldSelector": "desc", "databaseColumn": "desc_txt" },
-        { "constant": "PD",        "databaseColumn": "source_cd" }
+        { "fieldSelector": "id",   "column": "id_txt" },
+        { "fieldSelector": "desc", "column": "desc_txt" },
+        { "constant": "PD",        "column": "source_cd" }
       ]
     }
   ]

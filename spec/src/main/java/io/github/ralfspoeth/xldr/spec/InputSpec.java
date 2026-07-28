@@ -48,6 +48,9 @@ public record InputSpec(String mimeType, String sentinel, String accepts,
                         Map<String, String> properties)
         implements Serializable {
 
+    /**
+     * Canonical constructor.
+     */
     public InputSpec {
         recordSelectors = List.copyOf(requireNonNullElse(recordSelectors, List.of()));
         vars = List.copyOf(requireNonNullElse(vars, List.of()));

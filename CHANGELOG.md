@@ -6,6 +6,46 @@ ways that break existing code and existing specs; those changes are listed here 
 The versions are the git tags `xldr-<version>`; the published artifacts carry the same version under the group
 `io.github.ralfspoeth.xldr`.
 
+## 0.10
+
+### Fixed
+
+- `${now()}` was bound as a `java.time.Instant`, which JDBC 4.2 does not require a driver to support - an instant
+  carries no calendar to write into a column. Oracle rejected it outright, before the type of the target column was
+  even considered, so it failed against a text column too. It is bound as an `OffsetDateTime` at the JVM's zone now;
+  a `ZonedDateTime` from anywhere else is converted the same way.
+
+### Added
+
+- Two expression functions: `format(value, 'pattern')` renders a date or timestamp as text, and
+  `parse(text, 'pattern')` reads one from text in a notation no adapter recognises - per column, where the feed-wide
+  `dateFormat` property is too broad a brush. `format` is also the way to put a timestamp into a *text* column and
+  know what it will say, rather than leaving the rendering to the driver.
+- An expression argument may be a name or another call, not only a literal, so `${format(now(), 'yyyy-MM-dd')}` and
+  `${format(birthdate, 'yyyy')}` parse. A name inside a call is resolved as it would be on its own, and a field named
+  there is requested from the adapter like any other.
+- A JSON `"constant": null` is valid and loads a SQL NULL into the column. A missing member and a null one differ: the
+  first leaves a field mapping with no source at all, which is still an error. XML cannot express it - a constant
+  there is an attribute, and an attribute has no null.
+- The schemas are published as `mapping-spec-0.10`; earlier ones stay where they are.
+
+### Breaking
+
+- `databaseTable` is now `table` and `databaseColumn` is now `column`, in both the JSON and the XML form and in the
+  `RecordMappingSpec` and `FieldMappingSpec` accessors. The `database` prefix said nothing that the surrounding
+  `mapping` did not, and a `lookup` had called them `table` and `column` all along, so the spec now uses one name for
+  one thing. A spec using an old name is refused with a message naming the new one rather than reporting the new one
+  as missing; that hint can go once specs from before 0.10 are out of circulation.
+
+### Changed
+
+- The connection pool is sized from `xldr.maxConcurrentLoads` rather than from Hikari's default of ten. A load borrows
+  one connection for one file, so the two numbers said the same thing, and the pool could silently be the lower of
+  them - at which point surplus loads queued in `getConnection()` rather than anywhere the configuration mentioned.
+  An explicit `pool.maximumPoolSize` still wins, for a database that will not grant that many sessions.
+- A lookup whose key is null returns NULL without going to the database. `= NULL` is never true, so the query could
+  only have returned nothing.
+
 ## 0.9
 
 ### Fixed

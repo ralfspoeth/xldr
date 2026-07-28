@@ -39,7 +39,10 @@ public sealed interface ValueSource extends Serializable {
      * A fixed value from the spec.
      *
      * @param value the value, whose Java type follows the literal it was read
-     *              from: a {@code String}, a {@code BigDecimal} or a {@code Boolean}
+     *              from: a {@code String}, a {@code BigDecimal} or a
+     *              {@code Boolean}, or {@code null} for a JSON null, which loads
+     *              a SQL NULL. An XML spec carries constants as attributes and
+     *              so cannot express one
      */
     record Constant(Object value) implements ValueSource {}
 

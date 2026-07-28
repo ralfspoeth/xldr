@@ -63,9 +63,10 @@ public class ServerIT {
         props.setProperty("xldr.roots", root.toString());
         // short, so a missed event is recovered quickly enough for a test
         props.setProperty("xldr.scanInterval", "1");
+        // the pool is sized from this, so nothing else has to say how many
+        // connections the server may hold
         props.setProperty("xldr.maxConcurrentLoads", "2");
         props.setProperty("jdbc.url", JDBC_URL);
-        props.setProperty("pool.maximumPoolSize", "3");
 
         var config = AppConfig.of(props);
         pool = new ConnectionPool(config);
@@ -428,10 +429,10 @@ public class ServerIT {
               "mapping": [
                 {
                   "recordSelector": "people",
-                  "databaseTable": "person",
+                  "table": "person",
                   "fieldMapping": [
-                    {"fieldSelector": "id", "databaseColumn": "id"},
-                    {"fieldSelector": "name", "databaseColumn": "name"}
+                    {"fieldSelector": "id", "column": "id"},
+                    {"fieldSelector": "name", "column": "name"}
                   ]
                 }
               ]
@@ -463,10 +464,10 @@ public class ServerIT {
               "mapping": [
                 {
                   "recordSelector": "people",
-                  "databaseTable": "person",
+                  "table": "person",
                   "fieldMapping": [
-                    {"fieldSelector": "id", "databaseColumn": "id"},
-                    {"fieldSelector": "name", "databaseColumn": "name"}
+                    {"fieldSelector": "id", "column": "id"},
+                    {"fieldSelector": "name", "column": "name"}
                   ]
                 }
               ]
@@ -499,10 +500,10 @@ public class ServerIT {
               "mapping": [
                 {
                   "recordSelector": "people",
-                  "databaseTable": "person",
+                  "table": "person",
                   "fieldMapping": [
-                    {"fieldSelector": "id", "databaseColumn": "id"},
-                    {"fieldSelector": "name", "databaseColumn": "name"}
+                    {"fieldSelector": "id", "column": "id"},
+                    {"fieldSelector": "name", "column": "name"}
                   ]
                 }
               ]
@@ -532,10 +533,10 @@ public class ServerIT {
               "mapping": [
                 {
                   "recordSelector": "people",
-                  "databaseTable": "person",
+                  "table": "person",
                   "fieldMapping": [
-                    {"fieldSelector": "id", "databaseColumn": "id"},
-                    {"fieldSelector": "name", "databaseColumn": "name"}
+                    {"fieldSelector": "id", "column": "id"},
+                    {"fieldSelector": "name", "column": "name"}
                   ]
                 }
               ]

@@ -23,8 +23,8 @@ import static io.github.ralfspoeth.xmls.XmlFunctions.elements;
  *             &lt;fieldSelector name="id" selector="@id" type="STRING"/&gt;
  *         &lt;/recordSelector&gt;
  *     &lt;/input&gt;
- *     &lt;mapping recordSelector="fund" databaseTable="snmandat"&gt;
- *         &lt;fieldMapping fieldSelector="id" databaseColumn="ident1_txt"/&gt;
+ *     &lt;mapping recordSelector="fund" table="snmandat"&gt;
+ *         &lt;fieldMapping fieldSelector="id" column="ident1_txt"/&gt;
  *     &lt;/mapping&gt;
  * &lt;/mappingSpec&gt;
  * </pre>
@@ -132,15 +132,32 @@ public class XmlMappingSpecReader implements MappingSpecReader {
     }
 
     private static RecordMappingSpec recordMappingSpec(Element mapping) {
+        renamed(mapping, "databaseTable", "table");
         return new RecordMappingSpec(
                 required(mapping, "recordSelector"),
-                required(mapping, "databaseTable"),
+                required(mapping, "table"),
                 elements("fieldMapping")
                         .apply(mapping)
-                        .map(fm -> new FieldMappingSpec(valueSource(fm), required(fm, "databaseColumn")))
+                        .map(fm -> {
+                            renamed(fm, "databaseColumn", "column");
+                            return new FieldMappingSpec(valueSource(fm), required(fm, "column"));
+                        })
                         .toList(),
                 attributeValue("limit").apply(mapping).map(Integer::valueOf).orElse(null)
         );
+    }
+
+    /**
+     * Says so when a spec uses an attribute by the name it had before 0.10,
+     * rather than letting it be reported as the new one simply missing - which
+     * is what an author would otherwise be told about an attribute their spec
+     * plainly has. Can go once specs from before 0.10 are out of circulation.
+     */
+    private static void renamed(Element element, String was, String now) {
+        if (attributeValue(was).apply(element).isPresent()) {
+            throw new IllegalArgumentException("<" + element.getNodeName() + ">: '" + was
+                    + "' was renamed to '" + now + "' in 0.10");
+        }
     }
 
     /**

@@ -182,7 +182,7 @@ class Validate implements Callable<Integer> {
         }
 
         for (var mapping : spec.recordMappingSpecs()) {
-            var where = "mapping of '" + mapping.recordSelector() + "' onto " + mapping.databaseTable();
+            var where = "mapping of '" + mapping.recordSelector() + "' onto " + mapping.table();
             var record = recordSelectors.get(mapping.recordSelector());
             if (record == null) {
                 problems.add(where + ": the input declares no record selector '"
@@ -194,7 +194,7 @@ class Validate implements Callable<Integer> {
                     .collect(Collectors.toSet());
             for (var fm : mapping.fieldMappings()) {
                 checkSources(fm.source(), fields, declaredVars,
-                        where + ", column " + fm.databaseColumnName(), problems);
+                        where + ", column " + fm.column(), problems);
             }
         }
     }

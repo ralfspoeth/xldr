@@ -17,7 +17,6 @@ import java.io.StringReader;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 
 public class XmlMappingSpecReaderTest {
 
@@ -36,13 +35,13 @@ public class XmlMappingSpecReaderTest {
                             <fieldSelector name="fund" selector="../../../fund/@id"/>
                         </recordSelector>
                     </input>
-                    <mapping recordSelector="fund" databaseTable="snmandat">
-                        <fieldMapping fieldSelector="id" databaseColumn="ident1_txt"/>
-                        <fieldMapping fieldSelector="desc" databaseColumn="kbez_txt"/>
-                        <fieldMapping constant="PD" databaseColumn="syssnmut_cd"/>
+                    <mapping recordSelector="fund" table="snmandat">
+                        <fieldMapping fieldSelector="id" column="ident1_txt"/>
+                        <fieldMapping fieldSelector="desc" column="kbez_txt"/>
+                        <fieldMapping constant="PD" column="syssnmut_cd"/>
                     </mapping>
-                    <mapping recordSelector="position" databaseTable="snposition" limit="500">
-                        <fieldMapping fieldSelector="fund" databaseColumn="mandat_nr"/>
+                    <mapping recordSelector="position" table="snposition" limit="500">
+                        <fieldMapping fieldSelector="fund" column="mandat_nr"/>
                     </mapping>
                 </mappingSpec>
                 """;
@@ -103,8 +102,8 @@ public class XmlMappingSpecReaderTest {
                         <var name="batchId" constant="B1"/>
                         <var name="src" constant="PD"/>
                     </input>
-                    <mapping recordSelector="r" databaseTable="t">
-                        <fieldMapping var="batchId" databaseColumn="batch_id"/>
+                    <mapping recordSelector="r" table="t">
+                        <fieldMapping var="batchId" column="batch_id"/>
                     </mapping>
                 </mappingSpec>
                 """;

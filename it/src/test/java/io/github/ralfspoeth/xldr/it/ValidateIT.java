@@ -50,9 +50,9 @@ public class ValidateIT {
                     ]
                   },
                   "mapping": [
-                    { "recordSelector": "people", "databaseTable": "person", "fieldMapping": [
-                        { "fieldSelector": "id", "databaseColumn": "id" },
-                        { "var": "source", "databaseColumn": "source_cd" }
+                    { "recordSelector": "people", "table": "person", "fieldMapping": [
+                        { "fieldSelector": "id", "column": "id" },
+                        { "var": "source", "column": "source_cd" }
                     ] }
                   ]
                 }
@@ -83,21 +83,21 @@ public class ValidateIT {
         assertEquals(1, validate("record.json", """
                 { "input": { "mimeType": "text/csv", "accepts": "glob:*.csv",
                     "recordSelectors": [ { "name": "people" } ] },
-                  "mapping": [ { "recordSelector": "persons", "databaseTable": "t",
-                                 "fieldMapping": [ { "constant": "x", "databaseColumn": "c" } ] } ] }
+                  "mapping": [ { "recordSelector": "persons", "table": "t",
+                                 "fieldMapping": [ { "constant": "x", "column": "c" } ] } ] }
                 """));
         assertEquals(1, validate("field.json", """
                 { "input": { "mimeType": "text/csv", "accepts": "glob:*.csv",
                     "recordSelectors": [ { "name": "people",
                         "fieldSelectors": [ { "name": "id", "selector": "id" } ] } ] },
-                  "mapping": [ { "recordSelector": "people", "databaseTable": "t",
-                                 "fieldMapping": [ { "fieldSelector": "nope", "databaseColumn": "c" } ] } ] }
+                  "mapping": [ { "recordSelector": "people", "table": "t",
+                                 "fieldMapping": [ { "fieldSelector": "nope", "column": "c" } ] } ] }
                 """));
         assertEquals(1, validate("var.json", """
                 { "input": { "mimeType": "text/csv", "accepts": "glob:*.csv",
                     "recordSelectors": [ { "name": "people" } ] },
-                  "mapping": [ { "recordSelector": "people", "databaseTable": "t",
-                                 "fieldMapping": [ { "var": "nope", "databaseColumn": "c" } ] } ] }
+                  "mapping": [ { "recordSelector": "people", "table": "t",
+                                 "fieldMapping": [ { "var": "nope", "column": "c" } ] } ] }
                 """));
     }
 
@@ -113,16 +113,16 @@ public class ValidateIT {
                 { "input": { "mimeType": "text/csv", "accepts": "glob:*.csv",
                     "recordSelectors": [ { "name": "people", "selector": "people",
                         "fieldSelectors": [ { "name": "id", "selector": "id" } ] } ] },
-                  "mapping": [ { "recordSelector": "people", "databaseTable": "t",
-                                 "fieldMapping": [ { "fieldSelector": "id", "databaseColumn": "c" } ] } ] }
+                  "mapping": [ { "recordSelector": "people", "table": "t",
+                                 "fieldMapping": [ { "fieldSelector": "id", "column": "c" } ] } ] }
                 """));
         assertEquals(0, validate("headerless.json", """
                 { "input": { "mimeType": "text/csv", "accepts": "glob:*.csv",
                     "properties": { "header": false },
                     "recordSelectors": [ { "name": "people", "selector": "people",
                         "fieldSelectors": [ { "name": "id", "selector": "2" } ] } ] },
-                  "mapping": [ { "recordSelector": "people", "databaseTable": "t",
-                                 "fieldMapping": [ { "fieldSelector": "id", "databaseColumn": "c" } ] } ] }
+                  "mapping": [ { "recordSelector": "people", "table": "t",
+                                 "fieldMapping": [ { "fieldSelector": "id", "column": "c" } ] } ] }
                 """));
     }
 

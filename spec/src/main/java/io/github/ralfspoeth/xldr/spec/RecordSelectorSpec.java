@@ -18,6 +18,9 @@ import java.util.List;
 public record RecordSelectorSpec(String name, String selector,
                                  Collection<FieldSelectorSpec> fieldSelectors) implements Serializable
 {
+    /**
+     * Canonical constructor.
+     */
     public RecordSelectorSpec {
         fieldSelectors = List.copyOf(fieldSelectors);
     }

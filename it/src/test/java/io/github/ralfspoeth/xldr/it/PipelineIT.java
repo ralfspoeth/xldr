@@ -61,15 +61,15 @@ public class PipelineIT {
                 ]
               },
               "mapping": [
-                { "recordSelector": "line", "databaseTable": "order_line", "fieldMapping": [
-                    { "var": "loadId",              "databaseColumn": "load_ref" },
-                    { "expr": "${nextval('line')}", "databaseColumn": "line_no" },
-                    { "constant": "PD",             "databaseColumn": "source_cd" },
-                    { "fieldSelector": "2",         "databaseColumn": "sku" },
-                    { "fieldSelector": "4",         "databaseColumn": "qty" },
+                { "recordSelector": "line", "table": "order_line", "fieldMapping": [
+                    { "var": "loadId",              "column": "load_ref" },
+                    { "expr": "${nextval('line')}", "column": "line_no" },
+                    { "constant": "PD",             "column": "source_cd" },
+                    { "fieldSelector": "2",         "column": "sku" },
+                    { "fieldSelector": "4",         "column": "qty" },
                     { "lookup": { "table": "country", "column": "id", "keyColumn": "iso",
-                                  "fieldSelector": "3" }, "databaseColumn": "country_id" },
-                    { "expr": "${xldr.filename}",   "databaseColumn": "loaded_from" }
+                                  "fieldSelector": "3" }, "column": "country_id" },
+                    { "expr": "${xldr.filename}",   "column": "loaded_from" }
                 ] }
               ]
             }

@@ -9,7 +9,16 @@ import io.github.ralfspoeth.xldr.spec.RecordMappingSpec;
 import java.io.IOException;
 import java.io.InputStream;
 import java.sql.*;
+import java.time.DateTimeException;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.time.OffsetDateTime;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
+import java.time.temporal.TemporalAccessor;
 import java.util.*;
 import java.util.function.Function;
 import java.util.regex.Pattern;
@@ -52,6 +61,8 @@ public class Loader implements AutoCloseable {
     private final Map<String, Object> ambient;
     /** in-memory sequences, one per name, living for the duration of this load */
     private final Map<String, Integer> sequences = new HashMap<>();
+    /** compiled once per pattern rather than per row, the patterns coming from the spec */
+    private final Map<String, DateTimeFormatter> formatters = new HashMap<>();
     private final Map<String, Object> varValues;
     private final Map<TabCol, PreparedStatement> statementCache = new HashMap<>();
     private boolean failed = false;
@@ -152,8 +163,10 @@ public class Loader implements AutoCloseable {
     /**
      * Bindings for an expression: {@code xldr.}-prefixed names come from the
      * ambient values, then declared variables, then - if a record is in scope -
-     * the record's fields. {@code now()} yields an {@link Instant}; {@code
-     * nextval(name[, start])} draws from an in-memory per-load sequence.
+     * the record's fields. {@code now()} yields an {@link Instant};
+     * {@code nextval(name[, start])} draws from an in-memory per-load sequence;
+     * {@code format(value, pattern)} and {@code parse(text, pattern)} convert
+     * between text and the date types.
      */
     private Expression.Bindings bindings(Map<String, Object> vars, Row row) {
         return new Expression.Bindings() {
@@ -185,10 +198,91 @@ public class Loader implements AutoCloseable {
                         yield Instant.now();
                     }
                     case "nextval" -> nextval(args);
+                    case "format" -> format(args);
+                    case "parse" -> parseTemporal(args);
                     default -> throw new IllegalArgumentException("unknown function: " + name);
                 };
             }
         };
+    }
+
+    /**
+     * {@code format(value, 'pattern')} - a date or timestamp as text, in the
+     * pattern language of {@link DateTimeFormatter}.
+     * <p>
+     * This is the way to put a timestamp into a text column and know what it
+     * will say: bind an instant to one and the driver renders it however it
+     * likes, which under Oracle follows the session's NLS settings. An
+     * {@link Instant} is rendered at the JVM's zone, having none of its own. A
+     * null formats to null, so an absent date stays a SQL NULL rather than
+     * becoming the text {@code "null"}.
+     */
+    private String format(List<Object> args) {
+        if (args.size() != 2 || !(args.get(1) instanceof String pattern)) {
+            throw new IllegalArgumentException(
+                    "format(value, 'pattern') needs a value and a quoted pattern");
+        }
+        var value = args.getFirst();
+        if (value == null) {
+            return null;
+        }
+        if (!(value instanceof TemporalAccessor temporal)) {
+            throw new IllegalArgumentException("format() takes a date or a timestamp, but got a "
+                    + value.getClass().getSimpleName() + ": " + value);
+        }
+        return formatter(pattern).format(temporal);
+    }
+
+    /**
+     * {@code parse(text, 'pattern')} - a date or timestamp read from text that
+     * is in none of the notations an adapter recognises, for the one column that
+     * needs it rather than for the whole feed the way {@code dateFormat} does.
+     * <p>
+     * The fields the pattern reads decide the type: a date and a time yield a
+     * {@code LocalDateTime}, a date alone a {@code LocalDate}, a time alone a
+     * {@code LocalTime} - all three types a driver has to bind. Blank text is an
+     * absent value, as everywhere else, and yields null.
+     */
+    private Object parseTemporal(List<Object> args) {
+        if (args.size() != 2 || !(args.get(1) instanceof String pattern)) {
+            throw new IllegalArgumentException(
+                    "parse(text, 'pattern') needs a text and a quoted pattern");
+        }
+        var value = args.getFirst();
+        if (value == null) {
+            return null;
+        }
+        var text = value.toString().strip();
+        if (text.isEmpty()) {
+            return null;
+        }
+        var parsed = formatter(pattern).parse(text);
+        try {
+            return LocalDateTime.from(parsed);
+        } catch (DateTimeException _) {
+            // the pattern read no time, or no date
+        }
+        try {
+            return LocalDate.from(parsed);
+        } catch (DateTimeException _) {
+            // then a time is all it read, or the pattern reads neither
+        }
+        try {
+            return LocalTime.from(parsed);
+        } catch (DateTimeException e) {
+            throw new IllegalArgumentException(
+                    "parse('" + text + "', '" + pattern + "') yields neither a date nor a time", e);
+        }
+    }
+
+    /**
+     * The formatter for a pattern, compiled once. The zone is only consulted for
+     * a value that has none - an {@link Instant} - and is the JVM's, the same
+     * zone in which {@code now()} is read.
+     */
+    private DateTimeFormatter formatter(String pattern) {
+        return formatters.computeIfAbsent(
+                pattern, p -> DateTimeFormatter.ofPattern(p).withZone(ZoneId.systemDefault()));
     }
 
     /**
@@ -219,12 +313,42 @@ public class Loader implements AutoCloseable {
         return sequences.merge(name, start, (current, _) -> current + finalInc);
     }
 
+    /**
+     * A value in a type every JDBC driver has to accept.
+     * <p>
+     * JDBC 4.2 lists the {@code java.time} types a driver must map -
+     * {@code LocalDate}, {@code LocalTime}, {@code LocalDateTime},
+     * {@code OffsetTime}, {@code OffsetDateTime} - and {@link Instant} is
+     * deliberately not among them, an instant carrying no calendar to write into
+     * a column. A driver may accept one, and several do; Oracle's rejects it
+     * outright, before the type of the target column is even considered, so
+     * {@code now()} would fail even against a text column. Converting here keeps
+     * the instant exact and leaves {@code now()} returning what it says it does.
+     *
+     * @param value a value bound to a statement parameter, possibly {@code null}
+     * @return the same value, or a JDBC-mandated type standing for it
+     */
+    private static Object jdbcValue(Object value) {
+        return switch (value) {
+            // the JVM's zone: the zone in which "now" was asked
+            case Instant i -> OffsetDateTime.ofInstant(i, ZoneId.systemDefault());
+            case ZonedDateTime z -> z.toOffsetDateTime();
+            case null, default -> value;
+        };
+    }
+
     private Object lookup(ValueSource.Lookup lk, Object key) throws SQLException {
+        if (key == null) {
+            // = NULL is never true, so the query could only return nothing;
+            // asking spares the round trip and the drivers that will not bind an
+            // untyped null
+            return null;
+        }
         var sql = "select " + normalizeIdentifier(lk.column())
                 + " from " + normalizeIdentifier(lk.table())
                 + " where " + normalizeIdentifier(lk.keyColumn()) + " = ?";
         try (var ps = connection.prepareStatement(sql)) {
-            ps.setObject(1, key);
+            ps.setObject(1, jdbcValue(key));
             try (var rs = ps.executeQuery()) {
                 return rs.next() ? rs.getObject(1) : null;
             }
@@ -257,7 +381,7 @@ public class Loader implements AutoCloseable {
         try {
             var fieldMappings = mapping.fieldMappings()
                     .stream()
-                    .filter(fm -> fm.source() != null && fm.databaseColumnName() != null)
+                    .filter(fm -> fm.source() != null && fm.column() != null)
                     .toList();
             if (fieldMappings.isEmpty()) {
                 return 0;
@@ -268,14 +392,14 @@ public class Loader implements AutoCloseable {
             var binders = new ArrayList<Function<Row, Object>>();
             var fieldNames = new LinkedHashSet<String>();
             for (var fm : fieldMappings) {
-                columns.add(fm.databaseColumnName());
+                columns.add(fm.column());
                 valueExprs.add(plan(fm.source(), binders, fieldNames));
             }
 
             var result = adapter.parse(source, mapping.recordSelector(), Set.copyOf(fieldNames));
             // the statement is not closed here - the cache owns it, and close()
             // closes them all once the load is over
-            var ps = prepareInsert(new TabCol(mapping.databaseTable(), columns, valueExprs));
+            var ps = prepareInsert(new TabCol(mapping.table(), columns, valueExprs));
 
             var rowStream = result.rows();
             if (mapping.limit() != null) {
@@ -297,7 +421,7 @@ public class Loader implements AutoCloseable {
                             if (value == null) {
                                 ps.setNull(i + 1, Types.VARCHAR);
                             } else {
-                                ps.setObject(i + 1, value);
+                                ps.setObject(i + 1, jdbcValue(value));
                             }
                         }
                         ps.addBatch();
@@ -392,7 +516,7 @@ public class Loader implements AutoCloseable {
     }
 
     private static String where(String record, RecordMappingSpec mapping) {
-        return record + " of '" + mapping.recordSelector() + "' into " + mapping.databaseTable();
+        return record + " of '" + mapping.recordSelector() + "' into " + mapping.table();
     }
 
     /**

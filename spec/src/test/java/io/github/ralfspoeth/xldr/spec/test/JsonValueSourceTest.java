@@ -29,13 +29,13 @@ public class JsonValueSourceTest {
                     "mapping": [
                         {
                             "recordSelector": "r",
-                            "databaseTable": "t",
+                            "table": "t",
                             "limit": 100,
                             "fieldMapping": [
-                                { "fieldSelector": "id", "databaseColumn": "id" },
-                                { "constant": "PD",      "databaseColumn": "src" },
-                                { "constant": 42,        "databaseColumn": "n" },
-                                { "constant": true,      "databaseColumn": "flag" }
+                                { "fieldSelector": "id", "column": "id" },
+                                { "constant": "PD",      "column": "src" },
+                                { "constant": 42,        "column": "n" },
+                                { "constant": true,      "column": "flag" }
                             ]
                         }
                     ]
@@ -68,7 +68,7 @@ public class JsonValueSourceTest {
                     "mapping": [
                         {
                             "recordSelector": "r",
-                            "databaseTable": "t",
+                            "table": "t",
                             "fieldMapping": [
                                 {
                                     "lookup": {
@@ -77,7 +77,7 @@ public class JsonValueSourceTest {
                                         "keyColumn": "iso",
                                         "fieldSelector": "c"
                                     },
-                                    "databaseColumn": "country_id"
+                                    "column": "country_id"
                                 }
                             ]
                         }
@@ -101,8 +101,8 @@ public class JsonValueSourceTest {
                     "mapping": [
                         {
                             "recordSelector": "r",
-                            "databaseTable": "t",
-                            "fieldMapping": [ { "fieldSelector": "id", "databaseColumn": "id" } ]
+                            "table": "t",
+                            "fieldMapping": [ { "fieldSelector": "id", "column": "id" } ]
                         }
                     ]
                 }
@@ -119,9 +119,9 @@ public class JsonValueSourceTest {
                     "mapping": [
                         {
                             "recordSelector": "r",
-                            "databaseTable": "t",
+                            "table": "t",
                             "fieldMapping": [
-                                { "fieldSelector": "id", "constant": 1, "databaseColumn": "id" }
+                                { "fieldSelector": "id", "constant": 1, "column": "id" }
                             ]
                         }
                     ]
@@ -142,8 +142,8 @@ public class JsonValueSourceTest {
                     "input": { "mimeType": "text/csv",
                         "vars": [ { "name": "gid", "expr": "${xldr.filename}-${nextval('b')}" } ] },
                     "mapping": [
-                        { "recordSelector": "r", "databaseTable": "t",
-                          "fieldMapping": [ { "expr": "${now()}", "databaseColumn": "loaded_at" } ] }
+                        { "recordSelector": "r", "table": "t",
+                          "fieldMapping": [ { "expr": "${now()}", "column": "loaded_at" } ] }
                     ]
                 }
                 """;
@@ -171,8 +171,8 @@ public class JsonValueSourceTest {
                         "recordSelectors": [ { "name": "r", "selector": "//r",
                             "fieldSelectors": [ { "name": "id", "selector": "@id" } ] } ] },
                     "mapping": [
-                        { "recordSelector": "r", "databaseTable": "t",
-                          "fieldMapping": [ { "fieldSelector": "id", "databaseColumn": "id" } ] }
+                        { "recordSelector": "r", "table": "t",
+                          "fieldMapping": [ { "fieldSelector": "id", "column": "id" } ] }
                     ]
                 }
                 """;
@@ -184,8 +184,8 @@ public class JsonValueSourceTest {
                         "recordSelectors": [ { "name": "r", "selector": "//r", "x": 1,
                             "fieldSelectors": [ { "name": "id", "selector": "@id", "unit": "n/a" } ] } ] },
                     "mapping": [
-                        { "recordSelector": "r", "databaseTable": "t", "todo": "verify",
-                          "fieldMapping": [ { "fieldSelector": "id", "databaseColumn": "id", "comment": "pk" } ] }
+                        { "recordSelector": "r", "table": "t", "todo": "verify",
+                          "fieldMapping": [ { "fieldSelector": "id", "column": "id", "comment": "pk" } ] }
                     ]
                 }
                 """;
@@ -227,6 +227,71 @@ public class JsonValueSourceTest {
                 input.properties());
         assertEquals("text/csv", input.mimeType());
         assertEquals("glob:*.csv", input.accepts());
+    }
+
+    /**
+     * A spec written before 0.10 is told what changed. Left to itself the reader
+     * would report the new name as missing, which reads like nonsense to an
+     * author looking at a spec that plainly names its table.
+     */
+    @Test
+    public void namesTheRenamedMembers() {
+        var withOldTable = """
+                {
+                    "input": { "mimeType": "text/csv" },
+                    "mapping": [
+                        { "recordSelector": "r", "databaseTable": "t",
+                          "fieldMapping": [ { "fieldSelector": "id", "column": "id" } ] }
+                    ]
+                }
+                """;
+        var withOldColumn = """
+                {
+                    "input": { "mimeType": "text/csv" },
+                    "mapping": [
+                        { "recordSelector": "r", "table": "t",
+                          "fieldMapping": [ { "fieldSelector": "id", "databaseColumn": "id" } ] }
+                    ]
+                }
+                """;
+        assertTrue(assertThrows(IllegalArgumentException.class,
+                () -> new JsonMappingSpecReader().readFrom(new StringReader(withOldTable)))
+                .getMessage().contains("renamed"));
+        assertTrue(assertThrows(IllegalArgumentException.class,
+                () -> new JsonMappingSpecReader().readFrom(new StringReader(withOldColumn)))
+                .getMessage().contains("renamed"));
+    }
+
+    /**
+     * A JSON null is a constant like any other and loads a SQL NULL. It has to
+     * count as a source, or a field mapping carrying only it would be rejected
+     * for having none - which is how a missing member and a null one differ.
+     */
+    @Test
+    public void readsANullConstant() throws IOException {
+        var source = """
+                {
+                    "input": { "mimeType": "text/csv" },
+                    "mapping": [
+                        {
+                            "recordSelector": "r",
+                            "table": "t",
+                            "fieldMapping": [
+                                { "constant": null, "column": "note" },
+                                { "constant": "PD", "column": "src" }
+                            ]
+                        }
+                    ]
+                }
+                """;
+        var mapping = List.copyOf(
+                new JsonMappingSpecReader().readFrom(new StringReader(source)).recordMappingSpecs()).getFirst();
+
+        assertEquals(
+                List.of(
+                        new FieldMappingSpec(new ValueSource.Constant(null), "note"),
+                        new FieldMappingSpec(new ValueSource.Constant("PD"), "src")),
+                mapping.fieldMappings());
     }
 
     /**

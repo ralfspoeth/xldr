@@ -17,6 +17,8 @@ import org.junit.jupiter.api.Test;
 import java.io.InputStream;
 import java.sql.DriverManager;
 import java.sql.SQLException;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -34,49 +36,6 @@ public class LoaderTest {
 
     private String jdbcUrl;
 
-/*
-    @Test
-    public void testInsKurs() throws SQLException {
-        String lfnr = "test1-" + LocalDateTime.now();
-        /*
-        try (var ldr = new Loader(ms)) {
-            ldr.prepareInsert("snlieferung", List.of("lieferung_nr", "schnittstelle_cd", "institut_nr", "neu_dat", "syssnliefart_cd", "syssnliefstatus_cd"));
-            ldr.insert("snlieferung", lfnr, "PD", "1", new Date(System.currentTimeMillis()), "IMP", "WAIT");
-            ldr.prepareInsert("snkurs", List.of("kurs_dat", "syssnmut_cd", "lieferung_nr"));
-            ldr.insert("snkurs", Date.valueOf(LocalDate.now()), "X", lfnr);
-            ldr.insert("snkurs", Date.valueOf(LocalDate.now()), "UEX", lfnr);
-        }
-    }
-
-    @Test
-    public void testDefaults() throws SQLException {
-        if (this.ms == null) return;
-        try (var ldr = new Loader(ms)) {
-            System.out.println(ldr.defaultInstitut());
-            System.out.println(ldr.defaultSnDef());
-            System.out.println(ldr.defaultJobDef());
-        }
-    }
-
-    @Test
-    public void testInsKurs2AndTrigger() throws SQLException {
-        String lfnr = "test2-" + LocalDateTime.now();
-        if (this.ms == null) return;
-        try (var ldr = new Loader(ms)) {
-            ldr.generateImportHeader(lfnr, true);
-            /*
-            ldr.prepareInsert("snkurs", List.of("lieferung_nr", "syssnmut_cd", "kurs_dat", "valident_txt", "kurs", "waehrung_cd"));
-            ldr.insert("snkurs", lfnr, "X", Date.valueOf(LocalDate.now()), "519000", new BigDecimal("1000"), "EUR");
-            ldr.insert("snkurs", lfnr, "X", Date.valueOf(LocalDate.now().minusDays(1)), "519000", new BigDecimal("1003"), "EUR");
-            ldr.insert("snkurs", lfnr, "X", Date.valueOf(LocalDate.now().minusDays(2)), "519000", new BigDecimal("998"), "EUR");
-            ldr.insert("snkurs", lfnr, "X", Date.valueOf(LocalDate.now().minusDays(3)), "519000", new BigDecimal("995"), "EUR");
-            ldr.insert("snkurs", lfnr, "X", Date.valueOf(LocalDate.now().minusDays(4)), "519000", new BigDecimal("996"), "EUR");
-            ldr.triggerImport(lfnr);
-
-
-        }
-    }
-*/
 
     @BeforeEach
     public void prepareConn() throws SQLException {
@@ -471,6 +430,77 @@ public class LoaderTest {
                 ns.add(rs.getInt(1));
             }
             assertEquals(List.of(10, 11, 12), ns);
+        }
+    }
+
+    /**
+     * {@code format} renders a timestamp into a text column as the pattern says,
+     * rather than however the driver would render one - the reason the function
+     * exists. It takes a call as its argument, which the parser has to see
+     * through: the comma inside the quoted pattern is part of the pattern, not a
+     * separator.
+     */
+    @Test
+    public void expressionFormatsATimestampAsText() throws Exception {
+        try (var conn = DriverManager.getConnection(jdbcUrl);
+             var stmt = conn.createStatement()) {
+            stmt.execute("drop table if exists stamped");
+            // not 'day': H2 2.x reserves it, as it does year, hour, minute and second
+            // wide enough for a long month name in any default locale
+            stmt.execute("create table stamped(id varchar(10), loaded_at varchar(40), weekday varchar(60))");
+        }
+        var mapping = new RecordMappingSpec("rows", "stamped", List.of(
+                new FieldMappingSpec(new ValueSource.Field("id"), "id"),
+                new FieldMappingSpec(new ValueSource.Expr("${format(now(), 'yyyy-MM-dd')}"), "loaded_at"),
+                // a comma inside the pattern is the pattern's, not an argument separator
+                new FieldMappingSpec(new ValueSource.Expr("${format(now(), 'EEE, dd MMM yyyy')}"), "weekday")
+        ));
+        var spec = new MappingSpec(new InputSpec("text/csv", List.of()), List.of(mapping));
+        var adapter = adapterFor(Map.of("rows", List.of(Map.of("id", "1"))));
+
+        try (var loader = new Loader(spec, DriverManager.getConnection(jdbcUrl))) {
+            loader.loadInput(adapter, InputStream.nullInputStream(), mapping);
+        }
+
+        try (var conn = DriverManager.getConnection(jdbcUrl);
+             var stmt = conn.createStatement();
+             var rs = stmt.executeQuery("select loaded_at, weekday from stamped")) {
+            assertTrue(rs.next());
+            assertEquals(LocalDate.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd")), rs.getString(1));
+            assertTrue(rs.getString(2).contains(","), "the whole pattern was used: " + rs.getString(2));
+        }
+    }
+
+    /**
+     * {@code parse} reads a field written in a notation no adapter recognises,
+     * for the one column that needs it, and binds it as a date the driver
+     * understands. A field named inside the call is requested from the adapter
+     * just as a bare reference would be.
+     */
+    @Test
+    public void expressionParsesAFieldIntoADate() throws Exception {
+        try (var conn = DriverManager.getConnection(jdbcUrl);
+             var stmt = conn.createStatement()) {
+            stmt.execute("drop table if exists dated");
+            stmt.execute("create table dated(id varchar(10), born date)");
+        }
+        var mapping = new RecordMappingSpec("rows", "dated", List.of(
+                new FieldMappingSpec(new ValueSource.Field("id"), "id"),
+                new FieldMappingSpec(new ValueSource.Expr("${parse(birthdate, 'dd.MM.yyyy')}"), "born")
+        ));
+        var spec = new MappingSpec(new InputSpec("text/csv", List.of()), List.of(mapping));
+        var adapter = adapterFor(Map.of("rows", List.of(
+                Map.of("id", "1", "birthdate", "07.03.1975"))));
+
+        try (var loader = new Loader(spec, DriverManager.getConnection(jdbcUrl))) {
+            loader.loadInput(adapter, InputStream.nullInputStream(), mapping);
+        }
+
+        try (var conn = DriverManager.getConnection(jdbcUrl);
+             var stmt = conn.createStatement();
+             var rs = stmt.executeQuery("select born from dated")) {
+            assertTrue(rs.next());
+            assertEquals(LocalDate.of(1975, 3, 7), rs.getObject(1, LocalDate.class));
         }
     }
 

@@ -25,7 +25,6 @@ import java.util.stream.Stream;
  * jdbc.url      = jdbc:oracle:thin:@//host:1521/sid
  * jdbc.user     = dbuser
  * jdbc.password = secret
- * pool.maximumPoolSize = 4
  * </pre>
  *
  * The roots are the only directories in which feeds may be created; they are
@@ -33,14 +32,19 @@ import java.util.stream.Stream;
  * nothing watches their parents. Every {@code pool.*} key is passed straight to
  * {@code HikariConfig} under its own name, so the whole pool configuration is
  * reachable without this class having to mirror it.
+ * <p>
+ * How many loads run at once is said once, by {@code xldr.maxConcurrentLoads},
+ * and the pool is sized to follow it. Two numbers for one thing would only give
+ * the pool the chance to be the lower of them, at which point the surplus loads
+ * would queue in {@code getConnection()} rather than anywhere a reader of the
+ * configuration would look.
  *
  * @param roots                the directories in which feeds may be created
  * @param scanIntervalSeconds  how often the whole tree is reconciled; watch
  *                             events only make the reaction quicker
- * @param maxConcurrentLoads   how many files may be loaded at the same time.
- *                             Keep it at or below the pool size, otherwise the
- *                             pool becomes the real limit and the surplus
- *                             threads merely queue in {@code getConnection()}.
+ * @param maxConcurrentLoads   how many files may be loaded at the same time, and
+ *                             so how large the pool is unless
+ *                             {@code pool.maximumPoolSize} says otherwise
  * @param poolProperties       the connection pool settings, under the names
  *                             {@code HikariConfig} knows them by
  */
@@ -55,6 +59,7 @@ public record AppConfig(
     private static final String ROOTS_KEY = "xldr.roots";
     private static final String SCAN_KEY = "xldr.scanInterval";
     private static final String CONCURRENCY_KEY = "xldr.maxConcurrentLoads";
+    private static final String MAX_POOL_SIZE = "maximumPoolSize";
     private static final long DEFAULT_SCAN_INTERVAL = 30L;
     private static final int DEFAULT_MAX_CONCURRENT_LOADS = 4;
     private static final String URL_KEY = "jdbc.url";
@@ -118,6 +123,13 @@ public record AppConfig(
                 pool.setProperty(name.substring(POOL_PREFIX.length()), props.getProperty(name));
             }
         }
+        // A load borrows exactly one connection for the duration of one file, so
+        // this many is enough for every load that may run at once and the pool
+        // never becomes a second, lower limit that no setting names. Hikari's own
+        // default of ten would silently cap - or needlessly exceed - the
+        // concurrency actually configured. An explicit pool.maximumPoolSize still
+        // wins, for a database that will not have that many sessions.
+        pool.putIfAbsent(MAX_POOL_SIZE, String.valueOf(maxConcurrentLoads));
         return new AppConfig(roots, scanInterval, maxConcurrentLoads, pool);
     }
 

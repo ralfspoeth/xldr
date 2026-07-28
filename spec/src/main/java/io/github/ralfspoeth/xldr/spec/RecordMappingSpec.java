@@ -9,18 +9,21 @@ import static java.util.Objects.requireNonNullElse;
  * Maps the records of one record selector to one database table.
  *
  * @param recordSelector the record selector whose records are mapped
- * @param databaseTable  the target table
+ * @param table          the target table
  * @param fieldMappings  the column mappings
  * @param limit          at most this many records are inserted; {@code null}
  *                       means no limit
  */
 public record RecordMappingSpec(
         String recordSelector,
-        String databaseTable,
+        String table,
         List<FieldMappingSpec> fieldMappings,
         Integer limit
 ) implements Serializable {
 
+    /**
+     * Canonical constructor.
+     */
     public RecordMappingSpec {
         fieldMappings = List.copyOf(requireNonNullElse(fieldMappings, List.of()));
         if (limit != null && limit < 0) {
@@ -31,7 +34,7 @@ public record RecordMappingSpec(
     /**
      * No row limit.
      */
-    public RecordMappingSpec(String recordSelector, String databaseTable, List<FieldMappingSpec> fieldMappings) {
-        this(recordSelector, databaseTable, fieldMappings, null);
+    public RecordMappingSpec(String recordSelector, String table, List<FieldMappingSpec> fieldMappings) {
+        this(recordSelector, table, fieldMappings, null);
     }
 }
