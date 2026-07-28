@@ -28,7 +28,7 @@ import static io.github.ralfspoeth.xmls.XmlFunctions.elements;
  *     &lt;/mapping&gt;
  * &lt;/mappingSpec&gt;
  * </pre>
- *
+ * <p>
  * The element and attribute names are those of the JSON format, so a spec can
  * be transliterated between the two without renaming anything. {@code type} is
  * optional.
@@ -140,7 +140,7 @@ public class XmlMappingSpecReader implements MappingSpecReader {
                         .apply(mapping)
                         .map(fm -> {
                             renamed(fm, "databaseColumn", "column");
-                            return new FieldMappingSpec(valueSource(fm), required(fm, "column"));
+                            return new FieldMappingSpec(required(fm, "column"), valueSource(fm));
                         })
                         .toList(),
                 attributeValue("limit").apply(mapping).map(Integer::valueOf).orElse(null)

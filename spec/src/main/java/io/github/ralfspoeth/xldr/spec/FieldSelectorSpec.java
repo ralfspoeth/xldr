@@ -1,5 +1,7 @@
 package io.github.ralfspoeth.xldr.spec;
 
+import org.jspecify.annotations.Nullable;
+
 import java.io.Serializable;
 
 /**
@@ -12,6 +14,6 @@ import java.io.Serializable;
 public record FieldSelectorSpec(
         String name,
         String selector,
-        DataType dataType
+        @Nullable DataType dataType
 ) implements Serializable {
 }

@@ -25,5 +25,9 @@
             <groupId>io.github.ralfspoeth</groupId>
             <artifactId>xmls</artifactId>
         </dependency>
+        <dependency>
+            <groupId>org.jspecify</groupId>
+            <artifactId>jspecify</artifactId>
+        </dependency>
     </dependencies>
 </project>

@@ -1,5 +1,7 @@
 package io.github.ralfspoeth.xldr.spec;
 
+import org.jspecify.annotations.Nullable;
+
 import java.io.Serializable;
 import java.util.Collection;
 import java.util.List;
@@ -15,9 +17,11 @@ import java.util.List;
  *                       nothing to locate
  * @param fieldSelectors the fields to read from each record
  */
-public record RecordSelectorSpec(String name, String selector,
-                                 Collection<FieldSelectorSpec> fieldSelectors) implements Serializable
-{
+public record RecordSelectorSpec(
+        String name,
+        @Nullable String selector,
+        Collection<FieldSelectorSpec> fieldSelectors
+) implements Serializable {
     /**
      * Canonical constructor.
      */

@@ -1,20 +1,13 @@
 package io.github.ralfspoeth.xldr.spec.test;
 
-import io.github.ralfspoeth.xldr.spec.ValueSource;
-import io.github.ralfspoeth.xldr.spec.DataType;
-import io.github.ralfspoeth.xldr.spec.FieldMappingSpec;
-import io.github.ralfspoeth.xldr.spec.FieldSelectorSpec;
-import io.github.ralfspoeth.xldr.spec.InputSpec;
-import io.github.ralfspoeth.xldr.spec.MappingSpec;
-import io.github.ralfspoeth.xldr.spec.RecordMappingSpec;
-import io.github.ralfspoeth.xldr.spec.RecordSelectorSpec;
-import io.github.ralfspoeth.xldr.spec.VarSpec;
+import io.github.ralfspoeth.xldr.spec.*;
 import io.github.ralfspoeth.xldr.spec.io.XmlMappingSpecReader;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 import java.io.StringReader;
 import java.util.List;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
@@ -58,16 +51,16 @@ public class XmlMappingSpecReaderTest {
                         new RecordSelectorSpec("position", "//position", List.of(
                                 new FieldSelectorSpec("fund", "../../../fund/@id", null)
                         ))
-                ), List.of()),
+                ), List.of(), Map.of()),
                 List.of(
                         new RecordMappingSpec("fund", "snmandat", List.of(
-                                new FieldMappingSpec(new ValueSource.Field("id"), "ident1_txt"),
-                                new FieldMappingSpec(new ValueSource.Field("desc"), "kbez_txt"),
+                                new FieldMappingSpec("ident1_txt", new ValueSource.Field("id")),
+                                new FieldMappingSpec("kbez_txt", new ValueSource.Field("desc")),
                                 // XML constants are always strings - attributes carry no type
-                                new FieldMappingSpec(new ValueSource.Constant("PD"), "syssnmut_cd")
+                                new FieldMappingSpec("syssnmut_cd", new ValueSource.Constant("PD"))
                         )),
                         new RecordMappingSpec("position", "snposition", List.of(
-                                new FieldMappingSpec(new ValueSource.Field("fund"), "mandat_nr")
+                                new FieldMappingSpec("mandat_nr", new ValueSource.Field("fund"))
                         ), 500)
                 )
         );

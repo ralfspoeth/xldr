@@ -1,9 +1,9 @@
 package io.github.ralfspoeth.xldr.spec;
 
+import org.jspecify.annotations.Nullable;
+
 import java.io.Serializable;
 import java.util.List;
-
-import static java.util.Objects.requireNonNullElse;
 
 /**
  * Maps the records of one record selector to one database table.
@@ -18,14 +18,14 @@ public record RecordMappingSpec(
         String recordSelector,
         String table,
         List<FieldMappingSpec> fieldMappings,
-        Integer limit
+        @Nullable Integer limit
 ) implements Serializable {
 
     /**
      * Canonical constructor.
      */
     public RecordMappingSpec {
-        fieldMappings = List.copyOf(requireNonNullElse(fieldMappings, List.of()));
+        fieldMappings = List.copyOf(fieldMappings);
         if (limit != null && limit < 0) {
             throw new IllegalArgumentException("limit must not be negative: " + limit);
         }

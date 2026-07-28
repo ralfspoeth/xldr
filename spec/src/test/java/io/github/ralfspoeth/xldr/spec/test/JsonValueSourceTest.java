@@ -48,10 +48,10 @@ public class JsonValueSourceTest {
         assertEquals(100, mapping.limit());
         assertEquals(
                 List.of(
-                        new FieldMappingSpec(new ValueSource.Field("id"), "id"),
-                        new FieldMappingSpec(new ValueSource.Constant("PD"), "src"),
-                        new FieldMappingSpec(new ValueSource.Constant(new BigDecimal("42")), "n"),
-                        new FieldMappingSpec(new ValueSource.Constant(Boolean.TRUE), "flag")
+                        new FieldMappingSpec("id", new ValueSource.Field("id")),
+                        new FieldMappingSpec("src", new ValueSource.Constant("PD")),
+                        new FieldMappingSpec("n", new ValueSource.Constant(new BigDecimal("42"))),
+                        new FieldMappingSpec("flag", new ValueSource.Constant(Boolean.TRUE))
                 ),
                 mapping.fieldMappings());
     }
@@ -88,8 +88,8 @@ public class JsonValueSourceTest {
         var mapping = List.copyOf(spec.recordMappingSpecs()).getFirst();
         assertEquals(
                 List.of(new FieldMappingSpec(
-                        new ValueSource.Lookup("country", "id", "iso", new ValueSource.Field("c")),
-                        "country_id")),
+                        "country_id", new ValueSource.Lookup("country", "id", "iso", new ValueSource.Field("c"))
+                )),
                 mapping.fieldMappings());
     }
 
@@ -289,8 +289,8 @@ public class JsonValueSourceTest {
 
         assertEquals(
                 List.of(
-                        new FieldMappingSpec(new ValueSource.Constant(null), "note"),
-                        new FieldMappingSpec(new ValueSource.Constant("PD"), "src")),
+                        new FieldMappingSpec("note", new ValueSource.Constant(null)),
+                        new FieldMappingSpec("src", new ValueSource.Constant("PD"))),
                 mapping.fieldMappings());
     }
 

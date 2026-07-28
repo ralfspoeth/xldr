@@ -1,12 +1,13 @@
 package io.github.ralfspoeth.xldr.spec.io;
 
-import io.github.ralfspoeth.xldr.spec.*;
 import io.github.ralfspoeth.json.Greyson;
 import io.github.ralfspoeth.json.data.JsonNull;
 import io.github.ralfspoeth.json.data.JsonObject;
 import io.github.ralfspoeth.json.data.JsonValue;
 import io.github.ralfspoeth.json.query.Pointer;
 import io.github.ralfspoeth.json.query.Selector;
+import io.github.ralfspoeth.xldr.spec.*;
+import org.jspecify.annotations.Nullable;
 
 import java.io.IOException;
 import java.io.Reader;
@@ -101,7 +102,7 @@ public class JsonMappingSpecReader implements MappingSpecReader {
 
     private static FieldMappingSpec fieldMappingSpec(JsonValue fm) {
         renamed(fm, "databaseColumn", "column");
-        return new FieldMappingSpec(valueSource(fm), PTR.member("column").stringOrThrow(fm));
+        return new FieldMappingSpec(PTR.member("column").stringOrThrow(fm), valueSource(fm));
     }
 
     /**
@@ -175,7 +176,7 @@ public class JsonMappingSpecReader implements MappingSpecReader {
      * {@link java.math.BigDecimal}, exact), boolean, or {@code null} for the JSON
      * null literal, which loads a SQL NULL into the column.
      */
-    private static Object constantValue(JsonValue value) {
+    private static @Nullable Object constantValue(JsonValue value) {
         if (value instanceof JsonNull) {
             return null;
         }

@@ -1,11 +1,11 @@
 package io.github.ralfspoeth.xldr.spec;
 
+import org.jspecify.annotations.Nullable;
+
 import java.io.Serializable;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
-
-import static java.util.Objects.requireNonNullElse;
 
 /**
  * How some input file is turned into a stream of records and how the fields are
@@ -42,28 +42,22 @@ import static java.util.Objects.requireNonNullElse;
  *                        and they travel with the spec so that an input is
  *                        described by one document.
  */
-public record InputSpec(String mimeType, String sentinel, String accepts,
-                        Collection<RecordSelectorSpec> recordSelectors,
-                        Collection<VarSpec> vars,
-                        Map<String, String> properties)
-        implements Serializable {
+public record InputSpec(
+        String mimeType,
+        @Nullable String sentinel,
+        @Nullable String accepts,
+        Collection<RecordSelectorSpec> recordSelectors,
+        Collection<VarSpec> vars,
+        Map<String, String> properties
+) implements Serializable {
 
     /**
      * Canonical constructor.
      */
     public InputSpec {
-        recordSelectors = List.copyOf(requireNonNullElse(recordSelectors, List.of()));
-        vars = List.copyOf(requireNonNullElse(vars, List.of()));
-        properties = Map.copyOf(requireNonNullElse(properties, Map.of()));
-    }
-
-    /**
-     * An input without adapter settings.
-     */
-    public InputSpec(String mimeType, String sentinel, String accepts,
-                     Collection<RecordSelectorSpec> recordSelectors,
-                     Collection<VarSpec> vars) {
-        this(mimeType, sentinel, accepts, recordSelectors, vars, Map.of());
+        recordSelectors = List.copyOf(recordSelectors);
+        vars = List.copyOf(vars);
+        properties = Map.copyOf(properties);
     }
 
     /**

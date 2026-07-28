@@ -1,9 +1,13 @@
 package io.github.ralfspoeth.xldr.spec;
 
+import org.jspecify.annotations.Nullable;
+
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeParseException;
+
+import static java.util.Objects.requireNonNull;
 
 /**
  * The types a field value may be delivered as, each mapped to its Java class.
@@ -19,7 +23,7 @@ public enum DataType {
     private final Class<?> clazz;
 
     DataType(Class<?> clazz) {
-        this.clazz = clazz;
+        this.clazz = requireNonNull(clazz);
     }
 
     /**
@@ -47,7 +51,7 @@ public enum DataType {
      * @return the value as this type, or {@code null} if {@code raw} is null or blank
      * @throws RuntimeException if the text is not a valid value of this type
      */
-    public Object parse(String raw) {
+    public @Nullable Object parse(@Nullable String raw) {
         if (raw == null) {
             return null;
         }

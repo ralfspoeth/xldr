@@ -56,13 +56,13 @@ public class LoaderTest {
     public void loadsSeveralMappingsIntoTheSameTable() throws Exception {
         // column order deliberately differs from the natural one: name before id
         var people = new RecordMappingSpec("people", "person", List.of(
-                new FieldMappingSpec(new ValueSource.Field("name"), "name"),
-                new FieldMappingSpec(new ValueSource.Field("id"), "id")
+                new FieldMappingSpec("name", new ValueSource.Field("name")),
+                new FieldMappingSpec("id", new ValueSource.Field("id"))
         ));
         // same table, spelled in upper case, and a different set of columns
         var visitors = new RecordMappingSpec("visitors", "PERSON", List.of(
-                new FieldMappingSpec(new ValueSource.Field("id"), "id"),
-                new FieldMappingSpec(new ValueSource.Field("city"), "city")
+                new FieldMappingSpec("id", new ValueSource.Field("id")),
+                new FieldMappingSpec("city", new ValueSource.Field("city"))
         ));
         var spec = new MappingSpec(
                 new InputSpec("text/csv", List.of()),
@@ -107,8 +107,8 @@ public class LoaderTest {
     @Test
     public void loadsMoreRecordsThanOneBatch() throws Exception {
         var mapping = new RecordMappingSpec("people", "person", List.of(
-                new FieldMappingSpec(new ValueSource.Field("id"), "id"),
-                new FieldMappingSpec(new ValueSource.Field("name"), "name")
+                new FieldMappingSpec("id", new ValueSource.Field("id")),
+                new FieldMappingSpec("name", new ValueSource.Field("name"))
         ));
         var spec = new MappingSpec(new InputSpec("text/csv", List.of()), List.of(mapping));
 
@@ -142,8 +142,8 @@ public class LoaderTest {
     @Test
     public void reusesTheStatementOfTwoIdenticalMappings() throws Exception {
         var columns = List.of(
-                new FieldMappingSpec(new ValueSource.Field("id"), "id"),
-                new FieldMappingSpec(new ValueSource.Field("name"), "name"));
+                new FieldMappingSpec("id", new ValueSource.Field("id")),
+                new FieldMappingSpec("name", new ValueSource.Field("name")));
         var first = new RecordMappingSpec("people", "person", columns);
         var second = new RecordMappingSpec("visitors", "person", columns);
         var spec = new MappingSpec(new InputSpec("text/csv", List.of()), List.of(first, second));
@@ -176,7 +176,7 @@ public class LoaderTest {
             stmt.execute("create table narrow(id varchar(3))");
         }
         var mapping = new RecordMappingSpec("people", "narrow", List.of(
-                new FieldMappingSpec(new ValueSource.Field("id"), "id")
+                new FieldMappingSpec("id", new ValueSource.Field("id"))
         ));
         var spec = new MappingSpec(new InputSpec("text/csv", List.of()), List.of(mapping));
 
@@ -205,7 +205,7 @@ public class LoaderTest {
     @Test
     public void namesTheRecordThatCouldNotBeRead() throws Exception {
         var mapping = new RecordMappingSpec("people", "person", List.of(
-                new FieldMappingSpec(new ValueSource.Field("id"), "id")
+                new FieldMappingSpec("id", new ValueSource.Field("id"))
         ));
         var spec = new MappingSpec(new InputSpec("text/csv", List.of()), List.of(mapping));
 
@@ -235,10 +235,10 @@ public class LoaderTest {
     @Test
     public void rollsBackWhenAMappingFails() throws Exception {
         var good = new RecordMappingSpec("people", "person", List.of(
-                new FieldMappingSpec(new ValueSource.Field("id"), "id")
+                new FieldMappingSpec("id", new ValueSource.Field("id"))
         ));
         var broken = new RecordMappingSpec("people", "no_such_table", List.of(
-                new FieldMappingSpec(new ValueSource.Field("id"), "id")
+                new FieldMappingSpec("id", new ValueSource.Field("id"))
         ));
         var spec = new MappingSpec(
                 new InputSpec("text/csv", List.of()),
@@ -263,10 +263,10 @@ public class LoaderTest {
     @Test
     public void rejectsForeignMapping() throws Exception {
         var known = new RecordMappingSpec("people", "person", List.of(
-                new FieldMappingSpec(new ValueSource.Field("id"), "id")
+                new FieldMappingSpec("id", new ValueSource.Field("id"))
         ));
         var foreign = new RecordMappingSpec("elsewhere", "person", List.of(
-                new FieldMappingSpec(new ValueSource.Field("id"), "id")
+                new FieldMappingSpec("id", new ValueSource.Field("id"))
         ));
         var spec = new MappingSpec(
                 new InputSpec("text/csv", List.of()),
@@ -292,8 +292,8 @@ public class LoaderTest {
             stmt.execute("create table event(id varchar(10), source varchar(10))");
         }
         var mapping = new RecordMappingSpec("events", "event", List.of(
-                new FieldMappingSpec(new ValueSource.Field("id"), "id"),
-                new FieldMappingSpec(new ValueSource.Constant("PD"), "source")
+                new FieldMappingSpec("id", new ValueSource.Field("id")),
+                new FieldMappingSpec("source", new ValueSource.Constant("PD"))
         ));
         var spec = new MappingSpec(new InputSpec("text/csv", List.of()), List.of(mapping));
         var adapter = adapterFor(Map.of("events", List.of(Map.of("id", "1"), Map.of("id", "2"))));
@@ -336,11 +336,11 @@ public class LoaderTest {
         var vars = List.of(new VarSpec("bid",
                 new ValueSource.Lookup("batch_src", "v", "k", new ValueSource.Constant(1))));
         var mapping = new RecordMappingSpec("rows", "batch", List.of(
-                new FieldMappingSpec(new ValueSource.Field("id"), "id"),
-                new FieldMappingSpec(new ValueSource.Var("bid"), "batch_id")
+                new FieldMappingSpec("id", new ValueSource.Field("id")),
+                new FieldMappingSpec("batch_id", new ValueSource.Var("bid"))
         ));
         var spec = new MappingSpec(
-                new InputSpec("text/csv", null, null, List.of(), vars),
+                new InputSpec("text/csv", null, null, List.of(), vars, Map.of()),
                 List.of(mapping));
         var adapter = adapterFor(Map.of("rows", List.of(
                 Map.of("id", "1"), Map.of("id", "2"), Map.of("id", "3"))));
@@ -375,11 +375,11 @@ public class LoaderTest {
         var vars = List.of(new VarSpec("gid",
                 new ValueSource.Expr("${xldr.filename}-${nextval('batch')}")));
         var mapping = new RecordMappingSpec("rows", "doc", List.of(
-                new FieldMappingSpec(new ValueSource.Field("id"), "id"),
-                new FieldMappingSpec(new ValueSource.Var("gid"), "gen")
+                new FieldMappingSpec("id", new ValueSource.Field("id")),
+                new FieldMappingSpec("gen", new ValueSource.Var("gid"))
         ));
         var spec = new MappingSpec(
-                new InputSpec("text/csv", null, null, List.of(), vars),
+                new InputSpec("text/csv", null, null, List.of(), vars, Map.of()),
                 List.of(mapping));
         var adapter = adapterFor(Map.of("rows", List.of(Map.of("id", "1"), Map.of("id", "2"))));
 
@@ -411,8 +411,8 @@ public class LoaderTest {
             stmt.execute("create table seq_rows(id varchar(10), n integer)");
         }
         var mapping = new RecordMappingSpec("rows", "seq_rows", List.of(
-                new FieldMappingSpec(new ValueSource.Field("id"), "id"),
-                new FieldMappingSpec(new ValueSource.Expr("${nextval('r', 10)}"), "n")
+                new FieldMappingSpec("id", new ValueSource.Field("id")),
+                new FieldMappingSpec("n", new ValueSource.Expr("${nextval('r', 10)}"))
         ));
         var spec = new MappingSpec(new InputSpec("text/csv", List.of()), List.of(mapping));
         var adapter = adapterFor(Map.of("rows", List.of(
@@ -450,10 +450,10 @@ public class LoaderTest {
             stmt.execute("create table stamped(id varchar(10), loaded_at varchar(40), weekday varchar(60))");
         }
         var mapping = new RecordMappingSpec("rows", "stamped", List.of(
-                new FieldMappingSpec(new ValueSource.Field("id"), "id"),
-                new FieldMappingSpec(new ValueSource.Expr("${format(now(), 'yyyy-MM-dd')}"), "loaded_at"),
+                new FieldMappingSpec("id", new ValueSource.Field("id")),
+                new FieldMappingSpec("loaded_at", new ValueSource.Expr("${format(now(), 'yyyy-MM-dd')}")),
                 // a comma inside the pattern is the pattern's, not an argument separator
-                new FieldMappingSpec(new ValueSource.Expr("${format(now(), 'EEE, dd MMM yyyy')}"), "weekday")
+                new FieldMappingSpec("weekday", new ValueSource.Expr("${format(now(), 'EEE, dd MMM yyyy')}"))
         ));
         var spec = new MappingSpec(new InputSpec("text/csv", List.of()), List.of(mapping));
         var adapter = adapterFor(Map.of("rows", List.of(Map.of("id", "1"))));
@@ -485,8 +485,8 @@ public class LoaderTest {
             stmt.execute("create table dated(id varchar(10), born date)");
         }
         var mapping = new RecordMappingSpec("rows", "dated", List.of(
-                new FieldMappingSpec(new ValueSource.Field("id"), "id"),
-                new FieldMappingSpec(new ValueSource.Expr("${parse(birthdate, 'dd.MM.yyyy')}"), "born")
+                new FieldMappingSpec("id", new ValueSource.Field("id")),
+                new FieldMappingSpec("born", new ValueSource.Expr("${parse(birthdate, 'dd.MM.yyyy')}"))
         ));
         var spec = new MappingSpec(new InputSpec("text/csv", List.of()), List.of(mapping));
         var adapter = adapterFor(Map.of("rows", List.of(
@@ -516,8 +516,8 @@ public class LoaderTest {
             stmt.execute("create table inc_rows(id varchar(10), n integer)");
         }
         var mapping = new RecordMappingSpec("rows", "inc_rows", List.of(
-                new FieldMappingSpec(new ValueSource.Field("id"), "id"),
-                new FieldMappingSpec(new ValueSource.Expr("${nextval('r', 100, 5)}"), "n")
+                new FieldMappingSpec("id", new ValueSource.Field("id")),
+                new FieldMappingSpec("n", new ValueSource.Expr("${nextval('r', 100, 5)}"))
         ));
         var spec = new MappingSpec(new InputSpec("text/csv", List.of()), List.of(mapping));
         var adapter = adapterFor(Map.of("rows", List.of(
@@ -553,10 +553,10 @@ public class LoaderTest {
             stmt.execute("create table holder(name varchar(20), country_id int)");
         }
         var mapping = new RecordMappingSpec("holders", "holder", List.of(
-                new FieldMappingSpec(new ValueSource.Field("name"), "name"),
+                new FieldMappingSpec("name", new ValueSource.Field("name")),
                 new FieldMappingSpec(
-                        new ValueSource.Lookup("country", "id", "iso", new ValueSource.Field("c")),
-                        "country_id")
+                        "country_id", new ValueSource.Lookup("country", "id", "iso", new ValueSource.Field("c"))
+                )
         ));
         var spec = new MappingSpec(new InputSpec("text/csv", List.of()), List.of(mapping));
         var adapter = adapterFor(Map.of("holders", List.of(
@@ -590,8 +590,8 @@ public class LoaderTest {
     @Test
     public void honoursTheRowLimit() throws Exception {
         var mapping = new RecordMappingSpec("people", "person", List.of(
-                new FieldMappingSpec(new ValueSource.Field("id"), "id"),
-                new FieldMappingSpec(new ValueSource.Field("name"), "name")
+                new FieldMappingSpec("id", new ValueSource.Field("id")),
+                new FieldMappingSpec("name", new ValueSource.Field("name"))
         ), 2);
         var spec = new MappingSpec(new InputSpec("text/csv", List.of()), List.of(mapping));
         var adapter = adapterFor(Map.of("people", List.of(

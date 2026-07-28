@@ -4,8 +4,6 @@ import java.io.Serializable;
 import java.util.Collection;
 import java.util.List;
 
-import static java.util.Objects.requireNonNullElse;
-
 /**
  * A complete mapping specification: how to parse an input, and how its records
  * map onto database tables.
@@ -21,6 +19,6 @@ public record MappingSpec(
      * Canonical constructor.
      */
     public MappingSpec {
-        recordMappingSpecs = requireNonNullElse(recordMappingSpecs, List.of());
+        recordMappingSpecs = List.copyOf(recordMappingSpecs);
     }
 }
