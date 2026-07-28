@@ -6,6 +6,32 @@ ways that break existing code and existing specs; those changes are listed here 
 The versions are the git tags `xldr-<version>`; the published artifacts carry the same version under the group
 `io.github.ralfspoeth.xldr`.
 
+## 0.11
+
+Nothing about the mapping-spec format changed, so a 0.10 spec is a 0.11 spec and `mapping-spec-0.10` remains its
+schema. What changed is the Java API.
+
+### Breaking
+
+- `FieldMappingSpec`'s components are now `(String column, ValueSource source)`, the target before where its value
+  comes from, which is the order the other records read in and the order the spec itself is written in. The two
+  components have different types, so the compiler catches every call site.
+- The convenience constructors are gone: `InputSpec(String, Collection)` and `RecordMappingSpec(String, String,
+  List)`. Call the canonical constructor with the omitted arguments spelled out - `null` for the delivery rules,
+  `List.of()` and `Map.of()` for the empty collections, `null` for no limit - which says at the call site what the
+  constructor was hiding.
+- The library modules are annotated for nullness with JSpecify: `@NullMarked` at module level, `@Nullable` where a
+  value may legitimately be absent. Nothing changes at runtime - the annotations are compile-only, `requires static`
+  and `provided` scope - but a build using a null checker will now see errors it did not see before, which is the
+  point.
+
+### Fixed
+
+- The Excel range parser stopped stripping the sheet name off the selector, so every sheet-qualified range -
+  `data!A2:C3`, the documented form - was refused as if its endpoints were malformed, and a range naming no sheet
+  looked for a sheet named after the range itself. Both forms read again, and a range without a sheet name reads the
+  first sheet, as it always did.
+
 ## 0.10
 
 ### Fixed

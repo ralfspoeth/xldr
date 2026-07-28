@@ -22,12 +22,19 @@ import org.jspecify.annotations.Nullable;
  *                  ranges, which span every data row
  * @param lastRow   the last record row (0-based), or {@code null} for column ranges
  */
-record Range(String sheetName, int anchorColumn, @Nullable Integer firstRow, @Nullable Integer lastRow) {
+record Range(@Nullable String sheetName, int anchorColumn,
+             @Nullable Integer firstRow, @Nullable Integer lastRow) {
 
     static Range parse(String selector) {
         var s = selector.strip();
+        String sheetName = null;
         var bang = s.indexOf('!');
-        var sheetName = bang >= 0 ? s.substring(0, bang) : s;
+        if (bang >= 0) {
+            sheetName = s.substring(0, bang);
+            // the sheet is off the front now; what remains is the range itself,
+            // and the endpoints are parsed from that alone
+            s = s.substring(bang + 1);
+        }
 
         var colon = s.indexOf(':');
         if (colon < 0) {
@@ -55,6 +62,14 @@ record Range(String sheetName, int anchorColumn, @Nullable Integer firstRow, @Nu
     }
 
     Sheet sheet(Workbook workbook) {
+        if (sheetName == null) {
+            // a selector that names no sheet reads the first one, which is the
+            // only sheet most feeds have
+            if (workbook.getNumberOfSheets() == 0) {
+                throw new IllegalStateException("the workbook has no sheet");
+            }
+            return workbook.getSheetAt(0);
+        }
         var sheet = workbook.getSheet(sheetName);
         if (sheet == null) {
             throw new IllegalArgumentException("no sheet named " + sheetName);

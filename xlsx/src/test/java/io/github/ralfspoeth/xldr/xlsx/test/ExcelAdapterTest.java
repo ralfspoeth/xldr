@@ -128,6 +128,38 @@ public class ExcelAdapterTest {
         void fill(Sheet sheet);
     }
 
+    /**
+     * A selector that names no sheet reads the first one - the only sheet most
+     * feeds have. Nothing else covered this, so a rewrite of the range parser
+     * could take both the fallback and the stripping of the sheet prefix away
+     * unnoticed.
+     */
+    @Test
+    public void aRangeWithoutAsheetNameReadsTheFirstSheet() throws IOException {
+        var xlsx = workbook(sheet -> {
+            header(sheet, 0, "id", "name");
+            dataRow(sheet, 1, 1d, "Alice");
+        });
+
+        var spec = new InputSpec(XLSX, null, null, List.of(
+                new RecordSelectorSpec("rows", "A2:B2", List.of(
+                        new FieldSelectorSpec("id", "A", DataType.INTEGER),
+                        new FieldSelectorSpec("name", "B", DataType.STRING)
+                ))
+        ), List.of(), Map.of());
+
+        var rows = adapter(spec)
+                .parse(new ByteArrayInputStream(xlsx), "rows", Set.of("id", "name"))
+                .rows()
+                .toList();
+
+        assertEquals(1, rows.size());
+        assertAll(
+                () -> assertEquals(1L, rows.getFirst().get("id")),
+                () -> assertEquals("Alice", rows.getFirst().get("name"))
+        );
+    }
+
     private static byte[] workbook(SheetContent content) throws IOException {
         try (var wb = new XSSFWorkbook(); var out = new ByteArrayOutputStream()) {
             content.fill(wb.createSheet("data"));

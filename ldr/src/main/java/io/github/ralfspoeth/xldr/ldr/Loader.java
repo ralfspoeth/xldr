@@ -379,19 +379,15 @@ public class Loader implements AutoCloseable {
             throw new IllegalArgumentException("mapping is not part of this loader's mapping spec: " + mapping);
         }
         try {
-            var fieldMappings = mapping.fieldMappings()
-                    .stream()
-                    .filter(fm -> fm.source() != null && fm.column() != null)
-                    .toList();
-            if (fieldMappings.isEmpty()) {
+            if (mapping.fieldMappings().isEmpty()) {
                 return 0;
             }
 
-            var columns = new ArrayList<String>(fieldMappings.size());
-            var valueExprs = new ArrayList<String>(fieldMappings.size());
+            var columns = new ArrayList<String>(mapping.fieldMappings().size());
+            var valueExprs = new ArrayList<String>(mapping.fieldMappings().size());
             var binders = new ArrayList<Function<Row, Object>>();
             var fieldNames = new LinkedHashSet<String>();
-            for (var fm : fieldMappings) {
+            for (var fm : mapping.fieldMappings()) {
                 columns.add(fm.column());
                 valueExprs.add(plan(fm.source(), binders, fieldNames));
             }

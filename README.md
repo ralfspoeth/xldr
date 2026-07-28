@@ -68,7 +68,7 @@ fix their versions in one place:
             <dependency>
                 <groupId>io.github.ralfspoeth.xldr</groupId>
                 <artifactId>bom</artifactId>
-                <version>0.9</version>
+                <version>0.11</version>
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>
@@ -86,6 +86,11 @@ Then take the loader plus the adapters for the formats you read, without repeati
         <groupId>io.github.ralfspoeth.xldr</groupId>
         <artifactId>csv</artifactId>
     </dependency>
+
+The published modules are annotated for nullness with [JSpecify](https://jspecify.dev): `@NullMarked` at module
+level, so every type is non-null unless it carries `@Nullable`. The annotations are compile-only - `requires static`
+and `provided` scope - so nothing is added to your runtime; a null checker will read them, and a build without one is
+unaffected.
 
 The `bom` manages exactly the published artifacts - `spec`, `ia`, `ldr` and the adapters `csv`, `xml`, `xlsx`, `flt`
 and `json` - and deliberately no third-party versions, so importing it does not bind you to the POI, HikariCP or JDBC
@@ -214,9 +219,9 @@ The XSD is the more permissive of the two, because XSD 1.0 cannot state either o
 allow arbitrary extra elements next to the named ones, so annotate an XML spec with XML comments rather than with
 elements of your own; a JSON spec takes an extra member anywhere.
 
-A schema is published per release, since the format is still settling: `mapping-spec-0.10` describes the format of
-release 0.10, `mapping-spec-0.9` that of 0.9, and so on. An earlier one stays where it is, so a spec pinned to it
-keeps validating.
+A schema is published whenever the format changes, and is named after the release that changed it: `mapping-spec-0.10`
+describes the format of 0.10 - and of 0.11, which did not change it - `mapping-spec-0.9` that of 0.9, and so on. An
+earlier one stays where it is, so a spec pinned to it keeps validating.
 
 What a schema cannot see is whether the spec makes sense as a whole - whether a mapping names a record selector the
 input actually declares, or whether the adapter accepts the selectors. The distribution checks that:

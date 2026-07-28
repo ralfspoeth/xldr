@@ -35,7 +35,16 @@ import java.util.Set;
  */
 class ExcelAdapter implements InputAdapter {
 
-    private record RecordDef(Range range, Map<String, Field> fields, Map<String, CellRef> refs) {}
+    /**
+     * One column of a record: what it is called and what type it is delivered
+     * as, together with where to read it. The two travel as one because they are
+     * always wanted together - keeping them in two maps under the same key only
+     * created lookups that can, as far as any reader or checker can tell, come
+     * back with nothing.
+     */
+    private record Column(Field field, CellRef ref) {}
+
+    private record RecordDef(Range range, Map<String, Column> columns) {}
 
     private final Map<String, RecordDef> records = new LinkedHashMap<>();
 
@@ -43,14 +52,14 @@ class ExcelAdapter implements InputAdapter {
         for (var rss : spec.recordSelectors()) {
             // a sheet range has to point somewhere, so this input cannot omit it
             var range = Range.parse(rss.requireSelector());
-            var fields = new LinkedHashMap<String, Field>();
-            var refs = new LinkedHashMap<String, CellRef>();
+            var columns = new LinkedHashMap<String, Column>();
             for (var fss : rss.fieldSelectors()) {
                 var type = fss.dataType() == null ? DataType.STRING : fss.dataType();
-                fields.put(fss.name(), new Field(fss.name(), type.clazz()));
-                refs.put(fss.name(), CellRef.parse(fss.selector()));
+                columns.put(fss.name(), new Column(
+                        new Field(fss.name(), type.clazz()),
+                        CellRef.parse(fss.selector())));
             }
-            if (records.putIfAbsent(rss.name(), new RecordDef(range, fields, refs)) != null) {
+            if (records.putIfAbsent(rss.name(), new RecordDef(range, columns)) != null) {
                 throw new IllegalArgumentException("duplicate record selector " + rss.name());
             }
         }
@@ -63,12 +72,16 @@ class ExcelAdapter implements InputAdapter {
             throw new IllegalArgumentException("no record selector named " + recordSelector
                     + "; the input spec declares " + records.keySet());
         }
-        var unknown = fieldSelectors.stream().filter(n -> !record.refs().containsKey(n)).toList();
+        var unknown = fieldSelectors.stream().filter(n -> !record.columns().containsKey(n)).toList();
         if (!unknown.isEmpty()) {
             throw new IllegalArgumentException("record selector " + recordSelector
                     + " declares no field selector(s) " + unknown);
         }
-        var selected = record.refs().keySet().stream().filter(fieldSelectors::contains).toList();
+        // in the order the spec declares them, which is the order of the map
+        var selected = record.columns().entrySet().stream()
+                .filter(e -> fieldSelectors.contains(e.getKey()))
+                .map(Map.Entry::getValue)
+                .toList();
 
         try (var workbook = WorkbookFactory.create(source)) {
             var sheet = record.range().sheet(workbook);
@@ -81,17 +94,17 @@ class ExcelAdapter implements InputAdapter {
             for (int r = span[0]; r <= span[1]; r++) {
                 var values = new LinkedHashMap<String, @Nullable Object>();
                 var allNull = true;
-                for (var name : selected) {
-                    var value = valueOf(sheet, r, anchorColumn, record.refs().get(name),
-                            record.fields().get(name).type(), formatter, evaluator);
-                    values.put(name, value);
+                for (var column : selected) {
+                    var value = valueOf(sheet, r, anchorColumn, column.ref(),
+                            column.field().type(), formatter, evaluator);
+                    values.put(column.field().name(), value);
                     allNull &= isEmpty(value);
                 }
                 if (!allNull) {
                     rows.add(values::get);
                 }
             }
-            var fields = selected.stream().map(record.fields()::get).toList();
+            var fields = selected.stream().map(Column::field).toList();
             return new Result(fields, rows.stream());
         }
     }
@@ -103,7 +116,7 @@ class ExcelAdapter implements InputAdapter {
     private static @Nullable Object valueOf(Sheet sheet, int recordRow, int anchorColumn, CellRef ref,
                                             Class<?> type, DataFormatter formatter, FormulaEvaluator evaluator) {
         var at = ref.resolve(recordRow, anchorColumn);
-        if (at.length==0) {
+        if (at == null) {
             return null;
         }
         var poiRow = sheet.getRow(at[0]);

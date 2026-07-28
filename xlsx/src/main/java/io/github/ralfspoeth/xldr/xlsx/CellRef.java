@@ -1,6 +1,7 @@
 package io.github.ralfspoeth.xldr.xlsx;
 
 import org.apache.poi.ss.util.CellReference;
+import org.jspecify.annotations.Nullable;
 
 import java.util.regex.Pattern;
 
@@ -25,10 +26,14 @@ sealed interface CellRef {
     Pattern DIGITS = Pattern.compile("\\d+");
 
     /**
+     * The annotation sits between the element type and the brackets: it is the
+     * array that may be absent, not its elements. {@code @Nullable int[]} would
+     * not even compile, {@code int} being unable to be null.
+     *
      * @return the cell coordinates (0-based row, 0-based column), or {@code null}
      * if they fall off the sheet (a negative index)
      */
-    int[] resolve(int recordRow, int anchorColumn);
+    int @Nullable [] resolve(int recordRow, int anchorColumn);
 
     static CellRef parse(String selector) {
         var s = selector.strip();
@@ -58,10 +63,10 @@ sealed interface CellRef {
 
     record Relative(int rowOffset, int columnOffset) implements CellRef {
         @Override
-        public int[] resolve(int recordRow, int anchorColumn) {
+        public int @Nullable [] resolve(int recordRow, int anchorColumn) {
             var r = recordRow + rowOffset;
             var c = anchorColumn + columnOffset;
-            return r < 0 || c < 0 ? new int[0] : new int[]{r, c};
+            return r < 0 || c < 0 ? null : new int[]{r, c};
         }
     }
 }

@@ -1,6 +1,7 @@
 package io.github.ralfspoeth.xldr.ia;
 
 import io.github.ralfspoeth.xldr.spec.DataType;
+import org.jspecify.annotations.Nullable;
 
 import java.math.BigDecimal;
 import java.text.DecimalFormat;
@@ -12,6 +13,9 @@ import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
+
+import static java.util.function.Predicate.not;
 
 /**
  * How an adapter turns the text of a field into a typed value, where the text is
@@ -44,10 +48,10 @@ public final class Formats {
 
     private static final Formats DEFAULTS = new Formats(null, null);
 
-    private final DateTimeFormatter date;
-    private final DecimalFormat number;
+    private final @Nullable DateTimeFormatter date;
+    private final @Nullable DecimalFormat number;
 
-    private Formats(DateTimeFormatter date, DecimalFormat number) {
+    private Formats(@Nullable DateTimeFormatter date, @Nullable DecimalFormat number) {
         this.date = date;
         this.number = number;
     }
@@ -103,24 +107,19 @@ public final class Formats {
      * @return the value as that type, or {@code null} if {@code raw} is null or blank
      * @throws RuntimeException if the text is not a valid value of that type
      */
-    public Object parse(DataType type, String raw) {
-        if (type == null) {
-            type = DataType.STRING;
-        }
-        if (raw == null) {
-            return null;
-        }
-        var s = raw.strip();
-        if (s.isEmpty()) {
-            return null;
-        }
-        return switch (type) {
-            case DATE -> date == null ? DataType.DATE.parse(s) : dateTime(s);
-            case INTEGER -> number == null ? DataType.INTEGER.parse(s) : number(s).longValue();
-            case FLOAT -> number == null ? DataType.FLOAT.parse(s) : number(s).doubleValue();
-            case DECIMAL -> number == null ? DataType.DECIMAL.parse(s) : bigDecimal(s);
-            case STRING -> s;
-        };
+    public @Nullable Object parse(@Nullable DataType type, @Nullable String raw) {
+        return Optional.ofNullable(raw)
+                .map(String::strip)
+                .filter(not(String::isEmpty))
+                .map(s -> switch (type) {
+                    case DATE -> date == null ? DataType.DATE.parse(s) : dateTime(s);
+                    case INTEGER -> number == null ? DataType.INTEGER.parse(s) : number(s).longValue();
+                    case FLOAT -> number == null ? DataType.FLOAT.parse(s) : number(s).doubleValue();
+                    case DECIMAL -> number == null ? DataType.DECIMAL.parse(s) : bigDecimal(s);
+                    case STRING -> s;
+                    case null -> s;
+                })
+                .orElse(null);
     }
 
     /**
@@ -129,6 +128,7 @@ public final class Formats {
      */
     private LocalDateTime dateTime(String s) {
         try {
+            assert date != null;
             return LocalDateTime.parse(s, date);
         } catch (DateTimeParseException e) {
             return LocalDate.parse(s, date).atStartOfDay();
@@ -137,6 +137,7 @@ public final class Formats {
 
     private Number number(String s) {
         try {
+            assert number != null;
             return number.parse(s);
         } catch (ParseException e) {
             throw new IllegalArgumentException("cannot read '" + s + "' with " + number.toPattern(), e);
