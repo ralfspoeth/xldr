@@ -1,5 +1,7 @@
 package io.github.ralfspoeth.xldr.csv;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.ArrayList;
 
 /**
@@ -47,7 +49,7 @@ final class Csv {
      * @return the fields, whether a quoted field is still open, and whether the
      * record held anything at all
      */
-    static Scan scan(String text, String separator, Character quote, Character comment) {
+    static Scan scan(String text, String separator, @Nullable Character quote, @Nullable Character comment) {
         var fields = new ArrayList<String>();
         var field = new StringBuilder();
         boolean atFieldStart = true;

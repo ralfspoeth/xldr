@@ -1,11 +1,8 @@
 package io.github.ralfspoeth.xldr.flt;
 
-import io.github.ralfspoeth.xldr.ia.Field;
-import io.github.ralfspoeth.xldr.ia.Formats;
-import io.github.ralfspoeth.xldr.ia.InputAdapter;
-import io.github.ralfspoeth.xldr.ia.Result;
-import io.github.ralfspoeth.xldr.ia.Row;
+import io.github.ralfspoeth.xldr.ia.*;
 import io.github.ralfspoeth.xldr.spec.DataType;
+import org.jspecify.annotations.Nullable;
 
 import java.io.BufferedReader;
 import java.io.InputStream;
@@ -68,7 +65,7 @@ class FixedLengthInputAdapter implements InputAdapter {
         private FLRow(String text) {this.text = text;}
 
         @Override
-        public Object get(String name) {
+        public @Nullable Object get(String name) {
             var bds = bounds.get(name);
             if (bds.left >= text.length()) return null;
             int right = min(bds.right, text.length());
@@ -77,7 +74,7 @@ class FixedLengthInputAdapter implements InputAdapter {
     }
 
     private class LineAccu {
-        StringBuilder bldr = new StringBuilder();
+        final StringBuilder bldr = new StringBuilder();
         int count = 0;
 
         boolean add(String s) {

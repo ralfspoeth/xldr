@@ -3,6 +3,7 @@ package io.github.ralfspoeth.xldr.xlsx;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Workbook;
 import org.apache.poi.ss.util.CellReference;
+import org.jspecify.annotations.Nullable;
 
 /**
  * A record selector: an Excel range, one record per row.
@@ -21,16 +22,13 @@ import org.apache.poi.ss.util.CellReference;
  *                  ranges, which span every data row
  * @param lastRow   the last record row (0-based), or {@code null} for column ranges
  */
-record Range(String sheetName, int anchorColumn, Integer firstRow, Integer lastRow) {
+record Range(String sheetName, int anchorColumn, @Nullable Integer firstRow, @Nullable Integer lastRow) {
 
     static Range parse(String selector) {
         var s = selector.strip();
-        String sheetName = null;
         var bang = s.indexOf('!');
-        if (bang >= 0) {
-            sheetName = s.substring(0, bang);
-            s = s.substring(bang + 1);
-        }
+        var sheetName = bang >= 0 ? s.substring(0, bang) : s;
+
         var colon = s.indexOf(':');
         if (colon < 0) {
             throw new IllegalArgumentException("range needs a ':' - " + selector);
@@ -57,12 +55,6 @@ record Range(String sheetName, int anchorColumn, Integer firstRow, Integer lastR
     }
 
     Sheet sheet(Workbook workbook) {
-        if (sheetName == null) {
-            if (workbook.getNumberOfSheets() == 0) {
-                throw new IllegalStateException("the workbook has no sheet");
-            }
-            return workbook.getSheetAt(0);
-        }
         var sheet = workbook.getSheet(sheetName);
         if (sheet == null) {
             throw new IllegalArgumentException("no sheet named " + sheetName);
@@ -75,7 +67,7 @@ record Range(String sheetName, int anchorColumn, Integer firstRow, Integer lastR
      * physical row for a column range. {@code first > last} means no rows.
      */
     int[] rowSpan(Sheet sheet) {
-        if (firstRow != null) {
+        if (firstRow != null && lastRow != null) {
             return new int[]{firstRow, lastRow};
         }
         return new int[]{sheet.getFirstRowNum(), sheet.getLastRowNum()};

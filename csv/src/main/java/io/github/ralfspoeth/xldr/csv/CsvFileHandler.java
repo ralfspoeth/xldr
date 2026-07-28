@@ -1,24 +1,17 @@
 package io.github.ralfspoeth.xldr.csv;
 
-import io.github.ralfspoeth.xldr.ia.Field;
-import io.github.ralfspoeth.xldr.ia.InputAdapter;
-import io.github.ralfspoeth.xldr.ia.Result;
-import io.github.ralfspoeth.xldr.ia.Formats;
-import io.github.ralfspoeth.xldr.ia.Row;
+import io.github.ralfspoeth.xldr.ia.*;
 import io.github.ralfspoeth.xldr.spec.DataType;
 import io.github.ralfspoeth.xldr.spec.FieldSelectorSpec;
 import io.github.ralfspoeth.xldr.spec.InputSpec;
+import org.jspecify.annotations.Nullable;
 
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.charset.Charset;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.function.ToIntFunction;
 import java.util.stream.Gatherer;
 import java.util.stream.Stream;
@@ -46,17 +39,31 @@ class CsvFileHandler implements InputAdapter {
     private final Charset charset;
     private final boolean header;
     private final Formats formats;
-    /** what opens and closes a quoted field, or null where quotes are ordinary characters */
-    private final Character quote;
-    /** what begins a comment outside a quoted field, or null where nothing does */
-    private final Character comment;
-    /** what an empty line means */
+    /**
+     * what opens and closes a quoted field, or null where quotes are ordinary characters
+     */
+    private final @Nullable Character quote;
+    /**
+     * what begins a comment outside a quoted field, or null where nothing does
+     */
+    private final @Nullable Character comment;
+    /**
+     * what an empty line means
+     */
     private final EmptyLine emptyLine;
 
     private final InputSpec inputSpec;
 
-    CsvFileHandler(String fieldSeparator, Charset charset, boolean header, Character quote,
-                   Character comment, EmptyLine emptyLine, Formats formats, InputSpec spec) {
+    CsvFileHandler(
+            String fieldSeparator,
+            Charset charset,
+            boolean header,
+            @Nullable Character quote,
+            @Nullable Character comment,
+            EmptyLine emptyLine,
+            Formats formats,
+            InputSpec spec
+    ) {
         this.fieldSeparator = fieldSeparator;
         this.charset = charset;
         this.header = header;
@@ -75,7 +82,7 @@ class CsvFileHandler implements InputAdapter {
     private record Line(String[] values, ToIntFunction<String> index, Map<String, DataType> types,
                         Formats formats) implements Row {
         @Override
-        public Object get(String name) {
+        public @Nullable Object get(String name) {
             var i = index.applyAsInt(name);
             if (i < 0 || i >= values.length) {
                 return null;
@@ -170,7 +177,9 @@ class CsvFileHandler implements InputAdapter {
     private static final class Partial {
         private final StringBuilder text = new StringBuilder();
         private int lines;
-        /** lines of the file read so far, the header among them */
+        /**
+         * lines of the file read so far, the header among them
+         */
         private long read;
         private long startedAt;
 
@@ -206,7 +215,7 @@ class CsvFileHandler implements InputAdapter {
             lines = 0;
         }
 
-        String unterminated(Integer limit) {
+        String unterminated(@Nullable Integer limit) {
             return "unterminated quoted field: the record starting on line " + startedAt
                     + " is still open after " + lines + " line(s)"
                     + (limit == null ? " at the end of the file" : ", the limit being " + limit)
@@ -230,7 +239,7 @@ class CsvFileHandler implements InputAdapter {
         return fs.dataType() == null ? DataType.STRING : fs.dataType();
     }
 
-    private static boolean matches(String discriminator, String[] values) {
+    private static boolean matches(@Nullable String discriminator, String[] values) {
         return discriminator == null || discriminator.isBlank()
                 || (values.length > 0 && discriminator.strip().equals(values[0].strip()));
     }
@@ -253,8 +262,7 @@ class CsvFileHandler implements InputAdapter {
      *                  so that the records that follow can still be numbered
      *                  from the top of the file
      */
-    private record Header(String line, long linesRead) {
-    }
+    private record Header(@Nullable String line, long linesRead) {}
 
     /**
      * The header row, looked for past any banner of comments and empty lines -

@@ -1,5 +1,7 @@
 package io.github.ralfspoeth.xldr.csv;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.Locale;
 
 /**
@@ -22,7 +24,7 @@ enum EmptyLine {
      * @return what it names
      * @throws IllegalArgumentException if it names neither
      */
-    static EmptyLine of(String setting) {
+    static EmptyLine of(@Nullable String setting) {
         if (setting == null || setting.isBlank()) {
             return SKIP;
         }

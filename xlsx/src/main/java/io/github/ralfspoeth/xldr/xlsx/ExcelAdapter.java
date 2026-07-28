@@ -12,6 +12,7 @@ import org.apache.poi.ss.usermodel.DateUtil;
 import org.apache.poi.ss.usermodel.FormulaEvaluator;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.WorkbookFactory;
+import org.jspecify.annotations.Nullable;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -78,7 +79,7 @@ class ExcelAdapter implements InputAdapter {
 
             var rows = new ArrayList<Row>();
             for (int r = span[0]; r <= span[1]; r++) {
-                var values = new LinkedHashMap<String, Object>();
+                var values = new LinkedHashMap<String, @Nullable Object>();
                 var allNull = true;
                 for (var name : selected) {
                     var value = valueOf(sheet, r, anchorColumn, record.refs().get(name),
@@ -95,14 +96,14 @@ class ExcelAdapter implements InputAdapter {
         }
     }
 
-    private static boolean isEmpty(Object value) {
+    private static boolean isEmpty(@Nullable Object value) {
         return value == null || "".equals(value);
     }
 
-    private static Object valueOf(Sheet sheet, int recordRow, int anchorColumn, CellRef ref,
-                                  Class<?> type, DataFormatter formatter, FormulaEvaluator evaluator) {
+    private static @Nullable Object valueOf(Sheet sheet, int recordRow, int anchorColumn, CellRef ref,
+                                            Class<?> type, DataFormatter formatter, FormulaEvaluator evaluator) {
         var at = ref.resolve(recordRow, anchorColumn);
-        if (at == null) {
+        if (at.length==0) {
             return null;
         }
         var poiRow = sheet.getRow(at[0]);

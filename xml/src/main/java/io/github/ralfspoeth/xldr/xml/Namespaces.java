@@ -1,5 +1,7 @@
 package io.github.ralfspoeth.xldr.xml;
 
+import org.jspecify.annotations.Nullable;
+
 import javax.xml.XMLConstants;
 import javax.xml.namespace.NamespaceContext;
 import java.util.HashMap;
@@ -48,7 +50,7 @@ final class Namespaces implements NamespaceContext {
     }
 
     @Override
-    public String getNamespaceURI(String prefix) {
+    public String getNamespaceURI(@Nullable String prefix) {
         if (prefix == null) {
             throw new IllegalArgumentException("null prefix");
         }
@@ -60,7 +62,7 @@ final class Namespaces implements NamespaceContext {
     }
 
     @Override
-    public String getPrefix(String namespaceURI) {
+    public @Nullable String getPrefix(@Nullable String namespaceURI) {
         return byPrefix.entrySet()
                 .stream()
                 .filter(e -> e.getValue().equals(namespaceURI))
@@ -70,7 +72,7 @@ final class Namespaces implements NamespaceContext {
     }
 
     @Override
-    public Iterator<String> getPrefixes(String namespaceURI) {
+    public Iterator<String> getPrefixes(@Nullable String namespaceURI) {
         return byPrefix.entrySet()
                 .stream()
                 .filter(e -> e.getValue().equals(namespaceURI))

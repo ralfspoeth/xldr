@@ -2,6 +2,7 @@ package io.github.ralfspoeth.xldr.xml;
 
 import io.github.ralfspoeth.xldr.ia.Formats;
 import io.github.ralfspoeth.xldr.spec.DataType;
+import org.jspecify.annotations.Nullable;
 import org.w3c.dom.Node;
 
 import javax.xml.xpath.XPathConstants;
@@ -27,8 +28,13 @@ class XmlFieldSelector {
     private final DataType dataType;
     private final Formats formats;
 
-    XmlFieldSelector(String name, String selector, XPathExpression expression, DataType dataType,
-                     Formats formats) {
+    XmlFieldSelector(
+            String name,
+            String selector,
+            XPathExpression expression,
+            @Nullable DataType dataType,
+            Formats formats
+    ) {
         this.name = Objects.requireNonNull(name);
         this.selector = selector;
         this.expression = Objects.requireNonNull(expression);
@@ -56,7 +62,7 @@ class XmlFieldSelector {
      * while a string field keeps the empty string, since XPath cannot tell
      * "no such element" from "an element that is empty".
      */
-    Object evaluate(Node record) {
+    @Nullable Object evaluate(Node record) {
         try {
             return switch (dataType) {
                 case STRING -> string(record);

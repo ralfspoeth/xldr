@@ -61,7 +61,7 @@ sealed interface CellRef {
         public int[] resolve(int recordRow, int anchorColumn) {
             var r = recordRow + rowOffset;
             var c = anchorColumn + columnOffset;
-            return r < 0 || c < 0 ? null : new int[]{r, c};
+            return r < 0 || c < 0 ? new int[0] : new int[]{r, c};
         }
     }
 }

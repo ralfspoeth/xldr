@@ -4,6 +4,7 @@ import io.github.ralfspoeth.xldr.ia.Formats;
 import io.github.ralfspoeth.xldr.ia.InputAdapter;
 import io.github.ralfspoeth.xldr.ia.InputAdapterFactory;
 import io.github.ralfspoeth.xldr.spec.InputSpec;
+import org.jspecify.annotations.Nullable;
 
 import java.nio.charset.Charset;
 import java.util.List;
@@ -57,7 +58,7 @@ public class CsvFileHandlerFactory implements InputAdapterFactory {
      * have made of {@code header = yes} - a headerless read of a file that has
      * one, and a column of nulls to show for it.
      */
-    private static boolean header(String setting) {
+    private static boolean header(@Nullable String setting) {
         if (setting == null || setting.isBlank()) {
             return true;
         }
@@ -76,7 +77,7 @@ public class CsvFileHandlerFactory implements InputAdapterFactory {
      *
      * @param fallback what the character is when the feed does not mention it
      */
-    private static Character character(String name, String setting, Character fallback) {
+    private static @Nullable Character character(String name, @Nullable String setting, @Nullable Character fallback) {
         if (setting == null) {
             return fallback;
         }
