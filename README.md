@@ -621,15 +621,46 @@ Excel needs none of these: a spreadsheet carries typed cells, so a date or a num
 | Key | Default | Meaning |
 |-----|---------|---------|
 | `fieldSeparator` | tab | Column separator. |
-| `header` | `true` | Whether the first row names the columns. With `false`, field selectors are 1-based column positions (`"1"` → first column). |
+| `header` | `present` | Whether the first row names the columns: `present`/`true`, or `absent`/`false`. With the header absent, field selectors are 1-based column positions (`"1"` → first column). Anything else is refused rather than read as absent. |
+| `quote` | `"` | What opens and closes a quoted field. Empty switches quoting off, leaving quotes as ordinary characters. |
+| `comment` | none | What begins a comment outside a quoted field. Unset, no character does. |
+| `emptyLine` | `skip` | What an empty line means: `skip`, or `stop` to end the data there. |
 | `charset` | platform default | Character set, e.g. `UTF-8`. |
 
 A record is a line, and there is nothing to configure about that: a file may end its lines with `\n`, `\r\n` or `\r`
 and is read the same way, so a file written on Windows loads on Linux unchanged. The lines are read as the loader
 consumes them, so the size of a file is not the size of the memory it needs.
 
-Quoted fields are not supported yet: a separator inside a value splits it, so a feed whose values may contain the
-separator needs one that does not occur in the data (a tab, say).
+Inside a **quoted field** the separator and the line break are ordinary characters, and a doubled quote is one
+literal quote - so `"Doe, Alice"` is one value, `"she said ""no"""` is `she said "no"`, and a record runs over as
+many lines as a quoted field needs. That last part is the only thing that makes a record more than a line, and it is
+what a spreadsheet export produces.
+
+A quote is structural **only where a field begins** - right after a separator, or at the start of the record.
+Anywhere else it is data, so `5" pipe` and `he said "no"` read as they are written. The strict reading would call
+those an error; this one leaves files that load today loading. Where a value genuinely starts with a quote that is
+data, set `quote` to nothing and no quote is special anywhere.
+
+A quoted field that is never closed would otherwise swallow the rest of the file into a single record and report a
+load of one row, so a record that stays open for more than a thousand lines is refused, naming the line that opened
+it.
+
+A **comment** runs from the comment character to the end of the record, and only outside a quoted field - inside one
+the character is data, which is why the comment is found by the same scan that reads the fields rather than by
+looking at the line. Nothing is a comment character unless the feed names one: a value like `#12345` is common enough
+that the setting has to be asked for. A line that is nothing but a comment is not a record, and a banner of them at
+the top of a generated file is looked past to find the header:
+
+    "properties": { "fieldSeparator": ",", "comment": "#" }
+
+    # produced 2026-07-28 by the nightly job
+    id,name
+    1,Alice          # this trailing comment is cut off
+    2,"a # inside quotes is data"
+
+An **empty line** is nothing at all by default and the file goes on. With `emptyLine = stop` it ends the data
+instead, for a feed that writes a trailer - a checksum, a record count - after a blank line. A comment line never
+stops anything, whatever is left of it once the comment is taken off.
 
 For CSV a record selector's `selector` is a *first-column discriminator*. Headerless feeds often interleave several
 record types in one file, the first column naming the type and the columns that follow varying in number, meaning and

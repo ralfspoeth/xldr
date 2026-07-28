@@ -17,6 +17,19 @@ The versions are the git tags `xldr-<version>`; the published artifacts carry th
 
 ### Added
 
+- The CSV adapter takes a `comment` character - none by default, since a value like `#12345` is common enough that
+  the setting has to be asked for. A comment runs to the end of the record and only outside a quoted field, where the
+  character is data; a line that is nothing but a comment is not a record, and a banner of them above the header is
+  looked past.
+- `emptyLine = stop` ends the data at the first empty line, for a feed that writes a trailer after a blank one. The
+  default, `skip`, is what the adapter did before. A comment line never stops anything, whatever is left of it.
+- `header` accepts `present` and `absent` beside `true` and `false`, the words the header itself is spoken of in.
+- The CSV adapter reads quoted fields: inside one, the separator and the line break are data, and a doubled quote is
+  one literal quote. A record therefore spans as many lines as a quoted field needs, which is what a spreadsheet
+  export produces. A quote is structural only where a field begins, so a value like `5" pipe` still reads as it is
+  written and a file that loads today keeps loading; the new `quote` property (default `"`) switches the whole thing
+  off when set to nothing. A quoted field left open for more than a thousand lines is refused, naming the line that
+  opened it, rather than swallowing the rest of the file into one record.
 - Two expression functions: `format(value, 'pattern')` renders a date or timestamp as text, and
   `parse(text, 'pattern')` reads one from text in a notation no adapter recognises - per column, where the feed-wide
   `dateFormat` property is too broad a brush. `format` is also the way to put a timestamp into a *text* column and
@@ -75,6 +88,8 @@ The versions are the git tags `xldr-<version>`; the published artifacts carry th
 
 ### Changed
 
+- A CSV `header` setting that is none of the four accepted words is refused. `Boolean.parseBoolean` used to read
+  `header = yes` as `false` - a headerless read of a file that has a header, and a column of nulls to show for it.
 - A record selector's `selector` is now optional, in both readers and in both published schemas. For a CSV with a
   header or a fixed-length file the whole file holds one kind of record and there is nothing to locate, yet a spec
   had to carry a selector anyway - and for CSV, where a selector is a first-column discriminator, giving one made the

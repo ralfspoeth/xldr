@@ -3,6 +3,7 @@ package io.github.ralfspoeth.xldr.csv.test;
 import io.github.ralfspoeth.xldr.ia.InputAdapter;
 import io.github.ralfspoeth.xldr.ia.Field;
 import io.github.ralfspoeth.xldr.ia.InputAdapterFactory;
+import io.github.ralfspoeth.xldr.ia.Row;
 import io.github.ralfspoeth.xldr.spec.DataType;
 import io.github.ralfspoeth.xldr.spec.FieldSelectorSpec;
 import io.github.ralfspoeth.xldr.spec.InputSpec;
@@ -21,6 +22,8 @@ import java.util.Set;
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 public class CsvFileHandlerTest {
 
@@ -42,6 +45,16 @@ public class CsvFileHandlerTest {
             new RecordSelectorSpec("people", null, List.of(
                     new FieldSelectorSpec("id", "id", DataType.STRING),
                     new FieldSelectorSpec("name", "name", DataType.STRING)
+            ))
+    );
+
+    // the same, plus a free-text column - the one that carries separators,
+    // line breaks and quotes in a real feed
+    private static final InputSpec SPEC_WITH_NOTE = spec(COMMAS,
+            new RecordSelectorSpec("people", null, List.of(
+                    new FieldSelectorSpec("id", "id", DataType.STRING),
+                    new FieldSelectorSpec("name", "name", DataType.STRING),
+                    new FieldSelectorSpec("note", "note", DataType.STRING)
             ))
     );
 
@@ -237,6 +250,185 @@ public class CsvFileHandlerTest {
                     () -> assertEquals("1003", rows.get(2).get("2")),
                     () -> assertEquals("INITECH", rows.get(2).get("4"))
             );
+        }
+    }
+
+    /**
+     * A quoted field may carry the separator and a line break, and a doubled
+     * quote inside it is one literal quote. The record then spans as many lines
+     * as the field needs, which is what a spreadsheet export looks like.
+     */
+    @Test
+    public void readsQuotedFields() throws IOException {
+        var csv = """
+                id,name,note
+                1,"Doe, Alice","she said ""no""!"
+                2,"Roe, Bob","first line
+                second line"
+                3,plain,plain
+                """;
+        var rows = rowsOf(SPEC_WITH_NOTE, csv, "id", "name", "note");
+
+        assertEquals(3, rows.size());
+        assertAll(
+                () -> assertEquals("Doe, Alice", rows.get(0).get("name"), "the separator is data here"),
+                () -> assertEquals("she said \"no\"!", rows.get(0).get("note")),
+                () -> assertEquals("Roe, Bob", rows.get(1).get("name")),
+                () -> assertEquals("first line\nsecond line", rows.get(1).get("note")),
+                () -> assertEquals("plain", rows.get(2).get("name"))
+        );
+    }
+
+    /**
+     * A quote is structural only where a field begins. Anywhere else it is an
+     * ordinary character, so a file that carries inch marks or an inline
+     * quotation reads as it did before quoting was understood at all.
+     */
+    @Test
+    public void aQuoteInsideAFieldIsAnOrdinaryCharacter() throws IOException {
+        var csv = """
+                id,name,note
+                1,5" pipe,he said "no" twice
+                """;
+        var rows = rowsOf(SPEC_WITH_NOTE, csv, "id", "name", "note");
+
+        assertAll(
+                () -> assertEquals("5\" pipe", rows.getFirst().get("name")),
+                () -> assertEquals("he said \"no\" twice", rows.getFirst().get("note"))
+        );
+    }
+
+    /**
+     * Setting {@code quote} to nothing switches quoting off, for a feed whose
+     * values do start with a quote and mean it literally.
+     */
+    @Test
+    public void quotingCanBeSwitchedOff() throws IOException {
+        var spec = spec(Map.of("fieldSeparator", ",", "quote", ""),
+                new RecordSelectorSpec("people", null, List.of(
+                        new FieldSelectorSpec("id", "id", DataType.STRING),
+                        new FieldSelectorSpec("name", "name", DataType.STRING)
+                )));
+        var rows = rowsOf(spec, "id,name\n1,\"quoted\"\n", "id", "name");
+
+        assertEquals("\"quoted\"", rows.getFirst().get("name"));
+    }
+
+    /**
+     * A stray quote at the start of a field would otherwise swallow the rest of
+     * the file into one record and report a load of one row. It is called what
+     * it is instead, and the message names the line that opened it.
+     */
+    @Test
+    public void reportsAnUnterminatedQuote() {
+        var csv = """
+                id,name,note
+                1,"unclosed,note
+                2,Bob,fine
+                """;
+        var thrown = assertThrows(IllegalArgumentException.class,
+                () -> rowsOf(SPEC_WITH_NOTE, csv, "id", "name", "note"));
+        // line 2 of the file: the header is line 1, and an author counts from there
+        assertTrue(thrown.getMessage().contains("line 2"), thrown.getMessage());
+    }
+
+    /**
+     * {@code present} and {@code absent} say what {@code true} and {@code false}
+     * say, in the words the thing itself is spoken of in. A setting that is
+     * none of the four is refused rather than read as {@code false}, which would
+     * be a headerless read of a file that has a header.
+     */
+    @Test
+    public void headerMaybeSaidToBePresentOrAbsent() throws IOException {
+        var withHeader = spec(Map.of("fieldSeparator", ",", "header", "present"),
+                new RecordSelectorSpec("people", null, List.of(
+                        new FieldSelectorSpec("id", "id", DataType.STRING),
+                        new FieldSelectorSpec("name", "name", DataType.STRING))));
+        var withoutHeader = spec(Map.of("fieldSeparator", ",", "header", "absent"),
+                new RecordSelectorSpec("people", null, List.of(
+                        new FieldSelectorSpec("1", "1", DataType.STRING),
+                        new FieldSelectorSpec("2", "2", DataType.STRING))));
+
+        var named = rowsOf(withHeader, "id,name\n1,Alice\n", "id", "name");
+        assertEquals("Alice", named.getFirst().get("name"));
+
+        var positional = rowsOf(withoutHeader, "1,Alice\n", "1", "2");
+        assertEquals("Alice", positional.getFirst().get("2"));
+
+        var nonsense = spec(Map.of("fieldSeparator", ",", "header", "yes"),
+                new RecordSelectorSpec("people", null, List.of()));
+        assertThrows(IllegalArgumentException.class, () -> adapterFor(nonsense));
+    }
+
+    /**
+     * An empty line is nothing by default, and the end of the data where the
+     * feed says so - the shape of a file that carries a trailer after a blank
+     * line.
+     */
+    @Test
+    public void anEmptyLineIsSkippedOrStopsTheData() throws IOException {
+        var csv = """
+                id,name,note
+                1,Alice,a
+
+                2,Bob,b
+                """;
+        assertEquals(2, rowsOf(SPEC_WITH_NOTE, csv, "id", "name", "note").size());
+
+        var stopping = spec(Map.of("fieldSeparator", ",", "emptyLine", "stop"),
+                new RecordSelectorSpec("people", null, List.of(
+                        new FieldSelectorSpec("id", "id", DataType.STRING),
+                        new FieldSelectorSpec("name", "name", DataType.STRING),
+                        new FieldSelectorSpec("note", "note", DataType.STRING))));
+        var rows = rowsOf(stopping, csv, "id", "name", "note");
+        assertEquals(1, rows.size(), "everything after the empty line is a trailer");
+        assertEquals("Alice", rows.getFirst().get("name"));
+    }
+
+    /**
+     * A comment runs from the comment character to the end of the record, but
+     * only outside a quoted field - inside one it is data. A line that is
+     * nothing but a comment is not a record, and a banner of them is looked past
+     * to find the header.
+     */
+    @Test
+    public void readsComments() throws IOException {
+        var commented = spec(Map.of("fieldSeparator", ",", "comment", "#"),
+                new RecordSelectorSpec("people", null, List.of(
+                        new FieldSelectorSpec("id", "id", DataType.STRING),
+                        new FieldSelectorSpec("name", "name", DataType.STRING),
+                        new FieldSelectorSpec("note", "note", DataType.STRING))));
+        var csv = """
+                # produced 2026-07-28 by the nightly job
+                id,name,note
+                1,Alice,plain # trailing comment
+                # a whole line of comment
+                2,Bob,"a # inside quotes is data"
+                """;
+        var rows = rowsOf(commented, csv, "id", "name", "note");
+
+        assertEquals(2, rows.size());
+        assertAll(
+                () -> assertEquals("Alice", rows.get(0).get("name"), "the banner is not the header"),
+                () -> assertEquals("plain", rows.get(0).get("note"), "the comment is cut, the value stripped"),
+                () -> assertEquals("a # inside quotes is data", rows.get(1).get("note"))
+        );
+    }
+
+    /**
+     * A comment character is only a comment character where the feed names one;
+     * by default it is data, since a value like an order number may well start
+     * with a hash.
+     */
+    @Test
+    public void withoutTheSettingAcommentCharacterIsData() throws IOException {
+        var rows = rowsOf(SPEC_WITH_NOTE, "id,name,note\n1,Alice,#12345\n", "id", "name", "note");
+        assertEquals("#12345", rows.getFirst().get("note"));
+    }
+
+    private static List<Row> rowsOf(InputSpec spec, String csv, String... fields) throws IOException {
+        try (var in = new ByteArrayInputStream(csv.getBytes(StandardCharsets.UTF_8))) {
+            return adapterFor(spec).parse(in, "people", Set.of(fields)).rows().toList();
         }
     }
 

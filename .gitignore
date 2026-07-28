@@ -2,3 +2,4 @@
 /.idea/
 *.iml
 .flattened-pom.xml
+.DS_Store
