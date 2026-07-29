@@ -439,8 +439,6 @@ public class LoaderTest {
         try (var conn = DriverManager.getConnection(jdbcUrl);
              var stmt = conn.createStatement()) {
             stmt.execute("drop table if exists stamped");
-            // not 'day': H2 2.x reserves it, as it does year, hour, minute and second
-            // wide enough for a long month name in any default locale
             stmt.execute("create table stamped(id varchar(10), loaded_at varchar(40), weekday varchar(60))");
         }
         var mapping = new RecordMappingSpec("rows", "stamped", List.of(

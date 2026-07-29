@@ -90,7 +90,7 @@ public class EndToEndIT {
 
     private static MappingSpec readSpec(String name) throws IOException {
         try (var in = resource(name)) {
-            return new JsonMappingSpecReader().readFrom(in);
+            return new JsonMappingSpecReader().read(in);
         }
     }
 

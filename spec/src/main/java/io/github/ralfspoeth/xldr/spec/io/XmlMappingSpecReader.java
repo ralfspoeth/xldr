@@ -50,7 +50,7 @@ public class XmlMappingSpecReader implements MappingSpecReader {
     }
 
     @Override
-    public MappingSpec readFrom(InputStream source) {
+    public MappingSpec read(InputStream source) {
         var root = Xml.parse(source).getDocumentElement();
         return new MappingSpec(
                 elements("input")
@@ -140,32 +140,15 @@ public class XmlMappingSpecReader implements MappingSpecReader {
     }
 
     private static RecordMappingSpec recordMappingSpec(Element mapping) {
-        renamed(mapping, "databaseTable", "table");
         return new RecordMappingSpec(
                 required(mapping, "recordSelector"),
                 required(mapping, "table"),
                 elements("fieldMapping")
                         .apply(mapping)
-                        .map(fm -> {
-                            renamed(fm, "databaseColumn", "column");
-                            return new FieldMappingSpec(required(fm, "column"), valueSource(fm));
-                        })
+                        .map(fm -> new FieldMappingSpec(required(fm, "column"), valueSource(fm)))
                         .toList(),
                 attributeValue("limit").apply(mapping).map(Integer::valueOf).orElse(null)
         );
-    }
-
-    /**
-     * Says so when a spec uses an attribute by the name it had before 0.10,
-     * rather than letting it be reported as the new one simply missing - which
-     * is what an author would otherwise be told about an attribute their spec
-     * plainly has. Can go once specs from before 0.10 are out of circulation.
-     */
-    private static void renamed(Element element, String was, String now) {
-        if (attributeValue(was).apply(element).isPresent()) {
-            throw new IllegalArgumentException("<" + element.getNodeName() + ">: '" + was
-                    + "' was renamed to '" + now + "' in 0.10");
-        }
     }
 
     /**

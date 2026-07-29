@@ -16,5 +16,6 @@ module io.github.ralfspoeth.xldr.spec {
     requires java.xml;
     requires static org.jspecify;
 
+    uses MappingSpecReader;
     provides MappingSpecReader with JsonMappingSpecReader, XmlMappingSpecReader;
 }

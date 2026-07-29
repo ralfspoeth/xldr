@@ -68,7 +68,7 @@ fix their versions in one place:
             <dependency>
                 <groupId>io.github.ralfspoeth.xldr</groupId>
                 <artifactId>bom</artifactId>
-                <version>0.11</version>
+                <version>0.12</version>
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>
@@ -94,10 +94,11 @@ unaffected.
 
 The `bom` manages exactly the published artifacts - `spec`, `ia`, `ldr` and the adapters `csv`, `xml`, `xlsx`, `flt`
 and `json` - and deliberately no third-party versions, so importing it does not bind you to the POI, HikariCP or JDBC
-driver versions this build happens to use. `app` and `it` are not published at all. An adapter is found through
-`ServiceLoader`, so it need only be on the module path:
+driver versions this build happens to use. `app` and `it` are not published at all. Both the spec readers and the
+adapters are found through `ServiceLoader`, so each need only be on the module path - naming the spec file is enough
+to read it, since its name says which format it is in:
 
-    var spec = new JsonMappingSpecReader().readFrom(reader);
+    var spec = readSpec(Path.of("/var/lib/xldr/people/spec.json"));
     var factory = ServiceLoader.load(InputAdapterFactory.class).stream()
             .map(ServiceLoader.Provider::get)
             .filter(f -> f.reads(spec.inputSpec()))
@@ -111,6 +112,11 @@ driver versions this build happens to use. `app` and `it` are not published at a
             }
         }
     }   // commits, or rolls back if any mapping failed
+
+`readSpec` is named to be static-imported, which is how it reads best - `readSpec(specFile)` at the call site, from
+`import static io.github.ralfspoeth.xldr.spec.io.MappingSpecReader.readSpec`. `MappingSpecReader.of(Path)` is the
+same lookup without the reading, for asking whether a file is a spec this build can read at all; `readSpec` insists,
+refusing an unsupported extension with an `IllegalArgumentException` before it opens anything.
 
 ## Building and Releasing
 
@@ -219,9 +225,10 @@ The XSD is the more permissive of the two, because XSD 1.0 cannot state either o
 allow arbitrary extra elements next to the named ones, so annotate an XML spec with XML comments rather than with
 elements of your own; a JSON spec takes an extra member anywhere.
 
-A schema is published whenever the format changes, and is named after the release that changed it: `mapping-spec-0.10`
-describes the format of 0.10 - and of 0.11, which did not change it - `mapping-spec-0.9` that of 0.9, and so on. An
-earlier one stays where it is, so a spec pinned to it keeps validating.
+A schema is published whenever the format changes, and is named after the release that changed it:
+`mapping-spec-0.10` describes the format of 0.10, and of 0.11 and 0.12, neither of which changed it;
+`mapping-spec-0.9` that of 0.9, and so on. An earlier one stays where it is, so a spec pinned to it keeps
+validating.
 
 What a schema cannot see is whether the spec makes sense as a whole - whether a mapping names a record selector the
 input actually declares, or whether the adapter accepts the selectors. The distribution checks that:

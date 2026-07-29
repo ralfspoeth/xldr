@@ -18,5 +18,4 @@ module io.github.ralfspoeth.xldr.app {
     requires org.slf4j.jul;
 
     uses io.github.ralfspoeth.xldr.ia.InputAdapterFactory;
-    uses io.github.ralfspoeth.xldr.spec.io.MappingSpecReader;
 }

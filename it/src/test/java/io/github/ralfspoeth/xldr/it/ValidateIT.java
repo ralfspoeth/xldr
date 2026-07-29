@@ -161,6 +161,19 @@ public class ValidateIT {
     }
 
     /**
+     * A reader is chosen by what it says it accepts, and no reader accepts a
+     * name in an unknown format - so the file is refused rather than handed to
+     * whichever reader the service loader offered first, which would report a
+     * parse error about a format the file was never in.
+     */
+    @Test
+    void rejectsAspecInAnUnknownFormat() throws IOException {
+        assertEquals(1, validate("spec.txt", """
+                { "input": { "mimeType": "text/csv", "accepts": "glob:*.csv", "recordSelectors": [] } }
+                """));
+    }
+
+    /**
      * Several specs at once, the exit code reporting whether any was bad - so a
      * whole feed tree can be checked in one call, in CI or before a deploy.
      */

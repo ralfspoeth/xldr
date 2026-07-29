@@ -37,7 +37,7 @@ public class JsonMappingSpecReader implements MappingSpecReader {
     }
 
     @Override
-    public MappingSpec readFrom(InputStream src) throws IOException {
+    public MappingSpec read(InputStream src) throws IOException {
         return Greyson.readValue(new InputStreamReader(src))
                 .map(v -> new MappingSpec(
                         PTR.member("input").apply(v).map(JsonMappingSpecReader::inputSpec).orElseThrow(),
@@ -96,7 +96,6 @@ public class JsonMappingSpecReader implements MappingSpecReader {
     }
 
     private static RecordMappingSpec recordMappingSpec(JsonValue element) {
-        renamed(element, "databaseTable", "table");
         return new RecordMappingSpec(
                 PTR.member("recordSelector").stringOrThrow(element),
                 PTR.member("table").stringOrThrow(element),
@@ -110,21 +109,7 @@ public class JsonMappingSpecReader implements MappingSpecReader {
     }
 
     private static FieldMappingSpec fieldMappingSpec(JsonValue fm) {
-        renamed(fm, "databaseColumn", "column");
         return new FieldMappingSpec(PTR.member("column").stringOrThrow(fm), valueSource(fm));
-    }
-
-    /**
-     * Says so when a spec uses a member by the name it had before 0.10, rather
-     * than letting it be reported as the new one simply missing - which is what
-     * an author would otherwise be told about a member their spec plainly has.
-     * Can go once specs from before 0.10 are out of circulation.
-     */
-    private static void renamed(JsonValue owner, String was, String now) {
-        if (PTR.member(was).apply(owner).isPresent()) {
-            throw new IllegalArgumentException(
-                    "'" + was + "' was renamed to '" + now + "' in 0.10: " + owner);
-        }
     }
 
     /**

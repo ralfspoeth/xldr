@@ -4,13 +4,11 @@ import io.github.ralfspoeth.xldr.spec.*;
 import io.github.ralfspoeth.xldr.spec.io.XmlMappingSpecReader;
 import org.junit.jupiter.api.Test;
 
-import java.io.ByteArrayInputStream;
 import java.io.IOException;
-import java.io.InputStream;
-import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
 
+import static io.github.ralfspoeth.xldr.spec.test.Streams.stream;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 public class XmlMappingSpecReaderTest {
@@ -67,7 +65,7 @@ public class XmlMappingSpecReaderTest {
                 )
         );
 
-        assertEquals(expected, new XmlMappingSpecReader().readFrom(stream(source)));
+        assertEquals(expected, new XmlMappingSpecReader().read(stream(source)));
     }
 
     /**
@@ -80,7 +78,7 @@ public class XmlMappingSpecReaderTest {
                     <input mimeType="text/csv"/>
                 </mappingSpec>
                 """;
-        var spec = new XmlMappingSpecReader().readFrom(stream(source));
+        var spec = new XmlMappingSpecReader().read(stream(source));
         assertEquals(List.of(), List.copyOf(spec.inputSpec().recordSelectors()));
         assertEquals(List.of(), List.copyOf(spec.recordMappingSpecs()));
     }
@@ -102,7 +100,7 @@ public class XmlMappingSpecReaderTest {
                     </mapping>
                 </mappingSpec>
                 """;
-        var spec = new XmlMappingSpecReader().readFrom(stream(source));
+        var spec = new XmlMappingSpecReader().read(stream(source));
 
         assertEquals(
                 List.of(
@@ -116,8 +114,4 @@ public class XmlMappingSpecReaderTest {
         assertEquals(new ValueSource.Var("batchId"), fm.source());
     }
 
-
-    private static InputStream stream(String string) {
-        return new ByteArrayInputStream(string.getBytes(StandardCharsets.UTF_8));
-    }
 }

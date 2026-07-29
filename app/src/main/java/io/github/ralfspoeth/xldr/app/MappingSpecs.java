@@ -1,18 +1,13 @@
 package io.github.ralfspoeth.xldr.app;
 
-import io.github.ralfspoeth.xldr.spec.MappingSpec;
-import io.github.ralfspoeth.xldr.spec.io.MappingSpecReader;
-
-import java.io.BufferedInputStream;
-import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Optional;
-import java.util.ServiceLoader;
 
 /**
- * Locating and reading the mapping spec of a feed directory.
+ * Locating the mapping spec of a feed directory. Reading it is
+ * {@link io.github.ralfspoeth.xldr.spec.io.MappingSpecReader#readSpec(Path)}.
  */
 final class MappingSpecs {
 
@@ -42,27 +37,4 @@ final class MappingSpecs {
         };
     }
 
-    static MappingSpec read(Path specFile) throws IOException {
-        var reader = readerFor(specFile);
-        try (var in = Files.newInputStream(specFile);
-             var bis = new BufferedInputStream(in))
-        {
-            return reader.readFrom(bis);
-        }
-    }
-
-    /**
-     * Picks the reader utilizing {@link MappingSpecReader#accepts(Path)}
-     * discriminator.
-     *
-     * @throws IllegalArgumentException if no reader can be found
-     */
-    private static MappingSpecReader readerFor(Path specFile) {
-        for (var sl : ServiceLoader.load(MappingSpecReader.class)) {
-            if (sl.accepts(specFile)) {
-                return sl;
-            }
-        }
-        throw new IllegalArgumentException("unsupported mapping spec format: " + specFile);
-    }
 }

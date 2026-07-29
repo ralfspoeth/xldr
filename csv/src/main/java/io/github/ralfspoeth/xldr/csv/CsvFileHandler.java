@@ -156,8 +156,6 @@ class CsvFileHandler implements InputAdapter {
             var text = partial.text();
             partial.clear();
             if (scan.blank()) {
-                // a comment is never the end of anything; an empty line is,
-                // where the feed says a trailer follows the data
                 return !(text.isBlank() && emptyLine == EmptyLine.STOP);
             }
             return downstream.push(scan.fields());

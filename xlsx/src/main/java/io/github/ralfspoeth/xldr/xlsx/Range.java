@@ -31,8 +31,6 @@ record Range(@Nullable String sheetName, int anchorColumn,
         var bang = s.indexOf('!');
         if (bang >= 0) {
             sheetName = s.substring(0, bang);
-            // the sheet is off the front now; what remains is the range itself,
-            // and the endpoints are parsed from that alone
             s = s.substring(bang + 1);
         }
 

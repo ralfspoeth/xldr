@@ -20,6 +20,8 @@ import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.stream.Collectors;
 
+import static io.github.ralfspoeth.xldr.spec.io.MappingSpecReader.readSpec;
+
 /**
  * Checks mapping specs without a database and without a server, so that the
  * author of a spec finds out what is wrong while writing it rather than from a
@@ -72,7 +74,7 @@ class Validate implements Callable<Integer> {
         }
         MappingSpec spec;
         try {
-            spec = MappingSpecs.read(file);
+            spec = readSpec(file);
         } catch (Exception e) {
             // a spec that does not parse cannot be checked any further
             return List.of("cannot be read: " + message(e));

@@ -8,15 +8,13 @@ import javax.xml.XMLConstants;
 import javax.xml.transform.stream.StreamSource;
 import javax.xml.validation.Schema;
 import javax.xml.validation.SchemaFactory;
-import java.io.ByteArrayInputStream;
 import java.io.File;
-import java.io.InputStream;
 import java.io.StringReader;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 
+import static io.github.ralfspoeth.xldr.spec.test.Streams.stream;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -82,7 +80,7 @@ public class XsdTest {
     public void theCompleteSpecIsValidAndReadable() throws Exception {
         assertDoesNotThrow(() -> validate(COMPLETE_SPEC));
 
-        var spec = new XmlMappingSpecReader().readFrom(stream(COMPLETE_SPEC));
+        var spec = new XmlMappingSpecReader().read(stream(COMPLETE_SPEC));
         assertTrue(spec.inputSpec().properties().containsKey("ns.f"));
         assertTrue(spec.recordMappingSpecs().stream()
                 .anyMatch(m -> m.fieldMappings().size() == 5));
@@ -119,7 +117,7 @@ public class XsdTest {
                 """;
         assertDoesNotThrow(() -> validate(xml));
 
-        var spec = new XmlMappingSpecReader().readFrom(stream(xml));
+        var spec = new XmlMappingSpecReader().read(stream(xml));
         var recordSelector = List.copyOf(spec.inputSpec().recordSelectors()).getFirst();
         assertNull(recordSelector.selector());
         assertThrows(IllegalArgumentException.class, recordSelector::requireSelector);
@@ -179,8 +177,4 @@ public class XsdTest {
         assertThrows(SAXException.class, () -> validate(xml), () -> "should not validate: " + xml);
     }
 
-
-    private static InputStream stream(String string) {
-        return new ByteArrayInputStream(string.getBytes(StandardCharsets.UTF_8));
-    }
 }

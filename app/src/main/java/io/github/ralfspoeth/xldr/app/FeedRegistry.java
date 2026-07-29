@@ -13,6 +13,7 @@ import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.PatternSyntaxException;
 
+import static io.github.ralfspoeth.xldr.spec.io.MappingSpecReader.readSpec;
 import static java.lang.System.Logger.Level.DEBUG;
 import static java.lang.System.Logger.Level.INFO;
 import static java.lang.System.Logger.Level.WARNING;
@@ -71,7 +72,7 @@ class FeedRegistry {
                 return;
             }
 
-            var mappingSpec = MappingSpecs.read(specFile);
+            var mappingSpec = readSpec(specFile);
             var sentinelSpec = mappingSpec.inputSpec().sentinel();
             var acceptsSpec = mappingSpec.inputSpec().accepts();
             if ((sentinelSpec == null) == (acceptsSpec == null)) {

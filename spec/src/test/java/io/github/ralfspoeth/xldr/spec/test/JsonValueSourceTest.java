@@ -6,14 +6,12 @@ import io.github.ralfspoeth.xldr.spec.VarSpec;
 import io.github.ralfspoeth.xldr.spec.io.JsonMappingSpecReader;
 import org.junit.jupiter.api.Test;
 
-import java.io.ByteArrayInputStream;
 import java.io.IOException;
-import java.io.InputStream;
 import java.math.BigDecimal;
-import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
 
+import static io.github.ralfspoeth.xldr.spec.test.Streams.stream;
 import static org.junit.jupiter.api.Assertions.*;
 
 public class JsonValueSourceTest {
@@ -44,7 +42,7 @@ public class JsonValueSourceTest {
                 }
                 """;
 
-        var spec = new JsonMappingSpecReader().readFrom(stream(source));
+        var spec = new JsonMappingSpecReader().read(stream(source));
         var mapping = List.copyOf(spec.recordMappingSpecs()).getFirst();
 
         assertEquals(100, mapping.limit());
@@ -86,7 +84,7 @@ public class JsonValueSourceTest {
                     ]
                 }
                 """;
-        var spec = new JsonMappingSpecReader().readFrom(stream(source));
+        var spec = new JsonMappingSpecReader().read(stream(source));
         var mapping = List.copyOf(spec.recordMappingSpecs()).getFirst();
         assertEquals(
                 List.of(new FieldMappingSpec(
@@ -109,7 +107,7 @@ public class JsonValueSourceTest {
                     ]
                 }
                 """;
-        var spec = new JsonMappingSpecReader().readFrom(stream(source));
+        var spec = new JsonMappingSpecReader().read(stream(source));
         assertNull(List.copyOf(spec.recordMappingSpecs()).getFirst().limit());
     }
 
@@ -130,7 +128,7 @@ public class JsonValueSourceTest {
                 }
                 """;
         assertThrows(IllegalArgumentException.class,
-                () -> new JsonMappingSpecReader().readFrom(stream(source)));
+                () -> new JsonMappingSpecReader().read(stream(source)));
     }
 
     /**
@@ -149,7 +147,7 @@ public class JsonValueSourceTest {
                     ]
                 }
                 """;
-        var spec = new JsonMappingSpecReader().readFrom(stream(source));
+        var spec = new JsonMappingSpecReader().read(stream(source));
 
         assertEquals(
                 List.of(new VarSpec("gid", new ValueSource.Expr("${xldr.filename}-${nextval('b')}"))),
@@ -193,8 +191,8 @@ public class JsonValueSourceTest {
                 """;
         var reader = new JsonMappingSpecReader();
         assertEquals(
-                reader.readFrom(stream(bare)),
-                reader.readFrom(stream(annotated)));
+                reader.read(stream(bare)),
+                reader.read(stream(annotated)));
     }
 
     /**
@@ -221,7 +219,7 @@ public class JsonValueSourceTest {
                     "mapping": []
                 }
                 """;
-        var input = new JsonMappingSpecReader().readFrom(stream(source)).inputSpec();
+        var input = new JsonMappingSpecReader().read(stream(source)).inputSpec();
 
         assertEquals(
                 Map.of("fieldSeparator", ";", "header", "false",
@@ -231,38 +229,6 @@ public class JsonValueSourceTest {
         assertEquals("glob:*.csv", input.accepts());
     }
 
-    /**
-     * A spec written before 0.10 is told what changed. Left to itself the reader
-     * would report the new name as missing, which reads like nonsense to an
-     * author looking at a spec that plainly names its table.
-     */
-    @Test
-    public void namesTheRenamedMembers() {
-        var withOldTable = """
-                {
-                    "input": { "mimeType": "text/csv" },
-                    "mapping": [
-                        { "recordSelector": "r", "databaseTable": "t",
-                          "fieldMapping": [ { "fieldSelector": "id", "column": "id" } ] }
-                    ]
-                }
-                """;
-        var withOldColumn = """
-                {
-                    "input": { "mimeType": "text/csv" },
-                    "mapping": [
-                        { "recordSelector": "r", "table": "t",
-                          "fieldMapping": [ { "fieldSelector": "id", "databaseColumn": "id" } ] }
-                    ]
-                }
-                """;
-        assertTrue(assertThrows(IllegalArgumentException.class,
-                () -> new JsonMappingSpecReader().readFrom(stream(withOldTable)))
-                .getMessage().contains("renamed"));
-        assertTrue(assertThrows(IllegalArgumentException.class,
-                () -> new JsonMappingSpecReader().readFrom(stream(withOldColumn)))
-                .getMessage().contains("renamed"));
-    }
 
     /**
      * A JSON null is a constant like any other and loads a SQL NULL. It has to
@@ -287,7 +253,7 @@ public class JsonValueSourceTest {
                 }
                 """;
         var mapping = List.copyOf(
-                new JsonMappingSpecReader().readFrom(stream(source)).recordMappingSpecs()).getFirst();
+                new JsonMappingSpecReader().read(stream(source)).recordMappingSpecs()).getFirst();
 
         assertEquals(
                 List.of(
@@ -316,14 +282,10 @@ public class JsonValueSourceTest {
                     "mapping": []
                 }
                 """;
-        var input = new JsonMappingSpecReader().readFrom(stream(source)).inputSpec();
+        var input = new JsonMappingSpecReader().read(stream(source)).inputSpec();
         var recordSelector = List.copyOf(input.recordSelectors()).getFirst();
 
         assertNull(recordSelector.selector());
         assertThrows(IllegalArgumentException.class, recordSelector::requireSelector);
     }
-    
-    private static InputStream stream(String string) {
-        return new ByteArrayInputStream(string.getBytes(StandardCharsets.UTF_8));
     }
-}

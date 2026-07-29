@@ -96,7 +96,7 @@ public class PipelineIT {
                     )""");
         }
 
-        var spec = new JsonMappingSpecReader().readFrom(stream(SPEC));
+        var spec = new JsonMappingSpecReader().read(stream(SPEC));
         var adapter = csvAdapterFor(spec.inputSpec());
         var ambient = Map.<String, Object>of("xldr.filename", "orders.csv");
 

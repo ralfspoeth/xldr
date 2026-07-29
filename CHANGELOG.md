@@ -6,6 +6,37 @@ ways that break existing code and existing specs; those changes are listed here 
 The versions are the git tags `xldr-<version>`; the published artifacts carry the same version under the group
 `io.github.ralfspoeth.xldr`.
 
+## 0.12
+
+The mapping-spec format is untouched again, so `mapping-spec-0.10` remains the schema. What changed is how a spec
+file is read: a reader says which files are its own, and naming a file is enough to read it.
+
+### Breaking
+
+- `MappingSpecReader.readFrom(Reader)` is `read(InputStream)`. A spec file is bytes until something decides the
+  encoding, and the readers are the things that know: JSON is UTF-8 by definition, and an XML document declares its
+  own, which a `Reader` would have taken the choice away from. The shorter name reads better on a type already
+  called a reader.
+- `MappingSpecReader` gained `accepts(Path)`, so a reader says for itself which files it takes rather than leaving
+  the server to keep a list of extensions. Anyone implementing the interface has to answer it.
+
+### Added
+
+- `MappingSpecReader.of(Path)` returns the reader that takes a spec file, chosen among the readers registered as
+  services. Picking a reader is knowledge about readers, so it lives with them rather than with each caller - and,
+  being in the same module as the readers, it can be tested next to them.
+- `MappingSpecReader.readSpec(Path)` goes the rest of the way: it picks the reader, opens the file and reads the
+  spec, so naming a spec file is all it takes to load one. Where `of` answers whether a file can be read at all,
+  this insists - a caller holding a spec file with nothing to fall back on wants the reason it could not be read,
+  not an empty result it has to invent a message for. The format is refused by name before the file is opened, so
+  an unsupported extension is an `IllegalArgumentException` and a missing file an `IOException`.
+
+### Removed
+
+- The hint that a spec still spelling `databaseTable` or `databaseColumn` gets, naming the 0.10 replacement. Two
+  releases on, a spec from before 0.10 is refused as one missing `table` or `column`, like any other spec that does
+  not name its target.
+
 ## 0.11
 
 Nothing about the mapping-spec format changed, so a 0.10 spec is a 0.11 spec and `mapping-spec-0.10` remains its
