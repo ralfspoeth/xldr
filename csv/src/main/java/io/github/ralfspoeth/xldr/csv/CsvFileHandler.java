@@ -33,7 +33,7 @@ class CsvFileHandler implements InputAdapter {
      * is called what it is. Without a limit a single stray quote would swallow
      * the rest of the file into one record and the load would report one row.
      */
-    private static final int MAX_LINES_PER_RECORD = 1_000;
+    private static final int MAX_LINES_PER_RECORD = 256;
 
     private final String fieldSeparator;
     private final Charset charset;
@@ -84,7 +84,7 @@ class CsvFileHandler implements InputAdapter {
                         Formats formats) implements Row {
         @Override
         public @Nullable Object get(String name) {
-            var i = positions.getOrDefault(name, -1);
+            int i = positions.getOrDefault(name, -1);
             if (i < 0 || i >= values.length) {
                 return null;
             }
