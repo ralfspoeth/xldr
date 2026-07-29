@@ -75,15 +75,16 @@ class CsvFileHandler implements InputAdapter {
     }
 
     /**
-     * One data line. A column the line does not have at all is null; one it has
-     * is converted according to the field's declared {@link DataType}, which
-     * strips it and treats a blank as absent.
+     * One data line, read by field name: a mapping names a field, and the field
+     * says which column it is. A column the line does not have at all is null;
+     * one it has is converted according to the field's declared
+     * {@link DataType}, which strips it and treats a blank as absent.
      */
-    private record Line(String[] values, ToIntFunction<String> index, Map<String, DataType> types,
+    private record Line(String[] values, Map<String, Integer> positions, Map<String, DataType> types,
                         Formats formats) implements Row {
         @Override
         public @Nullable Object get(String name) {
-            var i = index.applyAsInt(name);
+            var i = positions.getOrDefault(name, -1);
             if (i < 0 || i >= values.length) {
                 return null;
             }
@@ -122,6 +123,7 @@ class CsvFileHandler implements InputAdapter {
         }
 
         var types = typesOf(record.fieldSelectors());
+        var positions = positions(record.fieldSelectors(), index);
         // the record selector's selector, if set, is the value the first column
         // must equal for a line to belong to this record type - the discriminator
         // of an interleaved, headerless file; absent means every line matches
@@ -129,8 +131,29 @@ class CsvFileHandler implements InputAdapter {
         var rows = lines.lines()
                 .gather(records(linesRead))
                 .filter(values -> matches(discriminator, values))
-                .map(values -> (Row) new Line(values, index, types, formats));
+                .map(values -> (Row) new Line(values, positions, types, formats));
         return new Result(fields, rows);
+    }
+
+    /**
+     * Which column each field sits in, resolved once for the file.
+     * <p>
+     * A field's {@code selector} says where to read it - a column name where the
+     * file has a header, a 1-based position where it has none - and its
+     * {@code name} is what a mapping calls it by, exactly as in every other
+     * adapter. The two are the same word often enough that a spec can leave them
+     * alike, but they need not be.
+     *
+     * @param index resolves a selector to a column position, or -1 for a column
+     *              this file does not have
+     */
+    private static Map<String, Integer> positions(
+            Collection<FieldSelectorSpec> fieldSelectors, ToIntFunction<String> index) {
+        Map<String, Integer> positions = new HashMap<>();
+        for (var fs : fieldSelectors) {
+            positions.putIfAbsent(fs.name(), index.applyAsInt(fs.selector()));
+        }
+        return positions;
     }
 
     /**
@@ -294,13 +317,16 @@ class CsvFileHandler implements InputAdapter {
         for (int i = 0; i < headers.length; i++) {
             index.putIfAbsent(headers[i], i);
         }
-        return name -> index.getOrDefault(name, -1);
+        return selector -> index.getOrDefault(selector, -1);
     }
 
+    /**
+     * Without a header a selector is a 1-based column position.
+     */
     private static ToIntFunction<String> positionalIndex() {
-        return name -> {
+        return selector -> {
             try {
-                return Integer.parseInt(name.strip()) - 1;
+                return Integer.parseInt(selector.strip()) - 1;
             } catch (NumberFormatException e) {
                 return -1;
             }

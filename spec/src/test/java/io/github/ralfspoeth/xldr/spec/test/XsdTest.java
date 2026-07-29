@@ -16,6 +16,7 @@ import java.util.List;
 
 import static io.github.ralfspoeth.xldr.spec.test.Streams.stream;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -30,7 +31,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 public class XsdTest {
 
-    private static final Path SCHEMA = Path.of("..", "docs", "schema", "mapping-spec-0.10.xsd");
+    private static final Path SCHEMA = Path.of("..", "docs", "schema", "mapping-spec-0.13.xsd");
 
     /**
      * Every element and attribute the reader knows, in one document.
@@ -137,6 +138,37 @@ public class XsdTest {
                     <input mimeType="text/csv" accepts="glob:*.csv"/>
                 </mappingSpec>
                 """));
+    }
+
+    /**
+     * A {@code comment} attribute is allowed on every element and ignored by the
+     * reader. It is named in the schema rather than left to the general
+     * tolerance of the readers, because the schema refuses an attribute it does
+     * not know - and that refusal is what catches a misspelling, which is what
+     * an unknown attribute usually is.
+     */
+    @Test
+    public void aCommentAttributeIsAllowedEverywhereAndIgnored() throws Exception {
+        var xml = """
+                <mappingSpec comment="the fund feed">
+                    <input mimeType="text/csv" accepts="glob:*.csv" comment="delivered nightly">
+                        <var name="source" constant="PD" comment="the sending system"/>
+                        <recordSelector name="people" comment="one record per line">
+                            <fieldSelector name="id" selector="Id" type="INTEGER" comment="the key"/>
+                        </recordSelector>
+                    </input>
+                    <mapping recordSelector="people" table="person" comment="the only mapping">
+                        <fieldMapping fieldSelector="id" column="id" comment="straight through"/>
+                        <fieldMapping column="country_id">
+                            <lookup table="country" column="id" keyColumn="iso" constant="DE" comment="fixed"/>
+                        </fieldMapping>
+                    </mapping>
+                </mappingSpec>
+                """;
+        assertDoesNotThrow(() -> validate(xml));
+
+        var spec = new XmlMappingSpecReader().read(stream(xml));
+        assertEquals("person", List.copyOf(spec.recordMappingSpecs()).getFirst().table());
     }
 
     /**

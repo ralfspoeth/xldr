@@ -6,6 +6,35 @@ ways that break existing code and existing specs; those changes are listed here 
 The versions are the git tags `xldr-<version>`; the published artifacts carry the same version under the group
 `io.github.ralfspoeth.xldr`.
 
+## 0.13
+
+### Added
+
+- A `comment` member, on every object of a JSON spec and every element of an XML one, for a note to whoever reads
+  the spec next. The readers have always ignored what they do not know, so this changes nothing at load time; what
+  it changes is the schemas, which now name the annotation and go on refusing every other unknown name. That
+  refusal is worth keeping: further down a spec an unknown name is far more often a misspelling than a note, and
+  `fieldSelector` written for `fieldSelectors` costs a record every one of its fields without a word from the reader.
+- The schemas are published as `mapping-spec-0.13`; `mapping-spec-0.10`, which describes 0.10 to 0.12, stays where
+  it is. A 0.12 spec is valid under 0.13 - the format only grew.
+
+### Fixed
+
+- `bin/xldr validate` reported a mapping reading a field of a record selector that declares no field selectors as
+  "reads the field 'n1', but no record is in scope here" - the wording meant for a var, and pointing away from the
+  mistake. It says the record selector declares no field selectors at all, which is what a spec spelling
+  `fieldSelector` for `fieldSelectors` has done to itself.
+- The CSV adapter ignored a field selector's `selector` and addressed columns by the field's `name` instead. Every
+  other adapter reads the `name` as the handle a mapping uses and the `selector` as where to find the value, and a
+  CSV spec that did the same - `{"name": "n1", "selector": "Name"}` - silently loaded nulls into every mapped
+  column. It went unnoticed because a CSV field is usually called after its column, which makes the two alike. A
+  spec whose names and selectors already agree is unaffected.
+
+### Changed
+
+- The README no longer says a JSON spec takes an extra member anywhere. The readers do ignore one anywhere, but the
+  schemas allow only the named `comment` below the top level, and deliberately so - see above.
+
 ## 0.12
 
 The mapping-spec format is untouched again, so `mapping-spec-0.10` remains the schema. What changed is how a spec

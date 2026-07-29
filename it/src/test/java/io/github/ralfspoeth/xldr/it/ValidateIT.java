@@ -161,6 +161,25 @@ public class ValidateIT {
     }
 
     /**
+     * A record selector spelled {@code fieldSelector} declares no field
+     * selectors at all - the reader ignores what it does not know - so every
+     * mapped column loads null while the load reports success. The report has
+     * to say that the record selector is empty rather than that no record is in
+     * scope, which is what a var would be told and points nowhere near the
+     * missing letter.
+     */
+    @Test
+    void reportsArecordSelectorWithNoFieldSelectors() throws IOException {
+        assertEquals(1, validate("empty.json", """
+                { "input": { "mimeType": "text/csv", "accepts": "glob:*.csv",
+                    "recordSelectors": [ { "name": "all",
+                        "fieldSelector": [ { "name": "n1", "selector": "Name" } ] } ] },
+                  "mapping": [ { "recordSelector": "all", "table": "t",
+                                 "fieldMapping": [ { "fieldSelector": "n1", "column": "c" } ] } ] }
+                """));
+    }
+
+    /**
      * A reader is chosen by what it says it accepts, and no reader accepts a
      * name in an unknown format - so the file is refused rather than handed to
      * whichever reader the service loader offered first, which would report a

@@ -68,7 +68,7 @@ fix their versions in one place:
             <dependency>
                 <groupId>io.github.ralfspoeth.xldr</groupId>
                 <artifactId>bom</artifactId>
-                <version>0.12</version>
+                <version>0.13</version>
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>
@@ -195,8 +195,8 @@ following formats:
 * .xml: well-formed XML complying to a schema described below
 
 A spec may carry more than the members the reader consumes. Anything a reader does not recognise - a JSON member, an
-XML element or attribute, at any level - is ignored, so an author is free to annotate a spec with, say, a
-`"comments": "..."` member without deviating from the format. The one exception is `load`: that name is **reserved**.
+XML element or attribute, at any level - is ignored, so an annotation never breaks a spec; the schemas, being
+stricter, name `comment` for exactly that purpose. The one exception is `load`: that name is **reserved**.
 It carried the commit policy in an earlier version and may return, so it must not be repurposed for the author's own
 data; a spec that still contains an old `load` block is simply ignored today.
 
@@ -206,12 +206,12 @@ Both formats have a published schema, so an editor can check a spec before it ev
 only reports a broken spec in its log, by leaving the feed inactive. Point at the schema from the spec itself:
 
     {
-      "$schema": "https://ralfspoeth.github.io/xldr/schema/mapping-spec-0.10.json",
+      "$schema": "https://ralfspoeth.github.io/xldr/schema/mapping-spec-0.13.json",
       "input": { ... }
     }
 
     <mappingSpec xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-                 xsi:noNamespaceSchemaLocation="https://ralfspoeth.github.io/xldr/schema/mapping-spec-0.10.xsd">
+                 xsi:noNamespaceSchemaLocation="https://ralfspoeth.github.io/xldr/schema/mapping-spec-0.13.xsd">
 
 Both are ignored by the readers - `$schema` is just another unrecognised member, and `xsi:` attributes carry no
 meaning for a spec that has no namespace of its own. IntelliJ and VS Code both validate and autocomplete from them.
@@ -222,13 +222,22 @@ neither, a field mapping with no source or several, and a var that reads a field
 is read, in particular that every selector compiles.
 
 The XSD is the more permissive of the two, because XSD 1.0 cannot state either of those exactly-one rules. Nor can it
-allow arbitrary extra elements next to the named ones, so annotate an XML spec with XML comments rather than with
-elements of your own; a JSON spec takes an extra member anywhere.
+allow arbitrary extra elements next to the named ones, so a longer note belongs in an XML comment rather than in an
+element of your own.
+
+Annotate a spec with `comment`, which every element and every object takes and both readers ignore:
+
+    { "recordSelector": "people", "table": "person", "comment": "the nightly delivery", ... }
+    <mapping recordSelector="people" table="person" comment="the nightly delivery">
+
+The readers ignore any member or attribute they do not know, but the schemas name this one and go on refusing the
+rest - because further down a spec an unknown name is far more often a misspelling than a note. `fieldSelector`
+written for `fieldSelectors` costs a record every one of its fields, and no reader will say so: ignoring the
+unknown is exactly what it promises.
 
 A schema is published whenever the format changes, and is named after the release that changed it:
-`mapping-spec-0.10` describes the format of 0.10, and of 0.11 and 0.12, neither of which changed it;
-`mapping-spec-0.9` that of 0.9, and so on. An earlier one stays where it is, so a spec pinned to it keeps
-validating.
+`mapping-spec-0.13` describes the format of 0.13, `mapping-spec-0.10` that of 0.10 to 0.12, which did not
+change it, and so on. An earlier one stays where it is, so a spec pinned to it keeps validating.
 
 What a schema cannot see is whether the spec makes sense as a whole - whether a mapping names a record selector the
 input actually declares, or whether the adapter accepts the selectors. The distribution checks that:
@@ -633,7 +642,7 @@ Excel needs none of these: a spreadsheet carries typed cells, so a date or a num
 | Key | Default | Meaning |
 |-----|---------|---------|
 | `fieldSeparator` | tab | Column separator. |
-| `header` | `present` | Whether the first row names the columns: `present`/`true`, or `absent`/`false`. With the header absent, field selectors are 1-based column positions (`"1"` → first column). Anything else is refused rather than read as absent. |
+| `header` | `present` | Whether the first row names the columns: `present`/`true`, or `absent`/`false`. A field selector's `selector` is a column name where the header is present and a 1-based position where it is absent (`"1"` → first column); its `name` is what a mapping calls it by, as in every adapter. Anything else is refused rather than read as absent. |
 | `quote` | `"` | What opens and closes a quoted field. Empty switches quoting off, leaving quotes as ordinary characters. |
 | `comment` | none | What begins a comment outside a quoted field. Unset, no character does. |
 | `emptyLine` | `skip` | What an empty line means: `skip`, or `stop` to end the data there. |

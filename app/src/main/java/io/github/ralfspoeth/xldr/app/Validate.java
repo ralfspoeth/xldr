@@ -179,7 +179,7 @@ class Validate implements Callable<Integer> {
         var declaredVars = new LinkedHashSet<String>();
         for (var v : input.vars()) {
             // a var may only use one declared before it, since they are evaluated in order
-            checkSources(v.source(), Set.of(), declaredVars, "var '" + v.name() + "'", problems);
+            checkSources(v.source(), null, declaredVars, "var '" + v.name() + "'", problems);
             declaredVars.add(v.name());
         }
 
@@ -203,14 +203,23 @@ class Validate implements Callable<Integer> {
 
     /**
      * Walks a value source, a lookup key being one in turn.
+     *
+     * @param fields the fields of the record in scope, or {@code null} where
+     *               there is no record at all - a var. The two differ: a record
+     *               selector that declares no fields is a spec with something
+     *               missing, and saying "no record is in scope" about it would
+     *               point away from the mistake.
      */
     private static void checkSources(ValueSource source, Set<String> fields, Set<String> vars,
                                      String where, List<String> problems) {
         switch (source) {
             case ValueSource.Field f -> {
-                if (fields.isEmpty()) {
+                if (fields == null) {
                     problems.add(where + ": reads the field '" + f.fieldName()
                             + "', but no record is in scope here");
+                } else if (fields.isEmpty()) {
+                    problems.add(where + ": reads the field '" + f.fieldName()
+                            + "', but its record selector declares no field selectors at all");
                 } else if (!fields.contains(f.fieldName())) {
                     problems.add(where + ": the record selector declares no field '"
                             + f.fieldName() + "', but " + fields);

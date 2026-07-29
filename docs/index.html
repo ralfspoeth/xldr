@@ -54,7 +54,12 @@
         <th>XML</th>
     </tr>
     <tr>
-        <td>0.10 - 0.12 (current)</td>
+        <td>0.13 (current)</td>
+        <td><a href="schema/mapping-spec-0.13.json">mapping-spec-0.13.json</a></td>
+        <td><a href="schema/mapping-spec-0.13.xsd">mapping-spec-0.13.xsd</a></td>
+    </tr>
+    <tr>
+        <td>0.10 - 0.12</td>
         <td><a href="schema/mapping-spec-0.10.json">mapping-spec-0.10.json</a></td>
         <td><a href="schema/mapping-spec-0.10.xsd">mapping-spec-0.10.xsd</a></td>
     </tr>
@@ -78,6 +83,13 @@
 </p>
 
 <p>
+    In 0.13 every element takes an optional <code>comment</code>, for a note to whoever reads the spec next.
+    The readers have always ignored what they do not know; naming the annotation lets the schema go on refusing
+    everything else, which is how a misspelling like <code>fieldSelector</code> for <code>fieldSelectors</code>
+    gets caught.
+</p>
+
+<p>
     In 0.10 <code>databaseTable</code> became <code>table</code> and <code>databaseColumn</code> became
     <code>column</code>, the names a <code>lookup</code> had used all along; a spec from an earlier release has to be
     renamed, and is refused with a message saying so rather than silently. Also in 0.10, a <code>constant</code> may
@@ -91,7 +103,7 @@
 <p>In a JSON spec, as a member the reader does not recognise and therefore ignores:</p>
 
 <pre><code>{
-  "$schema": "https://ralfspoeth.github.io/xldr/schema/mapping-spec-0.10.json",
+  "$schema": "https://ralfspoeth.github.io/xldr/schema/mapping-spec-0.13.json",
   "input": {
     "mimeType": "text/csv",
     "accepts": "glob:*.csv",
@@ -104,7 +116,7 @@
 <p>In an XML spec, as the schema location of a document that has no namespace of its own:</p>
 
 <pre><code>&lt;mappingSpec xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-             xsi:noNamespaceSchemaLocation="https://ralfspoeth.github.io/xldr/schema/mapping-spec-0.10.xsd"&gt;
+             xsi:noNamespaceSchemaLocation="https://ralfspoeth.github.io/xldr/schema/mapping-spec-0.13.xsd"&gt;
     &lt;input mimeType="text/xml" accepts="glob:*.xml"&gt;
         ...
     &lt;/input&gt;

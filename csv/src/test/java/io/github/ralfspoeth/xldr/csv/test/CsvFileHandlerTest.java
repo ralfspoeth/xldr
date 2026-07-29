@@ -426,6 +426,55 @@ public class CsvFileHandlerTest {
         assertEquals("#12345", rows.getFirst().get("note"));
     }
 
+    /**
+     * A field's {@code name} is what a mapping calls it by; its {@code selector}
+     * says which column it is. The two are alike in most specs, which is why
+     * this went unnoticed: the adapter used to address columns by name and
+     * ignore the selector, so a spec that named its fields anything else - as
+     * every other adapter allows - read nothing but nulls.
+     */
+    @Test
+    public void aFieldsSelectorNamesTheColumn() throws IOException {
+        var spec = spec(Map.of("fieldSeparator", ";"),
+                new RecordSelectorSpec("people", null, List.of(
+                        new FieldSelectorSpec("n1", "Name", DataType.STRING),
+                        new FieldSelectorSpec("n2", "Text", DataType.STRING),
+                        new FieldSelectorSpec("n3", "Id", DataType.INTEGER)
+                )));
+        var rows = rowsOf(spec, """
+                Id;leer;Name;Text
+                1;;Hello;asdf
+                2;;World;asdf
+                """, "n1", "n2", "n3");
+
+        assertEquals(2, rows.size());
+        assertAll(
+                () -> assertEquals("Hello", rows.getFirst().get("n1")),
+                () -> assertEquals("asdf", rows.getFirst().get("n2")),
+                () -> assertEquals(1L, rows.getFirst().get("n3")),
+                () -> assertEquals("World", rows.get(1).get("n1"))
+        );
+    }
+
+    /**
+     * The same, without a header: the selector is the 1-based column position,
+     * and the name stays the mapping's handle.
+     */
+    @Test
+    public void aFieldsSelectorIsApositionWithoutAheader() throws IOException {
+        var spec = spec(Map.of("fieldSeparator", ";", "header", "absent"),
+                new RecordSelectorSpec("people", null, List.of(
+                        new FieldSelectorSpec("name", "3", DataType.STRING),
+                        new FieldSelectorSpec("id", "1", DataType.INTEGER)
+                )));
+        var rows = rowsOf(spec, "1;;Hello;asdf\n", "name", "id");
+
+        assertAll(
+                () -> assertEquals("Hello", rows.getFirst().get("name")),
+                () -> assertEquals(1L, rows.getFirst().get("id"))
+        );
+    }
+
     private static List<Row> rowsOf(InputSpec spec, String csv, String... fields) throws IOException {
         try (var in = new ByteArrayInputStream(csv.getBytes(StandardCharsets.UTF_8))) {
             return adapterFor(spec).parse(in, "people", Set.of(fields)).rows().toList();
