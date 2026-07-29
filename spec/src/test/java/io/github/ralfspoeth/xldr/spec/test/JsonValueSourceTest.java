@@ -6,9 +6,11 @@ import io.github.ralfspoeth.xldr.spec.VarSpec;
 import io.github.ralfspoeth.xldr.spec.io.JsonMappingSpecReader;
 import org.junit.jupiter.api.Test;
 
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
-import java.io.StringReader;
+import java.io.InputStream;
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
 
@@ -42,7 +44,7 @@ public class JsonValueSourceTest {
                 }
                 """;
 
-        var spec = new JsonMappingSpecReader().readFrom(new StringReader(source));
+        var spec = new JsonMappingSpecReader().readFrom(stream(source));
         var mapping = List.copyOf(spec.recordMappingSpecs()).getFirst();
 
         assertEquals(100, mapping.limit());
@@ -84,7 +86,7 @@ public class JsonValueSourceTest {
                     ]
                 }
                 """;
-        var spec = new JsonMappingSpecReader().readFrom(new StringReader(source));
+        var spec = new JsonMappingSpecReader().readFrom(stream(source));
         var mapping = List.copyOf(spec.recordMappingSpecs()).getFirst();
         assertEquals(
                 List.of(new FieldMappingSpec(
@@ -107,7 +109,7 @@ public class JsonValueSourceTest {
                     ]
                 }
                 """;
-        var spec = new JsonMappingSpecReader().readFrom(new StringReader(source));
+        var spec = new JsonMappingSpecReader().readFrom(stream(source));
         assertNull(List.copyOf(spec.recordMappingSpecs()).getFirst().limit());
     }
 
@@ -128,7 +130,7 @@ public class JsonValueSourceTest {
                 }
                 """;
         assertThrows(IllegalArgumentException.class,
-                () -> new JsonMappingSpecReader().readFrom(new StringReader(source)));
+                () -> new JsonMappingSpecReader().readFrom(stream(source)));
     }
 
     /**
@@ -147,7 +149,7 @@ public class JsonValueSourceTest {
                     ]
                 }
                 """;
-        var spec = new JsonMappingSpecReader().readFrom(new StringReader(source));
+        var spec = new JsonMappingSpecReader().readFrom(stream(source));
 
         assertEquals(
                 List.of(new VarSpec("gid", new ValueSource.Expr("${xldr.filename}-${nextval('b')}"))),
@@ -191,8 +193,8 @@ public class JsonValueSourceTest {
                 """;
         var reader = new JsonMappingSpecReader();
         assertEquals(
-                reader.readFrom(new StringReader(bare)),
-                reader.readFrom(new StringReader(annotated)));
+                reader.readFrom(stream(bare)),
+                reader.readFrom(stream(annotated)));
     }
 
     /**
@@ -219,7 +221,7 @@ public class JsonValueSourceTest {
                     "mapping": []
                 }
                 """;
-        var input = new JsonMappingSpecReader().readFrom(new StringReader(source)).inputSpec();
+        var input = new JsonMappingSpecReader().readFrom(stream(source)).inputSpec();
 
         assertEquals(
                 Map.of("fieldSeparator", ";", "header", "false",
@@ -255,10 +257,10 @@ public class JsonValueSourceTest {
                 }
                 """;
         assertTrue(assertThrows(IllegalArgumentException.class,
-                () -> new JsonMappingSpecReader().readFrom(new StringReader(withOldTable)))
+                () -> new JsonMappingSpecReader().readFrom(stream(withOldTable)))
                 .getMessage().contains("renamed"));
         assertTrue(assertThrows(IllegalArgumentException.class,
-                () -> new JsonMappingSpecReader().readFrom(new StringReader(withOldColumn)))
+                () -> new JsonMappingSpecReader().readFrom(stream(withOldColumn)))
                 .getMessage().contains("renamed"));
     }
 
@@ -285,7 +287,7 @@ public class JsonValueSourceTest {
                 }
                 """;
         var mapping = List.copyOf(
-                new JsonMappingSpecReader().readFrom(new StringReader(source)).recordMappingSpecs()).getFirst();
+                new JsonMappingSpecReader().readFrom(stream(source)).recordMappingSpecs()).getFirst();
 
         assertEquals(
                 List.of(
@@ -314,10 +316,14 @@ public class JsonValueSourceTest {
                     "mapping": []
                 }
                 """;
-        var input = new JsonMappingSpecReader().readFrom(new StringReader(source)).inputSpec();
+        var input = new JsonMappingSpecReader().readFrom(stream(source)).inputSpec();
         var recordSelector = List.copyOf(input.recordSelectors()).getFirst();
 
         assertNull(recordSelector.selector());
         assertThrows(IllegalArgumentException.class, recordSelector::requireSelector);
+    }
+    
+    private static InputStream stream(String string) {
+        return new ByteArrayInputStream(string.getBytes(StandardCharsets.UTF_8));
     }
 }

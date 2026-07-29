@@ -1,15 +1,15 @@
 package io.github.ralfspoeth.xldr.app;
 
 import io.github.ralfspoeth.xldr.spec.MappingSpec;
-import io.github.ralfspoeth.xldr.spec.io.JsonMappingSpecReader;
 import io.github.ralfspoeth.xldr.spec.io.MappingSpecReader;
-import io.github.ralfspoeth.xldr.spec.io.XmlMappingSpecReader;
 
+import java.io.BufferedInputStream;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Optional;
+import java.util.ServiceLoader;
 
 /**
  * Locating and reading the mapping spec of a feed directory.
@@ -44,27 +44,25 @@ final class MappingSpecs {
 
     static MappingSpec read(Path specFile) throws IOException {
         var reader = readerFor(specFile);
-        try (var in = Files.newBufferedReader(specFile)) {
-            return reader.readFrom(in);
+        try (var in = Files.newInputStream(specFile);
+             var bis = new BufferedInputStream(in))
+        {
+            return reader.readFrom(bis);
         }
     }
 
     /**
-     * Picks the reader by file name.
-     * <p>
-     * {@code MappingSpecReader} carries no discriminator - no {@code accepts(...)}
-     * the way {@code InputAdapterFactory} has one - so the implementations cannot
-     * be told apart through {@code ServiceLoader} even though {@code spec}
-     * declares them as providers.
+     * Picks the reader utilizing {@link MappingSpecReader#accepts(Path)}
+     * discriminator.
+     *
+     * @throws IllegalArgumentException if no reader can be found
      */
     private static MappingSpecReader readerFor(Path specFile) {
-        var name = specFile.getFileName().toString();
-        if (name.endsWith(".json")) {
-            return new JsonMappingSpecReader();
-        } else if (name.endsWith(".xml")) {
-            return new XmlMappingSpecReader();
-        } else {
-            throw new IllegalArgumentException("unsupported mapping spec format: " + specFile);
+        for (var sl : ServiceLoader.load(MappingSpecReader.class)) {
+            if (sl.accepts(specFile)) {
+                return sl;
+            }
         }
+        throw new IllegalArgumentException("unsupported mapping spec format: " + specFile);
     }
 }

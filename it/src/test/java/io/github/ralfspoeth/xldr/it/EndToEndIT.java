@@ -10,13 +10,11 @@ import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.ServiceLoader;
 
-import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.sql.DriverManager.getConnection;
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -91,7 +89,7 @@ public class EndToEndIT {
     }
 
     private static MappingSpec readSpec(String name) throws IOException {
-        try (var in = new InputStreamReader(resource(name), UTF_8)) {
+        try (var in = resource(name)) {
             return new JsonMappingSpecReader().readFrom(in);
         }
     }

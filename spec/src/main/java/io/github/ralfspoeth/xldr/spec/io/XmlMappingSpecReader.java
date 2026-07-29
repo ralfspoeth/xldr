@@ -4,7 +4,8 @@ import io.github.ralfspoeth.xldr.spec.*;
 import io.github.ralfspoeth.xmls.Xml;
 import org.w3c.dom.Element;
 
-import java.io.Reader;
+import java.io.InputStream;
+import java.nio.file.Path;
 import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
@@ -42,7 +43,14 @@ import static io.github.ralfspoeth.xmls.XmlFunctions.elements;
 public class XmlMappingSpecReader implements MappingSpecReader {
 
     @Override
-    public MappingSpec readFrom(Reader source) {
+    public boolean accepts(Path path) {
+        return path.getFileSystem()
+                .getPathMatcher("glob:*.xml")
+                .matches(path.getFileName());
+    }
+
+    @Override
+    public MappingSpec readFrom(InputStream source) {
         var root = Xml.parse(source).getDocumentElement();
         return new MappingSpec(
                 elements("input")

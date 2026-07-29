@@ -13,7 +13,7 @@
     <description>Bill of materials for the published xldr modules</description>
 
     <!--
-      The published modules, and only those: app is an executable and it holds
+      The published modules, and only those: `app` is an executable, and `it` holds
       the integration tests, so neither is on Maven Central. Third-party versions
       are deliberately not managed here - importing this must not bind a consumer
       to the POI, HikariCP or driver versions this build happens to use.

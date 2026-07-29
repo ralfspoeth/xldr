@@ -8,7 +8,8 @@ import io.github.ralfspoeth.xldr.spec.io.JsonMappingSpecReader;
 import org.junit.jupiter.api.Test;
 
 import java.io.ByteArrayInputStream;
-import java.io.StringReader;
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -95,7 +96,7 @@ public class PipelineIT {
                     )""");
         }
 
-        var spec = new JsonMappingSpecReader().readFrom(new StringReader(SPEC));
+        var spec = new JsonMappingSpecReader().readFrom(stream(SPEC));
         var adapter = csvAdapterFor(spec.inputSpec());
         var ambient = Map.<String, Object>of("xldr.filename", "orders.csv");
 
@@ -146,5 +147,9 @@ public class PipelineIT {
                 .findFirst()
                 .orElseThrow(() -> new IllegalStateException("no adapter for " + inputSpec.mimeType()))
                 .createInputAdapter(inputSpec);
+    }
+
+    private static InputStream stream(String string) {
+        return new ByteArrayInputStream(string.getBytes(StandardCharsets.UTF_8));
     }
 }

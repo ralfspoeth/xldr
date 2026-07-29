@@ -12,7 +12,7 @@ open module io.github.ralfspoeth.xldr.it.test {
     requires java.management;
     requires org.apache.poi.poi;
     requires org.apache.poi.ooxml;
-    // driving the validate subcommand through the command line
+    // driving the "validate" subcommand through the command line
     requires info.picocli;
     requires org.junit.jupiter.api;
 

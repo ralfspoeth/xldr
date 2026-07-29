@@ -8,8 +8,11 @@ import javax.xml.XMLConstants;
 import javax.xml.transform.stream.StreamSource;
 import javax.xml.validation.Schema;
 import javax.xml.validation.SchemaFactory;
+import java.io.ByteArrayInputStream;
 import java.io.File;
+import java.io.InputStream;
 import java.io.StringReader;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
@@ -79,7 +82,7 @@ public class XsdTest {
     public void theCompleteSpecIsValidAndReadable() throws Exception {
         assertDoesNotThrow(() -> validate(COMPLETE_SPEC));
 
-        var spec = new XmlMappingSpecReader().readFrom(new StringReader(COMPLETE_SPEC));
+        var spec = new XmlMappingSpecReader().readFrom(stream(COMPLETE_SPEC));
         assertTrue(spec.inputSpec().properties().containsKey("ns.f"));
         assertTrue(spec.recordMappingSpecs().stream()
                 .anyMatch(m -> m.fieldMappings().size() == 5));
@@ -116,7 +119,7 @@ public class XsdTest {
                 """;
         assertDoesNotThrow(() -> validate(xml));
 
-        var spec = new XmlMappingSpecReader().readFrom(new StringReader(xml));
+        var spec = new XmlMappingSpecReader().readFrom(stream(xml));
         var recordSelector = List.copyOf(spec.inputSpec().recordSelectors()).getFirst();
         assertNull(recordSelector.selector());
         assertThrows(IllegalArgumentException.class, recordSelector::requireSelector);
@@ -174,5 +177,10 @@ public class XsdTest {
 
     private static void assertAllInvalid(String xml) {
         assertThrows(SAXException.class, () -> validate(xml), () -> "should not validate: " + xml);
+    }
+
+
+    private static InputStream stream(String string) {
+        return new ByteArrayInputStream(string.getBytes(StandardCharsets.UTF_8));
     }
 }

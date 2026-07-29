@@ -10,8 +10,10 @@ import io.github.ralfspoeth.xldr.spec.*;
 import org.jspecify.annotations.Nullable;
 
 import java.io.IOException;
-import java.io.Reader;
+import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.math.BigDecimal;
+import java.nio.file.Path;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
@@ -28,8 +30,15 @@ import java.util.Optional;
 public class JsonMappingSpecReader implements MappingSpecReader {
 
     @Override
-    public MappingSpec readFrom(Reader src) throws IOException {
-        return Greyson.readValue(src)
+    public boolean accepts(Path path) {
+        return path.getFileSystem()
+                .getPathMatcher("glob:*.json")
+                .matches(path.getFileName());
+    }
+
+    @Override
+    public MappingSpec readFrom(InputStream src) throws IOException {
+        return Greyson.readValue(new InputStreamReader(src))
                 .map(v -> new MappingSpec(
                         PTR.member("input").apply(v).map(JsonMappingSpecReader::inputSpec).orElseThrow(),
                         PTR.member("mapping").select(Selector.all()).apply(v).map(JsonMappingSpecReader::recordMappingSpec).toList()
