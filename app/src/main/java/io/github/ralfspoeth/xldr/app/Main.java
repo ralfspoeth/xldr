@@ -3,11 +3,13 @@ package io.github.ralfspoeth.xldr.app;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Model.CommandSpec;
-import picocli.CommandLine.Parameters;
+import picocli.CommandLine.Option;
 import picocli.CommandLine.Spec;
 
 import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
 import java.util.logging.LogManager;
@@ -18,9 +20,10 @@ import static java.lang.System.Logger.Level.INFO;
  * Entry point: starts the server and watches the configured roots until the
  * process is asked to stop.
  * <p>
- * Running the server is what the command does on its own, so a deployment keeps
- * invoking {@code xldr <config>}; {@code xldr validate <spec>} checks specs
- * instead, without a database or a server.
+ * Running the server is what the command does on its own: {@code xldr} reads
+ * {@code xldr.properties} from the working directory, or from the one named by
+ * {@code --dir}. {@code xldr validate <spec>} checks specs instead, without a
+ * database or a server.
  */
 @Command(
         name = "xldr",
@@ -46,32 +49,45 @@ public class Main implements Callable<Integer> {
         }
     }
 
+    /** the configuration a deployment writes, looked for in the working directory */
+    static final String CONFIG_FILE = "xldr.properties";
+
+    /** optional beside it, and shipped in {@code conf/} as the fallback */
+    static final String LOGGING_FILE = "logging.properties";
+
+    /**
+     * Where the distribution was unpacked, set by the launcher. Absent when the
+     * classes are run from a build directory, where there is no {@code conf/}
+     * to fall back on either.
+     */
+    static final String HOME_PROPERTY = "xldr.home";
+
     @Spec
     private CommandSpec spec;
 
-    /**
-     * Optional only so that a subcommand may be invoked without it; running the
-     * server without a configuration is an error.
-     */
-    @Parameters(
-            index = "0",
-            arity = "0..1",
-            paramLabel = "CONFIG",
-            description = "the server configuration properties file (xldr.roots, jdbc.url, ...)"
+    @Option(
+            names = {"-d", "--dir"},
+            paramLabel = "DIR",
+            defaultValue = ".",
+            description = "the directory holding " + CONFIG_FILE + ", and optionally "
+                    + LOGGING_FILE + "; the working directory by default"
     )
-    private Path configFile;
+    private Path directory;
 
     static void main(String[] args) {
-        initLogging();
         System.exit(new CommandLine(new Main()).execute(args));
     }
 
     @Override
     public Integer call() throws Exception {
-        if (configFile == null) {
-            spec.commandLine().usage(System.err);
+        var configFile = directory.resolve(CONFIG_FILE);
+        if (!Files.isRegularFile(configFile)) {
+            spec.commandLine().getErr().println("no " + CONFIG_FILE + " in "
+                    + directory.toAbsolutePath().normalize()
+                    + " - name another directory with --dir, or start the server from the one holding it");
             return CommandLine.ExitCode.USAGE;
         }
+        initLogging(directory);
         var config = AppConfig.load(configFile);
         try (var pool = new ConnectionPool(config);
              var watcher = new Watcher(config, pool)) {
@@ -93,22 +109,50 @@ public class Main implements Callable<Integer> {
     }
 
     /**
-     * Applies the bundled {@code logging.properties} unless the deployment
-     * already points java.util.logging at a configuration of its own. slf4j
-     * itself needs no setup - {@code slf4j-jdk14} is discovered as a service
-     * provider - so configuring JUL configures everything.
+     * Configures logging from the first of these that exists: whatever the
+     * deployment already pointed java.util.logging at, a {@code
+     * logging.properties} beside the server configuration, the one shipped in
+     * the distribution's {@code conf/}, and finally the copy bundled in the jar.
+     * <p>
+     * So a deployment tunes its logging by dropping a file next to its
+     * {@code xldr.properties}, and one that does not gets what the distribution
+     * ships. slf4j needs no setup of its own - {@code slf4j-jdk14} is discovered
+     * as a service provider - so configuring JUL configures everything.
      */
-    private static void initLogging() {
+    private static void initLogging(Path directory) {
         if (System.getProperty("java.util.logging.config.file") != null
                 || System.getProperty("java.util.logging.config.class") != null) {
             return;
         }
-        try (var in = Main.class.getResourceAsStream("/logging.properties")) {
+        for (var candidate : configuredLogging(directory)) {
+            if (Files.isRegularFile(candidate)) {
+                try (var in = Files.newInputStream(candidate)) {
+                    LogManager.getLogManager().readConfiguration(in);
+                    return;
+                } catch (IOException e) {
+                    System.err.println("could not read " + candidate + ": " + e);
+                }
+            }
+        }
+        try (var in = Main.class.getResourceAsStream("/" + LOGGING_FILE)) {
             if (in != null) {
                 LogManager.getLogManager().readConfiguration(in);
             }
         } catch (IOException e) {
             System.err.println("could not apply the bundled logging configuration: " + e);
         }
+    }
+
+    /**
+     * The files to try, nearest first: the deployment's own, then the
+     * distribution's. The installation is only known when a launcher said where
+     * it is.
+     */
+    private static List<Path> configuredLogging(Path directory) {
+        var home = System.getProperty(HOME_PROPERTY);
+        var beside = directory.resolve(LOGGING_FILE);
+        return home == null
+                ? List.of(beside)
+                : List.of(beside, Path.of(home, "conf", LOGGING_FILE));
     }
 }

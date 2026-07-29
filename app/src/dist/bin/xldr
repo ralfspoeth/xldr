@@ -1,12 +1,63 @@
 #!/bin/sh
 # xldr server launcher.
 #
-# Runs the application off the module path in lib/. JPMS service binding
-# resolves the input adapters (uses/provides InputAdapterFactory) and the JDBC
-# driver (java.sql uses Driver) from lib/, so no --add-modules is needed.
+# The server reads xldr.properties from the working directory, or from the one
+# named by --dir:
+#   cd /var/lib/xldr && /opt/xldr/bin/xldr
+#   /opt/xldr/bin/xldr --dir /var/lib/xldr
 #
+# lib/ holds the application and the input adapters, drivers/ the JDBC drivers.
+# Both go on the module path: JPMS service binding resolves the adapters
+# (uses/provides InputAdapterFactory) and the driver (java.sql uses Driver) from
+# there, so no --add-modules is needed. Put your own driver jar in drivers/ and
+# remove the ones you do not target.
+#
+# java is taken from JAVA_HOME when that is set, and from PATH otherwise.
 # JAVA_OPTS may carry extra VM options, e.g.
-#   JAVA_OPTS=-Djava.util.logging.config.file=conf/logging.properties bin/xldr conf/xldr.properties
-set -e
-here=$(cd "$(dirname "$0")/.." && pwd)
-exec java ${JAVA_OPTS:-} -p "$here/lib" -m io.github.ralfspoeth.xldr.app/io.github.ralfspoeth.xldr.app.Main "$@"
+#   JAVA_OPTS=-Xmx512m bin/xldr
+set -eu
+
+fail() {
+    echo "xldr: $1" >&2
+    exit 1
+}
+
+# The installation, resolved through any symlinks the script was invoked
+# through - /usr/local/bin/xldr pointing into /opt/xldr is an ordinary way to
+# install this, and dirname alone would then find the wrong directory.
+self=$0
+while [ -L "$self" ]; do
+    link=$(readlink "$self")
+    case $link in
+        /*) self=$link ;;
+        *) self=$(dirname "$self")/$link ;;
+    esac
+done
+here=$(cd "$(dirname "$self")/.." && pwd) || fail "cannot determine the installation directory"
+
+[ -d "$here/lib" ] || fail "no lib/ in $here - is the distribution complete?"
+
+if [ -n "${JAVA_HOME:-}" ]; then
+    java=$JAVA_HOME/bin/java
+    [ -x "$java" ] || fail "JAVA_HOME is set to $JAVA_HOME, but $java is not executable"
+else
+    java=$(command -v java) || fail "no java on PATH and JAVA_HOME is not set"
+fi
+
+# A wrong JVM otherwise fails with an UnsupportedClassVersionError naming a
+# class file version, which says nothing to whoever has to fix it. An
+# unparseable answer is not held against the JVM: the run is what tells.
+required=25
+version=$("$java" -XshowSettings:properties -version 2>&1 |
+    sed -n 's/^ *java\.specification\.version = \([0-9][0-9]*\).*/\1/p') || version=
+if [ -n "$version" ] && [ "$version" -lt "$required" ]; then
+    fail "Java $required or later is required, but $java is $version"
+fi
+
+# drivers/ may be absent, or empty, and both are fine: a deployment that talks
+# to no database has nothing to put there.
+modules=$here/lib
+[ -d "$here/drivers" ] && modules=$modules:$here/drivers
+
+exec "$java" ${JAVA_OPTS:-} -Dxldr.home="$here" -p "$modules" \
+    -m io.github.ralfspoeth.xldr.app/io.github.ralfspoeth.xldr.app.Main "$@"

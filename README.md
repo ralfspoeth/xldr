@@ -49,10 +49,12 @@ Then set up a feed - a directory below a root, holding a mapping spec:
     }
     EOF
 
-Point the server at the root and start it; it creates the working directories and picks the feed up:
+Point the server at the root and start it; it creates the working directories and picks the feed up. The server
+reads `xldr.properties` from the directory it is started in, or from the one `--dir` names:
 
-    printf 'xldr.roots=/var/lib/xldr\njdbc.url=jdbc:postgresql://localhost:5432/xldr\n' > conf/xldr.properties
-    bin/xldr conf/xldr.properties
+    printf 'xldr.roots=/var/lib/xldr\njdbc.url=jdbc:postgresql://localhost:5432/xldr\n' > xldr.properties
+    bin/xldr                        # this directory
+    bin/xldr --dir /etc/xldr        # or that one
 
 A file moved into `/var/lib/xldr/people/in/` is now loaded into `person` and filed away under `archive/`. See
 [Configuration](#configuration) for the full set of settings, and [Delivering files](#delivering-files) for why the
@@ -68,7 +70,7 @@ fix their versions in one place:
             <dependency>
                 <groupId>io.github.ralfspoeth.xldr</groupId>
                 <artifactId>bom</artifactId>
-                <version>0.13</version>
+                <version>0.14</version>
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>
@@ -143,20 +145,28 @@ carry the concrete version rather than a literal `${revision}`.
 `maven-assembly-plugin`. Unpacked, it is
 
     xldr-<version>/
-        bin/xldr, bin/xldr.bat   launchers
-        lib/                     the application and every module jar it needs
+        bin/xldr, bin/xldr.cmd   launchers
+        lib/                     the application, and the input adapters
+        drivers/                 the JDBC drivers - yours goes here
         conf/                    sample xldr.properties and logging.properties
         README.md
 
 and runs with
 
-    bin/xldr conf/xldr.properties
+    cd /etc/xldr && /opt/xldr/bin/xldr        # xldr.properties here
+    /opt/xldr/bin/xldr --dir /etc/xldr        # or named
 
-The launcher puts `lib/` on the module path (`java -p lib -m io.github.ralfspoeth.xldr.app/...`); JPMS service binding then resolves
-the input adapters (via the `uses`/`provides` of `InputAdapterFactory`) and the JDBC driver (via `java.sql`'s
-`uses java.sql.Driver`) straight from `lib/`. The adapters and all three drivers are `provided` dependencies bundled
-into `lib/` so the package is self-contained; drop the drivers you do not target. Do that before passing a
-distribution on to anyone else - the Oracle driver is proprietary and not yours to redistribute.
+The launcher puts both `lib/` and `drivers/` on the module path; JPMS service binding then resolves the input
+adapters (via the `uses`/`provides` of `InputAdapterFactory`) and the JDBC driver (via `java.sql`'s
+`uses java.sql.Driver`) from there. A driver is nothing but another service provider, so **installing your own is
+copying its jar into `drivers/`** - no classpath to edit, no setting to change. Removing the ones you do not target
+is the same operation in reverse, and worth doing before passing a distribution on to anyone else: the Oracle driver
+is proprietary and not yours to redistribute. An empty `drivers/`, or none at all, is fine.
+
+The launcher takes `java` from `JAVA_HOME` when that is set and from `PATH` otherwise, follows any symlink it was
+invoked through - installing `/usr/local/bin/xldr` pointing into `/opt/xldr` works - and checks the JVM is new enough
+before starting, so a wrong `JAVA_HOME` is reported as such rather than as an `UnsupportedClassVersionError` naming a
+class file version. `JAVA_OPTS` carries extra VM options.
 
 `jlink` is deliberately not used: several runtime dependencies - the Oracle JDBC driver, 
 HikariCP, picocli, SLF4J, POI - are automatic modules, which `jlink` cannot link into an image. The module-path distribution sidesteps that while
@@ -236,8 +246,8 @@ written for `fieldSelectors` costs a record every one of its fields, and no read
 unknown is exactly what it promises.
 
 A schema is published whenever the format changes, and is named after the release that changed it:
-`mapping-spec-0.13` describes the format of 0.13, `mapping-spec-0.10` that of 0.10 to 0.12, which did not
-change it, and so on. An earlier one stays where it is, so a spec pinned to it keeps validating.
+`mapping-spec-0.13` describes the format of 0.13 and 0.14, `mapping-spec-0.10` that of 0.10 to 0.12, and so on. An
+earlier one stays where it is, so a spec pinned to it keeps validating.
 
 What a schema cannot see is whether the spec makes sense as a whole - whether a mapping names a record selector the
 input actually declares, or whether the adapter accepts the selectors. The distribution checks that:
@@ -578,8 +588,14 @@ claims, what is extracted and where it goes - is in the one spec document.
 
 ### Server configuration
 
-A single properties file, passed as the sole argument to the application. Connection settings live here, not in the
-mapping specs, so a spec can be promoted between environments unchanged and no credentials sit in the watched tree.
+A single file called `xldr.properties`, read from the directory the server is started in, or from the one `--dir`
+(`-d`) names. Connection settings live here, not in the mapping specs, so a spec can be promoted between environments
+unchanged and no credentials sit in the watched tree. A deployment is therefore a directory of its own - its
+configuration, and whatever else it keeps beside it - rather than a path passed on every invocation.
+
+A `logging.properties` in that same directory is picked up if it is there. Failing that the server uses the one in
+the distribution's `conf/`, and failing that the copy inside the jar; pointing `java.util.logging.config.file` at a
+file of your own still overrides the lot.
 
 | Key | Required | Default | Meaning |
 |-----|----------|---------|---------|

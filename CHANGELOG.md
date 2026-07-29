@@ -6,6 +6,32 @@ ways that break existing code and existing specs; those changes are listed here 
 The versions are the git tags `xldr-<version>`; the published artifacts carry the same version under the group
 `io.github.ralfspoeth.xldr`.
 
+## 0.14
+
+Nothing about the mapping-spec format changed, so `mapping-spec-0.13` remains the schema. What changed is how a
+deployment is laid out and started.
+
+### Breaking
+
+- The server no longer takes the configuration file as an argument. It reads `xldr.properties` from the directory it
+  is started in, or from the one `--dir` (`-d`) names, so `bin/xldr conf/xldr.properties` becomes
+  `cd /etc/xldr && bin/xldr` or `bin/xldr --dir /etc/xldr`. A deployment is a directory of its own rather than a path
+  spelled out on every invocation, which is also what lets the server find the rest of its configuration beside it.
+
+### Added
+
+- The distribution ships its JDBC drivers in `drivers/` rather than mixed into `lib/`, and the launchers put that
+  directory on the module path beside it. A driver is only another service provider, so installing one is copying
+  its jar into a directory that says what it is for - and removing the ones a deployment does not target is the same
+  operation in reverse. An absent or empty `drivers/` is fine.
+- The launchers take `java` from `JAVA_HOME` when it is set and from `PATH` otherwise, resolve any symlink they were
+  invoked through, and refuse a JVM older than the one required - saying so, rather than letting it fail with an
+  `UnsupportedClassVersionError` that names a class file version and nothing else.
+- A `logging.properties` beside `xldr.properties` configures logging, so a deployment tunes it by dropping a file in
+  its own directory. Failing that the distribution's `conf/logging.properties` is used - the launchers now pass
+  `xldr.home` so the installation can be found - and failing that the copy bundled in the jar. Setting
+  `java.util.logging.config.file` still overrides all of them.
+
 ## 0.13
 
 ### Added
