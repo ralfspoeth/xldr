@@ -6,6 +6,23 @@ ways that break existing code and existing specs; those changes are listed here 
 The versions are the git tags `xldr-<version>`; the published artifacts carry the same version under the group
 `io.github.ralfspoeth.xldr`.
 
+## 0.15
+
+### Added
+
+- A CSV feed may say `"fieldsFromHeader": true`, and a field its record selector does not declare is then the column
+  of that name - so a feed whose columns are already named as the mapping wants them declares no field selectors at
+  all. A declared field still wins, which is how a column is renamed or given a type; an implicit one has no type and
+  arrives as text. It is opt-in because `validate` reports a mapping naming an undeclared field, which is the check
+  that catches `fieldSelector` written for `fieldSelectors`, and no spec says which columns a file will have. Saying
+  so in the spec is what excuses that feed, and only that feed.
+
+### Changed
+
+- A quoted field may now stay open for 256 lines rather than a thousand before it is refused as unterminated. A
+  record spanning more than a couple of hundred lines is a runaway quote in every feed seen so far, and the sooner
+  the file is refused the closer the report is to the line that opened it.
+
 ## 0.14
 
 Nothing about the mapping-spec format changed, so `mapping-spec-0.13` remains the schema. What changed is how a

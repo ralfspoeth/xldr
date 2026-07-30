@@ -88,6 +88,17 @@ class Validate implements Callable<Integer> {
     }
 
     /**
+     * Whether the input lets a mapping name a field its record selector does not
+     * declare, the CSV adapter taking such a name for the column of that name.
+     * Nothing here can check those: which columns a file has is a property of
+     * the file, not of the spec.
+     */
+    private static boolean fieldsFromHeader(InputSpec input) {
+        return "text/csv".equals(input.mimeType())
+                && Boolean.parseBoolean(input.properties().getOrDefault("fieldsFromHeader", "false"));
+    }
+
+    /**
      * A CSV record selector's {@code selector} is a first-column discriminator,
      * which belongs to a headerless file interleaving several record types. Given
      * one alongside a header it is almost always a misreading of what a selector
@@ -179,7 +190,7 @@ class Validate implements Callable<Integer> {
         var declaredVars = new LinkedHashSet<String>();
         for (var v : input.vars()) {
             // a var may only use one declared before it, since they are evaluated in order
-            checkSources(v.source(), null, declaredVars, "var '" + v.name() + "'", problems);
+            checkSources(v.source(), null, false, declaredVars, "var '" + v.name() + "'", problems);
             declaredVars.add(v.name());
         }
 
@@ -195,7 +206,7 @@ class Validate implements Callable<Integer> {
                     .map(FieldSelectorSpec::name)
                     .collect(Collectors.toSet());
             for (var fm : mapping.fieldMappings()) {
-                checkSources(fm.source(), fields, declaredVars,
+                checkSources(fm.source(), fields, fieldsFromHeader(input), declaredVars,
                         where + ", column " + fm.column(), problems);
             }
         }
@@ -204,17 +215,23 @@ class Validate implements Callable<Integer> {
     /**
      * Walks a value source, a lookup key being one in turn.
      *
-     * @param fields the fields of the record in scope, or {@code null} where
-     *               there is no record at all - a var. The two differ: a record
-     *               selector that declares no fields is a spec with something
-     *               missing, and saying "no record is in scope" about it would
-     *               point away from the mistake.
+     * @param fields    the fields of the record in scope, or {@code null} where
+     *                  there is no record at all - a var. The two differ: a
+     *                  record selector that declares no fields is a spec with
+     *                  something missing, and saying "no record is in scope"
+     *                  about it would point away from the mistake.
+     * @param anyColumn whether the input takes an undeclared name for a column
+     *                  of that name, in which case there is nothing here to
+     *                  check: what the file's header holds is not known until a
+     *                  file arrives
      */
-    private static void checkSources(ValueSource source, Set<String> fields, Set<String> vars,
-                                     String where, List<String> problems) {
+    private static void checkSources(ValueSource source, Set<String> fields, boolean anyColumn,
+                                     Set<String> vars, String where, List<String> problems) {
         switch (source) {
             case ValueSource.Field f -> {
-                if (fields == null) {
+                if (anyColumn) {
+                    // the header answers for it, and only the load can ask
+                } else if (fields == null) {
                     problems.add(where + ": reads the field '" + f.fieldName()
                             + "', but no record is in scope here");
                 } else if (fields.isEmpty()) {
@@ -231,7 +248,8 @@ class Validate implements Callable<Integer> {
                             + (vars.isEmpty() ? "" : "; declared are " + vars));
                 }
             }
-            case ValueSource.Lookup lk -> checkSources(lk.key(), fields, vars, where + " (lookup key)", problems);
+            case ValueSource.Lookup lk ->
+                    checkSources(lk.key(), fields, anyColumn, vars, where + " (lookup key)", problems);
             case ValueSource.Constant _, ValueSource.Expr _ -> {
                 // a constant is always valid; an expression is only resolvable
                 // against a record and a connection, so it is left to the load

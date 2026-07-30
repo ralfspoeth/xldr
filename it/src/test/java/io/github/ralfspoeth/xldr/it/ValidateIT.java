@@ -161,6 +161,24 @@ public class ValidateIT {
     }
 
     /**
+     * A feed whose header names its fields is entitled to name one the record
+     * selector does not declare, so the check that would otherwise report it is
+     * off - for that feed only, which is the point of saying so in the spec.
+     */
+    @Test
+    void acceptsAnUndeclaredFieldWhereTheHeaderSuppliesIt() throws IOException {
+        var spec = """
+                { "input": { "mimeType": "text/csv", "accepts": "glob:*.csv",
+                    "properties": { "fieldSeparator": ";"%s },
+                    "recordSelectors": [ { "name": "all" } ] },
+                  "mapping": [ { "recordSelector": "all", "table": "t",
+                                 "fieldMapping": [ { "fieldSelector": "Name", "column": "c" } ] } ] }
+                """;
+        assertEquals(0, validate("from-header.json", spec.formatted(", \"fieldsFromHeader\": true")));
+        assertEquals(1, validate("declared.json", spec.formatted("")));
+    }
+
+    /**
      * A record selector spelled {@code fieldSelector} declares no field
      * selectors at all - the reader ignores what it does not know - so every
      * mapped column loads null while the load reports success. The report has

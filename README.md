@@ -70,7 +70,7 @@ fix their versions in one place:
             <dependency>
                 <groupId>io.github.ralfspoeth.xldr</groupId>
                 <artifactId>bom</artifactId>
-                <version>0.14</version>
+                <version>0.15</version>
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>
@@ -246,7 +246,7 @@ written for `fieldSelectors` costs a record every one of its fields, and no read
 unknown is exactly what it promises.
 
 A schema is published whenever the format changes, and is named after the release that changed it:
-`mapping-spec-0.13` describes the format of 0.13 and 0.14, `mapping-spec-0.10` that of 0.10 to 0.12, and so on. An
+`mapping-spec-0.13` describes the format of 0.13 to 0.15, `mapping-spec-0.10` that of 0.10 to 0.12, and so on. An
 earlier one stays where it is, so a spec pinned to it keeps validating.
 
 What a schema cannot see is whether the spec makes sense as a whole - whether a mapping names a record selector the
@@ -661,6 +661,7 @@ Excel needs none of these: a spreadsheet carries typed cells, so a date or a num
 | `header` | `present` | Whether the first row names the columns: `present`/`true`, or `absent`/`false`. A field selector's `selector` is a column name where the header is present and a 1-based position where it is absent (`"1"` → first column); its `name` is what a mapping calls it by, as in every adapter. Anything else is refused rather than read as absent. |
 | `quote` | `"` | What opens and closes a quoted field. Empty switches quoting off, leaving quotes as ordinary characters. |
 | `comment` | none | What begins a comment outside a quoted field. Unset, no character does. |
+| `fieldsFromHeader` | `false` | Whether a field the record selector does not declare is the column of that name. Needs a header. |
 | `emptyLine` | `skip` | What an empty line means: `skip`, or `stop` to end the data there. |
 | `charset` | platform default | Character set, e.g. `UTF-8`. |
 
@@ -679,8 +680,21 @@ those an error; this one leaves files that load today loading. Where a value gen
 data, set `quote` to nothing and no quote is special anywhere.
 
 A quoted field that is never closed would otherwise swallow the rest of the file into a single record and report a
-load of one row, so a record that stays open for more than a thousand lines is refused, naming the line that opened
+load of one row, so a record that stays open for more than 256 lines is refused, naming the line that opened
 it.
+
+With **`fieldsFromHeader`** a field the spec does not declare is looked for among the columns under its own
+name, as if `{"name": "Id", "selector": "Id"}` had been written out - so a feed whose columns are already
+named as the mapping wants them declares no field selectors at all:
+
+    "properties": { "fieldSeparator": ",", "fieldsFromHeader": true },
+    "recordSelectors": [ { "name": "people" } ]
+
+A declared field still wins, which is how a column is renamed or given a type; an implicit one has no `type`
+and so arrives as text. It is off by default because `bin/xldr validate` reports a mapping naming a field no
+record selector declares - the check that catches `fieldSelector` written for `fieldSelectors` - and it cannot
+tell that from a column name without a file in hand. Saying `fieldsFromHeader` in the spec is what tells it,
+for that feed and no other.
 
 A **comment** runs from the comment character to the end of the record, and only outside a quoted field - inside one
 the character is data, which is why the comment is found by the same scan that reads the fields rather than by

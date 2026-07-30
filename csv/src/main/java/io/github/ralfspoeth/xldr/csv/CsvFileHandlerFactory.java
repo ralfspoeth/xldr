@@ -9,6 +9,7 @@ import org.jspecify.annotations.Nullable;
 import java.nio.charset.Charset;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 
 /**
  * Creates CSV adapters.
@@ -18,11 +19,16 @@ import java.util.Locale;
  * {@code absent}/{@code false}), {@code quote} (a double quote by default,
  * empty to read quotes as ordinary characters), {@code comment} (none by
  * default), {@code emptyLine} ({@code skip} by default, or {@code stop}),
- * {@code charset}, and the shared conversion settings of {@link Formats}. A
+ * {@code fieldsFromHeader} (off by default; with it, a field the spec does not
+ * declare is the column of that name), {@code charset}, and the shared
+ * conversion settings of {@link Formats}. A
  * record is a line unless a quoted field holds a line break, so there is no row
  * separator to configure.
  */
 public class CsvFileHandlerFactory implements InputAdapterFactory {
+
+    /** the property by which a feed says that its header names its fields */
+    private static final String FIELDS_FROM_HEADER = "fieldsFromHeader";
 
     private static final List<String> ACCEPT = List.of("text/csv");
 
@@ -43,9 +49,33 @@ public class CsvFileHandlerFactory implements InputAdapterFactory {
                 character("quote", properties.get("quote"), '"'),
                 character("comment", properties.get("comment"), null),
                 EmptyLine.of(properties.get("emptyLine")),
+                fieldsFromHeader(properties),
                 Formats.of(properties),
                 spec
         );
+    }
+
+    /**
+     * Whether the header supplies a field the spec does not declare. Off by
+     * default: a mapping naming a field no record selector declares is a
+     * mistake worth reporting, and only a feed that says otherwise gives that
+     * up. It says nothing where there is no header to take a name from.
+     */
+    private static boolean fieldsFromHeader(Map<String, String> properties) {
+        var setting = properties.get(FIELDS_FROM_HEADER);
+        if (setting == null) {
+            return false;
+        }
+        if (!header(properties.get("header"))) {
+            throw new IllegalArgumentException(
+                    FIELDS_FROM_HEADER + " needs a header to take the names from");
+        }
+        return switch (setting.strip().toLowerCase(Locale.ROOT)) {
+            case "true" -> true;
+            case "false" -> false;
+            default -> throw new IllegalArgumentException(
+                    FIELDS_FROM_HEADER + " must be 'true' or 'false', was: " + setting);
+        };
     }
 
     /**

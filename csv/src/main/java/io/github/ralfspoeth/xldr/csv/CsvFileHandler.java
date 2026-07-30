@@ -13,6 +13,7 @@ import java.io.InputStreamReader;
 import java.nio.charset.Charset;
 import java.util.*;
 import java.util.function.ToIntFunction;
+import java.util.stream.Collectors;
 import java.util.stream.Gatherer;
 import java.util.stream.Stream;
 
@@ -51,6 +52,10 @@ class CsvFileHandler implements InputAdapter {
      * what an empty line means
      */
     private final EmptyLine emptyLine;
+    /**
+     * whether a field the spec does not declare may be a column of that name
+     */
+    private final boolean fieldsFromHeader;
 
     private final InputSpec inputSpec;
 
@@ -61,6 +66,7 @@ class CsvFileHandler implements InputAdapter {
             @Nullable Character quote,
             @Nullable Character comment,
             EmptyLine emptyLine,
+            boolean fieldsFromHeader,
             Formats formats,
             InputSpec spec
     ) {
@@ -70,6 +76,7 @@ class CsvFileHandler implements InputAdapter {
         this.quote = quote;
         this.comment = comment;
         this.emptyLine = emptyLine;
+        this.fieldsFromHeader = fieldsFromHeader;
         this.formats = formats;
         this.inputSpec = spec;
     }
@@ -123,7 +130,7 @@ class CsvFileHandler implements InputAdapter {
         }
 
         var types = typesOf(record.fieldSelectors());
-        var positions = positions(record.fieldSelectors(), index);
+        var positions = positions(record.fieldSelectors(), fieldSelectors, index);
         // the record selector's selector, if set, is the value the first column
         // must equal for a line to belong to this record type - the discriminator
         // of an interleaved, headerless file; absent means every line matches
@@ -143,15 +150,25 @@ class CsvFileHandler implements InputAdapter {
      * {@code name} is what a mapping calls it by, exactly as in every other
      * adapter. The two are the same word often enough that a spec can leave them
      * alike, but they need not be.
+     * <p>
+     * Where {@code fieldsFromHeader} is set, a name the spec does not declare is
+     * looked for among the columns as it stands, as if the spec had declared it
+     * with a selector equal to its name.
      *
-     * @param index resolves a selector to a column position, or -1 for a column
-     *              this file does not have
+     * @param wanted the field names the mapping uses
+     * @param index  resolves a selector to a column position, or -1 for a column
+     *               this file does not have
      */
-    private static Map<String, Integer> positions(
-            Collection<FieldSelectorSpec> fieldSelectors, ToIntFunction<String> index) {
+    private Map<String, Integer> positions(
+            Collection<FieldSelectorSpec> fieldSelectors, Set<String> wanted, ToIntFunction<String> index) {
         Map<String, Integer> positions = new HashMap<>();
         for (var fs : fieldSelectors) {
             positions.putIfAbsent(fs.name(), index.applyAsInt(fs.selector()));
+        }
+        if (fieldsFromHeader) {
+            for (var name : wanted) {
+                positions.computeIfAbsent(name, index::applyAsInt);
+            }
         }
         return positions;
     }
@@ -265,13 +282,29 @@ class CsvFileHandler implements InputAdapter {
                 || (values.length > 0 && discriminator.strip().equals(values[0].strip()));
     }
 
+    /**
+     * The fields this parse resolves: those the record selector declares and the
+     * mapping asks for, and - where the header supplies them - those it asks for
+     * without declaring, which carry no type and so arrive as text.
+     */
     private List<Field> fields(String recordSelector, Set<String> fieldSelectors) {
-        return inputSpec.recordSelectors()
+        var declared = inputSpec.recordSelectors()
                 .stream()
                 .filter(rs -> rs.name().equals(recordSelector))
                 .flatMap(rs -> rs.fieldSelectors().stream())
                 .filter(fs -> fieldSelectors.contains(fs.name()))
                 .map(fs -> new Field(fs.name(), typeOf(fs).clazz()))
+                .toList();
+        if (!fieldsFromHeader) {
+            return declared;
+        }
+        var named = declared.stream().map(Field::name).collect(Collectors.toSet());
+        return Stream.concat(
+                        declared.stream(),
+                        fieldSelectors.stream()
+                                .filter(name -> !named.contains(name))
+                                .sorted()
+                                .map(name -> new Field(name, DataType.STRING.clazz())))
                 .toList();
     }
 

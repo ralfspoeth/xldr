@@ -475,6 +475,61 @@ public class CsvFileHandlerTest {
         );
     }
 
+    /**
+     * With {@code fieldsFromHeader} a field the spec does not declare is the
+     * column of that name, so a feed whose columns are already named as the
+     * mapping wants them declares nothing at all. A declared field still wins -
+     * that is how a column is renamed, or given a type.
+     */
+    @Test
+    public void takesUndeclaredFieldsFromTheHeader() throws IOException {
+        var spec = spec(Map.of("fieldSeparator", ";", "fieldsFromHeader", "true"),
+                new RecordSelectorSpec("people", null, List.of(
+                        new FieldSelectorSpec("who", "Name", DataType.STRING)
+                )));
+        var rows = rowsOf(spec, """
+                Id;leer;Name;Text
+                1;;Hello;asdf
+                """, "who", "Id", "Text");
+
+        assertAll(
+                () -> assertEquals("Hello", rows.getFirst().get("who"), "the declared one keeps its column"),
+                () -> assertEquals("1", rows.getFirst().get("Id"), "and the header supplies the rest"),
+                () -> assertEquals("asdf", rows.getFirst().get("Text")),
+                // no type is declared for an implicit field, so it arrives as text
+                () -> assertEquals(String.class, rows.getFirst().get("Id").getClass())
+        );
+    }
+
+    /**
+     * Without the property nothing changes: an undeclared name is a column the
+     * record does not have, which is what lets {@code validate} report it.
+     */
+    @Test
+    public void anUndeclaredFieldIsNothingWithoutTheProperty() throws IOException {
+        var spec = spec(Map.of("fieldSeparator", ";"),
+                new RecordSelectorSpec("people", null, List.of(
+                        new FieldSelectorSpec("who", "Name", DataType.STRING)
+                )));
+        var rows = rowsOf(spec, "Id;leer;Name;Text\n1;;Hello;asdf\n", "who", "Id");
+
+        assertAll(
+                () -> assertEquals("Hello", rows.getFirst().get("who")),
+                () -> assertNull(rows.getFirst().get("Id"))
+        );
+    }
+
+    /**
+     * The header is where the names come from, so a headerless feed asking for
+     * this is refused rather than left to resolve nothing.
+     */
+    @Test
+    public void fieldsFromHeaderNeedsAheader() {
+        var spec = spec(Map.of("fieldSeparator", ";", "header", "absent", "fieldsFromHeader", "true"),
+                new RecordSelectorSpec("people", null, List.of()));
+        assertThrows(IllegalArgumentException.class, () -> adapterFor(spec));
+    }
+
     private static List<Row> rowsOf(InputSpec spec, String csv, String... fields) throws IOException {
         try (var in = new ByteArrayInputStream(csv.getBytes(StandardCharsets.UTF_8))) {
             return adapterFor(spec).parse(in, "people", Set.of(fields)).rows().toList();
