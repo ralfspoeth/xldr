@@ -70,7 +70,7 @@ fix their versions in one place:
             <dependency>
                 <groupId>io.github.ralfspoeth.xldr</groupId>
                 <artifactId>bom</artifactId>
-                <version>0.15</version>
+                <version>0.16</version>
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>
@@ -246,7 +246,7 @@ written for `fieldSelectors` costs a record every one of its fields, and no read
 unknown is exactly what it promises.
 
 A schema is published whenever the format changes, and is named after the release that changed it:
-`mapping-spec-0.13` describes the format of 0.13 to 0.15, `mapping-spec-0.10` that of 0.10 to 0.12, and so on. An
+`mapping-spec-0.13` describes the format of 0.13 to 0.16, `mapping-spec-0.10` that of 0.10 to 0.12, and so on. An
 earlier one stays where it is, so a spec pinned to it keeps validating.
 
 What a schema cannot see is whether the spec makes sense as a whole - whether a mapping names a record selector the

@@ -6,6 +6,20 @@ ways that break existing code and existing specs; those changes are listed here 
 The versions are the git tags `xldr-<version>`; the published artifacts carry the same version under the group
 `io.github.ralfspoeth.xldr`.
 
+## 0.16
+
+Nothing about the toolkit's behaviour changed, and nothing about the mapping-spec format: a spec that loaded under
+0.15 loads under 0.16, and `mapping-spec-0.13` remains its schema. What moved is where the build says things.
+
+### Changed
+
+- The Oracle, PostgreSQL and HikariCP versions are managed in `app` rather than in the reactor parent. Only the
+  server uses them - the library modules touch no driver and no pool - so the parent no longer pins versions on
+  behalf of a module that could just as well pin its own. Nothing a consumer imports is affected: the `bom` never
+  carried these.
+- The parent is `plumbum` 3.0.2, which brings JSpecify 1.0.1 and pins the jar plugin. The annotations remain
+  compile-only, so this reaches a consumer's build only if it runs a null checker of its own.
+
 ## 0.15
 
 ### Added
