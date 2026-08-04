@@ -10,20 +10,24 @@
     <parent>
         <groupId>io.github.ralfspoeth</groupId>
         <artifactId>plumbum</artifactId>
-        <version>3.0.0</version>
+        <version>3.0.1</version>
     </parent>
 
     <groupId>io.github.ralfspoeth.xldr</groupId>
     <modules>
+        <!-- the library part -->
         <module>spec</module>
         <module>ia</module>
+        <!-- input adapter implementation modules -->
         <module>ldr</module>
         <module>csv</module>
         <module>flt</module>
         <module>json</module>
         <module>xml</module>
         <module>xlsx</module>
+        <!-- bill of materials -->
         <module>bom</module>
+        <!-- app and it are part of the reactor but not published -->
         <module>app</module>
         <module>it</module>
     </modules>
@@ -33,7 +37,11 @@
     <packaging>pom</packaging>
 
     <name>xldr</name>
-    <description>A modular toolkit that loads CSV, XML and Excel files into database tables from a mapping specification.</description>
+    <description>
+        A modular toolkit that loads files
+        into database tables from a mapping specification,
+        and ships implementations for CSV, fixed-length, JSON, XML and Excel files.
+    </description>
     <url>https://github.com/ralfspoeth/xldr</url>
 
     <!-- declared here rather than inherited: the terms of an artifact should be
@@ -64,7 +72,7 @@
             <dependency>
                 <groupId>com.oracle.database.jdbc</groupId>
                 <artifactId>ojdbc17</artifactId>
-                <version>23.26.2.0.0</version>
+                <version>23.26.3.0.0</version>
             </dependency>
             <dependency>
                 <groupId>com.h2database</groupId>
@@ -94,12 +102,12 @@
             <dependency>
                 <groupId>io.github.ralfspoeth</groupId>
                 <artifactId>json</artifactId>
-                <version>1.6.1</version>
+                <version>1.6.2</version>
             </dependency>
             <dependency>
                 <groupId>io.github.ralfspoeth</groupId>
                 <artifactId>xmls</artifactId>
-                <version>0.10.0</version>
+                <version>0.11.0</version>
             </dependency>
             <dependency>
                 <groupId>io.github.ralfspoeth</groupId>
