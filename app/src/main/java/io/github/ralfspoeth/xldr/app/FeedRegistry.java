@@ -58,6 +58,7 @@ class FeedRegistry {
                 deactivate(feedDir, "directory is gone");
                 return;
             }
+            watch(feedDir);
             var specFile = MappingSpecs.find(feedDir).orElse(null);
             if (specFile == null) {
                 deactivate(feedDir, "no mapping spec");
@@ -125,6 +126,36 @@ class FeedRegistry {
             children.filter(Files::isDirectory).forEach(this::reconcile);
         } catch (IOException e) {
             LOG.log(WARNING, () -> "cannot list root " + root + ": " + e);
+        }
+    }
+
+    /**
+     * Watches the feed directory itself, so that a spec appearing, changing or
+     * being removed is noticed at once rather than at the next scan.
+     * <p>
+     * Called for every directory below a root, whether it holds a spec or not: a
+     * directory without one is a feed waiting to be configured, and that is
+     * precisely the moment the watch has to already be in place. The watch is
+     * therefore never given up while the directory exists - {@link #deactivate}
+     * releases the inbox only.
+     * <p>
+     * A {@link java.nio.file.WatchService} reports the entries of a watched
+     * directory, so this covers {@code spec.json} and {@code spec.xml} without
+     * naming them. It cannot cover them any other way: a file cannot be watched,
+     * only the directory holding it.
+     * <p>
+     * Failure is not fatal. The periodic reconciliation remains the guarantee,
+     * and a directory that could not be registered costs latency, not
+     * correctness.
+     */
+    private void watch(Path feedDir) {
+        try {
+            // idempotent: the platform returns the existing key for a directory
+            // already watched, so this may run on every scan
+            watchService.register(feedDir);
+        } catch (IOException e) {
+            LOG.log(WARNING, () -> "cannot watch feed directory " + feedDir
+                    + "; changes there will only be seen by the periodic scan: " + e);
         }
     }
 

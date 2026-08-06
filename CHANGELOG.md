@@ -6,6 +6,17 @@ ways that break existing code and existing specs; those changes are listed here 
 The versions are the git tags `xldr-<version>`; the published artifacts carry the same version under the group
 `io.github.ralfspoeth.xldr`.
 
+## Unreleased
+
+### Fixed
+
+- A feed directory that already existed when the server started was not watched, so a spec written or changed in it
+  was only noticed by the next periodic reconciliation - up to `xldr.scanInterval` seconds later, thirty by default.
+  Only directories *created* while the server ran were watched, which is why the delay showed itself after a restart
+  and not before it. Every directory below a root is now watched, whether it holds a spec or not, so `spec.json` and
+  `spec.xml` appearing, changing or being removed takes effect at once. Both the README and the code said this was
+  already the case; only the code was wrong.
+
 ## 0.16
 
 Nothing about the toolkit's behaviour changed, and nothing about the mapping-spec format: a spec that loaded under

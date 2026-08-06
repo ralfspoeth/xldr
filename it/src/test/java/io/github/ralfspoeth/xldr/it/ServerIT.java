@@ -386,6 +386,44 @@ public class ServerIT {
         return rows;
     }
 
+    /**
+     * A feed directory that already existed when the server started must be
+     * watched, so that a spec written into it later activates the feed at once.
+     * <p>
+     * Runs its own server on its own root with the scan effectively switched
+     * off, because the shared one scans every second and would hide the very
+     * thing under test: with no scan to fall back on, only a watch on the feed
+     * directory can carry the news.
+     */
+    @Test
+    @Timeout(60)
+    void watchesAfeedDirectoryThatExistedBeforeTheServerStarted() throws Exception {
+        var otherRoot = Files.createTempDirectory("xldr-preexisting");
+        // no spec yet: an unconfigured feed is exactly the case where the watch
+        // has to be in place before there is anything to activate
+        var feed = Files.createDirectory(otherRoot.resolve("later"));
+
+        var props = new Properties();
+        props.setProperty("xldr.roots", otherRoot.toString());
+        // an hour: long enough that a scan cannot rescue the assertion
+        props.setProperty("xldr.scanInterval", "3600");
+        props.setProperty("xldr.maxConcurrentLoads", "1");
+        props.setProperty("jdbc.url", JDBC_URL);
+        var config = AppConfig.of(props);
+
+        try (var otherPool = new ConnectionPool(config);
+             var server = new Watcher(config, otherPool)) {
+            server.start();
+            // nothing to activate yet, so no in/ - and the directory is now watched
+            assertTrue(Files.notExists(feed.resolve("in")), "the feed must still be inactive");
+
+            Files.writeString(feed.resolve("spec.json"), SPEC);
+
+            await("the spec to be noticed without a scan",
+                    () -> Files.isDirectory(feed.resolve("in")));
+        }
+    }
+
     private static List<Path> archived(Path feed) {
         try (var files = Files.walk(feed.resolve("archive"))) {
             return files.filter(Files::isRegularFile).toList();
