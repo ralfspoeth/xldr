@@ -14,6 +14,7 @@ import java.util.List;
  * <pre>
  * &lt;root&gt;/&lt;feed&gt;/
  *     spec.json           promotes the directory to a feed
+ *     env.properties      optional; what this deployment supplies to it
  *     in/                 producers move input files in here
  *     work/               claimed, currently being loaded
  *     archive/            loaded successfully, date partitioned

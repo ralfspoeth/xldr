@@ -70,7 +70,7 @@ fix their versions in one place:
             <dependency>
                 <groupId>io.github.ralfspoeth.xldr</groupId>
                 <artifactId>bom</artifactId>
-                <version>0.16</version>
+                <version>0.17</version>
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>
@@ -246,7 +246,7 @@ written for `fieldSelectors` costs a record every one of its fields, and no read
 unknown is exactly what it promises.
 
 A schema is published whenever the format changes, and is named after the release that changed it:
-`mapping-spec-0.13` describes the format of 0.13 to 0.16, `mapping-spec-0.10` that of 0.10 to 0.12, and so on. An
+`mapping-spec-0.13` describes the format of 0.13 to 0.17, `mapping-spec-0.10` that of 0.10 to 0.12, and so on. An
 earlier one stays where it is, so a spec pinned to it keeps validating.
 
 What a schema cannot see is whether the spec makes sense as a whole - whether a mapping names a record selector the
@@ -386,8 +386,12 @@ call, and adjacent holes concatenate:
 
 the first as a `var` in the input, the other two as field mappings.
 
-A **name** resolves in order: `${xldr.*}` for the application-provided ambient values (currently just
-`xldr.filename`), then a declared `var`, then - in a field mapping - a field of the record. The two **functions** are:
+A **name** resolves in order: the two reserved prefixes `${xldr.*}` for what the application knows about the load
+(currently just `xldr.filename`) and `${env.*}` for what the deployment supplies (see
+[Deployment values](#deployment-values)), then a declared `var`, then - in a field mapping - a field of the record.
+The prefixes are reserved rather than merged into that order on purpose: an unprefixed ambient name placed ahead of
+the fields would silently shadow a column of the same name in every row, and placed behind them would be invisible in
+exactly the mappings that have a record in scope. The **functions** are:
 
 * `nextval('name'[, start[, inc]])` - the next value of an in-memory sequence that lives for the one load, shared by
   name. The first draw is `start` (default 1), each later one adds `inc` (default 1). Sequences never touch the
@@ -526,6 +530,7 @@ be created; a feed is a directory exactly one level below a root that contains a
 
     <root>/<feed>/
         spec.json           one of spec.json | spec.xml; its presence activates the feed
+        env.properties      optional; what this deployment supplies to the spec
         in/                 producers move input files in here
         work/               claimed, currently being loaded
         archive/2026/07/22/ loaded successfully
@@ -535,6 +540,34 @@ Creating a feed is `mkdir` plus dropping a spec in it; the four working director
 the spec deactivates the feed, replacing it reloads it - no restart in either case. Exactly one spec file must be
 present: two of them is refused rather than resolved by precedence, because loading through the wrong spec is worse
 than not loading at all.
+
+### Deployment values
+
+A spec is meant to travel from test to production unchanged, so anything that must differ between the two cannot be in
+it. A feed may therefore hold an optional `env.properties` beside its spec, and every key in it becomes an expression
+name under the `env.` prefix:
+
+    # <root>/prices/env.properties
+    mandant  = 4711
+    currency = CHF
+
+    {"expr": "${env.mandant}",  "column": "mandant_nr"}
+    {"expr": "${env.currency}", "column": "waehrung_cd"}
+
+The same spec then loads under a different client number on the test box without being edited, which is the point.
+This is not a second home for what the spec could say itself: how to *read* the file - separators, formats, selectors -
+belongs in the spec and is the same everywhere, and putting it here instead only splits one description across two
+files.
+
+The file is read once per loaded file rather than cached with the feed, so an edit reaches the next load with no
+reload in between. Having none is normal and silent; a spec that names an `env.` value the file does not supply fails
+that load with the name it could not resolve, and the input goes to the hospital. Values are always text, so a
+non-text column relies on the driver coercing, or on `parse(...)`.
+
+Two things it is not for. **Secrets**: the database credentials live in `xldr.properties` outside the watched tree
+precisely so that nobody who can drop a file into a feed can read them, and `env.properties` is inside it. **Adapter
+properties**: `input.properties` is consumed when the adapter is built, before any expression is evaluated, so `env.`
+cannot reach it.
 
 ### Delivering files
 

@@ -125,7 +125,7 @@ class FileProcessor {
         }
         statistics.loadStarted();
         try {
-            var rows = new LoadJob(feed.mappingSpec(), connectionSource).load(claimed);
+            var rows = new LoadJob(feed.mappingSpec(), feed.directory(), connectionSource).load(claimed);
             var target = archive(feed, claimed);
             statistics.loaded(feed.name(), rows);
             LOG.log(INFO, () -> "loaded " + rows + " row(s) from " + originalName

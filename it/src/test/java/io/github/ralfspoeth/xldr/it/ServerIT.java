@@ -387,6 +387,76 @@ public class ServerIT {
     }
 
     /**
+     * A feed may carry an {@code env.properties} beside its spec, and its keys
+     * become expression names under {@code env.}. The file is read per load, so
+     * an edit reaches the next file without the feed being reloaded - which is
+     * the second half of what this asserts, and the reason the same feed loads
+     * twice.
+     */
+    @Test
+    @Timeout(60)
+    void readsDeploymentValuesFromEnvProperties() throws Exception {
+        var feed = Files.createDirectory(root.resolve("labelled"));
+        Files.writeString(feed.resolve("env.properties"), "label = from-test\n");
+        // the name column comes from the deployment, not from the file
+        Files.writeString(feed.resolve("spec.json"), SPEC.replace(
+                "{\"fieldSelector\": \"name\", \"column\": \"name\"}",
+                "{\"expr\": \"${env.label}\", \"column\": \"name\"}"));
+        await("in/ to be created", () -> Files.isDirectory(feed.resolve("in")));
+
+        deliver(feed, "first.csv", """
+                id,name
+                1,ignored
+                """);
+        await("the first row", () -> selectPersons().size() == 1);
+        assertEquals(List.of("1:from-test"), selectPersons());
+
+        // no reload in between: only the file on disk changes
+        Files.writeString(feed.resolve("env.properties"), "label = from-prod\n");
+        deliver(feed, "second.csv", """
+                id,name
+                2,ignored
+                """);
+        await("the second row", () -> selectPersons().size() == 2);
+        assertEquals(List.of("1:from-test", "2:from-prod"), selectPersons(),
+                "env.properties is read per load, so the edit must reach the second file");
+    }
+
+    /**
+     * A spec naming an {@code env.} value that no {@code env.properties}
+     * supplies must fail the load rather than insert a null: the file is missing,
+     * not the value optional.
+     */
+    @Test
+    @Timeout(60)
+    void hospitalisesAloadWhoseDeploymentValueIsMissing() throws Exception {
+        var feed = Files.createDirectory(root.resolve("unconfigured"));
+        Files.writeString(feed.resolve("spec.json"), SPEC.replace(
+                "{\"fieldSelector\": \"name\", \"column\": \"name\"}",
+                "{\"expr\": \"${env.label}\", \"column\": \"name\"}"));
+        await("in/ to be created", () -> Files.isDirectory(feed.resolve("in")));
+
+        deliver(feed, "nolabel.csv", """
+                id,name
+                1,Alice
+                """);
+
+        await("the input to be hospitalised", () -> {
+            try (var files = Files.list(feed.resolve("hospital"))) {
+                return files.anyMatch(p -> p.getFileName().toString().endsWith(".log"));
+            } catch (IOException e) {
+                return false;
+            }
+        });
+        try (var files = Files.list(feed.resolve("hospital"))) {
+            var log = files.filter(p -> p.getFileName().toString().endsWith(".log")).findFirst().orElseThrow();
+            assertTrue(Files.readString(log).contains("env.label"),
+                    "the log should name the value it could not resolve");
+        }
+        assertEquals(List.of(), selectPersons(), "nothing may have been inserted");
+    }
+
+    /**
      * A feed directory that already existed when the server started must be
      * watched, so that a spec written into it later activates the feed at once.
      * <p>

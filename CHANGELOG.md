@@ -6,7 +6,21 @@ ways that break existing code and existing specs; those changes are listed here 
 The versions are the git tags `xldr-<version>`; the published artifacts carry the same version under the group
 `io.github.ralfspoeth.xldr`.
 
-## Unreleased
+## 0.17
+
+The mapping-spec format is unchanged and `mapping-spec-0.13` remains its schema: a deployment value is named in an
+expression, which the schema already allows, and supplied by a file the server reads rather than by anything in the
+spec. A spec that loaded under 0.16 loads under 0.17.
+
+### Added
+
+- A feed may hold an optional `env.properties` beside its spec. Every key in it becomes an expression name under the
+  reserved `env.` prefix, so `${env.mandant}` reads what that deployment supplies and the same spec loads unchanged on
+  the test box and in production. The file is read once per loaded file rather than cached with the feed, so an edit
+  reaches the next load without a reload; it is read as UTF-8; and a spec naming a value the file does not supply
+  fails that load rather than inserting a null. `env.` is a reserved prefix like `xldr.` rather than a fourth tier in
+  the var-then-field fallback: an unprefixed name would shadow a column of the same name in every row, silently.
+  Values are text, and adapter `properties` are out of reach - the adapter is built before any expression runs.
 
 ### Fixed
 

@@ -119,8 +119,13 @@ public class Loader implements AutoCloseable {
      * @param connection an open connection to the target database, supplied by the
      *                   application
      * @param ambient    application-provided values expressions can read, each
-     *                   keyed under the reserved {@code xldr.} prefix (for example
-     *                   {@code xldr.filename})
+     *                   keyed under one of the reserved prefixes: {@code xldr.}
+     *                   for what the application knows about the load itself
+     *                   (for example {@code xldr.filename}), {@code env.} for
+     *                   what the deployment supplies (for example
+     *                   {@code env.mandant}). The loader does not care where
+     *                   either comes from; the prefixes exist so that a name in
+     *                   an expression cannot be mistaken for a var or a field.
      */
     public Loader(MappingSpec ms, Connection connection, Map<String, Object> ambient) throws SQLException {
         this.mappingSpec = Objects.requireNonNull(ms);
@@ -161,9 +166,22 @@ public class Loader implements AutoCloseable {
     }
 
     /**
-     * Bindings for an expression: {@code xldr.}-prefixed names come from the
-     * ambient values, then declared variables, then - if a record is in scope -
-     * the record's fields. {@code now()} yields an {@link Instant};
+     * The prefixes that send a name to the ambient values rather than to a var
+     * or a field.
+     * <p>
+     * Reserved rather than merged for a reason: the fallback order is vars, then
+     * fields, and an unprefixed ambient name would have to take a place in it.
+     * Ahead of the fields it would shadow a column that happens to share its
+     * name - silently, and in every row - and behind them it would be invisible
+     * in exactly the mappings that have a record in scope. A prefix removes the
+     * question rather than answering it.
+     */
+    private static final List<String> AMBIENT_PREFIXES = List.of("xldr.", "env.");
+
+    /**
+     * Bindings for an expression: names under a reserved prefix ({@code xldr.},
+     * {@code env.}) come from the ambient values, then declared variables, then -
+     * if a record is in scope - the record's fields. {@code now()} yields an {@link Instant};
      * {@code nextval(name[, start])} draws from an in-memory per-load sequence;
      * {@code format(value, pattern)} and {@code parse(text, pattern)} convert
      * between text and the date types.
@@ -172,9 +190,12 @@ public class Loader implements AutoCloseable {
         return new Expression.Bindings() {
             @Override
             public Object variable(String name) {
-                if (name.startsWith("xldr.")) {
+                if (AMBIENT_PREFIXES.stream().anyMatch(name::startsWith)) {
                     if (!ambient.containsKey(name)) {
-                        throw new IllegalArgumentException("unknown ambient variable: " + name);
+                        // the names, never the values: an ambient map may hold
+                        // things a log file should not
+                        throw new IllegalArgumentException("unknown ambient variable '" + name
+                                + "'; supplied are " + new TreeSet<>(ambient.keySet()));
                     }
                     return ambient.get(name);
                 }
