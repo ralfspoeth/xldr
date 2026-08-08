@@ -10,7 +10,7 @@
     </parent>
 
     <artifactId>server</artifactId>
-
+    <name>server</name>
     <description>
         The watching and loading half of the server, without the decisions a
         runner makes: no command line, no connection pool, no logging setup.
