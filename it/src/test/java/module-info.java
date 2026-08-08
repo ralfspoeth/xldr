@@ -1,4 +1,5 @@
 open module io.github.ralfspoeth.xldr.it.test {
+    requires io.github.ralfspoeth.xldr.server;
     requires io.github.ralfspoeth.xldr.app;
     requires io.github.ralfspoeth.xldr.spec;
     requires io.github.ralfspoeth.xldr.ldr;

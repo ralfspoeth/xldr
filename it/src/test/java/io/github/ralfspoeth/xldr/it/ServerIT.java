@@ -1,9 +1,9 @@
 package io.github.ralfspoeth.xldr.it;
 
-import io.github.ralfspoeth.xldr.app.AppConfig;
+import io.github.ralfspoeth.xldr.server.AppConfig;
 import io.github.ralfspoeth.xldr.app.ConnectionPool;
-import io.github.ralfspoeth.xldr.app.ServerMXBean;
-import io.github.ralfspoeth.xldr.app.Watcher;
+import io.github.ralfspoeth.xldr.server.ServerMXBean;
+import io.github.ralfspoeth.xldr.server.Watcher;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;

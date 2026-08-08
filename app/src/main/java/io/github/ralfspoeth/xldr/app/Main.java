@@ -1,5 +1,8 @@
 package io.github.ralfspoeth.xldr.app;
 
+import io.github.ralfspoeth.xldr.server.AppConfig;
+import io.github.ralfspoeth.xldr.server.Watcher;
+
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Model.CommandSpec;

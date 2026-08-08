@@ -38,6 +38,11 @@
         </dependency>
         <dependency>
             <groupId>io.github.ralfspoeth.xldr</groupId>
+            <artifactId>server</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>io.github.ralfspoeth.xldr</groupId>
             <artifactId>app</artifactId>
             <version>${project.version}</version>
         </dependency>

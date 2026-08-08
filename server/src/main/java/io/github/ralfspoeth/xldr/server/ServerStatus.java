@@ -1,4 +1,4 @@
-package io.github.ralfspoeth.xldr.app;
+package io.github.ralfspoeth.xldr.server;
 
 import javax.management.JMException;
 import javax.management.ObjectName;

@@ -1,5 +1,8 @@
 package io.github.ralfspoeth.xldr.app;
 
+import io.github.ralfspoeth.xldr.server.AppConfig;
+import io.github.ralfspoeth.xldr.server.ConnectionSource;
+
 import io.github.ralfspoeth.xldr.ldr.Loader;
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;

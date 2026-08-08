@@ -6,6 +6,24 @@ ways that break existing code and existing specs; those changes are listed here 
 The versions are the git tags `xldr-<version>`; the published artifacts carry the same version under the group
 `io.github.ralfspoeth.xldr`.
 
+## Unreleased
+
+### Breaking
+
+- The server is split in two. `io.github.ralfspoeth.xldr.server` now holds the watching and the loading -
+  `Watcher`, `AppConfig`, `ConnectionSource`, the feed registry, the file processor, the JMX statistics - and
+  `io.github.ralfspoeth.xldr.app` keeps only what a *runner* decides: the command line, the connection pool and the
+  logging setup. Code that embedded the watcher imported those types from `...app` and must now import them from
+  `...server`; nothing else moved and no visibility changed, because `Main` and `ConnectionPool` only ever touched
+  `AppConfig`, `ConnectionSource` and `Watcher`, all of them already public.
+
+### Added
+
+- `server` is published, and is in the `bom`. `app` remains unpublished: it is the distribution rather than a
+  library. An application embedding the server therefore no longer inherits picocli, HikariCP and the slf4j bridge,
+  which were transitive burdens of `app` and are decisions an embedder makes for itself. `ConnectionSource` is a
+  functional interface, so bringing your own database access is one lambda.
+
 ## 0.17
 
 The mapping-spec format is unchanged and `mapping-spec-0.13` remains its schema: a deployment value is named in an

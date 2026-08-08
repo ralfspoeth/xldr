@@ -60,6 +60,11 @@
                 <artifactId>xlsx</artifactId>
                 <version>${project.version}</version>
             </dependency>
+            <dependency>
+                <groupId>io.github.ralfspoeth.xldr</groupId>
+                <artifactId>server</artifactId>
+                <version>${project.version}</version>
+            </dependency>
         </dependencies>
     </dependencyManagement>
 

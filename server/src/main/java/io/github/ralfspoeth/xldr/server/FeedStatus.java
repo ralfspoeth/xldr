@@ -1,4 +1,4 @@
-package io.github.ralfspoeth.xldr.app;
+package io.github.ralfspoeth.xldr.server;
 
 /**
  * What one feed has done and what is waiting for it.

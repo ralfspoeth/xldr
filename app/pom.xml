@@ -58,6 +58,11 @@
             <artifactId>ldr</artifactId>
             <version>${project.version}</version>
         </dependency>
+        <dependency>
+            <groupId>io.github.ralfspoeth.xldr</groupId>
+            <artifactId>server</artifactId>
+            <version>${project.version}</version>
+        </dependency>
         <!-- input adapters -->
         <dependency>
             <groupId>io.github.ralfspoeth.xldr</groupId>

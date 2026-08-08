@@ -1,4 +1,4 @@
-package io.github.ralfspoeth.xldr.app;
+package io.github.ralfspoeth.xldr.server;
 
 import io.github.ralfspoeth.filews.DirectoryWatchService;
 

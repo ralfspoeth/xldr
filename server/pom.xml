@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <artifactId>xldr</artifactId>
+        <groupId>io.github.ralfspoeth.xldr</groupId>
+        <version>${revision}</version>
+    </parent>
+
+    <artifactId>server</artifactId>
+
+    <description>
+        The watching and loading half of the server, without the decisions a
+        runner makes: no command line, no connection pool, no logging setup.
+        Depend on this to embed the server; depend on the distribution instead
+        to run it as it comes.
+    </description>
+
+    <dependencies>
+        <dependency>
+            <groupId>io.github.ralfspoeth</groupId>
+            <artifactId>filews</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.github.ralfspoeth.xldr</groupId>
+            <artifactId>ia</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>io.github.ralfspoeth.xldr</groupId>
+            <artifactId>spec</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>io.github.ralfspoeth.xldr</groupId>
+            <artifactId>ldr</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter-api</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+</project>

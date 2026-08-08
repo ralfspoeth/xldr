@@ -94,9 +94,10 @@ level, so every type is non-null unless it carries `@Nullable`. The annotations 
 and `provided` scope - so nothing is added to your runtime; a null checker will read them, and a build without one is
 unaffected.
 
-The `bom` manages exactly the published artifacts - `spec`, `ia`, `ldr` and the adapters `csv`, `xml`, `xlsx`, `flt`
-and `json` - and deliberately no third-party versions, so importing it does not bind you to the POI, HikariCP or JDBC
-driver versions this build happens to use. `app` and `it` are not published at all. Both the spec readers and the
+The `bom` manages exactly the published artifacts - `spec`, `ia`, `ldr`, `server` and the adapters `csv`, `xml`,
+`xlsx`, `flt` and `json` - and deliberately no third-party versions, so importing it does not bind you to the POI, HikariCP or JDBC
+driver versions this build happens to use. `app` and `it` are not published at all: `app` is the
+distribution rather than a library, and what an application would embed is `server`. Both the spec readers and the
 adapters are found through `ServiceLoader`, so each need only be on the module path - naming the spec file is enough
 to read it, since its name says which format it is in:
 
@@ -131,9 +132,14 @@ modules by their dependencies:
 * `bom` - a bill of materials fixing the versions of the published modules in one import;
 * `csv`, `xml`, `xlsx`, `flt`, `json` - the input adapters, each an `InputAdapterFactory` provider discovered through
   `ServiceLoader`;
-* `app` - the server. It does not `requires` any adapter; the adapters are `provided` dependencies, so they are on the
-  module path (JPMS service binding then pulls them into the graph via the `uses` in `app` and the `provides` in each
-  adapter) without being bundled into `app`'s own runtime footprint. A deployment supplies the adapter set it needs;
+* `server` - the watching and the loading: the `Watcher`, the feed registry, the file processor and the JMX
+  statistics. It does not `requires` any adapter; JPMS service binding pulls them into the graph via the `uses` here
+  and the `provides` in each adapter, so a deployment supplies the adapter set it needs on the module path. This is
+  the module to depend on to embed the server in something else;
+* `app` - the server as it is shipped: the command line, the connection pool and the logging setup around `server`,
+  plus the distribution. Those are the choices a *runner* makes rather than the server's own, which is why they are
+  separate - an embedder brings its own and should not inherit picocli and HikariCP for the privilege. The adapters
+  are `provided` dependencies here, so they reach the module path without being bundled into `app`'s own footprint;
 * `it` - integration tests exercising the whole pipeline end to end against a local H2 database.
 
 `revision` is a CI-friendly version property resolved by the `flatten-maven-plugin`, so the installed and deployed POMs
@@ -176,7 +182,7 @@ keeping the modular layout and its service binding intact.
 
 Publishing goes through the Central Portal via the `central-publishing-maven-plugin`, inherited from the `plumbum`
 parent. The plugin bundles the whole reactor into a single deployment, so the `xldr` parent POM, the `bom` and the
-eight library modules - `spec`, `ia`, `ldr`, `csv`, `xml`, `xlsx`, `flt`, `json` - are published together. `app` (an
+nine library modules - `spec`, `ia`, `ldr`, `server`, `csv`, `xml`, `xlsx`, `flt`, `json` - are published together. `app` (an
 executable, not a library) and `it` (integration tests) each set `skipPublishing` on the plugin, so they are left out
 of the bundle.
 
