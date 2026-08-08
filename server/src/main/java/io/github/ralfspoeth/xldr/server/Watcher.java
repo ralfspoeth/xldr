@@ -3,6 +3,7 @@ package io.github.ralfspoeth.xldr.server;
 import io.github.ralfspoeth.filews.DirectoryWatchService;
 import io.github.ralfspoeth.filews.PathEvent;
 
+import java.io.Closeable;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -31,7 +32,7 @@ import static java.nio.file.StandardWatchEventKinds.ENTRY_CREATE;
  * Watch events only reduce latency. The guarantee is the periodic
  * reconciliation, which re-derives the whole state from the file system.
  */
-public class Watcher implements AutoCloseable {
+public class Watcher implements Closeable {
 
     private static final System.Logger LOG = System.getLogger(Watcher.class.getName());
 

@@ -6,7 +6,11 @@ ways that break existing code and existing specs; those changes are listed here 
 The versions are the git tags `xldr-<version>`; the published artifacts carry the same version under the group
 `io.github.ralfspoeth.xldr`.
 
-## Unreleased
+## 0.19
+
+Nothing about the mapping-spec format changed, so `mapping-spec-0.13` remains its schema and a spec that loaded under
+0.18 loads under 0.19. What changed is a name in the server's API, and what the `xlsx` module puts on a consumer's
+runtime.
 
 ### Breaking
 
@@ -15,6 +19,21 @@ The versions are the git tags `xldr-<version>`; the published artifacts carry th
   module name does that, and `server.Config` reads better than `server.AppConfig` for a type that configures the
   server rather than any app. A mechanical rename with no change of behaviour: the members, the factory methods
   `of(Properties)` and `load(Path)`, and the properties it reads are all as they were.
+
+### Changed
+
+- `xlsx` no longer requires an SLF4J binding. `slf4j-jdk14` was a compile dependency and `requires org.slf4j.jul`
+  stood in the module declaration, so every consumer of the Excel adapter had a *binding* - not a facade - forced into
+  its runtime, and with it a decision about where log records go that belongs to a deployment rather than to a
+  library. The dependency is now test-scoped and the `requires` moved to the test module. The distribution binds
+  SLF4J exactly as before, because that is a runner's choice and `app` is a runner.
+- `Watcher` implements `Closeable` rather than `AutoCloseable`. Its `close()` already threw nothing but `IOException`,
+  so this only says so in the type. Existing callers are unaffected - `Closeable` is an `AutoCloseable` - and
+  try-with-resources behaves as it did.
+- `release:perform` no longer runs the integration tests. `release:prepare` runs `clean verify` before the tag is
+  cut, which is the gate; `perform` then rebuilds the very source that just passed, so running them again cost
+  minutes and proved nothing. Configured through the release plugin's `goals`, which is the only perform-only setting
+  it has. A plain `mvn verify` is unchanged.
 
 ## 0.18
 

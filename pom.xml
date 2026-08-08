@@ -67,7 +67,7 @@
             <dependency>
                 <groupId>org.junit</groupId>
                 <artifactId>junit-bom</artifactId>
-                <version>6.1.2</version>
+                <version>6.1.3</version>
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>
@@ -184,6 +184,26 @@
             </plugins>
         </pluginManagement>
         <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-release-plugin</artifactId>
+                <configuration>
+                    <!-- Run the integration tests once, not twice.
+                         release:prepare runs `clean verify` before the tag is
+                         cut, which is the gate worth having; release:perform
+                         then rebuilds the very source that just verified, so
+                         running them again buys nothing but minutes.
+
+                         `goals` is the only perform-only lever the plugin has:
+                         `arguments` and `releaseProfiles` are shared with
+                         prepare, and `useReleaseProfile` - which would have set
+                         `performRelease` for a profile to key on - defaults to
+                         false since 3.x and is deprecated. The default here is
+                         plain `deploy`, there being no distributionManagement
+                         <site> to add `site-deploy` for. -->
+                    <goals>deploy -DskipITs</goals>
+                </configuration>
+            </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>

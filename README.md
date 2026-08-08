@@ -70,7 +70,7 @@ fix their versions in one place:
             <dependency>
                 <groupId>io.github.ralfspoeth.xldr</groupId>
                 <artifactId>bom</artifactId>
-                <version>0.17</version>
+                <version>0.19</version>
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>
@@ -193,6 +193,13 @@ A plain deploy therefore publishes everything in one go:
 or as a tagged release, which additionally builds and tests everything first:
 
     mvn release:prepare release:perform
+
+`release:prepare` runs `clean verify`, integration tests included, before the tag is cut - that is the gate.
+`release:perform` then rebuilds the tagged source, and is configured with `<goals>deploy -DskipITs</goals>` so it does
+not run them a second time against source that has just passed. `goals` is the only perform-only setting the release
+plugin has: `arguments` and `releaseProfiles` are shared with prepare, and `useReleaseProfile` has defaulted to false
+since 3.x. Should a `<site>` ever be added to `distributionManagement`, this override would need `site-deploy` adding
+back to it.
 
 Publishing needs a Central Portal user token in `settings.xml` under the server id `central` (generate it at
 https://central.sonatype.com/account). `autoPublish` is on, so a valid deployment is released without a manual step.
@@ -861,6 +868,10 @@ configuration turns them on, since every `pool.*` key is passed through.
 The application logs through `System.Logger`; HikariCP and POI log through SLF4J, which the distribution binds with
 `slf4j-jdk14`. Everything therefore ends up in `java.util.logging`, and a single JUL configuration covers the whole
 process; no second logging framework is involved.
+
+The binding belongs to the *distribution*, not to any library module. A binding is a deployment's choice, so no
+published module requires one - a consumer taking `xlsx` from Maven Central gets POI and no opinion about where its
+log records go.
 
 A default `logging.properties` is bundled and applied at startup unless the deployment points `java.util.logging` at a
 configuration of its own:
