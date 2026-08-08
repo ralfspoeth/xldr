@@ -43,11 +43,13 @@ public class Watcher implements AutoCloseable {
     private final long scanIntervalSeconds;
     private final Statistics statistics;
     private Thread watchThread;
-    /** unregisters the JMX bean; does nothing if it could not be registered */
+    /**
+     * unregisters the JMX bean; does nothing if it could not be registered
+     */
     private AutoCloseable statusBean = () -> {
     };
 
-    public Watcher(AppConfig config, ConnectionSource connectionSource) throws IOException {
+    public Watcher(Config config, ConnectionSource connectionSource) throws IOException {
         this.roots = Set.copyOf(config.roots());
         this.scanIntervalSeconds = config.scanIntervalSeconds();
         validate(roots);

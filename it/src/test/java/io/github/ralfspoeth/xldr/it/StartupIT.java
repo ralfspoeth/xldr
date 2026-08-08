@@ -51,7 +51,7 @@ public class StartupIT {
      */
     @Test
     void readsTheConfigurationFromTheNamedDirectory(@TempDir Path dir) throws IOException {
-        // no xldr.roots, so AppConfig refuses it - and says so about this file
+        // no xldr.roots, so Config refuses it - and says so about this file
         Files.writeString(dir.resolve("xldr.properties"), "jdbc.url = jdbc:h2:mem:startupit\n");
 
         var err = new StringWriter();

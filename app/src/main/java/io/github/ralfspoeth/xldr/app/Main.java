@@ -1,6 +1,6 @@
 package io.github.ralfspoeth.xldr.app;
 
-import io.github.ralfspoeth.xldr.server.AppConfig;
+import io.github.ralfspoeth.xldr.server.Config;
 import io.github.ralfspoeth.xldr.server.Watcher;
 
 import picocli.CommandLine;
@@ -91,7 +91,7 @@ public class Main implements Callable<Integer> {
             return CommandLine.ExitCode.USAGE;
         }
         initLogging(directory);
-        var config = AppConfig.load(configFile);
+        var config = Config.load(configFile);
         try (var pool = new ConnectionPool(config);
              var watcher = new Watcher(config, pool)) {
             watcher.start();

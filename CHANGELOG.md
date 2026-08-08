@@ -10,6 +10,19 @@ The versions are the git tags `xldr-<version>`; the published artifacts carry th
 
 ### Breaking
 
+- `AppConfig` is now `Config`. The `App` prefix was there to tell it apart from the many other things called
+  `Config` on an application's classpath, back when it lived in `app`; in `io.github.ralfspoeth.xldr.server` the
+  module name does that, and `server.Config` reads better than `server.AppConfig` for a type that configures the
+  server rather than any app. A mechanical rename with no change of behaviour: the members, the factory methods
+  `of(Properties)` and `load(Path)`, and the properties it reads are all as they were.
+
+## 0.18
+
+Nothing about the mapping-spec format changed, so `mapping-spec-0.13` remains its schema and a spec that loaded under
+0.17 loads under 0.18. What moved is where the server's code lives.
+
+### Breaking
+
 - The server is split in two. `io.github.ralfspoeth.xldr.server` now holds the watching and the loading -
   `Watcher`, `AppConfig`, `ConnectionSource`, the feed registry, the file processor, the JMX statistics - and
   `io.github.ralfspoeth.xldr.app` keeps only what a *runner* decides: the command line, the connection pool and the

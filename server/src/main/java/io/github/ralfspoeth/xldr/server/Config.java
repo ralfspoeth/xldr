@@ -48,7 +48,7 @@ import java.util.stream.Stream;
  * @param poolProperties       the connection pool settings, under the names
  *                             {@code HikariConfig} knows them by
  */
-public record AppConfig(
+public record Config(
         List<Path> roots,
         long scanIntervalSeconds,
         int maxConcurrentLoads,
@@ -66,7 +66,7 @@ public record AppConfig(
     private static final String USER_KEY = "jdbc.user";
     private static final String PASSWORD_KEY = "jdbc.password";
 
-    public AppConfig {
+    public Config {
         roots = List.copyOf(roots);
     }
 
@@ -77,7 +77,7 @@ public record AppConfig(
      * @throws IllegalArgumentException if a required setting is missing or a
      *                                  value does not make sense
      */
-    public static AppConfig load(Path propertiesFile) throws IOException {
+    public static Config load(Path propertiesFile) throws IOException {
         var props = new Properties();
         try (var in = Files.newBufferedReader(propertiesFile)) {
             props.load(in);
@@ -91,7 +91,7 @@ public record AppConfig(
      * @throws IllegalArgumentException if a required setting is missing or a
      *                                  value does not make sense
      */
-    public static AppConfig of(Properties props) {
+    public static Config of(Properties props) {
         var roots = Stream.of(require(props, ROOTS_KEY).split(Pattern.quote(File.pathSeparator)))
                 .map(String::strip)
                 .filter(s -> !s.isEmpty())
@@ -130,7 +130,7 @@ public record AppConfig(
         // concurrency actually configured. An explicit pool.maximumPoolSize still
         // wins, for a database that will not have that many sessions.
         pool.putIfAbsent(MAX_POOL_SIZE, String.valueOf(maxConcurrentLoads));
-        return new AppConfig(roots, scanInterval, maxConcurrentLoads, pool);
+        return new Config(roots, scanInterval, maxConcurrentLoads, pool);
     }
 
     private static void copyIfPresent(Properties from, String key, Properties to, String targetKey) {

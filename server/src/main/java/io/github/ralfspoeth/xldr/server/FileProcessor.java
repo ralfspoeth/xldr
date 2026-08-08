@@ -6,16 +6,14 @@ import java.io.StringWriter;
 import java.nio.file.Files;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
-import java.util.List;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.List;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Semaphore;
 
-import static java.lang.System.Logger.Level.ERROR;
-import static java.lang.System.Logger.Level.INFO;
-import static java.lang.System.Logger.Level.WARNING;
+import static java.lang.System.Logger.Level.*;
 import static java.nio.file.StandardCopyOption.ATOMIC_MOVE;
 
 /**
@@ -40,7 +38,9 @@ class FileProcessor {
     private static final DateTimeFormatter STAMP = DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss-SSS");
 
     private final ConnectionSource connectionSource;
-    /** fair, so a file cannot be starved by a steady stream of newer arrivals */
+    /**
+     * fair, so a file cannot be starved by a steady stream of newer arrivals
+     */
     private final Semaphore loadPermits;
     private final Statistics statistics;
 

@@ -1,6 +1,6 @@
 package io.github.ralfspoeth.xldr.it;
 
-import io.github.ralfspoeth.xldr.server.AppConfig;
+import io.github.ralfspoeth.xldr.server.Config;
 import io.github.ralfspoeth.xldr.app.ConnectionPool;
 import io.github.ralfspoeth.xldr.server.ServerMXBean;
 import io.github.ralfspoeth.xldr.server.Watcher;
@@ -68,7 +68,7 @@ public class ServerIT {
         props.setProperty("xldr.maxConcurrentLoads", "2");
         props.setProperty("jdbc.url", JDBC_URL);
 
-        var config = AppConfig.of(props);
+        var config = Config.of(props);
         pool = new ConnectionPool(config);
         watcher = new Watcher(config, pool);
         watcher.start();
@@ -479,7 +479,7 @@ public class ServerIT {
         props.setProperty("xldr.scanInterval", "3600");
         props.setProperty("xldr.maxConcurrentLoads", "1");
         props.setProperty("jdbc.url", JDBC_URL);
-        var config = AppConfig.of(props);
+        var config = Config.of(props);
 
         try (var otherPool = new ConnectionPool(config);
              var server = new Watcher(config, otherPool)) {

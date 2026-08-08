@@ -1,11 +1,10 @@
 package io.github.ralfspoeth.xldr.app;
 
-import io.github.ralfspoeth.xldr.server.AppConfig;
-import io.github.ralfspoeth.xldr.server.ConnectionSource;
-
-import io.github.ralfspoeth.xldr.ldr.Loader;
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
+import io.github.ralfspoeth.xldr.ldr.Loader;
+import io.github.ralfspoeth.xldr.server.Config;
+import io.github.ralfspoeth.xldr.server.ConnectionSource;
 
 import java.sql.Connection;
 import java.sql.SQLException;
@@ -22,7 +21,7 @@ public final class ConnectionPool implements ConnectionSource, AutoCloseable {
 
     private final HikariDataSource dataSource;
 
-    public ConnectionPool(AppConfig config) {
+    public ConnectionPool(Config config) {
         this.dataSource = new HikariDataSource(new HikariConfig(config.poolProperties()));
     }
 
