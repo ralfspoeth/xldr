@@ -29,9 +29,7 @@ public class JsonAdapterTest {
 
     private static InputSpec spec(String recordSelector, FieldSelectorSpec... fields) {
         return new InputSpec(MIME, null, null,
-                List.of(
-                        new RecordSelectorSpec("rec", recordSelector, List.of(fields)))
-                ,
+                List.of(new RecordSelectorSpec("rec", recordSelector, List.of(fields))),
                 List.of(),
                 Map.of());
     }
@@ -187,17 +185,25 @@ public class JsonAdapterTest {
 
     /**
      * The document itself may be the array of records.
+     * <p>
+     * Both spellings of "no selector" mean it - blank and absent alike resolve
+     * to the document. This adapter is one of those that can do without one, so
+     * it reads {@code selector()} rather than {@code requireSelector()}: for
+     * JSON an absent selector is an answer, not an omission.
      */
     @Test
     public void readsAtopLevelArray() throws IOException {
-        var spec = spec("", new FieldSelectorSpec("id", "id", DataType.STRING));
+        for (var selector : new String[]{"", null}) {
+            var spec = spec(selector, new FieldSelectorSpec("id", "id", DataType.STRING));
 
-        var result = adapter(spec, Map.of())
-                .parse(in("""
-                        [ { "id": "A-1" }, { "id": "A-2" } ]
-                        """), "rec", Set.of("id"));
+            var result = adapter(spec, Map.of())
+                    .parse(in("""
+                            [ { "id": "A-1" }, { "id": "A-2" } ]
+                            """), "rec", Set.of("id"));
 
-        assertEquals(List.of("A-1", "A-2"), result.rows().map(r -> r.get("id")).toList());
+            assertEquals(List.of("A-1", "A-2"), result.rows().map(r -> r.get("id")).toList(),
+                    "selector " + (selector == null ? "absent" : "blank"));
+        }
     }
 
     /**

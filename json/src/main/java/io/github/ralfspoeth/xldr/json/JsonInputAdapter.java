@@ -13,6 +13,7 @@ import io.github.ralfspoeth.xldr.spec.DataType;
 import io.github.ralfspoeth.xldr.spec.FieldSelectorSpec;
 import io.github.ralfspoeth.xldr.spec.InputSpec;
 import io.github.ralfspoeth.xldr.spec.RecordSelectorSpec;
+import org.jspecify.annotations.Nullable;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -75,6 +76,9 @@ class JsonInputAdapter implements InputAdapter {
         for (var fs : rs.fieldSelectors()) {
             fields.putIfAbsent(fs.name(), new FieldDef(pointer(fs.selector()), typeOf(fs)));
         }
+        // selector(), not requireSelector(): for this adapter an absent one is
+        // an answer rather than an omission - the document itself is the record
+        // source, which is what a file that is one top-level array looks like
         return new RecordDef(pointer(rs.selector()), fields);
     }
 
@@ -88,7 +92,7 @@ class JsonInputAdapter implements InputAdapter {
      * dropped, since {@code parse} would otherwise read it as a step to a member
      * named {@code ""}.
      */
-    private static Pointer pointer(String path) {
+    private static Pointer pointer(@Nullable String path) {
         if (path == null || path.isBlank()) {
             return Pointer.self();
         }
