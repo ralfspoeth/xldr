@@ -1,7 +1,7 @@
 package io.github.ralfspoeth.xldr.it;
 
 import io.github.ralfspoeth.xldr.server.Config;
-import io.github.ralfspoeth.xldr.app.ConnectionPool;
+import io.github.ralfspoeth.xldr.server.ConnectionSource;
 import io.github.ralfspoeth.xldr.server.ServerMXBean;
 import io.github.ralfspoeth.xldr.server.Watcher;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
@@ -46,7 +46,7 @@ public class ServerIT {
 
     private Path root;
     private Path staging;
-    private ConnectionPool pool;
+    private ConnectionSource pool;
     private Watcher watcher;
 
     @BeforeEach
@@ -69,7 +69,7 @@ public class ServerIT {
         props.setProperty("jdbc.url", JDBC_URL);
 
         var config = Config.of(props);
-        pool = new ConnectionPool(config);
+        pool = () -> DriverManager.getConnection(JDBC_URL);
         watcher = Watcher.watch(config, pool);
     }
 
@@ -77,9 +77,6 @@ public class ServerIT {
     void tearDown() throws IOException {
         if (watcher != null) {
             watcher.close();
-        }
-        if (pool != null) {
-            pool.close();
         }
     }
 
@@ -566,9 +563,8 @@ public class ServerIT {
         props.setProperty("xldr.maxConcurrentLoads", "1");
         props.setProperty("jdbc.url", JDBC_URL);
         var config = Config.of(props);
-
-        try (var otherPool = new ConnectionPool(config);
-             var _ = Watcher.watch(config, otherPool)) {
+        ConnectionSource otherPool = () -> DriverManager.getConnection(JDBC_URL);
+        try (var _ = Watcher.watch(config, otherPool)) {
             // nothing to activate yet, so no in/ - and the directory is now watched
             assertTrue(Files.notExists(feed.resolve("in")), "the feed must still be inactive");
 

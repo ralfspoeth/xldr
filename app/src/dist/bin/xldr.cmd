@@ -36,4 +36,4 @@ set "MODULES=%HERE%\lib"
 if exist "%HERE%\drivers" set "MODULES=%MODULES%;%HERE%\drivers"
 
 "%JAVA%" %JAVA_OPTS% -Dxldr.home="%HERE%" -p "%MODULES%" ^
-    -m io.github.ralfspoeth.xldr.app/io.github.ralfspoeth.xldr.app.Main %*
+    -m io.github.ralfspoeth.xldr.app/io.github.ralfspoeth.xldr.app.App %*

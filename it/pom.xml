@@ -43,11 +43,6 @@
         </dependency>
         <dependency>
             <groupId>io.github.ralfspoeth.xldr</groupId>
-            <artifactId>app</artifactId>
-            <version>${project.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>io.github.ralfspoeth.xldr</groupId>
             <artifactId>xml</artifactId>
             <version>${project.version}</version>
         </dependency>
@@ -70,12 +65,6 @@
             <groupId>io.github.ralfspoeth.xldr</groupId>
             <artifactId>xlsx</artifactId>
             <version>${project.version}</version>
-        </dependency>
-        <!-- driving the "validate" subcommand through the command line -->
-        <dependency>
-            <groupId>info.picocli</groupId>
-            <artifactId>picocli</artifactId>
-            <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>com.h2database</groupId>

@@ -1,6 +1,6 @@
-package io.github.ralfspoeth.xldr.it;
+package io.github.ralfspoeth.xldr.app.test;
 
-import io.github.ralfspoeth.xldr.app.Main;
+import io.github.ralfspoeth.xldr.app.App;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import picocli.CommandLine;
@@ -15,8 +15,16 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
  * The {@code validate} command through the command line, with the adapters on
  * the module path - which is the point of it: a spec is checked against the
  * adapter that will read it, without a database and without a server.
+ * <p>
+ * A {@code Test} rather than an {@code IT} despite needing the adapters. What
+ * separates the two here is cost and environment - a database, background
+ * threads, timeouts measured in tens of seconds - and this has none of them: it
+ * writes a file and calls a method. The adapters reach the module path because
+ * they are {@code provided} dependencies of {@code app} and it declares
+ * {@code uses InputAdapterFactory}, which is as true under surefire as under
+ * failsafe.
  */
-public class ValidateIT {
+public class ValidateTest {
 
     private Path dir;
 
@@ -28,7 +36,7 @@ public class ValidateIT {
     private int validate(String name, String spec) throws IOException {
         var file = dir.resolve(name);
         Files.writeString(file, spec);
-        return new CommandLine(new Main()).execute("validate", file.toString());
+        return new CommandLine(new App()).execute("validate", file.toString());
     }
 
     /**
@@ -225,8 +233,8 @@ public class ValidateIT {
                 { "input": { "mimeType": "text/csv", "recordSelectors": [] } }
                 """);
 
-        assertEquals(0, new CommandLine(new Main()).execute("validate", good.toString()));
-        assertEquals(1, new CommandLine(new Main())
+        assertEquals(0, new CommandLine(new App()).execute("validate", good.toString()));
+        assertEquals(1, new CommandLine(new App())
                 .execute("validate", good.toString(), bad.toString()));
     }
 }

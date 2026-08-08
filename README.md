@@ -70,7 +70,7 @@ fix their versions in one place:
             <dependency>
                 <groupId>io.github.ralfspoeth.xldr</groupId>
                 <artifactId>bom</artifactId>
-                <version>0.19</version>
+                <version>0.20</version>
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>
@@ -140,7 +140,10 @@ modules by their dependencies:
   plus the distribution. Those are the choices a *runner* makes rather than the server's own, which is why they are
   separate - an embedder brings its own and should not inherit picocli and HikariCP for the privilege. The adapters
   are `provided` dependencies here, so they reach the module path without being bundled into `app`'s own footprint;
-* `it` - integration tests exercising the whole pipeline end to end against a local H2 database.
+* `it` - integration tests exercising the whole pipeline end to end against a local H2 database. It depends on
+  `server` and the adapters, not on `app`: a test supplies its own `ConnectionSource` as a lambda, so what is
+  exercised is the server rather than the way the distribution happens to run it. Tests that need no database and no
+  server - `validate`, and where the configuration is looked for - live in `app` and run under surefire.
 
 `revision` is a CI-friendly version property resolved by the `flatten-maven-plugin`, so the installed and deployed POMs
 carry the concrete version rather than a literal `${revision}`.
@@ -873,10 +876,16 @@ The binding belongs to the *distribution*, not to any library module. A binding 
 published module requires one - a consumer taking `xlsx` from Maven Central gets POI and no opinion about where its
 log records go.
 
+`server` goes the same way for the JDK's own logging: it writes through `System.Logger`, which is in `java.base`, and
+does not `requires java.logging`. Requiring it would pick JUL, because the default `LoggerFinder` routes there when
+the module is resolved. An application embedding the server therefore chooses - `requires java.logging` for JUL, or
+its own `System.LoggerFinder` for anything else. `app` requires it, which is why the distribution behaves as
+described above.
+
 A default `logging.properties` is bundled and applied at startup unless the deployment points `java.util.logging` at a
 configuration of its own:
 
-    java -Djava.util.logging.config.file=/etc/xldr/logging.properties -p <module-path> -m io.github.ralfspoeth.xldr.app config.properties
+    java -Djava.util.logging.config.file=/etc/xldr/logging.properties -p <module-path> -m io.github.ralfspoeth.xldr.app --dir /etc/xldr
 
 ## License
 

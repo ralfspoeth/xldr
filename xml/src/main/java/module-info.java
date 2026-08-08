@@ -6,7 +6,7 @@ import org.jspecify.annotations.NullMarked;
 @NullMarked
 module io.github.ralfspoeth.xldr.xml {
     requires java.xml;
-    requires transitive io.github.ralfspoeth.xldr.ia;
+    requires io.github.ralfspoeth.xldr.ia;
     requires static org.jspecify;
 
     provides io.github.ralfspoeth.xldr.ia.InputAdapterFactory

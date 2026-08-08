@@ -7,7 +7,7 @@ import org.jspecify.annotations.NullMarked;
  */
 @NullMarked
 module io.github.ralfspoeth.xldr.csv {
-    requires transitive io.github.ralfspoeth.xldr.ia;
+    requires io.github.ralfspoeth.xldr.ia;
     requires static org.jspecify;
 
     provides InputAdapterFactory

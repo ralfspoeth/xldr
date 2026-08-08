@@ -1,22 +1,14 @@
 package io.github.ralfspoeth.xldr.app;
 
 import io.github.ralfspoeth.xldr.ia.InputAdapterFactory;
-import io.github.ralfspoeth.xldr.spec.FieldSelectorSpec;
-import io.github.ralfspoeth.xldr.spec.InputSpec;
-import io.github.ralfspoeth.xldr.spec.MappingSpec;
-import io.github.ralfspoeth.xldr.spec.RecordSelectorSpec;
-import io.github.ralfspoeth.xldr.spec.ValueSource;
+import io.github.ralfspoeth.xldr.spec.*;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Parameters;
 
 import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.ServiceLoader;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.Callable;
 import java.util.stream.Collectors;
 
@@ -110,17 +102,16 @@ class Validate implements Callable<Integer> {
      * drop the selector.
      */
     private static void checkCsvDiscriminator(InputSpec input, List<String> problems) {
-        if (!"text/csv".equals(input.mimeType())
-                || !Boolean.parseBoolean(input.properties().getOrDefault("header", "true"))) {
-            return;
+        if ("text/csv".equals(input.mimeType())
+                && !Boolean.parseBoolean(input.properties().getOrDefault("header", "true"))) {
+            input.recordSelectors().stream()
+                    .filter(rs -> rs.selector() != null && !rs.selector().isBlank())
+                    .forEach(rs -> problems.add("record selector '" + rs.name() + "': a CSV selector is a"
+                            + " first-column discriminator, and with a header no line's first column will equal '"
+                            + rs.selector() + "', so nothing would load. Drop the selector, or set the"
+                            + " 'header' property to false if the file really does name its record type in"
+                            + " the first column."));
         }
-        input.recordSelectors().stream()
-                .filter(rs -> rs.selector() != null && !rs.selector().isBlank())
-                .forEach(rs -> problems.add("record selector '" + rs.name() + "': a CSV selector is a"
-                        + " first-column discriminator, and with a header no line's first column will equal '"
-                        + rs.selector() + "', so nothing would load. Drop the selector, or set the"
-                        + " 'header' property to false if the file really does name its record type in"
-                        + " the first column."));
     }
 
     /**

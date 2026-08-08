@@ -6,7 +6,11 @@ ways that break existing code and existing specs; those changes are listed here 
 The versions are the git tags `xldr-<version>`; the published artifacts carry the same version under the group
 `io.github.ralfspoeth.xldr`.
 
-## Unreleased
+## 0.20
+
+Nothing about the mapping-spec format changed, so `mapping-spec-0.13` remains its schema and a spec that loaded under
+0.19 loads under 0.20. What changed is how the server is entered, what the modules promise one another, and where the
+tests that need no server live.
 
 ### Breaking
 
@@ -18,6 +22,32 @@ The versions are the git tags `xldr-<version>`; the published artifacts carry th
   starting also registers a JMX bean under a fixed name and moves any file a previous run left in a `work/` into its
   `hospital/`, neither of which belongs in a constructor. The watcher wants no name at the call site, so
   `try (var _ = Watcher.watch(config, source))` is the shape, and the javadoc says so.
+- The adapters - `csv`, `flt`, `json`, `xml`, `xlsx` - `requires` `ia` rather than `requires transitive` it. None of
+  them exports a package, so the promise was one no consumer could observe; the only code affected is a module that
+  wrote `requires io.github.ralfspoeth.xldr.csv` and leaned on it to see `ia`, which now needs saying outright. Take
+  `ldr`, which does re-export `ia`, or `ia` itself.
+- `server` no longer `requires java.logging`. It logs through `System.Logger`, which is in `java.base`, and nothing
+  in it names `java.util.logging` - but requiring the module *chose a backend*, because the JDK's default
+  `LoggerFinder` routes to JUL when it is resolved. That is a deployment's decision, the same one that took the SLF4J
+  binding out of `xlsx` in 0.19. An application embedding `server` that wants its records in JUL now says
+  `requires java.logging` itself. The distribution is unaffected: `app` requires it, as a runner should.
+
+### Changed
+
+- `server` `requires transitive java.sql`. `ConnectionSource` is exported and its one method returns a `Connection`
+  and throws `SQLException`, so a module using it had to require `java.sql` on its own account to write even a
+  lambda. It no longer does.
+- `ConnectionPool` is package-private. HikariCP is how `app` happens to hand out connections, not something anyone
+  outside it should name; the integration tests took the hint and pass `() -> DriverManager.getConnection(url)`
+  instead, which is what `ConnectionSource` being a functional interface is for. `it` consequently depends on `app`
+  in no form at all - it exercises the server, with no runner in sight.
+- The two tests that need no database, no threads and no server - `validate`, and where the configuration is looked
+  for - moved from `it` to `app` as `ValidateTest` and `StartupTest`, and run under surefire. What makes an `IT` an
+  `IT` here is cost and environment; both of these write a file and call a method.
+- The distribution's main class is `io.github.ralfspoeth.xldr.app.App`, was `...app.Main`. The launchers name it in
+  full and were updated with it, and the jar's `Main-Class` and `ModuleMainClass` are generated from the POM, so
+  `bin/xldr` and `java -m io.github.ralfspoeth.xldr.app` are both unaffected. Only a hand-written command naming the
+  class outright would need changing.
 
 ### Fixed
 

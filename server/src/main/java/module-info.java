@@ -16,12 +16,11 @@
 module io.github.ralfspoeth.xldr.server {
     exports io.github.ralfspoeth.xldr.server;
 
+    requires transitive java.sql;
+    requires java.management;
+
     requires io.github.ralfspoeth.xldr.ia;
     requires io.github.ralfspoeth.xldr.ldr;
-    requires java.sql;
-    requires java.logging;
-    // the JMX statistics, which need no agent and no dependency
-    requires java.management;
     requires io.github.ralfspoeth.filews;
 
     uses io.github.ralfspoeth.xldr.ia.InputAdapterFactory;

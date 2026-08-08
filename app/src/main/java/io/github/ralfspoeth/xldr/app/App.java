@@ -31,13 +31,13 @@ import static java.lang.System.Logger.Level.INFO;
 @Command(
         name = "xldr",
         mixinStandardHelpOptions = true,
-        versionProvider = Main.ManifestVersion.class,
+        versionProvider = App.ManifestVersion.class,
         description = "Watches the configured roots and loads files that appear into the target database.",
         subcommands = Validate.class
 )
-public class Main implements Callable<Integer> {
+public class App implements Callable<Integer> {
 
-    private static final System.Logger LOG = System.getLogger(Main.class.getName());
+    private static final System.Logger LOG = System.getLogger(App.class.getName());
 
     /**
      * The version the jar was built as, rather than one written down twice and
@@ -47,23 +47,27 @@ public class Main implements Callable<Integer> {
     static class ManifestVersion implements CommandLine.IVersionProvider {
         @Override
         public String[] getVersion() {
-            var version = Main.class.getPackage().getImplementationVersion();
+            var version = App.class.getPackage().getImplementationVersion();
             return new String[]{"xldr " + (version == null ? "(development build)" : version)};
         }
     }
 
-    /** the configuration a deployment writes, looked for in the working directory */
-    static final String CONFIG_FILE = "xldr.properties";
+    /**
+     * the configuration a deployment writes, looked for in the working directory
+     */
+    private static final String CONFIG_FILE = "xldr.properties";
 
-    /** optional beside it, and shipped in {@code conf/} as the fallback */
-    static final String LOGGING_FILE = "logging.properties";
+    /**
+     * optional beside it, and shipped in {@code conf/} as the fallback
+     */
+    private static final String LOGGING_FILE = "logging.properties";
 
     /**
      * Where the distribution was unpacked, set by the launcher. Absent when the
      * classes are run from a build directory, where there is no {@code conf/}
      * to fall back on either.
      */
-    static final String HOME_PROPERTY = "xldr.home";
+    private static final String HOME_PROPERTY = "xldr.home";
 
     @Spec
     private CommandSpec spec;
@@ -77,8 +81,8 @@ public class Main implements Callable<Integer> {
     )
     private Path directory;
 
-    static void main(String[] args) {
-        System.exit(new CommandLine(new Main()).execute(args));
+    void main(String[] args) {
+        System.exit(new CommandLine(this).execute(args));
     }
 
     @Override
@@ -124,26 +128,25 @@ public class Main implements Callable<Integer> {
      * as a service provider - so configuring JUL configures everything.
      */
     private static void initLogging(Path directory) {
-        if (System.getProperty("java.util.logging.config.file") != null
-                || System.getProperty("java.util.logging.config.class") != null) {
-            return;
-        }
-        for (var candidate : configuredLogging(directory)) {
-            if (Files.isRegularFile(candidate)) {
-                try (var in = Files.newInputStream(candidate)) {
-                    LogManager.getLogManager().readConfiguration(in);
-                    return;
-                } catch (IOException e) {
-                    System.err.println("could not read " + candidate + ": " + e);
+        if (System.getProperty("java.util.logging.config.file") == null
+                && System.getProperty("java.util.logging.config.class") == null) {
+            for (var candidate : configuredLogging(directory)) {
+                if (Files.isRegularFile(candidate)) {
+                    try (var in = Files.newInputStream(candidate)) {
+                        LogManager.getLogManager().readConfiguration(in);
+                        return;
+                    } catch (IOException e) {
+                        System.err.println("could not read " + candidate + ": " + e);
+                    }
                 }
             }
-        }
-        try (var in = Main.class.getResourceAsStream("/" + LOGGING_FILE)) {
-            if (in != null) {
-                LogManager.getLogManager().readConfiguration(in);
+            try (var in = App.class.getResourceAsStream("/" + LOGGING_FILE)) {
+                if (in != null) {
+                    LogManager.getLogManager().readConfiguration(in);
+                }
+            } catch (IOException e) {
+                System.err.println("could not apply the bundled logging configuration: " + e);
             }
-        } catch (IOException e) {
-            System.err.println("could not apply the bundled logging configuration: " + e);
         }
     }
 

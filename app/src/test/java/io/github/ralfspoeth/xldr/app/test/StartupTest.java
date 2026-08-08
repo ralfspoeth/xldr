@@ -1,6 +1,6 @@
-package io.github.ralfspoeth.xldr.it;
+package io.github.ralfspoeth.xldr.app.test;
 
-import io.github.ralfspoeth.xldr.app.Main;
+import io.github.ralfspoeth.xldr.app.App;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import picocli.CommandLine;
@@ -22,11 +22,15 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * Only the refusals are exercised here: a configuration that is found starts a
  * server that runs until it is asked to stop, which is what {@code ServerIT}
  * does the long way round.
+ * <p>
+ * Both cases stop before a server exists - no roots to watch, no database, no
+ * threads - so this belongs beside the command it tests rather than among the
+ * integration tests, and runs under surefire.
  */
-public class StartupIT {
+public class StartupTest {
 
     private static int run(StringWriter err, String... args) {
-        var cmd = new CommandLine(new Main()).setErr(new PrintWriter(err));
+        var cmd = new CommandLine(new App()).setErr(new PrintWriter(err));
         return cmd.execute(args);
     }
 

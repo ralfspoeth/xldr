@@ -13,7 +13,6 @@ module io.github.ralfspoeth.xldr.app {
     requires io.github.ralfspoeth.xldr.server;
     requires io.github.ralfspoeth.xldr.ia;
     requires io.github.ralfspoeth.xldr.spec;
-    requires io.github.ralfspoeth.xldr.ldr;
     requires java.sql;
     requires java.logging;
     requires com.zaxxer.hikari;

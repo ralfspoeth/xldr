@@ -7,7 +7,7 @@ import org.jspecify.annotations.NullMarked;
  */
 @NullMarked
 module io.github.ralfspoeth.xldr.xlsx {
-    requires transitive io.github.ralfspoeth.xldr.ia;
+    requires io.github.ralfspoeth.xldr.ia;
     requires org.apache.poi.poi;
     requires org.apache.poi.ooxml;
     requires static org.jspecify;

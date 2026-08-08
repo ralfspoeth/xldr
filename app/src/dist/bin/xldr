@@ -60,4 +60,4 @@ modules=$here/lib
 [ -d "$here/drivers" ] && modules=$modules:$here/drivers
 
 exec "$java" ${JAVA_OPTS:-} -Dxldr.home="$here" -p "$modules" \
-    -m io.github.ralfspoeth.xldr.app/io.github.ralfspoeth.xldr.app.Main "$@"
+    -m io.github.ralfspoeth.xldr.app/io.github.ralfspoeth.xldr.app.App "$@"
