@@ -92,9 +92,10 @@ public class Main implements Callable<Integer> {
         }
         initLogging(directory);
         var config = Config.load(configFile);
+        // the watcher needs no name: it works on its own threads, and all this
+        // block wants from it is that it be closed when the process stops
         try (var pool = new ConnectionPool(config);
-             var watcher = new Watcher(config, pool)) {
-            watcher.start();
+             var _ = Watcher.watch(config, pool)) {
             awaitShutdown();
             LOG.log(INFO, "shutting down");
         }

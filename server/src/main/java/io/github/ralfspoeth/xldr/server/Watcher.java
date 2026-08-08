@@ -50,7 +50,41 @@ public class Watcher implements Closeable {
     private AutoCloseable statusBean = () -> {
     };
 
-    public Watcher(Config config, ConnectionSource connectionSource) throws IOException {
+    /**
+     * A watcher already watching the configured roots.
+     * <p>
+     * The only way to get one, so there is no such thing as a {@code Watcher}
+     * that exists but is not doing its job. It is two steps behind this door
+     * rather than one, and both are needed: the constructor hands
+     * {@code this::onEvent} to the watch service before the fields that handler
+     * uses are assigned, so nothing may deliver an event until construction has
+     * finished - and starting the thread in the constructor is exactly what
+     * would. Beyond that, starting registers a JMX bean under a fixed name and
+     * moves any file left in a {@code work/} by a previous run into its
+     * {@code hospital/}; neither belongs in a constructor.
+     *
+     * <p>
+     * The watcher runs on threads of its own, so a caller normally has nothing
+     * further to say to it - it wants the thing closed on the way out and
+     * otherwise left alone. That reads as an unnamed resource:
+     * <pre>
+     * try (var _ = Watcher.watch(config, source)) {
+     *     awaitShutdown();
+     * }
+     * </pre>
+     * which is not a mistake, only a resource with no name because none is
+     * needed.
+     *
+     * @throws IllegalArgumentException if a configured root is not a directory,
+     *                                  or one root is nested inside another
+     */
+    public static Watcher watch(Config config, ConnectionSource connectionSource) throws IOException {
+        var watcher = new Watcher(config, connectionSource);
+        watcher.start();
+        return watcher;
+    }
+
+    private Watcher(Config config, ConnectionSource connectionSource) throws IOException {
         this.roots = Set.copyOf(config.roots());
         this.scanIntervalSeconds = config.scanIntervalSeconds();
         validate(roots);
@@ -75,7 +109,7 @@ public class Watcher implements Closeable {
         }
     }
 
-    public void start() {
+    private void start() {
         statusBean = ServerStatus.register(registry, statistics);
         watchThread = Thread.ofVirtual().start(watchService);
         reconcileAll();
@@ -119,11 +153,10 @@ public class Watcher implements Closeable {
     }
 
     private void onInboxEvent(PathEvent event) {
-        if (!ENTRY_CREATE.equals(event.event().kind())) {
-            return;
+        if (ENTRY_CREATE.equals(event.event().kind())) {
+            registry.feedOfInbox(event.dir())
+                    .ifPresent(feed -> processor.onArrival(feed, event.path()));
         }
-        registry.feedOfInbox(event.dir())
-                .ifPresent(feed -> processor.onArrival(feed, event.path()));
     }
 
     @Override

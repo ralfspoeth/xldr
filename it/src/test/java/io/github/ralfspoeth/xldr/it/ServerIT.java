@@ -70,8 +70,7 @@ public class ServerIT {
 
         var config = Config.of(props);
         pool = new ConnectionPool(config);
-        watcher = new Watcher(config, pool);
-        watcher.start();
+        watcher = Watcher.watch(config, pool);
     }
 
     @AfterEach
@@ -335,6 +334,93 @@ public class ServerIT {
     }
 
     /**
+     * A file sitting in an {@code in/} is the number an operator watches: it
+     * means the server has been handed work it has not done. A sentinel feed
+     * makes it observable without a race - the data file waits, by design, until
+     * the marker says it is complete.
+     */
+    @Test
+    @Timeout(60)
+    void reportsFilesWaitingInAnInbox() throws Exception {
+        var status = serverStatus();
+        var feed = Files.createDirectory(root.resolve("waiting"));
+        Files.writeString(feed.resolve("spec.json"), SPEC.replace(
+                "\"accepts\": \"glob:*.csv\"",
+                "\"sentinel\": \"glob:*.done\""));
+        await("the feed to become active", () -> Files.isDirectory(feed.resolve("in")));
+        assertEquals(0, status.getFilesWaiting(), "nothing delivered yet");
+
+        deliver(feed, "people-1.csv", """
+                id,name
+                1,Alice
+                """);
+        await("the file to be counted as waiting", () -> status.getFilesWaiting() == 1);
+
+        // the marker releases it, and both files leave in/
+        deliver(feed, "people-1.csv.done", "");
+        await("the load to happen", () -> selectPersons().size() == 1);
+        await("the inbox to drain", () -> status.getFilesWaiting() == 0);
+    }
+
+    /**
+     * The counterpart to {@code lastLoad}: empty until something has failed, an
+     * instant afterwards. A monitor differences the counters and reads this to
+     * find out when.
+     */
+    @Test
+    @Timeout(60)
+    void reportsWhenAloadLastFailed() throws Exception {
+        var status = serverStatus();
+        assertEquals("", status.getLastFailure(), "nothing has failed yet");
+
+        var feed = Files.createDirectory(root.resolve("failing"));
+        Files.writeString(feed.resolve("spec.json"), SPEC.replace("\"person\"", "\"no_such_table\""));
+        await("the feed to become active", () -> Files.isDirectory(feed.resolve("in")));
+
+        deliver(feed, "bad.csv", """
+                id,name
+                9,Nobody
+                """);
+        await("the failure to be counted", () -> status.getLoadsFailed() == 1);
+        assertTrue(status.getLastFailure().startsWith("20"),
+                "an instant: " + status.getLastFailure());
+    }
+
+    /**
+     * {@code loadsInProgress} is a gauge rather than a counter, so what is worth
+     * pinning is that it comes back down. A load that increments it and then
+     * fails to decrement - on the error path especially - would read as a server
+     * permanently busy, and nothing else here would notice.
+     */
+    @Test
+    @Timeout(60)
+    void countsLoadsInProgressBackToZero() throws Exception {
+        var status = serverStatus();
+        assertEquals(0, status.getLoadsInProgress(), "idle before anything is delivered");
+
+        var good = Files.createDirectory(root.resolve("busy"));
+        Files.writeString(good.resolve("spec.json"), SPEC);
+        var bad = Files.createDirectory(root.resolve("busy-broken"));
+        Files.writeString(bad.resolve("spec.json"), SPEC.replace("\"person\"", "\"no_such_table\""));
+        await("both feeds to become active", () -> status.getActiveFeeds() == 2);
+
+        deliver(good, "people-1.csv", """
+                id,name
+                1,Alice
+                """);
+        deliver(bad, "bad.csv", """
+                id,name
+                9,Nobody
+                """);
+
+        await("both loads to be accounted for",
+                () -> status.getLoadsSucceeded() == 1 && status.getLoadsFailed() == 1);
+        // the failing one is the point: its path through FileProcessor is the
+        // one where a decrement is easiest to lose
+        await("the gauge to come back to zero", () -> status.getLoadsInProgress() == 0);
+    }
+
+    /**
      * A feed must declare exactly one of {@code accepts} or {@code sentinel};
      * one that declares neither, or both, is not activated at all - so its
      * working directories are never even created.
@@ -482,8 +568,7 @@ public class ServerIT {
         var config = Config.of(props);
 
         try (var otherPool = new ConnectionPool(config);
-             var server = new Watcher(config, otherPool)) {
-            server.start();
+             var _ = Watcher.watch(config, otherPool)) {
             // nothing to activate yet, so no in/ - and the directory is now watched
             assertTrue(Files.notExists(feed.resolve("in")), "the feed must still be inactive");
 
@@ -492,6 +577,13 @@ public class ServerIT {
             await("the spec to be noticed without a scan",
                     () -> Files.isDirectory(feed.resolve("in")));
         }
+    }
+
+    private static ServerMXBean serverStatus() throws Exception {
+        return JMX.newMXBeanProxy(
+                ManagementFactory.getPlatformMBeanServer(),
+                new ObjectName("io.github.ralfspoeth.xldr:type=Server"),
+                ServerMXBean.class);
     }
 
     private static List<Path> archived(Path feed) {

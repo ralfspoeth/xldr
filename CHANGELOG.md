@@ -6,6 +6,27 @@ ways that break existing code and existing specs; those changes are listed here 
 The versions are the git tags `xldr-<version>`; the published artifacts carry the same version under the group
 `io.github.ralfspoeth.xldr`.
 
+## Unreleased
+
+### Breaking
+
+- A `Watcher` comes from `Watcher.watch(config, connectionSource)` rather than being constructed and then started;
+  the constructor and `start()` are private. There is no longer such a thing as a `Watcher` that exists without
+  watching, which is the state the two-step form invited a caller to forget about. The two steps remain inside the
+  factory, and have to: the constructor hands `this::onEvent` to the watch service before the fields that handler
+  uses are assigned, so starting the thread from the constructor would let an event reach a half-built object - and
+  starting also registers a JMX bean under a fixed name and moves any file a previous run left in a `work/` into its
+  `hospital/`, neither of which belongs in a constructor. The watcher wants no name at the call site, so
+  `try (var _ = Watcher.watch(config, source))` is the shape, and the javadoc says so.
+
+### Fixed
+
+- A file arriving in a feed's `in/` in the moment that feed was being activated could be ignored until the next
+  scan. The registry kept two maps - feeds by directory, and feeds by inbox - and filled them one statement apart, so
+  a watch thread asking in between found the feed active and its inbox unknown. The second map is gone: an inbox is
+  `<feed>/in`, so the feed is the entry under its parent, and one map cannot fall out of step with another that is
+  not there.
+
 ## 0.19
 
 Nothing about the mapping-spec format changed, so `mapping-spec-0.13` remains its schema and a spec that loaded under
