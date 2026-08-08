@@ -163,3 +163,4 @@ public class App implements Callable<Integer> {
                 : List.of(beside, Path.of(home, "conf", LOGGING_FILE));
     }
 }
+

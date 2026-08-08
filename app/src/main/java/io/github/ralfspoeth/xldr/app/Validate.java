@@ -102,8 +102,9 @@ class Validate implements Callable<Integer> {
      * drop the selector.
      */
     private static void checkCsvDiscriminator(InputSpec input, List<String> problems) {
+        // a header is the default, so an absent property means there is one
         if ("text/csv".equals(input.mimeType())
-                && !Boolean.parseBoolean(input.properties().getOrDefault("header", "true"))) {
+                && Boolean.parseBoolean(input.properties().getOrDefault("header", "true"))) {
             input.recordSelectors().stream()
                     .filter(rs -> rs.selector() != null && !rs.selector().isBlank())
                     .forEach(rs -> problems.add("record selector '" + rs.name() + "': a CSV selector is a"

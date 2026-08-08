@@ -116,31 +116,52 @@ class FileProcessor {
      * away afterwards.
      */
     private void runLoad(Feed feed, Path claimed, String originalName) {
+        if (acquirePermit(feed, claimed)) {
+            // from here the permit is held, and the finally below is what returns it
+            statistics.loadStarted();
+            try {
+                var rows = new LoadJob(feed.mappingSpec(), feed.directory(), connectionSource).load(claimed);
+                var target = archive(feed, claimed);
+                statistics.loaded(feed.name(), rows);
+                LOG.log(INFO, () -> "loaded " + rows + " row(s) from " + originalName
+                        + " [" + feed.name() + "] -> " + target);
+            } catch (Exception e) {
+                statistics.failed(feed.name());
+                LOG.log(ERROR, () -> "load failed for " + originalName + " [" + feed.name() + "]: " + e);
+                try {
+                    hospitalise(feed, claimed, e);
+                } catch (IOException io) {
+                    LOG.log(ERROR, () -> "could not move " + claimed + " to the hospital: " + io);
+                }
+            } finally {
+                statistics.loadFinished();
+                loadPermits.release();
+            }
+        }
+    }
+
+    /**
+     * Waits for a concurrency permit, putting the file back if the wait is
+     * interrupted.
+     * <p>
+     * Separate from the load it guards, and deliberately so: {@code release()}
+     * on a {@link Semaphore} that was never acquired does not fail, it hands out
+     * a permit that did not exist. An acquire folded into the same {@code try}
+     * as the load would be covered by the same {@code finally}, so an
+     * interruption while waiting - which is what shutdown looks like - would
+     * raise the concurrency limit by one every time, and take
+     * {@code loadsInProgress} below zero with it.
+     *
+     * @return whether the permit was acquired; the caller must release it if so
+     */
+    private boolean acquirePermit(Feed feed, Path claimed) {
         try {
             loadPermits.acquire();
+            return true;
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             unclaim(feed, claimed);
-            return;
-        }
-        statistics.loadStarted();
-        try {
-            var rows = new LoadJob(feed.mappingSpec(), feed.directory(), connectionSource).load(claimed);
-            var target = archive(feed, claimed);
-            statistics.loaded(feed.name(), rows);
-            LOG.log(INFO, () -> "loaded " + rows + " row(s) from " + originalName
-                    + " [" + feed.name() + "] -> " + target);
-        } catch (Exception e) {
-            statistics.failed(feed.name());
-            LOG.log(ERROR, () -> "load failed for " + originalName + " [" + feed.name() + "]: " + e);
-            try {
-                hospitalise(feed, claimed, e);
-            } catch (IOException io) {
-                LOG.log(ERROR, () -> "could not move " + claimed + " to the hospital: " + io);
-            }
-        } finally {
-            statistics.loadFinished();
-            loadPermits.release();
+            return false;
         }
     }
 
