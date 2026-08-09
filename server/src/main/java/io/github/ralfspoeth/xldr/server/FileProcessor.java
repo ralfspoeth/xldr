@@ -78,13 +78,16 @@ class FileProcessor {
     }
 
     /**
-     * Claims {@code file} and loads it. Does nothing if the file has already
-     * been claimed by someone else or has disappeared.
+     * Claims {@code file} and loads it. Does nothing if the feed has been
+     * switched off in the meantime, if the file has already been claimed by
+     * someone else, or if it has disappeared.
      */
     public void process(Feed feed, Path file) {
-        var claimed = claimOrLog(feed, file);
-        if (claimed != null) {
-            runLoad(feed, claimed, file.getFileName().toString());
+        if (configured(feed, file)) {
+            var claimed = claimOrLog(feed, file);
+            if (claimed != null) {
+                runLoad(feed, claimed, file.getFileName().toString());
+            }
         }
     }
 
@@ -97,11 +100,43 @@ class FileProcessor {
      * (cleaned by the next scan), never a data file that is loaded twice.
      */
     private void processSignalled(Feed feed, Path sentinel, Path dataFile) {
-        var claimed = claimOrLog(feed, dataFile);
-        deleteQuietly(sentinel);
-        if (claimed != null) {
-            runLoad(feed, claimed, dataFile.getFileName().toString());
+        // before the marker is consumed: a feed that is no longer configured
+        // must leave both files where they are
+        if (configured(feed, dataFile)) {
+            var claimed = claimOrLog(feed, dataFile);
+            deleteQuietly(sentinel);
+            if (claimed != null) {
+                runLoad(feed, claimed, dataFile.getFileName().toString());
+            }
         }
+    }
+
+    /**
+     * Whether the spec that made this a feed has gone since the feed was
+     * registered - in which case the file is left in {@code in/} untouched.
+     * <p>
+     * The registry is authoritative but not instantaneous, and it cannot be:
+     * the feed directory and its {@code in/} are two watch keys, handled on two
+     * threads, so a file delivered just after the spec was removed can arrive
+     * here while the removal is still on its way through. The periodic scan has
+     * the same window from the other side - it takes the active feeds and then
+     * walks their inboxes, and the spec may go between the two.
+     * <p>
+     * The window cannot be locked shut, because what is stale is the registry's
+     * picture of the file system rather than any state of ours. So the file
+     * system is asked once more at the last moment where the answer still costs
+     * nothing - one stat, immediately before the claim that would otherwise be
+     * irreversible. Removing a spec is how a feed is switched off, and an
+     * operator who has switched one off is entitled to expect that nothing more
+     * is loaded from it.
+     */
+    private static boolean configured(Feed feed, Path file) {
+        boolean conf = Files.exists(feed.specFile());
+        if(!conf) {
+            LOG.log(DEBUG, () -> "not loading " + file.getFileName()
+                    + " [" + feed.name() + "]: the spec is gone");
+        }
+        return conf;
     }
 
     private @Nullable Path claimOrLog(Feed feed, Path file) {
