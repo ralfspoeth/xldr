@@ -14,6 +14,9 @@
         }
         h1 { font-size: 1.6rem; margin-bottom: .2rem; }
         h2 { font-size: 1.15rem; margin-top: 2.4rem; }
+        h3 { font-size: 1rem; margin-top: 1.8rem; }
+        h3 code { font-weight: 400; color: #555; font-size: .85rem; }
+        td code { white-space: nowrap; }
         .sub { color: #555; margin-top: 0; }
         pre {
             background: #f5f5f5;
@@ -34,7 +37,7 @@
 
 <h1>XLDR schemas</h1>
 <p class="sub">
-    Schemas for the mapping specification of
+    Schemas and adapter settings for the mapping specification of
     <a href="https://github.com/ralfspoeth/xldr">XLDR</a>, a modular toolkit that loads CSV, XML, JSON,
     fixed-length and Excel files into database tables.
 </p>
@@ -135,6 +138,163 @@
         ...
     &lt;/input&gt;
 &lt;/mappingSpec&gt;</code></pre>
+
+<h2>Adapter settings</h2>
+
+<p>
+    The settings of an adapter sit in the input's <code>properties</code>, beside the <code>mimeType</code> that
+    chooses it - grouped rather than spread out, because which of them mean anything depends on that MIME type. A
+    value is taken as its text, so <code>false</code> and <code>2</code> may be written as themselves. An adapter
+    ignores any key it does not recognise, so what follows is the whole of what each one reads; the schema does not
+    check these, since it cannot know which adapter will be asked.
+</p>
+
+<pre><code>"input": {
+  "mimeType": "text/csv",
+  "accepts": "glob:*.csv",
+  "properties": { "fieldSeparator": ";", "header": false, "dateFormat": "dd.MM.yyyy" },
+  "recordSelectors": [ ... ]
+}</code></pre>
+
+<p>In XML the same settings are the attributes of a <code>&lt;properties&gt;</code> child of <code>&lt;input&gt;</code>:</p>
+
+<pre><code>&lt;properties fieldSeparator=";" header="false" dateFormat="dd.MM.yyyy"/&gt;</code></pre>
+
+<h3>Every text adapter</h3>
+
+<p>
+    CSV, XML, fixed length and JSON share the conversion settings. They say how the <em>input</em> writes its values;
+    the field type says what the value <em>is</em>. Without them values are read in their canonical form - an
+    ungrouped literal, ISO-8601 for a date.
+</p>
+
+<table>
+    <tr><th>Key</th><th>Default</th><th>Meaning</th></tr>
+    <tr>
+        <td><code>dateFormat</code></td>
+        <td>ISO-8601</td>
+        <td><code>DateTimeFormatter</code> pattern for <code>DATE</code> fields, e.g. <code>yyyyMMdd</code> or
+            <code>dd.MM.yyyy HH:mm</code>. A pattern without a time of day yields midnight.</td>
+    </tr>
+    <tr>
+        <td><code>numberFormat</code></td>
+        <td>plain literal</td>
+        <td><code>DecimalFormat</code> pattern for <code>INTEGRAL</code>, <code>FP</code> and <code>DECIMAL</code>,
+            e.g. <code>#,##0.00</code>. <code>DECIMAL</code> stays exact - it is never rounded through a double.</td>
+    </tr>
+    <tr>
+        <td><code>locale</code></td>
+        <td><code>ROOT</code> (<code>1234.56</code>)</td>
+        <td>Language tag, e.g. <code>de-DE</code>, selecting the separators of <code>numberFormat</code> and the
+            symbols of <code>dateFormat</code>.</td>
+    </tr>
+</table>
+
+<p>Excel needs none of these: a spreadsheet carries typed cells, so a date or a number arrives as one already.</p>
+
+<h3>CSV <code>text/csv</code></h3>
+
+<table>
+    <tr><th>Key</th><th>Default</th><th>Meaning</th></tr>
+    <tr><td><code>fieldSeparator</code></td><td>tab</td><td>Column separator.</td></tr>
+    <tr>
+        <td><code>header</code></td>
+        <td><code>present</code></td>
+        <td>Whether the first row names the columns: <code>present</code>/<code>true</code>, or
+            <code>absent</code>/<code>false</code>. A field selector is a column name where the header is present and
+            a 1-based position where it is absent. Anything else is refused rather than read as absent.</td>
+    </tr>
+    <tr>
+        <td><code>quote</code></td>
+        <td><code>"</code></td>
+        <td>What opens and closes a quoted field, and only where a field begins. Empty switches quoting off.</td>
+    </tr>
+    <tr>
+        <td><code>comment</code></td>
+        <td>none</td>
+        <td>What begins a comment outside a quoted field, to the end of the record. Unset, no character does.</td>
+    </tr>
+    <tr>
+        <td><code>fieldsFromHeader</code></td>
+        <td><code>false</code></td>
+        <td>Whether a field the record selector does not declare is the column of that name. Needs a header.</td>
+    </tr>
+    <tr>
+        <td><code>emptyLine</code></td>
+        <td><code>skip</code></td>
+        <td>What an empty line means: <code>skip</code>, or <code>stop</code> to end the data there.</td>
+    </tr>
+    <tr><td><code>charset</code></td><td>platform default</td><td>Character set, e.g. <code>UTF-8</code>.</td></tr>
+</table>
+
+<p>
+    A record is a line, and there is nothing to configure about that: <code>\n</code>, <code>\r\n</code> and
+    <code>\r</code> all end one. Inside a quoted field the separator and the line break are ordinary characters and a
+    doubled quote is one literal quote, so a record runs over as many lines as a quoted field needs. A record selector's
+    selector is a first-column discriminator, which is how one file carrying several record types is partitioned;
+    an absent one matches every line.
+</p>
+
+<h3>XML <code>text/xml</code>, <code>application/xml</code></h3>
+
+<table>
+    <tr><th>Key</th><th>Default</th><th>Meaning</th></tr>
+    <tr>
+        <td><code>ns.&lt;prefix&gt;</code></td>
+        <td>–</td>
+        <td>Binds a namespace prefix for the selectors, e.g. <code>ns.f</code> =
+            <code>http://example.com/funds</code> to make <code>//f:fund</code> match. XPath 1.0 has no default
+            namespace, so a document with one is reachable only through a bound prefix.</td>
+    </tr>
+</table>
+
+<p>
+    Selectors are XPath. XML differs from the other adapters in two deliberate ways: a <code>TEXT</code> field keeps
+    an empty string rather than becoming null, because XPath cannot tell "no such element" from "an element that is
+    empty"; and an <code>FP</code> is taken through XPath's own numeric evaluation rather than from its text, which is
+    why <code>INTEGRAL</code> and <code>DECIMAL</code> are not - XPath 1.0 knows only doubles.
+</p>
+
+<h3>Fixed length <code>text/plain</code></h3>
+
+<table>
+    <tr><th>Key</th><th>Default</th><th>Meaning</th></tr>
+    <tr>
+        <td><code>linesPerRecord</code></td>
+        <td><code>1</code></td>
+        <td>How many lines make up one record. They are joined and the field bounds address the joined text, so a
+            field may sit on the second line. A file ending mid-record is an error.</td>
+    </tr>
+    <tr><td><code>charset</code></td><td>platform default</td><td>Character set, e.g. <code>UTF-8</code>.</td></tr>
+</table>
+
+<p>
+    A field selector is a half-open character range <code>left:right</code> counted from zero. The left bound may be
+    omitted, in which case the field starts where the previous one ended, so a layout can be written as a list of end
+    positions. The adapter expects exactly one record selector and does not use its selector.
+</p>
+
+<h3>JSON <code>application/json</code>, <code>text/json</code></h3>
+
+<p>
+    No settings of its own, and deliberately no charset - JSON exchanged between systems is UTF-8 by definition
+    (RFC 8259). Selectors are pointers in Greyson's syntax: slash separated steps, a step being a member name,
+    <code>[n]</code> for the n-th element of an array (<code>[-1]</code> counting from the end), or
+    <code>#regex</code> to match a member by pattern. An absent record selector is the whole document. JSON carries
+    its own types, so a number arrives exactly, never rounded through a double, and <code>dateFormat</code> and
+    <code>numberFormat</code> apply only to values written as strings.
+</p>
+
+<h3>Excel <code>application/vnd.ms-excel</code>,
+    <code>application/vnd.openxmlformats-officedocument.spreadsheetml.sheet</code></h3>
+
+<p>
+    No properties. One adapter serves both <code>.xls</code> and <code>.xlsx</code>, the format being detected from
+    the file itself. A record selector is a range, <code>[Sheet!]ref:ref</code>, one record per row -
+    <code>A:C</code> is columns A to C of the first sheet, <code>Sheet1!B2:C4</code> a cell rectangle of a named
+    sheet. A field selector addresses a cell either absolutely by column, <code>A</code>, or relatively to the
+    record's anchor, <code>R-1C+1</code> being one row up and one column right.
+</p>
 
 <h2>What they catch, and what they do not</h2>
 
