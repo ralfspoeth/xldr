@@ -18,8 +18,8 @@
         <!-- the library part -->
         <module>spec</module>
         <module>ia</module>
-        <!-- input adapter implementation modules -->
         <module>ldr</module>
+        <!-- input adapter implementation modules -->
         <module>csv</module>
         <module>flt</module>
         <module>json</module>
