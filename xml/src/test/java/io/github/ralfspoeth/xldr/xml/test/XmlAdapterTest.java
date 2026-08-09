@@ -51,12 +51,12 @@ public class XmlAdapterTest {
     public void evaluatesRelativeAbsoluteAndConstantSelectors() throws IOException {
         var spec = new InputSpec("text/xml", null, null, List.of(
                 new RecordSelectorSpec("row", "/simple1/row", List.of(
-                        new FieldSelectorSpec("cola", "col[@name='a']", DataType.INTEGER),
-                        new FieldSelectorSpec("colb", "col[@name='b']", DataType.INTEGER),
-                        new FieldSelectorSpec("firstcow", "//cow[1]/sound", DataType.STRING),
-                        new FieldSelectorSpec("lastcow", "/simple1/cow[last()]/sound", DataType.STRING),
-                        new FieldSelectorSpec("source", "'simple1'", DataType.STRING),
-                        new FieldSelectorSpec("missing", "col[@name='zzz']", DataType.STRING)
+                        new FieldSelectorSpec("cola", "col[@name='a']", DataType.INTEGRAL),
+                        new FieldSelectorSpec("colb", "col[@name='b']", DataType.INTEGRAL),
+                        new FieldSelectorSpec("firstcow", "//cow[1]/sound", DataType.TEXT),
+                        new FieldSelectorSpec("lastcow", "/simple1/cow[last()]/sound", DataType.TEXT),
+                        new FieldSelectorSpec("source", "'simple1'", DataType.TEXT),
+                        new FieldSelectorSpec("missing", "col[@name='zzz']", DataType.TEXT)
                 ))),
                 List.of(),
                 Map.of()
@@ -100,7 +100,7 @@ public class XmlAdapterTest {
     public void yieldsNoRowsWhenNothingMatches() throws IOException {
         var spec = new InputSpec("text/xml", null, null, List.of(
                 new RecordSelectorSpec("none", "/simple1/nothing", List.of(
-                        new FieldSelectorSpec("cola", "col[@name='a']", DataType.STRING)
+                        new FieldSelectorSpec("cola", "col[@name='a']", DataType.TEXT)
                 ))
         ), List.of(), Map.of());
         try (var in = getClass().getResourceAsStream("simple1.xml")) {
@@ -117,11 +117,11 @@ public class XmlAdapterTest {
     public void resolvesNamespacePrefixes() throws IOException {
         var spec = new InputSpec("text/xml", null, null, List.of(
                 new RecordSelectorSpec("fund", "/f:portfolio/f:fund", List.of(
-                        new FieldSelectorSpec("id", "@id", DataType.STRING),
-                        new FieldSelectorSpec("name", "f:name", DataType.STRING),
+                        new FieldSelectorSpec("id", "@id", DataType.TEXT),
+                        new FieldSelectorSpec("name", "f:name", DataType.TEXT),
                         new FieldSelectorSpec("nav", "f:nav", DataType.DECIMAL),
                         new FieldSelectorSpec("asOf", "f:asOf", DataType.DATE),
-                        new FieldSelectorSpec("version", "/f:portfolio/@version", DataType.INTEGER)
+                        new FieldSelectorSpec("version", "/f:portfolio/@version", DataType.INTEGRAL)
                 ))
         ), List.of(), Map.of());
         var wanted = Set.of("id", "name", "nav", "asOf", "version");
@@ -151,7 +151,7 @@ public class XmlAdapterTest {
     public void findsNothingWithoutTheNamespaceBinding() throws IOException {
         var spec = new InputSpec("text/xml", null, null, List.of(
                 new RecordSelectorSpec("fund", "/portfolio/fund", List.of(
-                        new FieldSelectorSpec("id", "@id", DataType.STRING)
+                        new FieldSelectorSpec("id", "@id", DataType.TEXT)
                 ))
         ), List.of(), Map.of());
         try (var in = getClass().getResourceAsStream("funds.xml")) {
@@ -180,7 +180,7 @@ public class XmlAdapterTest {
     public void rejectsAnUndeclaredFieldSelector() throws IOException {
         var spec = new InputSpec("text/xml", null, null, List.of(
                 new RecordSelectorSpec("row", "/simple1/row", List.of(
-                        new FieldSelectorSpec("cola", "col[@name='a']", DataType.STRING)
+                        new FieldSelectorSpec("cola", "col[@name='a']", DataType.TEXT)
                 ))
         ), List.of(), Map.of());
         try (var in = getClass().getResourceAsStream("simple1.xml")) {

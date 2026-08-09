@@ -38,7 +38,7 @@ class XmlFieldSelector {
         this.name = Objects.requireNonNull(name);
         this.selector = selector;
         this.expression = Objects.requireNonNull(expression);
-        this.dataType = dataType == null ? DataType.STRING : dataType;
+        this.dataType = dataType == null ? DataType.TEXT : dataType;
         this.formats = formats;
     }
 
@@ -65,14 +65,14 @@ class XmlFieldSelector {
     @Nullable Object evaluate(Node record) {
         try {
             return switch (dataType) {
-                case STRING -> string(record);
+                case TEXT -> string(record);
                 case FLOAT -> {
                     var number = (Double) expression.evaluate(record, XPathConstants.NUMBER);
                     yield number == null || number.isNaN() ? null : number;
                 }
                 // the shared formats apply the configured numberFormat/dateFormat
                 // and yield null for an empty result
-                case INTEGER, DECIMAL, DATE -> formats.parse(dataType, string(record));
+                case INTEGRAL, DECIMAL, DATE -> formats.parse(dataType, string(record));
             };
         } catch (XPathExpressionException e) {
             throw new IllegalStateException("cannot evaluate " + selector + " for field " + name, e);

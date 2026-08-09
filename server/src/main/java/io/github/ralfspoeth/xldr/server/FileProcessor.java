@@ -1,5 +1,7 @@
 package io.github.ralfspoeth.xldr.server;
 
+import org.jspecify.annotations.Nullable;
+
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
@@ -102,7 +104,7 @@ class FileProcessor {
         }
     }
 
-    private Path claimOrLog(Feed feed, Path file) {
+    private @Nullable Path claimOrLog(Feed feed, Path file) {
         try {
             return claim(feed, file);
         } catch (IOException e) {
@@ -193,7 +195,7 @@ class FileProcessor {
     /**
      * @return the file in {@code work/}, or {@code null} if it was not ours to claim
      */
-    private Path claim(Feed feed, Path file) throws IOException {
+    private @Nullable Path claim(Feed feed, Path file) throws IOException {
         if (!Files.isRegularFile(file) || isIgnored(file)) {
             return null;
         }

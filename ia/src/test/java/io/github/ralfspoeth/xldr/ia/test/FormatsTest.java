@@ -23,8 +23,8 @@ public class FormatsTest {
     public void fallsBackToTheCanonicalForm() {
         var formats = Formats.defaults();
         assertAll(
-                () -> assertEquals("abc", formats.parse(DataType.STRING, " abc ")),
-                () -> assertEquals(42L, formats.parse(DataType.INTEGER, "42")),
+                () -> assertEquals("abc", formats.parse(DataType.TEXT, " abc ")),
+                () -> assertEquals(42L, formats.parse(DataType.INTEGRAL, "42")),
                 () -> assertEquals(new BigDecimal("12.50"), formats.parse(DataType.DECIMAL, "12.50")),
                 () -> assertEquals(0.25d, formats.parse(DataType.FLOAT, "0.25")),
                 () -> assertEquals(LocalDateTime.of(2026, 7, 26, 0, 0),
@@ -59,7 +59,7 @@ public class FormatsTest {
                 Formats.LOCALE, "de-DE"));
         assertAll(
                 () -> assertEquals(new BigDecimal("1234.56"), german.parse(DataType.DECIMAL, "1.234,56")),
-                () -> assertEquals(1234L, german.parse(DataType.INTEGER, "1.234")),
+                () -> assertEquals(1234L, german.parse(DataType.INTEGRAL, "1.234")),
                 () -> assertEquals(1234.56d, german.parse(DataType.FLOAT, "1.234,56"))
         );
     }
@@ -107,6 +107,6 @@ public class FormatsTest {
     @Test
     public void reportsUnparsableInput() {
         var formats = Formats.of(Map.of(Formats.NUMBER_FORMAT, "#,##0.00"));
-        assertThrows(RuntimeException.class, () -> formats.parse(DataType.INTEGER, "abc"));
+        assertThrows(RuntimeException.class, () -> formats.parse(DataType.INTEGRAL, "abc"));
     }
 }

@@ -60,8 +60,8 @@ public class FixedLengthAdapterTest {
     @Test
     public void cutsColumnsAtExplicitBounds() throws IOException {
         var spec = spec(
-                new FieldSelectorSpec("id", "0:3", DataType.STRING),
-                new FieldSelectorSpec("name", "3:8", DataType.STRING));
+                new FieldSelectorSpec("id", "0:3", DataType.TEXT),
+                new FieldSelectorSpec("name", "3:8", DataType.TEXT));
 
         var result = adapter(spec, Map.of()).parse(in("""
                 001Alice
@@ -87,9 +87,9 @@ public class FixedLengthAdapterTest {
     @Test
     public void stripsPaddingAndToleratesShortLines() throws IOException {
         var spec = spec(
-                new FieldSelectorSpec("name", "0:8", DataType.STRING),
-                new FieldSelectorSpec("qty", "8:12", DataType.INTEGER),
-                new FieldSelectorSpec("tail", "12:20", DataType.STRING));
+                new FieldSelectorSpec("name", "0:8", DataType.TEXT),
+                new FieldSelectorSpec("qty", "8:12", DataType.INTEGRAL),
+                new FieldSelectorSpec("tail", "12:20", DataType.TEXT));
 
         var result = adapter(spec, Map.of())
                 .parse(in("Alice     42\n"), "rec", Set.of("name", "qty", "tail"));
@@ -111,9 +111,9 @@ public class FixedLengthAdapterTest {
     @Test
     public void continuesFromThePreviousFieldWhenLeftIsOmitted() throws IOException {
         var spec = spec(
-                new FieldSelectorSpec("a", ":3", DataType.STRING),
-                new FieldSelectorSpec("b", ":6", DataType.STRING),
-                new FieldSelectorSpec("c", ":9", DataType.STRING));
+                new FieldSelectorSpec("a", ":3", DataType.TEXT),
+                new FieldSelectorSpec("b", ":6", DataType.TEXT),
+                new FieldSelectorSpec("c", ":9", DataType.TEXT));
 
         var result = adapter(spec, Map.of()).parse(in("abcdefghi\n"), "rec", Set.of("a", "b", "c"));
 
@@ -132,8 +132,8 @@ public class FixedLengthAdapterTest {
     @Test
     public void convertsAccordingToTheDeclaredType() throws IOException {
         var spec = spec(
-                new FieldSelectorSpec("txt", "0:3", DataType.STRING),
-                new FieldSelectorSpec("num", "3:6", DataType.INTEGER),
+                new FieldSelectorSpec("txt", "0:3", DataType.TEXT),
+                new FieldSelectorSpec("num", "3:6", DataType.INTEGRAL),
                 new FieldSelectorSpec("dec", "6:11", DataType.DECIMAL),
                 new FieldSelectorSpec("flt", "11:15", DataType.FLOAT));
 
@@ -161,8 +161,8 @@ public class FixedLengthAdapterTest {
     @Test
     public void exposesOnlyTheRequestedFields() throws IOException {
         var spec = spec(
-                new FieldSelectorSpec("id", "0:3", DataType.STRING),
-                new FieldSelectorSpec("name", "3:8", DataType.STRING));
+                new FieldSelectorSpec("id", "0:3", DataType.TEXT),
+                new FieldSelectorSpec("name", "3:8", DataType.TEXT));
 
         var result = adapter(spec, Map.of()).parse(in("001Alice\n"), "rec", Set.of("id"));
 
@@ -177,8 +177,8 @@ public class FixedLengthAdapterTest {
     @Test
     public void joinsSeveralLinesIntoOneRecord() throws IOException {
         var spec = spec(
-                new FieldSelectorSpec("id", "0:3", DataType.STRING),
-                new FieldSelectorSpec("city", "3:9", DataType.STRING));
+                new FieldSelectorSpec("id", "0:3", DataType.TEXT),
+                new FieldSelectorSpec("city", "3:9", DataType.TEXT));
 
         var result = adapter(spec, Map.of("linesPerRecord", "2")).parse(in("""
                 001
@@ -202,7 +202,7 @@ public class FixedLengthAdapterTest {
      */
     @Test
     public void decodesWithTheConfiguredCharset() throws IOException {
-        var spec = spec(new FieldSelectorSpec("s", "0:5", DataType.STRING));
+        var spec = spec(new FieldSelectorSpec("s", "0:5", DataType.TEXT));
         var latin1 = new ByteArrayInputStream("Grüße".getBytes(ISO_8859_1));
 
         var result = adapter(spec, Map.of("charset", "ISO-8859-1"))
@@ -216,7 +216,7 @@ public class FixedLengthAdapterTest {
      */
     @Test
     public void rejectsAmalformedSelector() {
-        var spec = spec(new FieldSelectorSpec("id", "0-3", DataType.STRING));
+        var spec = spec(new FieldSelectorSpec("id", "0-3", DataType.TEXT));
         assertThrows(IllegalArgumentException.class, () -> adapter(spec, Map.of()));
     }
 }

@@ -61,8 +61,8 @@ public class JsonAdapterTest {
     @Test
     public void readsTheElementsOfAnArray() throws IOException {
         var spec = spec("orders",
-                new FieldSelectorSpec("id", "id", DataType.STRING),
-                new FieldSelectorSpec("qty", "qty", DataType.INTEGER));
+                new FieldSelectorSpec("id", "id", DataType.TEXT),
+                new FieldSelectorSpec("qty", "qty", DataType.INTEGRAL));
 
         var result = adapter(spec, Map.of()).parse(in("""
                 { "orders": [
@@ -88,8 +88,8 @@ public class JsonAdapterTest {
     @Test
     public void followsNestedPaths() throws IOException {
         var spec = spec("data/orders",
-                new FieldSelectorSpec("id", "id", DataType.STRING),
-                new FieldSelectorSpec("city", "customer/address/city", DataType.STRING));
+                new FieldSelectorSpec("id", "id", DataType.TEXT),
+                new FieldSelectorSpec("city", "customer/address/city", DataType.TEXT));
 
         var result = adapter(spec, Map.of()).parse(in("""
                 { "data": { "orders": [
@@ -111,8 +111,8 @@ public class JsonAdapterTest {
     @Test
     public void convertsAccordingToTheDeclaredType() throws IOException {
         var spec = spec("rows",
-                new FieldSelectorSpec("txt", "txt", DataType.STRING),
-                new FieldSelectorSpec("num", "num", DataType.INTEGER),
+                new FieldSelectorSpec("txt", "txt", DataType.TEXT),
+                new FieldSelectorSpec("num", "num", DataType.INTEGRAL),
                 new FieldSelectorSpec("dec", "dec", DataType.DECIMAL),
                 new FieldSelectorSpec("flt", "flt", DataType.FLOAT),
                 new FieldSelectorSpec("day", "day", DataType.DATE));
@@ -146,9 +146,9 @@ public class JsonAdapterTest {
     @Test
     public void treatsAbsentAndNullMembersAsNull() throws IOException {
         var spec = spec("rows",
-                new FieldSelectorSpec("id", "id", DataType.STRING),
-                new FieldSelectorSpec("note", "note", DataType.STRING),
-                new FieldSelectorSpec("qty", "qty", DataType.INTEGER));
+                new FieldSelectorSpec("id", "id", DataType.TEXT),
+                new FieldSelectorSpec("note", "note", DataType.TEXT),
+                new FieldSelectorSpec("qty", "qty", DataType.INTEGRAL));
 
         var result = adapter(spec, Map.of()).parse(in("""
                 { "rows": [ { "id": "A-1", "note": null } ] }
@@ -194,7 +194,7 @@ public class JsonAdapterTest {
     @Test
     public void readsAtopLevelArray() throws IOException {
         for (var selector : new String[]{"", null}) {
-            var spec = spec(selector, new FieldSelectorSpec("id", "id", DataType.STRING));
+            var spec = spec(selector, new FieldSelectorSpec("id", "id", DataType.TEXT));
 
             var result = adapter(spec, Map.of())
                     .parse(in("""
@@ -212,7 +212,7 @@ public class JsonAdapterTest {
      */
     @Test
     public void readsAsingleObjectAsOneRecord() throws IOException {
-        var spec = spec("data/order", new FieldSelectorSpec("id", "id", DataType.STRING));
+        var spec = spec("data/order", new FieldSelectorSpec("id", "id", DataType.TEXT));
 
         var result = adapter(spec, Map.of()).parse(in("""
                 { "data": { "order": { "id": "A-1" } } }
@@ -228,8 +228,8 @@ public class JsonAdapterTest {
     @Test
     public void addressesArrayElementsByIndex() throws IOException {
         var spec = spec("batches/[-1]/rows",
-                new FieldSelectorSpec("id", "id", DataType.STRING),
-                new FieldSelectorSpec("first", "tags/[0]", DataType.STRING));
+                new FieldSelectorSpec("id", "id", DataType.TEXT),
+                new FieldSelectorSpec("first", "tags/[0]", DataType.TEXT));
 
         var result = adapter(spec, Map.of()).parse(in("""
                 { "batches": [
@@ -248,7 +248,7 @@ public class JsonAdapterTest {
 
     @Test
     public void rejectsAnUnknownRecordSelector() throws IOException {
-        var spec = spec("rows", new FieldSelectorSpec("id", "id", DataType.STRING));
+        var spec = spec("rows", new FieldSelectorSpec("id", "id", DataType.TEXT));
         var adapter = adapter(spec, Map.of());
         assertThrows(IllegalArgumentException.class,
                 () -> adapter.parse(in("{\"rows\":[]}"), "nope", Set.of("id")));

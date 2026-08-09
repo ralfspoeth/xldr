@@ -6,6 +6,18 @@ ways that break existing code and existing specs; those changes are listed here 
 The versions are the git tags `xldr-<version>`; the published artifacts carry the same version under the group
 `io.github.ralfspoeth.xldr`.
 
+## Unreleased
+
+### Breaking
+
+- The field types `STRING` and `INTEGER` are now `TEXT` and `INTEGRAL`. Every spec naming either has to be edited:
+  the readers uppercase what they find and hand it to `DataType.valueOf`, so an old name is an
+  `IllegalArgumentException` when the spec is read, not a silent default. `FLOAT`, `DECIMAL` and `DATE` are
+  unchanged, as is leaving the type out, which still means text.
+- The schemas are published as `mapping-spec-0.21`; `mapping-spec-0.13`, which describes 0.13 to 0.20, stays where it
+  is, so a spec pinned to it goes on validating against the vocabulary it was written for. A spec moving to the new
+  names moves its `$schema` or `xsi:noNamespaceSchemaLocation` with them.
+
 ## 0.20
 
 Nothing about the mapping-spec format changed, so `mapping-spec-0.13` remains its schema and a spec that loaded under

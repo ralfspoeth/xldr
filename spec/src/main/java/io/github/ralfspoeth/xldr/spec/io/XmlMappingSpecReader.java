@@ -21,7 +21,7 @@ import static io.github.ralfspoeth.xmls.XmlFunctions.elements;
  * &lt;mappingSpec&gt;
  *     &lt;input mimeType="text/xml"&gt;
  *         &lt;recordSelector name="fund" selector="/root/fund"&gt;
- *             &lt;fieldSelector name="id" selector="@id" type="STRING"/&gt;
+ *             &lt;fieldSelector name="id" selector="@id" type="TEXT"/&gt;
  *         &lt;/recordSelector&gt;
  *     &lt;/input&gt;
  *     &lt;mapping recordSelector="fund" table="snmandat"&gt;

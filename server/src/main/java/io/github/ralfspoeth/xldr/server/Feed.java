@@ -2,6 +2,8 @@ package io.github.ralfspoeth.xldr.server;
 
 import io.github.ralfspoeth.xldr.spec.MappingSpec;
 
+import org.jspecify.annotations.Nullable;
+
 import java.nio.file.Path;
 import java.nio.file.PathMatcher;
 import java.nio.file.attribute.FileTime;
@@ -31,8 +33,8 @@ record Feed(
         Path specFile,
         FileTime specModified,
         MappingSpec mappingSpec,
-        Sentinel sentinel,
-        PathMatcher acceptMatcher
+        @Nullable Sentinel sentinel,
+        @Nullable PathMatcher acceptMatcher
 ) {
 
     /**

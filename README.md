@@ -35,8 +35,8 @@ Then set up a feed - a directory below a root, holding a mapping spec:
         "properties": { "fieldSeparator": "," },
         "recordSelectors": [
           { "name": "people", "fieldSelectors": [
-              {"name": "id",   "selector": "id",   "type": "INTEGER"},
-              {"name": "name", "selector": "name", "type": "STRING"}
+              {"name": "id",   "selector": "id",   "type": "INTEGRAL"},
+              {"name": "name", "selector": "name", "type": "TEXT"}
           ] }
         ]
       },
@@ -232,12 +232,12 @@ Both formats have a published schema, so an editor can check a spec before it ev
 only reports a broken spec in its log, by leaving the feed inactive. Point at the schema from the spec itself:
 
     {
-      "$schema": "https://ralfspoeth.github.io/xldr/schema/mapping-spec-0.13.json",
+      "$schema": "https://ralfspoeth.github.io/xldr/schema/mapping-spec-0.21.json",
       "input": { ... }
     }
 
     <mappingSpec xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-                 xsi:noNamespaceSchemaLocation="https://ralfspoeth.github.io/xldr/schema/mapping-spec-0.13.xsd">
+                 xsi:noNamespaceSchemaLocation="https://ralfspoeth.github.io/xldr/schema/mapping-spec-0.21.xsd">
 
 Both are ignored by the readers - `$schema` is just another unrecognised member, and `xsi:` attributes carry no
 meaning for a spec that has no namespace of its own. IntelliJ and VS Code both validate and autocomplete from them.
@@ -262,7 +262,8 @@ written for `fieldSelectors` costs a record every one of its fields, and no read
 unknown is exactly what it promises.
 
 A schema is published whenever the format changes, and is named after the release that changed it:
-`mapping-spec-0.13` describes the format of 0.13 to 0.17, `mapping-spec-0.10` that of 0.10 to 0.12, and so on. An
+`mapping-spec-0.21` describes the format from 0.21, `mapping-spec-0.13` that of 0.13 to 0.20,
+`mapping-spec-0.10` that of 0.10 to 0.12, and so on. An
 earlier one stays where it is, so a spec pinned to it keeps validating.
 
 What a schema cannot see is whether the spec makes sense as a whole - whether a mapping names a record selector the
@@ -283,13 +284,13 @@ Reading different file types is supported by providing a specific adapter per MI
 adapter per MIME type on the module path; it's then however unspecified which one will be selected. A future enhancement
 will allow require features to be implemented by the adapter. The adapters shipped with the toolkit are
 
-| MIME type | Adapter | Input |
-|-----------|---------|-------|
-| `text/csv` | `csv` | separated columns, with or without a header row |
-| `text/xml`, `application/xml` | `xml` | XML, selected with XPath |
-| `application/vnd.ms-excel`, `application/vnd.openxmlformats-officedocument.spreadsheetml.sheet` | `xlsx` | Excel, both `.xls` and `.xlsx` |
-| `text/plain` | `flt` | fixed length records, addressed by character position |
-| `application/json`, `text/json` | `json` | JSON, selected with Greyson pointers |
+| MIME type                                                                                       | Adapter | Input                                                 |
+|-------------------------------------------------------------------------------------------------|---------|-------------------------------------------------------|
+| `text/csv`                                                                                      | `csv`   | separated columns, with or without a header row       |
+| `text/xml`, `application/xml`                                                                   | `xml`   | XML, selected with XPath                              |
+| `application/vnd.ms-excel`, `application/vnd.openxmlformats-officedocument.spreadsheetml.sheet` | `xlsx`  | Excel, both `.xls` and `.xlsx`                        |
+| `text/plain`                                                                                    | `flt`   | fixed length records, addressed by character position |
+| `application/json`, `text/json`                                                                 | `json`  | JSON, selected with Greyson pointers                  |
 
 Selecting records and fields depends on the type and structure of the input file. An adapter has to provide
 implementations for *record selectors* and *field selectors*.
@@ -333,7 +334,7 @@ Example:
                 "fieldSelectors": [
                     {
                         "name": "id",
-                        "type": "STRING",
+                        "type": "TEXT",
                         "selector": "@xxid"
                     }
                 ]
@@ -518,7 +519,7 @@ is optional here.
             <properties ns.f="http://example.com/funds" dateFormat="dd.MM.yyyy"/>
             <var name="source" constant="PD"/>
             <recordSelector name="fund" selector="/root/fund">
-                <fieldSelector name="id" selector="@id" type="STRING"/>
+                <fieldSelector name="id" selector="@id" type="TEXT"/>
                 <fieldSelector name="nav" selector="nav" type="DECIMAL"/>
             </recordSelector>
         </input>
@@ -646,14 +647,14 @@ A `logging.properties` in that same directory is picked up if it is there. Faili
 the distribution's `conf/`, and failing that the copy inside the jar; pointing `java.util.logging.config.file` at a
 file of your own still overrides the lot.
 
-| Key | Required | Default | Meaning |
-|-----|----------|---------|---------|
-| `xldr.roots` | yes | – | The directories in which feeds may be created, separated by the platform path separator (`:` on Unix, `;` on Windows). Each must exist at startup and none may be nested in another. |
-| `xldr.scanInterval` | no | `30` | Seconds between full reconciliations of the tree; watch events only react sooner. |
-| `xldr.maxConcurrentLoads` | no | `4` | Upper bound on files loaded at once, and the size of the connection pool: a load borrows exactly one connection for one file, so the pool is sized to match and never becomes a second, lower limit. |
-| `jdbc.url` | yes | – | JDBC URL of the one target database. |
-| `jdbc.user`, `jdbc.password` | no | – | Credentials, if the URL does not carry them. |
-| `pool.*` | no | – | Passed through to HikariCP's `HikariConfig` under the key without the `pool.` prefix, e.g. `pool.connectionTimeout`. Setting `pool.maximumPoolSize` overrides the size derived from `xldr.maxConcurrentLoads`, for a database that will not grant that many sessions. |
+| Key                          | Required | Default | Meaning                                                                                                                                                                                                                                                               |
+|------------------------------|----------|---------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `xldr.roots`                 | yes      | –       | The directories in which feeds may be created, separated by the platform path separator (`:` on Unix, `;` on Windows). Each must exist at startup and none may be nested in another.                                                                                  |
+| `xldr.scanInterval`          | no       | `30`    | Seconds between full reconciliations of the tree; watch events only react sooner.                                                                                                                                                                                     |
+| `xldr.maxConcurrentLoads`    | no       | `4`     | Upper bound on files loaded at once, and the size of the connection pool: a load borrows exactly one connection for one file, so the pool is sized to match and never becomes a second, lower limit.                                                                  |
+| `jdbc.url`                   | yes      | –       | JDBC URL of the one target database.                                                                                                                                                                                                                                  |
+| `jdbc.user`, `jdbc.password` | no       | –       | Credentials, if the URL does not carry them.                                                                                                                                                                                                                          |
+| `pool.*`                     | no       | –       | Passed through to HikariCP's `HikariConfig` under the key without the `pool.` prefix, e.g. `pool.connectionTimeout`. Setting `pool.maximumPoolSize` overrides the size derived from `xldr.maxConcurrentLoads`, for a database that will not grant that many sessions. |
 
     xldr.roots              = /var/lib/xldr:/mnt/feeds
     xldr.scanInterval       = 30
@@ -694,25 +695,25 @@ An adapter ignores any setting it does not recognise, so the tables below list w
 *input* writes its values; the [field type](#field-types) says what the value *is*. Without them values are read in
 their canonical form.
 
-| Key | Default | Meaning |
-|-----|---------|---------|
-| `dateFormat` | ISO-8601 | `DateTimeFormatter` pattern for `DATE` fields, e.g. `yyyyMMdd` or `dd.MM.yyyy HH:mm`. A pattern without a time of day yields midnight. |
-| `numberFormat` | plain literal | `DecimalFormat` pattern for `INTEGER`, `FLOAT` and `DECIMAL`, e.g. `#,##0.00` for grouped input. `DECIMAL` stays exact - it is never rounded through a double. |
-| `locale` | `ROOT` (`1234.56`) | Language tag, e.g. `de-DE`, selecting the decimal and grouping separators of `numberFormat` and the symbols of `dateFormat`. |
+| Key            | Default            | Meaning                                                                                                                                                        |
+|----------------|--------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `dateFormat`   | ISO-8601           | `DateTimeFormatter` pattern for `DATE` fields, e.g. `yyyyMMdd` or `dd.MM.yyyy HH:mm`. A pattern without a time of day yields midnight.                         |
+| `numberFormat` | plain literal      | `DecimalFormat` pattern for `INTEGER`, `FLOAT` and `DECIMAL`, e.g. `#,##0.00` for grouped input. `DECIMAL` stays exact - it is never rounded through a double. |
+| `locale`       | `ROOT` (`1234.56`) | Language tag, e.g. `de-DE`, selecting the decimal and grouping separators of `numberFormat` and the symbols of `dateFormat`.                                   |
 
 Excel needs none of these: a spreadsheet carries typed cells, so a date or a number arrives as one already.
 
 **CSV** (`text/csv`):
 
-| Key | Default | Meaning |
-|-----|---------|---------|
-| `fieldSeparator` | tab | Column separator. |
-| `header` | `present` | Whether the first row names the columns: `present`/`true`, or `absent`/`false`. A field selector's `selector` is a column name where the header is present and a 1-based position where it is absent (`"1"` → first column); its `name` is what a mapping calls it by, as in every adapter. Anything else is refused rather than read as absent. |
-| `quote` | `"` | What opens and closes a quoted field. Empty switches quoting off, leaving quotes as ordinary characters. |
-| `comment` | none | What begins a comment outside a quoted field. Unset, no character does. |
-| `fieldsFromHeader` | `false` | Whether a field the record selector does not declare is the column of that name. Needs a header. |
-| `emptyLine` | `skip` | What an empty line means: `skip`, or `stop` to end the data there. |
-| `charset` | platform default | Character set, e.g. `UTF-8`. |
+| Key                | Default          | Meaning                                                                                                                                                                                                                                                                                                                                          |
+|--------------------|------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `fieldSeparator`   | tab              | Column separator.                                                                                                                                                                                                                                                                                                                                |
+| `header`           | `present`        | Whether the first row names the columns: `present`/`true`, or `absent`/`false`. A field selector's `selector` is a column name where the header is present and a 1-based position where it is absent (`"1"` → first column); its `name` is what a mapping calls it by, as in every adapter. Anything else is refused rather than read as absent. |
+| `quote`            | `"`              | What opens and closes a quoted field. Empty switches quoting off, leaving quotes as ordinary characters.                                                                                                                                                                                                                                         |
+| `comment`          | none             | What begins a comment outside a quoted field. Unset, no character does.                                                                                                                                                                                                                                                                          |
+| `fieldsFromHeader` | `false`          | Whether a field the record selector does not declare is the column of that name. Needs a header.                                                                                                                                                                                                                                                 |
+| `emptyLine`        | `skip`           | What an empty line means: `skip`, or `stop` to end the data there.                                                                                                                                                                                                                                                                               |
+| `charset`          | platform default | Character set, e.g. `UTF-8`.                                                                                                                                                                                                                                                                                                                     |
 
 A record is a line, and there is nothing to configure about that: a file may end its lines with `\n`, `\r\n` or `\r`
 and is read the same way, so a file written on Windows loads on Linux unchanged. The lines are read as the loader
@@ -779,9 +780,9 @@ partition one file, each mapping its own type to its own table:
 
 **XML** (`text/xml`, `application/xml`):
 
-| Key | Default | Meaning |
-|-----|---------|---------|
-| `ns.<prefix>` | – | Binds a namespace prefix for the selectors, e.g. `ns.f = http://example.com/funds` to make `//f:fund` match. XPath 1.0 has no default namespace, so a document with one is reachable only through a bound prefix. |
+| Key           | Default | Meaning                                                                                                                                                                                                           |
+|---------------|---------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `ns.<prefix>` | –       | Binds a namespace prefix for the selectors, e.g. `ns.f = http://example.com/funds` to make `//f:fund` match. XPath 1.0 has no default namespace, so a document with one is reachable only through a bound prefix. |
 
 XML differs from the other adapters in two deliberate ways. A `STRING` field keeps an empty string rather than
 becoming null, because XPath cannot tell "no such element" from "an element that is empty". And a `FLOAT` is taken
@@ -800,9 +801,9 @@ first three characters. The left bound may be omitted, in which case the field s
 a layout can therefore be written as a list of end positions:
 
     "fieldSelectors": [
-        {"name": "id",   "selector": "0:3",  "type": "STRING"},
-        {"name": "name", "selector": ":23",  "type": "STRING"},
-        {"name": "qty",  "selector": ":27",  "type": "INTEGER"}
+        {"name": "id",   "selector": "0:3",  "type": "TEXT"},
+        {"name": "name", "selector": ":23",  "type": "TEXT"},
+        {"name": "qty",  "selector": ":27",  "type": "INTEGRAL"}
     ]
 
 A line that stops short of a field's bounds is not an error: the value is whatever the line still holds, and a field
@@ -821,8 +822,8 @@ applied to the record, so `id` reads one of its members, `customer/address/city`
 
     "recordSelectors": [
         { "name": "orders", "selector": "data/orders", "fieldSelectors": [
-            {"name": "id",   "selector": "id",                   "type": "STRING"},
-            {"name": "city", "selector": "customer/address/city", "type": "STRING"},
+            {"name": "id",   "selector": "id",                   "type": "TEXT"},
+            {"name": "city", "selector": "customer/address/city", "type": "TEXT"},
             {"name": "net",  "selector": "amounts/net",          "type": "DECIMAL"}
         ] }
     ]
@@ -853,15 +854,15 @@ The server registers an MXBean at `io.github.ralfspoeth.xldr:type=Server`, so wh
 `jconsole`, VisualVM, or a Prometheus JMX exporter - no agent, no dependency, nothing to enable. Everything on it is
 read-only: the file system remains the way to make the server do anything.
 
-| Attribute | Meaning |
-|-----------|---------|
-| `ActiveFeeds` | How many feeds have a readable spec. A feed that disappears from this number has a spec the server refused. |
-| `LoadsInProgress` | Files being loaded at this moment. Bounded by `xldr.maxConcurrentLoads`. |
-| `LoadsSucceeded`, `LoadsFailed`, `RecordsLoaded` | Counted since the process started, so they are rates to be differenced. |
-| `LastLoad`, `LastFailure` | Instants, or empty. A `LastLoad` that stops advancing on a feed that should be busy is the quiet failure worth catching. |
-| `FilesWaiting` | Files sitting in any `in/`. Should fall back to zero; a number that does not is a feed not claiming what arrives - a delivery rule that matches nothing, say. |
-| `FilesInHospital` | Files a load failed on, not counting the `.log` written beside each. Nothing puts a file there but a failure and nothing removes one but an operator, so this is the alert to raise. |
-| `Feeds` | The same, per feed, so a failing feed can be told from a quiet one. |
+| Attribute                                        | Meaning                                                                                                                                                                              |
+|--------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `ActiveFeeds`                                    | How many feeds have a readable spec. A feed that disappears from this number has a spec the server refused.                                                                          |
+| `LoadsInProgress`                                | Files being loaded at this moment. Bounded by `xldr.maxConcurrentLoads`.                                                                                                             |
+| `LoadsSucceeded`, `LoadsFailed`, `RecordsLoaded` | Counted since the process started, so they are rates to be differenced.                                                                                                              |
+| `LastLoad`, `LastFailure`                        | Instants, or empty. A `LastLoad` that stops advancing on a feed that should be busy is the quiet failure worth catching.                                                             |
+| `FilesWaiting`                                   | Files sitting in any `in/`. Should fall back to zero; a number that does not is a feed not claiming what arrives - a delivery rule that matches nothing, say.                        |
+| `FilesInHospital`                                | Files a load failed on, not counting the `.log` written beside each. Nothing puts a file there but a failure and nothing removes one but an operator, so this is the alert to raise. |
+| `Feeds`                                          | The same, per feed, so a failing feed can be told from a quiet one.                                                                                                                  |
 
 HikariCP's own pool statistics are separate and off by default; `pool.registerMbeans = true` in the server
 configuration turns them on, since every `pool.*` key is passed through.

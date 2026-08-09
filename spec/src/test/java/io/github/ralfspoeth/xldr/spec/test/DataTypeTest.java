@@ -19,8 +19,8 @@ public class DataTypeTest {
     @Test
     public void parsesEachType() {
         assertAll(
-                () -> assertEquals("abc", DataType.STRING.parse("abc")),
-                () -> assertEquals(42L, DataType.INTEGER.parse("42")),
+                () -> assertEquals("abc", DataType.TEXT.parse("abc")),
+                () -> assertEquals(42L, DataType.INTEGRAL.parse("42")),
                 () -> assertEquals(new BigDecimal("12.50"), DataType.DECIMAL.parse("12.50")),
                 () -> assertEquals(0.25d, DataType.FLOAT.parse("0.25")),
                 () -> assertEquals(LocalDateTime.of(2026, 7, 26, 8, 30),
@@ -49,8 +49,8 @@ public class DataTypeTest {
     @Test
     public void stripsBeforeConverting() {
         assertAll(
-                () -> assertEquals("abc", DataType.STRING.parse("  abc  ")),
-                () -> assertEquals(42L, DataType.INTEGER.parse("   42")),
+                () -> assertEquals("abc", DataType.TEXT.parse("  abc  ")),
+                () -> assertEquals(42L, DataType.INTEGRAL.parse("   42")),
                 () -> assertEquals(new BigDecimal("12.50"), DataType.DECIMAL.parse(" 12.50 ")),
                 () -> assertEquals(0.25d, DataType.FLOAT.parse("0.25   "))
         );
@@ -75,7 +75,7 @@ public class DataTypeTest {
     @Test
     public void rejectsMalformedValues() {
         assertAll(
-                () -> assertThrows(RuntimeException.class, () -> DataType.INTEGER.parse("x")),
+                () -> assertThrows(RuntimeException.class, () -> DataType.INTEGRAL.parse("x")),
                 () -> assertThrows(RuntimeException.class, () -> DataType.DECIMAL.parse("1,5")),
                 () -> assertThrows(RuntimeException.class, () -> DataType.DATE.parse("26.07.2026"))
         );
@@ -88,10 +88,10 @@ public class DataTypeTest {
     public void clazzMatchesTheParsedValue() {
         for (var type : DataType.values()) {
             var sample = switch (type) {
-                case STRING -> "x";
-                case INTEGER -> "1";
+                case TEXT -> "x";
+                case INTEGRAL -> "1";
                 case FLOAT -> "1.5";
-                case DECIMAL -> "1.5";
+                case DECIMAL -> "1.75";
                 case DATE -> "2026-07-26T00:00";
             };
             assertEquals(type.clazz(), type.parse(sample).getClass(), type.toString());

@@ -1,5 +1,7 @@
 package io.github.ralfspoeth.xldr.server;
 
+import org.jspecify.annotations.Nullable;
+
 import java.time.Instant;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -24,8 +26,8 @@ final class Statistics {
         private final AtomicLong succeeded = new AtomicLong();
         private final AtomicLong failed = new AtomicLong();
         private final AtomicLong records = new AtomicLong();
-        private volatile Instant lastLoad;
-        private volatile Instant lastFailure;
+        private volatile @Nullable Instant lastLoad;
+        private volatile @Nullable Instant lastFailure;
     }
 
     private final AtomicInteger inProgress = new AtomicInteger();

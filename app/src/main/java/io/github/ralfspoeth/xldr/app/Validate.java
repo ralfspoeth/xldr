@@ -2,6 +2,7 @@ package io.github.ralfspoeth.xldr.app;
 
 import io.github.ralfspoeth.xldr.ia.InputAdapterFactory;
 import io.github.ralfspoeth.xldr.spec.*;
+import org.jspecify.annotations.Nullable;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Parameters;
 
@@ -48,7 +49,6 @@ class Validate implements Callable<Integer> {
                 System.out.println(spec + ": ok");
             } else {
                 broken++;
-                System.out.println(spec + ": " + problems.size() + " problem(s)");
                 problems.forEach(p -> System.out.println("    " + p));
             }
         }
@@ -128,7 +128,7 @@ class Validate implements Callable<Integer> {
         checkPattern("sentinel", input.sentinel(), problems);
     }
 
-    private static void checkPattern(String name, String pattern, List<String> problems) {
+    private static void checkPattern(String name, @Nullable String pattern, List<String> problems) {
         if (pattern == null) {
             return;
         }
@@ -217,10 +217,10 @@ class Validate implements Callable<Integer> {
      *                  check: what the file's header holds is not known until a
      *                  file arrives
      */
-    private static void checkSources(ValueSource source, Set<String> fields, boolean anyColumn,
+    private static void checkSources(ValueSource source, @Nullable Set<String> fields, boolean anyColumn,
                                      Set<String> vars, String where, List<String> problems) {
         switch (source) {
-            case ValueSource.Field f -> {
+            case ValueSource.Field f-> {
                 if (anyColumn) {
                     // the header answers for it, and only the load can ask
                 } else if (fields == null) {

@@ -1,5 +1,7 @@
 package io.github.ralfspoeth.xldr.ldr;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -34,7 +36,7 @@ final class Expression {
      * Resolves the names and functions a template references.
      */
     interface Bindings {
-        Object variable(String name);
+        @Nullable Object variable(String name);
 
         Object function(String name, List<Object> args);
     }
@@ -61,7 +63,7 @@ final class Expression {
         switch (o) {
             case VarRef(String name) -> names.add(name);
             case Call c -> c.args().forEach(a -> collectNames(a, names));
-            case null, default -> {
+            default -> {
                 // a literal, a string or an integer argument names nothing
             }
         }
@@ -74,7 +76,7 @@ final class Expression {
         var sb = new StringBuilder();
         for (var s : segments) {
             var v = valueOf(s, bindings);
-            sb.append(v == null ? "" : v);
+            sb.append(v);
         }
         return sb.toString();
     }

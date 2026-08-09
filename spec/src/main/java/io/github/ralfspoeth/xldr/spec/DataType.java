@@ -15,8 +15,8 @@ import static java.util.Objects.requireNonNull;
 public enum DataType {
 
     DATE(LocalDateTime.class),
-    STRING(String.class),
-    INTEGER(Long.class),
+    TEXT(String.class),
+    INTEGRAL(Long.class),
     FLOAT(Double.class),
     DECIMAL(BigDecimal.class);
 
@@ -61,8 +61,8 @@ public enum DataType {
         }
         return switch (this) {
             case DATE -> dateTime(s);
-            case STRING -> s;
-            case INTEGER -> Long.parseLong(s);
+            case TEXT -> s;
+            case INTEGRAL -> Long.parseLong(s);
             case FLOAT -> Double.parseDouble(s);
             case DECIMAL -> new BigDecimal(s);
         };

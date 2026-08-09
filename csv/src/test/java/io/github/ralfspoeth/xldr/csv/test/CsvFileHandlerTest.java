@@ -43,8 +43,8 @@ public class CsvFileHandlerTest {
     // no discriminator (selector null): a single-record-type file takes every line.
     private static final InputSpec SPEC = spec(COMMAS,
             new RecordSelectorSpec("people", null, List.of(
-                    new FieldSelectorSpec("id", "id", DataType.STRING),
-                    new FieldSelectorSpec("name", "name", DataType.STRING)
+                    new FieldSelectorSpec("id", "id", DataType.TEXT),
+                    new FieldSelectorSpec("name", "name", DataType.TEXT)
             ))
     );
 
@@ -52,18 +52,18 @@ public class CsvFileHandlerTest {
     // line breaks and quotes in a real feed
     private static final InputSpec SPEC_WITH_NOTE = spec(COMMAS,
             new RecordSelectorSpec("people", null, List.of(
-                    new FieldSelectorSpec("id", "id", DataType.STRING),
-                    new FieldSelectorSpec("name", "name", DataType.STRING),
-                    new FieldSelectorSpec("note", "note", DataType.STRING)
+                    new FieldSelectorSpec("id", "id", DataType.TEXT),
+                    new FieldSelectorSpec("name", "name", DataType.TEXT),
+                    new FieldSelectorSpec("note", "note", DataType.TEXT)
             ))
     );
 
     // no header: columns are addressed by 1-based position ("1" -> col 0, ...)
     private static final InputSpec POSITIONAL_SPEC = spec(HEADERLESS,
             new RecordSelectorSpec("people", null, List.of(
-                    new FieldSelectorSpec("1", "1", DataType.STRING),
-                    new FieldSelectorSpec("2", "2", DataType.STRING),
-                    new FieldSelectorSpec("3", "3", DataType.STRING)
+                    new FieldSelectorSpec("1", "1", DataType.TEXT),
+                    new FieldSelectorSpec("2", "2", DataType.TEXT),
+                    new FieldSelectorSpec("3", "3", DataType.TEXT)
             ))
     );
 
@@ -72,15 +72,15 @@ public class CsvFileHandlerTest {
     // positions stay absolute, so "1" is the discriminator column itself.
     private static final InputSpec DISCRIMINATED_SPEC = spec(HEADERLESS,
             new RecordSelectorSpec("orders", "O", List.of(
-                    new FieldSelectorSpec("2", "2", DataType.STRING),   // order id
-                    new FieldSelectorSpec("3", "3", DataType.STRING),   // date
-                    new FieldSelectorSpec("4", "4", DataType.STRING)    // customer
+                    new FieldSelectorSpec("2", "2", DataType.TEXT),   // order id
+                    new FieldSelectorSpec("3", "3", DataType.TEXT),   // date
+                    new FieldSelectorSpec("4", "4", DataType.TEXT)    // customer
             )),
             new RecordSelectorSpec("lines", "L", List.of(
-                    new FieldSelectorSpec("2", "2", DataType.STRING),   // order id
-                    new FieldSelectorSpec("3", "3", DataType.STRING),   // product
-                    new FieldSelectorSpec("4", "4", DataType.STRING),   // qty
-                    new FieldSelectorSpec("5", "5", DataType.STRING)    // price
+                    new FieldSelectorSpec("2", "2", DataType.TEXT),   // order id
+                    new FieldSelectorSpec("3", "3", DataType.TEXT),   // product
+                    new FieldSelectorSpec("4", "4", DataType.TEXT),   // qty
+                    new FieldSelectorSpec("5", "5", DataType.TEXT)    // price
             ))
     );
 
@@ -201,8 +201,8 @@ public class CsvFileHandlerTest {
     public void convertsAccordingToTheDeclaredType() throws IOException {
         var spec = spec(COMMAS,
                 new RecordSelectorSpec("people", null, List.of(
-                        new FieldSelectorSpec("id", "id", DataType.INTEGER),
-                        new FieldSelectorSpec("name", "name", DataType.STRING),
+                        new FieldSelectorSpec("id", "id", DataType.INTEGRAL),
+                        new FieldSelectorSpec("name", "name", DataType.TEXT),
                         new FieldSelectorSpec("rate", "rate", DataType.DECIMAL)
                 ))
         );
@@ -306,8 +306,8 @@ public class CsvFileHandlerTest {
     public void quotingCanBeSwitchedOff() throws IOException {
         var spec = spec(Map.of("fieldSeparator", ",", "quote", ""),
                 new RecordSelectorSpec("people", null, List.of(
-                        new FieldSelectorSpec("id", "id", DataType.STRING),
-                        new FieldSelectorSpec("name", "name", DataType.STRING)
+                        new FieldSelectorSpec("id", "id", DataType.TEXT),
+                        new FieldSelectorSpec("name", "name", DataType.TEXT)
                 )));
         var rows = rowsOf(spec, "id,name\n1,\"quoted\"\n", "id", "name");
 
@@ -342,12 +342,12 @@ public class CsvFileHandlerTest {
     public void headerMaybeSaidToBePresentOrAbsent() throws IOException {
         var withHeader = spec(Map.of("fieldSeparator", ",", "header", "present"),
                 new RecordSelectorSpec("people", null, List.of(
-                        new FieldSelectorSpec("id", "id", DataType.STRING),
-                        new FieldSelectorSpec("name", "name", DataType.STRING))));
+                        new FieldSelectorSpec("id", "id", DataType.TEXT),
+                        new FieldSelectorSpec("name", "name", DataType.TEXT))));
         var withoutHeader = spec(Map.of("fieldSeparator", ",", "header", "absent"),
                 new RecordSelectorSpec("people", null, List.of(
-                        new FieldSelectorSpec("1", "1", DataType.STRING),
-                        new FieldSelectorSpec("2", "2", DataType.STRING))));
+                        new FieldSelectorSpec("1", "1", DataType.TEXT),
+                        new FieldSelectorSpec("2", "2", DataType.TEXT))));
 
         var named = rowsOf(withHeader, "id,name\n1,Alice\n", "id", "name");
         assertEquals("Alice", named.getFirst().get("name"));
@@ -377,9 +377,9 @@ public class CsvFileHandlerTest {
 
         var stopping = spec(Map.of("fieldSeparator", ",", "emptyLine", "stop"),
                 new RecordSelectorSpec("people", null, List.of(
-                        new FieldSelectorSpec("id", "id", DataType.STRING),
-                        new FieldSelectorSpec("name", "name", DataType.STRING),
-                        new FieldSelectorSpec("note", "note", DataType.STRING))));
+                        new FieldSelectorSpec("id", "id", DataType.TEXT),
+                        new FieldSelectorSpec("name", "name", DataType.TEXT),
+                        new FieldSelectorSpec("note", "note", DataType.TEXT))));
         var rows = rowsOf(stopping, csv, "id", "name", "note");
         assertEquals(1, rows.size(), "everything after the empty line is a trailer");
         assertEquals("Alice", rows.getFirst().get("name"));
@@ -395,9 +395,9 @@ public class CsvFileHandlerTest {
     public void readsComments() throws IOException {
         var commented = spec(Map.of("fieldSeparator", ",", "comment", "#"),
                 new RecordSelectorSpec("people", null, List.of(
-                        new FieldSelectorSpec("id", "id", DataType.STRING),
-                        new FieldSelectorSpec("name", "name", DataType.STRING),
-                        new FieldSelectorSpec("note", "note", DataType.STRING))));
+                        new FieldSelectorSpec("id", "id", DataType.TEXT),
+                        new FieldSelectorSpec("name", "name", DataType.TEXT),
+                        new FieldSelectorSpec("note", "note", DataType.TEXT))));
         var csv = """
                 # produced 2026-07-28 by the nightly job
                 id,name,note
@@ -437,9 +437,9 @@ public class CsvFileHandlerTest {
     public void aFieldsSelectorNamesTheColumn() throws IOException {
         var spec = spec(Map.of("fieldSeparator", ";"),
                 new RecordSelectorSpec("people", null, List.of(
-                        new FieldSelectorSpec("n1", "Name", DataType.STRING),
-                        new FieldSelectorSpec("n2", "Text", DataType.STRING),
-                        new FieldSelectorSpec("n3", "Id", DataType.INTEGER)
+                        new FieldSelectorSpec("n1", "Name", DataType.TEXT),
+                        new FieldSelectorSpec("n2", "Text", DataType.TEXT),
+                        new FieldSelectorSpec("n3", "Id", DataType.INTEGRAL)
                 )));
         var rows = rowsOf(spec, """
                 Id;leer;Name;Text
@@ -464,8 +464,8 @@ public class CsvFileHandlerTest {
     public void aFieldsSelectorIsApositionWithoutAheader() throws IOException {
         var spec = spec(Map.of("fieldSeparator", ";", "header", "absent"),
                 new RecordSelectorSpec("people", null, List.of(
-                        new FieldSelectorSpec("name", "3", DataType.STRING),
-                        new FieldSelectorSpec("id", "1", DataType.INTEGER)
+                        new FieldSelectorSpec("name", "3", DataType.TEXT),
+                        new FieldSelectorSpec("id", "1", DataType.INTEGRAL)
                 )));
         var rows = rowsOf(spec, "1;;Hello;asdf\n", "name", "id");
 
@@ -485,7 +485,7 @@ public class CsvFileHandlerTest {
     public void takesUndeclaredFieldsFromTheHeader() throws IOException {
         var spec = spec(Map.of("fieldSeparator", ";", "fieldsFromHeader", "true"),
                 new RecordSelectorSpec("people", null, List.of(
-                        new FieldSelectorSpec("who", "Name", DataType.STRING)
+                        new FieldSelectorSpec("who", "Name", DataType.TEXT)
                 )));
         var rows = rowsOf(spec, """
                 Id;leer;Name;Text
@@ -509,7 +509,7 @@ public class CsvFileHandlerTest {
     public void anUndeclaredFieldIsNothingWithoutTheProperty() throws IOException {
         var spec = spec(Map.of("fieldSeparator", ";"),
                 new RecordSelectorSpec("people", null, List.of(
-                        new FieldSelectorSpec("who", "Name", DataType.STRING)
+                        new FieldSelectorSpec("who", "Name", DataType.TEXT)
                 )));
         var rows = rowsOf(spec, "Id;leer;Name;Text\n1;;Hello;asdf\n", "who", "Id");
 

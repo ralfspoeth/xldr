@@ -53,7 +53,7 @@ public class ValidateTest {
                     "vars": [ { "name": "source", "constant": "PD" } ],
                     "recordSelectors": [
                       { "name": "people", "fieldSelectors": [
-                          { "name": "id", "selector": "id", "type": "INTEGER" }
+                          { "name": "id", "selector": "id", "type": "INTEGRAL" }
                       ] }
                     ]
                   },

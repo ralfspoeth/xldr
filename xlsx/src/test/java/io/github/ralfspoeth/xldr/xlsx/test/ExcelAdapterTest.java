@@ -51,11 +51,11 @@ public class ExcelAdapterTest {
 
         var spec = new InputSpec(XLSX, null, null, List.of(
                 new RecordSelectorSpec("rows", "data!A2:C3", List.of(
-                        new FieldSelectorSpec("id", "A", DataType.INTEGER),
-                        new FieldSelectorSpec("name", "B", DataType.STRING),
+                        new FieldSelectorSpec("id", "A", DataType.INTEGRAL),
+                        new FieldSelectorSpec("name", "B", DataType.TEXT),
                         new FieldSelectorSpec("amount", "C", DataType.DECIMAL),
                         // one row up, one column right of the anchor (column A)
-                        new FieldSelectorSpec("above", "R-1C+1", DataType.STRING)
+                        new FieldSelectorSpec("above", "R-1C+1", DataType.TEXT)
                 ))
         ), List.of(), Map.of());
         var wanted = Set.of("id", "name", "amount", "above");
@@ -95,8 +95,8 @@ public class ExcelAdapterTest {
 
         var spec = new InputSpec(XLSX, null, null, List.of(
                 new RecordSelectorSpec("all", "data!A:B", List.of(
-                        new FieldSelectorSpec("v", "1", DataType.INTEGER),
-                        new FieldSelectorSpec("label", "2", DataType.STRING)
+                        new FieldSelectorSpec("v", "1", DataType.INTEGRAL),
+                        new FieldSelectorSpec("label", "2", DataType.TEXT)
                 ))
         ), List.of(), Map.of());
 
@@ -143,8 +143,8 @@ public class ExcelAdapterTest {
 
         var spec = new InputSpec(XLSX, null, null, List.of(
                 new RecordSelectorSpec("rows", "A2:B2", List.of(
-                        new FieldSelectorSpec("id", "A", DataType.INTEGER),
-                        new FieldSelectorSpec("name", "B", DataType.STRING)
+                        new FieldSelectorSpec("id", "A", DataType.INTEGRAL),
+                        new FieldSelectorSpec("name", "B", DataType.TEXT)
                 ))
         ), List.of(), Map.of());
 

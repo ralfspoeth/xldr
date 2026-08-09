@@ -113,10 +113,10 @@ public final class Formats {
                 .filter(not(String::isEmpty))
                 .map(s -> switch (type) {
                     case DATE -> date == null ? DataType.DATE.parse(s) : dateTime(s);
-                    case INTEGER -> number == null ? DataType.INTEGER.parse(s) : number(s).longValue();
+                    case INTEGRAL -> number == null ? DataType.INTEGRAL.parse(s) : number(s).longValue();
                     case FLOAT -> number == null ? DataType.FLOAT.parse(s) : number(s).doubleValue();
                     case DECIMAL -> number == null ? DataType.DECIMAL.parse(s) : bigDecimal(s);
-                    case STRING -> s;
+                    case TEXT -> s;
                     case null -> s;
                 })
                 .orElse(null);

@@ -19,10 +19,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.math.BigDecimal;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.stream.Stream;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
@@ -46,7 +43,7 @@ import static java.nio.charset.StandardCharsets.UTF_8;
  * {@code null}, yields {@code null}.
  * <p>
  * Numbers keep their exact value: a JSON number is taken as a {@code BigDecimal}
- * and narrowed to the declared type rather than being re-parsed from text, so a
+ * and narrowed to the declared type rather than being reparsed from text, so a
  * {@code DECIMAL} is never rounded through a double. Text is converted by the
  * shared {@link Formats}, which applies the feed's date and number patterns.
  */
@@ -83,7 +80,7 @@ class JsonInputAdapter implements InputAdapter {
     }
 
     private static DataType typeOf(FieldSelectorSpec fs) {
-        return fs.dataType() == null ? DataType.STRING : fs.dataType();
+        return fs.dataType() == null ? DataType.TEXT : fs.dataType();
     }
 
     /**
@@ -146,7 +143,7 @@ class JsonInputAdapter implements InputAdapter {
      * narrowed from its exact decimal; a boolean is read as its literal. Anything
      * else - a null, an object, an array - is an absent value.
      */
-    private Object valueOf(JsonValue value, DataType type) {
+    private @Nullable Object valueOf(JsonValue value, DataType type) {
         var text = value.string();
         if (text.isPresent()) {
             return formats.parse(type, text.get());
@@ -156,16 +153,16 @@ class JsonInputAdapter implements InputAdapter {
             return number(number.get(), type);
         }
         var bool = value.bool();
-        return bool.map(aBoolean -> type == DataType.STRING ? aBoolean.toString() : formats.parse(type, aBoolean.toString())).orElse(null);
+        return bool.map(aBoolean -> type == DataType.TEXT ? aBoolean.toString() : formats.parse(type, aBoolean.toString())).orElse(null);
     }
 
-    private Object number(BigDecimal value, DataType type) {
+    private @Nullable Object number(BigDecimal value, DataType type) {
         return switch (type) {
             case DECIMAL -> value;
-            case INTEGER -> value.longValue();
+            case INTEGRAL -> value.longValue();
             case FLOAT -> value.doubleValue();
             // a number where the spec wants text or a date: let the shared rules decide
-            case STRING, DATE -> formats.parse(type, value.toPlainString());
+            case TEXT, DATE -> formats.parse(type, value.toPlainString());
         };
     }
 }

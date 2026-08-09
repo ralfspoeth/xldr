@@ -274,7 +274,7 @@ class CsvFileHandler implements InputAdapter {
     }
 
     private static DataType typeOf(FieldSelectorSpec fs) {
-        return fs.dataType() == null ? DataType.STRING : fs.dataType();
+        return fs.dataType() == null ? DataType.TEXT : fs.dataType();
     }
 
     private static boolean matches(@Nullable String discriminator, String[] values) {
@@ -304,7 +304,7 @@ class CsvFileHandler implements InputAdapter {
                         fieldSelectors.stream()
                                 .filter(name -> !named.contains(name))
                                 .sorted()
-                                .map(name -> new Field(name, DataType.STRING.clazz())))
+                                .map(name -> new Field(name, DataType.TEXT.clazz())))
                 .toList();
     }
 

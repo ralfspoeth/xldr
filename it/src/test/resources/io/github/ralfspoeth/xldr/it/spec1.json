@@ -6,8 +6,8 @@
         "name": "fund",
         "selector": "/root/fund",
         "fieldSelectors": [
-          { "name": "id",   "selector": "@id",                   "type": "STRING" },
-          { "name": "desc", "selector": "normalize-space(text())", "type": "STRING" }
+          { "name": "id",   "selector": "@id",                   "type": "TEXT" },
+          { "name": "desc", "selector": "normalize-space(text())", "type": "TEXT" }
         ]
       }
     ]

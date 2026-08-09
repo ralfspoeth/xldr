@@ -1,3 +1,5 @@
+import org.jspecify.annotations.NullMarked;
+
 /**
  * The server as a library: watches the configured roots and loads the files that
  * appear in the feeds below them.
@@ -13,6 +15,7 @@
  * formats a deployment reads is decided by its module path rather than by any
  * code here.
  */
+@NullMarked
 module io.github.ralfspoeth.xldr.server {
     exports io.github.ralfspoeth.xldr.server;
 
@@ -22,6 +25,7 @@ module io.github.ralfspoeth.xldr.server {
     requires io.github.ralfspoeth.xldr.ia;
     requires io.github.ralfspoeth.xldr.ldr;
     requires io.github.ralfspoeth.filews;
+    requires static org.jspecify;
 
     uses io.github.ralfspoeth.xldr.ia.InputAdapterFactory;
 }

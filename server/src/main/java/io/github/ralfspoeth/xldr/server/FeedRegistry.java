@@ -1,6 +1,7 @@
 package io.github.ralfspoeth.xldr.server;
 
 import io.github.ralfspoeth.filews.DirectoryWatchService;
+import org.jspecify.annotations.Nullable;
 
 import java.io.IOException;
 import java.nio.file.FileSystems;
@@ -131,7 +132,7 @@ class FeedRegistry {
      *                                  does not compile - caught by reconcile,
      *                                  which then leaves the feed inactive
      */
-    private static PathMatcher acceptMatcher(String pattern) {
+    private static @Nullable PathMatcher acceptMatcher(@Nullable String pattern) {
         if (pattern == null) {
             return null;
         }

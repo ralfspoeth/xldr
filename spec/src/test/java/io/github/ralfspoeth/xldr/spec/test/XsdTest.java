@@ -31,7 +31,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 public class XsdTest {
 
-    private static final Path SCHEMA = Path.of("..", "docs", "schema", "mapping-spec-0.13.xsd");
+    private static final Path SCHEMA = Path.of("..", "docs", "schema", "mapping-spec-0.21.xsd");
 
     /**
      * Every element and attribute the reader knows, in one document.
@@ -46,7 +46,7 @@ public class XsdTest {
                         <lookup table="load_batch" column="id" keyColumn="feed" constant="funds"/>
                     </var>
                     <recordSelector name="fund" selector="/root/fund">
-                        <fieldSelector name="id" selector="@id" type="STRING"/>
+                        <fieldSelector name="id" selector="@id" type="text"/>
                         <fieldSelector name="nav" selector="nav" type="decimal"/>
                         <fieldSelector name="desc" selector="normalize-space(./text())"/>
                     </recordSelector>
@@ -111,7 +111,7 @@ public class XsdTest {
                 <mappingSpec>
                     <input mimeType="text/csv" accepts="glob:*.csv">
                         <recordSelector name="people">
-                            <fieldSelector name="id" selector="id" type="INTEGER"/>
+                            <fieldSelector name="id" selector="id" type="INTEGRAL"/>
                         </recordSelector>
                     </input>
                 </mappingSpec>
@@ -154,7 +154,7 @@ public class XsdTest {
                     <input mimeType="text/csv" accepts="glob:*.csv" comment="delivered nightly">
                         <var name="source" constant="PD" comment="the sending system"/>
                         <recordSelector name="people" comment="one record per line">
-                            <fieldSelector name="id" selector="Id" type="INTEGER" comment="the key"/>
+                            <fieldSelector name="id" selector="Id" type="INTEGRAL" comment="the key"/>
                         </recordSelector>
                     </input>
                     <mapping recordSelector="people" table="person" comment="the only mapping">
@@ -198,7 +198,7 @@ public class XsdTest {
                 <mappingSpec>
                     <input mimeType="text/csv" accepts="glob:*.csv">
                         <recordSelector name="r" selector="//r">
-                            <fieldSelector name="id" selector="@id" type="TEXT"/>
+                            <fieldSelector name="id" selector="@id" type="asdf"/>
                         </recordSelector>
                     </input>
                 </mappingSpec>

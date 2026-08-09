@@ -54,7 +54,7 @@ class ExcelAdapter implements InputAdapter {
             var range = Range.parse(rss.requireSelector());
             var columns = new LinkedHashMap<String, Column>();
             for (var fss : rss.fieldSelectors()) {
-                var type = fss.dataType() == null ? DataType.STRING : fss.dataType();
+                var type = fss.dataType() == null ? DataType.TEXT : fss.dataType();
                 columns.put(fss.name(), new Column(
                         new Field(fss.name(), type.clazz()),
                         CellRef.parse(fss.selector())));

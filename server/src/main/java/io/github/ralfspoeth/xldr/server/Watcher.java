@@ -2,6 +2,7 @@ package io.github.ralfspoeth.xldr.server;
 
 import io.github.ralfspoeth.filews.DirectoryWatchService;
 import io.github.ralfspoeth.filews.PathEvent;
+import org.jspecify.annotations.Nullable;
 
 import java.io.Closeable;
 import java.io.IOException;
@@ -43,7 +44,7 @@ public class Watcher implements Closeable {
     private final ScheduledExecutorService scanner;
     private final long scanIntervalSeconds;
     private final Statistics statistics;
-    private Thread watchThread;
+    private @Nullable Thread watchThread;
     /**
      * unregisters the JMX bean; does nothing if it could not be registered
      */

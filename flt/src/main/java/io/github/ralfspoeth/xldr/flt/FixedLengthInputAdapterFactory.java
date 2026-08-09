@@ -64,7 +64,7 @@ public class FixedLengthInputAdapterFactory implements InputAdapterFactory {
         if (m.matches()) {
             return new Bounds(m.group(1).isBlank() ? -1 : Integer.parseInt(m.group(1)),
                     Integer.parseInt(m.group(2)),
-                    dt == null ? DataType.STRING : dt);
+                    dt == null ? DataType.TEXT : dt);
         } else throw new IllegalArgumentException(s + " doesn't match the pattern " + BOUNDS.pattern());
     }
 

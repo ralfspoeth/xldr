@@ -5,6 +5,7 @@ import io.github.ralfspoeth.xldr.ia.Row;
 import io.github.ralfspoeth.xldr.spec.ValueSource;
 import io.github.ralfspoeth.xldr.spec.MappingSpec;
 import io.github.ralfspoeth.xldr.spec.RecordMappingSpec;
+import org.jspecify.annotations.Nullable;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -143,12 +144,12 @@ public class Loader implements AutoCloseable {
     private Map<String, Object> evaluateVars() throws SQLException {
         var values = new LinkedHashMap<String, Object>();
         for (var v : mappingSpec.inputSpec().vars()) {
-            values.put(v.name(), evaluate(v.source(), values));
+            values.put(v.name(), Objects.requireNonNull(evaluate(v.source(), values)));
         }
         return values;
     }
 
-    private Object evaluate(ValueSource source, Map<String, Object> resolved) throws SQLException {
+    private @Nullable Object evaluate(ValueSource source, Map<String, Object> resolved) throws SQLException {
         return switch (source) {
             case ValueSource.Constant c -> c.value();
             case ValueSource.Var v -> {
@@ -158,7 +159,7 @@ public class Loader implements AutoCloseable {
                 }
                 yield resolved.get(v.name());
             }
-            case ValueSource.Lookup lk -> lookup(lk, evaluate(lk.key(), resolved));
+            case ValueSource.Lookup lk -> lookup(lk, Objects.requireNonNull(evaluate(lk.key(), resolved)));
             case ValueSource.Expr e -> Expression.compile(e.template()).eval(bindings(resolved, null));
             case ValueSource.Field _ -> throw new IllegalArgumentException(
                     "a var cannot read an input field: it is evaluated with no record in hand");
@@ -186,10 +187,10 @@ public class Loader implements AutoCloseable {
      * {@code format(value, pattern)} and {@code parse(text, pattern)} convert
      * between text and the date types.
      */
-    private Expression.Bindings bindings(Map<String, Object> vars, Row row) {
+    private Expression.Bindings bindings(Map<String, Object> vars, @Nullable Row row) {
         return new Expression.Bindings() {
             @Override
-            public Object variable(String name) {
+            public @Nullable Object variable(String name) {
                 if (AMBIENT_PREFIXES.stream().anyMatch(name::startsWith)) {
                     if (!ambient.containsKey(name)) {
                         // the names, never the values: an ambient map may hold
@@ -202,11 +203,7 @@ public class Loader implements AutoCloseable {
                 if (vars.containsKey(name)) {
                     return vars.get(name);
                 }
-                if (row != null) {
-                    return row.get(name);
-                }
-                throw new IllegalArgumentException(
-                        "expression variable '" + name + "' is not a var, and no record is in scope");
+                return row.get(name);
             }
 
             @Override

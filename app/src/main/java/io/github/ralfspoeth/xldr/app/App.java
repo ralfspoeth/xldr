@@ -3,6 +3,7 @@ package io.github.ralfspoeth.xldr.app;
 import io.github.ralfspoeth.xldr.server.Config;
 import io.github.ralfspoeth.xldr.server.Watcher;
 
+import org.jspecify.annotations.Nullable;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Model.CommandSpec;
@@ -70,6 +71,7 @@ public class App implements Callable<Integer> {
     private static final String HOME_PROPERTY = "xldr.home";
 
     @Spec
+    @Nullable
     private CommandSpec spec;
 
     @Option(
@@ -79,6 +81,7 @@ public class App implements Callable<Integer> {
             description = "the directory holding " + CONFIG_FILE + ", and optionally "
                     + LOGGING_FILE + "; the working directory by default"
     )
+    @Nullable
     private Path directory;
 
     void main(String[] args) {
@@ -87,8 +90,10 @@ public class App implements Callable<Integer> {
 
     @Override
     public Integer call() throws Exception {
+        assert directory != null;
         var configFile = directory.resolve(CONFIG_FILE);
         if (!Files.isRegularFile(configFile)) {
+            assert spec != null;
             spec.commandLine().getErr().println("no " + CONFIG_FILE + " in "
                     + directory.toAbsolutePath().normalize()
                     + " - name another directory with --dir, or start the server from the one holding it");

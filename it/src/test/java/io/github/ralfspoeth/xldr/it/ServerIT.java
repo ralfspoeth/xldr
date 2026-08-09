@@ -46,7 +46,6 @@ public class ServerIT {
 
     private Path root;
     private Path staging;
-    private ConnectionSource pool;
     private Watcher watcher;
 
     @BeforeEach
@@ -69,8 +68,7 @@ public class ServerIT {
         props.setProperty("jdbc.url", JDBC_URL);
 
         var config = Config.of(props);
-        pool = () -> DriverManager.getConnection(JDBC_URL);
-        watcher = Watcher.watch(config, pool);
+        watcher = Watcher.watch(config, () -> DriverManager.getConnection(JDBC_URL));
     }
 
     @AfterEach
@@ -616,8 +614,8 @@ public class ServerIT {
                     "name": "people",
                     "selector": "people!A2:B3",
                     "fieldSelectors": [
-                      {"name": "id", "selector": "A", "type": "INTEGER"},
-                      {"name": "name", "selector": "B", "type": "STRING"}
+                      {"name": "id", "selector": "A", "type": "INTEGRAL"},
+                      {"name": "name", "selector": "B", "type": "TEXT"}
                     ]
                   }
                 ]
@@ -651,8 +649,8 @@ public class ServerIT {
                     "name": "people",
                     "selector": "data/people",
                     "fieldSelectors": [
-                      {"name": "id", "selector": "id", "type": "INTEGER"},
-                      {"name": "name", "selector": "person/name", "type": "STRING"}
+                      {"name": "id", "selector": "id", "type": "INTEGRAL"},
+                      {"name": "name", "selector": "person/name", "type": "TEXT"}
                     ]
                   }
                 ]
@@ -687,8 +685,8 @@ public class ServerIT {
                     "name": "people",
                     "selector": "people",
                     "fieldSelectors": [
-                      {"name": "id", "selector": "0:3", "type": "INTEGER"},
-                      {"name": "name", "selector": ":13", "type": "STRING"}
+                      {"name": "id", "selector": "0:3", "type": "INTEGRAL"},
+                      {"name": "name", "selector": ":13", "type": "TEXT"}
                     ]
                   }
                 ]
@@ -720,8 +718,8 @@ public class ServerIT {
                   {
                     "name": "people",
                     "fieldSelectors": [
-                      {"name": "id", "selector": "id", "type": "STRING"},
-                      {"name": "name", "selector": "name", "type": "STRING"}
+                      {"name": "id", "selector": "id", "type": "TEXT"},
+                      {"name": "name", "selector": "name", "type": "TEXT"}
                     ]
                   }
                 ]
