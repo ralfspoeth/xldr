@@ -22,7 +22,7 @@ public class DataTypeTest {
                 () -> assertEquals("abc", DataType.TEXT.parse("abc")),
                 () -> assertEquals(42L, DataType.INTEGRAL.parse("42")),
                 () -> assertEquals(new BigDecimal("12.50"), DataType.DECIMAL.parse("12.50")),
-                () -> assertEquals(0.25d, DataType.FLOAT.parse("0.25")),
+                () -> assertEquals(0.25d, DataType.FP.parse("0.25")),
                 () -> assertEquals(LocalDateTime.of(2026, 7, 26, 8, 30),
                         DataType.DATE.parse("2026-07-26T08:30"))
         );
@@ -52,7 +52,7 @@ public class DataTypeTest {
                 () -> assertEquals("abc", DataType.TEXT.parse("  abc  ")),
                 () -> assertEquals(42L, DataType.INTEGRAL.parse("   42")),
                 () -> assertEquals(new BigDecimal("12.50"), DataType.DECIMAL.parse(" 12.50 ")),
-                () -> assertEquals(0.25d, DataType.FLOAT.parse("0.25   "))
+                () -> assertEquals(0.25d, DataType.FP.parse("0.25   "))
         );
     }
 
@@ -90,7 +90,7 @@ public class DataTypeTest {
             var sample = switch (type) {
                 case TEXT -> "x";
                 case INTEGRAL -> "1";
-                case FLOAT -> "1.5";
+                case FP -> "1.5";
                 case DECIMAL -> "1.75";
                 case DATE -> "2026-07-26T00:00";
             };

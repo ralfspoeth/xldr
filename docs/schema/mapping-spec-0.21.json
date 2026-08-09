@@ -157,14 +157,14 @@
           "enum": [
             "TEXT",
             "INTEGRAL",
-            "FLOAT",
+            "FP",
             "DECIMAL",
             "DATE"
           ]
         },
         {
           "type": "string",
-          "pattern": "^([Ss][Tt][Rr][Ii][Nn][Gg]|[Ii][Nn][Tt][Ee][Gg][Ee][Rr]|[Ff][Ll][Oo][Aa][Tt]|[Dd][Ee][Cc][Ii][Mm][Aa][Ll]|[Dd][Aa][Tt][Ee])$"
+          "pattern": "^([Tt][Ee][Xx][Tt]|[Ii][Nn][Tt][Ee][Gg][Rr][Aa][Ll]|[Ff][Pp]|[Dd][Ee][Cc][Ii][Mm][Aa][Ll]|[Dd][Aa][Tt][Ee])$"
         }
       ]
     },

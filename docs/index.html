@@ -54,7 +54,12 @@
         <th>XML</th>
     </tr>
     <tr>
-        <td>0.13 - 0.16 (current)</td>
+        <td>0.21 (current)</td>
+        <td><a href="schema/mapping-spec-0.21.json">mapping-spec-0.21.json</a></td>
+        <td><a href="schema/mapping-spec-0.21.xsd">mapping-spec-0.21.xsd</a></td>
+    </tr>
+    <tr>
+        <td>0.13 - 0.20</td>
         <td><a href="schema/mapping-spec-0.13.json">mapping-spec-0.13.json</a></td>
         <td><a href="schema/mapping-spec-0.13.xsd">mapping-spec-0.13.xsd</a></td>
     </tr>
@@ -78,8 +83,17 @@
 <p>
     A schema is published whenever the format changes, and named after the release that changed it: the format is
     still settling before 1.0, and a spec should be validated against the schema its release reads. A release that
-    changes nothing about the format - 0.11, 0.12, 0.14 to 0.16 - keeps the previous schema rather than publishing a copy
+    changes nothing about the format - 0.11, 0.12, 0.14 to 0.20 - keeps the previous schema rather than publishing a copy
     of it. An older one stays where it is, so a spec pinned to it keeps validating.
+</p>
+
+<p>
+    In 0.21 the field types <code>STRING</code>, <code>INTEGER</code> and <code>FLOAT</code> became
+    <code>TEXT</code>, <code>INTEGRAL</code> and <code>FP</code>; <code>DECIMAL</code> and <code>DATE</code> are
+    unchanged, as is leaving the type out, which still means text. The names are deliberately none of Java's, so that
+    nobody reads <code>FP</code> as a <code>float</code> or <code>INTEGRAL</code> as an <code>int</code> and infers a
+    width from it. An old name is refused when the spec is read rather than defaulting quietly, so a spec that has not
+    been edited fails by name.
 </p>
 
 <p>
@@ -103,7 +117,7 @@
 <p>In a JSON spec, as a member the reader does not recognise and therefore ignores:</p>
 
 <pre><code>{
-  "$schema": "https://ralfspoeth.github.io/xldr/schema/mapping-spec-0.13.json",
+  "$schema": "https://ralfspoeth.github.io/xldr/schema/mapping-spec-0.21.json",
   "input": {
     "mimeType": "text/csv",
     "accepts": "glob:*.csv",
@@ -116,7 +130,7 @@
 <p>In an XML spec, as the schema location of a document that has no namespace of its own:</p>
 
 <pre><code>&lt;mappingSpec xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-             xsi:noNamespaceSchemaLocation="https://ralfspoeth.github.io/xldr/schema/mapping-spec-0.13.xsd"&gt;
+             xsi:noNamespaceSchemaLocation="https://ralfspoeth.github.io/xldr/schema/mapping-spec-0.21.xsd"&gt;
     &lt;input mimeType="text/xml" accepts="glob:*.xml"&gt;
         ...
     &lt;/input&gt;

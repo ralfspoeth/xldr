@@ -135,7 +135,7 @@ public class FixedLengthAdapterTest {
                 new FieldSelectorSpec("txt", "0:3", DataType.TEXT),
                 new FieldSelectorSpec("num", "3:6", DataType.INTEGRAL),
                 new FieldSelectorSpec("dec", "6:11", DataType.DECIMAL),
-                new FieldSelectorSpec("flt", "11:15", DataType.FLOAT));
+                new FieldSelectorSpec("flt", "11:15", DataType.FP));
 
         var names = Set.of("txt", "num", "dec", "flt");
         var result = adapter(spec, Map.of()).parse(in("abc04212.500.25\n"), "rec", names);

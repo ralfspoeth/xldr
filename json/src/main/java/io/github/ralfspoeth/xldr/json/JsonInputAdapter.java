@@ -160,7 +160,7 @@ class JsonInputAdapter implements InputAdapter {
         return switch (type) {
             case DECIMAL -> value;
             case INTEGRAL -> value.longValue();
-            case FLOAT -> value.doubleValue();
+            case FP -> value.doubleValue();
             // a number where the spec wants text or a date: let the shared rules decide
             case TEXT, DATE -> formats.parse(type, value.toPlainString());
         };

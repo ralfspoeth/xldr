@@ -54,7 +54,7 @@ class XmlFieldSelector {
      * Evaluates the expression against {@code record} and converts the result to
      * the declared {@link DataType}.
      * <p>
-     * Everything but {@code FLOAT} is taken as the string value and converted
+     * Everything but {@code FP} is taken as the string value and converted
      * from there by the shared {@link Formats}: XPath 1.0 knows only doubles, so
      * going through {@code XPathConstants.NUMBER} would round a long integer and
      * turn a decimal into a binary approximation. An empty result becomes
@@ -66,7 +66,7 @@ class XmlFieldSelector {
         try {
             return switch (dataType) {
                 case TEXT -> string(record);
-                case FLOAT -> {
+                case FP -> {
                     var number = (Double) expression.evaluate(record, XPathConstants.NUMBER);
                     yield number == null || number.isNaN() ? null : number;
                 }

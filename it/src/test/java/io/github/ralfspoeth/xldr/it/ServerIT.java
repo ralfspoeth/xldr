@@ -209,7 +209,7 @@ public class ServerIT {
                 """);
 
         await("rows to arrive", () -> selectPersons().size() == 2);
-        // the id is declared INTEGER, so "001" arrives as the number 1
+        // the id is declared INTEGRAL, so "001" arrives as the number 1
         assertEquals(List.of("1:Alice", "2:Bob"), selectPersons());
         await("the input to be archived", () -> !archived(feed).isEmpty());
     }
@@ -268,7 +268,7 @@ public class ServerIT {
         deliver(feed, "people-1.xlsx", workbook);
 
         await("rows to arrive", () -> selectPersons().size() == 2);
-        // the id cells are numeric, and the spec declares them INTEGER
+        // the id cells are numeric, and the spec declares them INTEGRAL
         assertEquals(List.of("1:Alice", "2:Bob"), selectPersons());
         await("the input to be archived", () -> !archived(feed).isEmpty());
     }

@@ -11,13 +11,19 @@ import static java.util.Objects.requireNonNull;
 
 /**
  * The types a field value may be delivered as, each mapped to its Java class.
+ * <p>
+ * The names are the spec's own vocabulary and deliberately none of Java's, so
+ * that no one reads {@code FP} as {@code float} or {@code INTEGRAL} as
+ * {@code int} and expects the width that goes with it. {@code FP} is binary
+ * floating point, delivered as a {@code Double}, and rounds; {@code DECIMAL} is
+ * exact and is what money wants.
  */
 public enum DataType {
 
     DATE(LocalDateTime.class),
     TEXT(String.class),
     INTEGRAL(Long.class),
-    FLOAT(Double.class),
+    FP(Double.class),
     DECIMAL(BigDecimal.class);
 
     private final Class<?> clazz;
@@ -63,7 +69,7 @@ public enum DataType {
             case DATE -> dateTime(s);
             case TEXT -> s;
             case INTEGRAL -> Long.parseLong(s);
-            case FLOAT -> Double.parseDouble(s);
+            case FP -> Double.parseDouble(s);
             case DECIMAL -> new BigDecimal(s);
         };
     }

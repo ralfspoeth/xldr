@@ -26,7 +26,7 @@ public class FormatsTest {
                 () -> assertEquals("abc", formats.parse(DataType.TEXT, " abc ")),
                 () -> assertEquals(42L, formats.parse(DataType.INTEGRAL, "42")),
                 () -> assertEquals(new BigDecimal("12.50"), formats.parse(DataType.DECIMAL, "12.50")),
-                () -> assertEquals(0.25d, formats.parse(DataType.FLOAT, "0.25")),
+                () -> assertEquals(0.25d, formats.parse(DataType.FP, "0.25")),
                 () -> assertEquals(LocalDateTime.of(2026, 7, 26, 0, 0),
                         formats.parse(DataType.DATE, "2026-07-26T00:00"))
         );
@@ -60,7 +60,7 @@ public class FormatsTest {
         assertAll(
                 () -> assertEquals(new BigDecimal("1234.56"), german.parse(DataType.DECIMAL, "1.234,56")),
                 () -> assertEquals(1234L, german.parse(DataType.INTEGRAL, "1.234")),
-                () -> assertEquals(1234.56d, german.parse(DataType.FLOAT, "1.234,56"))
+                () -> assertEquals(1234.56d, german.parse(DataType.FP, "1.234,56"))
         );
     }
 

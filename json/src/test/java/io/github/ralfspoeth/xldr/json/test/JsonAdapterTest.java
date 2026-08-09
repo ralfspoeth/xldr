@@ -114,7 +114,7 @@ public class JsonAdapterTest {
                 new FieldSelectorSpec("txt", "txt", DataType.TEXT),
                 new FieldSelectorSpec("num", "num", DataType.INTEGRAL),
                 new FieldSelectorSpec("dec", "dec", DataType.DECIMAL),
-                new FieldSelectorSpec("flt", "flt", DataType.FLOAT),
+                new FieldSelectorSpec("flt", "flt", DataType.FP),
                 new FieldSelectorSpec("day", "day", DataType.DATE));
 
         var names = Set.of("txt", "num", "dec", "flt", "day");

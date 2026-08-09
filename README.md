@@ -70,7 +70,7 @@ fix their versions in one place:
             <dependency>
                 <groupId>io.github.ralfspoeth.xldr</groupId>
                 <artifactId>bom</artifactId>
-                <version>0.20</version>
+                <version>0.21</version>
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>
@@ -347,9 +347,11 @@ Example:
 
 ### Field types
 
-A field selector's `type` is one of `STRING`, `INTEGER`, `FLOAT`, `DECIMAL` or `DATE` (matched case-insensitively),
+A field selector's `type` is one of `TEXT`, `INTEGRAL`, `FP`, `DECIMAL` or `DATE` (matched case-insensitively),
 and decides the Java type the adapter delivers and therefore what the loader binds: `String`, `Long`, `Double`,
-`BigDecimal` and `LocalDateTime`. It is optional; a field without one is read as text.
+`BigDecimal` and `LocalDateTime`. It is optional; a field without one is read as text. The names are none of Java's
+on purpose, so that `FP` is not read as `float` nor `INTEGRAL` as `int`, and so that the choice between `FP` and
+`DECIMAL` - rounding or exact - is the one the reader is asked to make.
 
 Values are read in their canonical form: an ungrouped literal such as `1234.56` for the numeric types, ISO-8601 for
 `DATE` - a plain date (`2026-07-22`) as well as a timestamp (`2026-07-21T14:30`), a plain date being midnight of that
@@ -558,6 +560,11 @@ the spec deactivates the feed, replacing it reloads it - no restart in either ca
 present: two of them is refused rather than resolved by precedence, because loading through the wrong spec is worse
 than not loading at all.
 
+Deactivating takes effect for files as well as for the feed: a file already sitting in `in/` when the spec goes is
+left there untouched, and so is a marker beside it. A load in flight when the spec is removed does run to the end -
+it is a transaction, and abandoning it halfway is not an improvement - but nothing new is started. Switching a feed
+off is therefore something an operator can rely on rather than a race against whatever is in the directory.
+
 ### Deployment values
 
 A spec is meant to travel from test to production unchanged, so anything that must differ between the two cannot be in
@@ -698,7 +705,7 @@ their canonical form.
 | Key            | Default            | Meaning                                                                                                                                                        |
 |----------------|--------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `dateFormat`   | ISO-8601           | `DateTimeFormatter` pattern for `DATE` fields, e.g. `yyyyMMdd` or `dd.MM.yyyy HH:mm`. A pattern without a time of day yields midnight.                         |
-| `numberFormat` | plain literal      | `DecimalFormat` pattern for `INTEGER`, `FLOAT` and `DECIMAL`, e.g. `#,##0.00` for grouped input. `DECIMAL` stays exact - it is never rounded through a double. |
+| `numberFormat` | plain literal      | `DecimalFormat` pattern for `INTEGRAL`, `FP` and `DECIMAL`, e.g. `#,##0.00` for grouped input. `DECIMAL` stays exact - it is never rounded through a double. |
 | `locale`       | `ROOT` (`1234.56`) | Language tag, e.g. `de-DE`, selecting the decimal and grouping separators of `numberFormat` and the symbols of `dateFormat`.                                   |
 
 Excel needs none of these: a spreadsheet carries typed cells, so a date or a number arrives as one already.
@@ -784,9 +791,9 @@ partition one file, each mapping its own type to its own table:
 |---------------|---------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `ns.<prefix>` | –       | Binds a namespace prefix for the selectors, e.g. `ns.f = http://example.com/funds` to make `//f:fund` match. XPath 1.0 has no default namespace, so a document with one is reachable only through a bound prefix. |
 
-XML differs from the other adapters in two deliberate ways. A `STRING` field keeps an empty string rather than
-becoming null, because XPath cannot tell "no such element" from "an element that is empty". And a `FLOAT` is taken
-through XPath's own numeric evaluation rather than from its text - which is why `INTEGER` and `DECIMAL` are not:
+XML differs from the other adapters in two deliberate ways. A `TEXT` field keeps an empty string rather than
+becoming null, because XPath cannot tell "no such element" from "an element that is empty". And an `FP` is taken
+through XPath's own numeric evaluation rather than from its text - which is why `INTEGRAL` and `DECIMAL` are not:
 XPath 1.0 knows only doubles, so it would round a long integer and turn a decimal into a binary approximation.
 
 **Fixed length** (`text/plain`):

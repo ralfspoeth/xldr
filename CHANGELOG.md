@@ -6,17 +6,52 @@ ways that break existing code and existing specs; those changes are listed here 
 The versions are the git tags `xldr-<version>`; the published artifacts carry the same version under the group
 `io.github.ralfspoeth.xldr`.
 
-## Unreleased
+## 0.21
+
+The field types are renamed, which is why this release has a schema of its own. Beyond that it is a release about
+promises kept: every module is now `@NullMarked`, the annotations that were missing under it are in place, and the
+guards an IDE had removed on the strength of the incomplete ones are back.
 
 ### Breaking
 
-- The field types `STRING` and `INTEGER` are now `TEXT` and `INTEGRAL`. Every spec naming either has to be edited:
-  the readers uppercase what they find and hand it to `DataType.valueOf`, so an old name is an
-  `IllegalArgumentException` when the spec is read, not a silent default. `FLOAT`, `DECIMAL` and `DATE` are
-  unchanged, as is leaving the type out, which still means text.
+- The field types `STRING`, `INTEGER` and `FLOAT` are now `TEXT`, `INTEGRAL` and `FP`. Every spec naming one of them
+  has to be edited: the readers uppercase what they find and hand it to `DataType.valueOf`, so an old name is an
+  `IllegalArgumentException` when the spec is read, not a silent default. `DECIMAL` and `DATE` are unchanged, as is
+  leaving the type out, which still means text. The new names are none of Java's on purpose - nobody should read a
+  spec's `FP` as a `float` or its `INTEGRAL` as an `int` and infer a width from it; `FP` is a `Double` and rounds,
+  `DECIMAL` is a `BigDecimal` and does not.
 - The schemas are published as `mapping-spec-0.21`; `mapping-spec-0.13`, which describes 0.13 to 0.20, stays where it
   is, so a spec pinned to it goes on validating against the vocabulary it was written for. A spec moving to the new
   names moves its `$schema` or `xsi:noNamespaceSchemaLocation` with them.
+
+### Fixed
+
+- A file that arrives in `in/` after its spec has been removed is no longer loaded. The registry is authoritative but
+  not instantaneous - the feed directory and its `in/` are two watch keys on two threads, and the periodic scan takes
+  the active feeds before it walks their inboxes - so both paths had a window in which a deactivated feed could still
+  pick something up. `FileProcessor` now stats the spec file once more immediately before the claim, which is the last
+  moment at which the answer still costs nothing and the first at which the step becomes irreversible. A marker file
+  is left alone as well, rather than being consumed by a feed that is off.
+- A load interrupted while waiting for a slot released a permit it had never acquired, so `xldr.maxConcurrentLoads`
+  grew by one every time it happened. The permit is now acquired outside the `try` whose `finally` returns it.
+- `Validate` rejected exactly the specs it should have accepted: a `csv` input with `discriminator` and a header row
+  is legal, and the check had kept a negation through a rewrite into `!(!isCsv || !header)`.
+
+### Nullness
+
+- Every module is `@NullMarked` with `requires static org.jspecify`, `json` being the last to join. The annotations
+  are compile-only, so nothing reaches your runtime.
+- Four null guards in `FileProcessor` had been lost to the incomplete annotations and are restored: `onArrival` and
+  `scanInbox` had lost their `sentinel == null` branches, `process` and `processSignalled` their `claimed != null`
+  ones. `@NullMarked` had told the IDE those expressions could not be null, so it offered to remove conditions it
+  believed were always true. The `scanInbox` one broke every feed that delivers with a marker: its filter still
+  guarded, so with no sentinel every file became pending and `Sentinel.dataFileOf` was then called on null, which the
+  reconciliation reported as a failure.
+- `@Nullable` is now on what can be null: `Feed.sentinel` and `Feed.acceptMatcher`, mutually exclusive by
+  construction; `FeedRegistry.acceptMatcher` on both sides; `FileProcessor.claim` and `claimOrLog`, whose javadoc had
+  said "or null if it was not ours to claim" over a bare `Path` return; `Statistics.lastLoad`, `lastFailure` and the
+  `text` that exists to render them; `Watcher.watchThread`; `Validate.checkPattern`; and three private methods in
+  `Loader`.
 
 ## 0.20
 

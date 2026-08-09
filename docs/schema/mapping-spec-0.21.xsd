@@ -138,7 +138,7 @@
     <!-- the Java type the value is delivered as; matched case-insensitively -->
     <xs:simpleType name="dataType">
         <xs:restriction base="xs:string">
-            <xs:pattern value="[Tt][Ee][Xx][Tt]|[Ii][Nn][Tt][Ee][Gg][Rr][Aa][Ll]|[Ff][Ll][Oo][Aa][Tt]|[Dd][Ee][Cc][Ii][Mm][Aa][Ll]|[Dd][Aa][Tt][Ee]"/>
+            <xs:pattern value="[Tt][Ee][Xx][Tt]|[Ii][Nn][Tt][Ee][Gg][Rr][Aa][Ll]|[Ff][Pp]|[Dd][Ee][Cc][Ii][Mm][Aa][Ll]|[Dd][Aa][Tt][Ee]"/>
         </xs:restriction>
     </xs:simpleType>
 
