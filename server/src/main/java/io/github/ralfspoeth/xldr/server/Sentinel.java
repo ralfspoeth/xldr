@@ -43,8 +43,9 @@ public final class Sentinel {
     }
 
     /**
+     * Tests whether some file is a marker rather than an input file
      * @param file a file that has arrived in {@code in/}
-     * @return whether it is a marker rather than a data file
+     * @return {@code true} iff a marker
      */
     public boolean isMarker(Path file) {
         return matcher.matches(file.getFileName());
