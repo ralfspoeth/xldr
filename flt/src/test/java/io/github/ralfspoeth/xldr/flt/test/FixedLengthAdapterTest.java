@@ -71,11 +71,10 @@ public class FixedLengthAdapterTest {
         var rows = result.rows().toList();
         assertEquals(2, rows.size());
         assertAll(
-                () -> assertEquals("001", rows.get(0).get("id")),
-                () -> assertEquals("Alice", rows.get(0).get("name")),
-                () -> assertEquals("002", rows.get(1).get("id")),
-                // the line stops after "Bob"; padding, present or absent, is stripped
-                () -> assertEquals("Bob", rows.get(1).get("name"))
+                () -> assertEquals("001", rows.getFirst().get("id")),
+                () -> assertEquals("Alice", rows.getFirst().get("name")),
+                () -> assertEquals("002", rows.getLast().get("id")),
+                () -> assertEquals("Bob", rows.getLast().get("name"))
         );
     }
 
@@ -190,8 +189,8 @@ public class FixedLengthAdapterTest {
         var rows = result.rows().toList();
         assertEquals(2, rows.size());
         assertAll(
-                () -> assertEquals("001", rows.get(0).get("id")),
-                () -> assertEquals("Berlin", rows.get(0).get("city")),
+                () -> assertEquals("001", rows.getFirst().get("id")),
+                () -> assertEquals("Berlin", rows.getFirst().get("city")),
                 () -> assertEquals("002", rows.get(1).get("id")),
                 () -> assertEquals("Bremen", rows.get(1).get("city"))
         );
