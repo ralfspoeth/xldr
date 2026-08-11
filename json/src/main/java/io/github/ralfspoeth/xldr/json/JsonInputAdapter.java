@@ -133,7 +133,9 @@ class JsonInputAdapter implements InputAdapter {
         Map<String, Object> values = new HashMap<>();
         for (var name : selected) {
             var field = record.fields().get(name);
-            values.put(name, field.path().apply(element).map(v -> valueOf(v, field.type())).orElse(null));
+            field.path.apply(element).map(v -> valueOf(v, field.type)).ifPresent(
+                    v -> values.put(name, v)
+            );
         }
         return values::get;
     }
