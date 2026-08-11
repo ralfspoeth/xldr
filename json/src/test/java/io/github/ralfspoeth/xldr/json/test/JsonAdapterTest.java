@@ -74,10 +74,10 @@ public class JsonAdapterTest {
         var rows = result.rows().toList();
         assertEquals(2, rows.size());
         assertAll(
-                () -> assertEquals("A-1", rows.get(0).get("id")),
-                () -> assertEquals(3L, rows.get(0).get("qty")),
-                () -> assertEquals("A-2", rows.get(1).get("id")),
-                () -> assertEquals(7L, rows.get(1).get("qty"))
+                () -> assertEquals("A-1", rows.getFirst().get("id")),
+                () -> assertEquals(3L, rows.getFirst().get("qty")),
+                () -> assertEquals("A-2", rows.getLast().get("id")),
+                () -> assertEquals(7L, rows.getLast().get("qty"))
         );
     }
 
@@ -163,7 +163,7 @@ public class JsonAdapterTest {
     }
 
     /**
-     * Values carried as strings still honour the feed's patterns.
+     * Values carried as strings still honor the feed's patterns.
      */
     @Test
     public void appliesTheConfiguredFormats() throws IOException {
@@ -211,7 +211,7 @@ public class JsonAdapterTest {
      * yields exactly one record.
      */
     @Test
-    public void readsAsingleObjectAsOneRecord() throws IOException {
+    public void readsASingleObjectAsOneRecord() throws IOException {
         var spec = spec("data/order", new FieldSelectorSpec("id", "id", DataType.TEXT));
 
         var result = adapter(spec, Map.of()).parse(in("""
@@ -247,7 +247,7 @@ public class JsonAdapterTest {
     }
 
     @Test
-    public void rejectsAnUnknownRecordSelector() throws IOException {
+    public void rejectsAnUnknownRecordSelector() {
         var spec = spec("rows", new FieldSelectorSpec("id", "id", DataType.TEXT));
         var adapter = adapter(spec, Map.of());
         assertThrows(IllegalArgumentException.class,
