@@ -25,7 +25,7 @@ import java.util.stream.Stream;
  * way whatever platform it was written on - unless a quoted field holds a line
  * break, in which case the record runs on until the field closes. The lines are
  * read lazily, so a file is never held in memory as a whole; only the record
- * being assembled is.
+ * being assembled is held in memory.
  */
 class CsvFileHandler implements InputAdapter {
 
@@ -188,7 +188,7 @@ class CsvFileHandler implements InputAdapter {
             partial.append(line);
             var scan = Csv.scan(partial.text(), fieldSeparator, quote, comment);
             if (scan.open()) {
-                if (partial.longerThan(MAX_LINES_PER_RECORD)) {
+                if (partial.longerThanMaxLinesPerRecord()) {
                     throw new IllegalArgumentException(partial.unterminated(MAX_LINES_PER_RECORD));
                 }
                 return true;
@@ -229,8 +229,8 @@ class CsvFileHandler implements InputAdapter {
             return lines == 0;
         }
 
-        boolean longerThan(int limit) {
-            return lines > limit;
+        boolean longerThanMaxLinesPerRecord() {
+            return lines > MAX_LINES_PER_RECORD;
         }
 
         void append(String line) {

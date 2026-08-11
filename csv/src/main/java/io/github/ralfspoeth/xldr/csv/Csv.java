@@ -5,7 +5,7 @@ import org.jspecify.annotations.Nullable;
 import java.util.ArrayList;
 
 /**
- * Splits a separated-value record into its fields, honouring quoted fields.
+ * Splits a separated-value record into its fields, honoring quoted fields.
  * <p>
  * A quote opens a quoted field only where a field begins - immediately after a
  * separator, or at the start of the record. Anywhere else it is an ordinary
@@ -19,7 +19,7 @@ import java.util.ArrayList;
  * cannot be structural anyway.
  * <p>
  * A comment character, where the feed defines one, ends the record wherever it
- * appears outside a quoted field. Inside one it is data like any other
+ * appears outside a quoted field. Inside one, it is data like any other
  * character, which is the point of asking the scanner rather than the line.
  */
 final class Csv {

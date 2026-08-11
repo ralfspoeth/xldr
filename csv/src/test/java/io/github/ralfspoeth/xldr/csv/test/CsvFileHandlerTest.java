@@ -14,11 +14,9 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
-import java.util.List;
-import java.util.Map;
-import java.util.ServiceLoader;
-import java.util.Set;
+import java.util.*;
 
+import static java.util.Objects.requireNonNull;
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -108,7 +106,7 @@ public class CsvFileHandlerTest {
     @Test
     public void parsesSelectedFields() throws IOException {
         try (var in = getClass().getResourceAsStream("simple.csv")) {
-            var result = adapter().parse(in, "people", Set.of("id", "name"));
+            var result = adapter().parse(requireNonNull(in), "people", Set.of("id", "name"));
 
             // only id and name are exposed as fields
             assertEquals(
@@ -119,8 +117,8 @@ public class CsvFileHandlerTest {
             var rows = result.rows().toList();
             assertEquals(2, rows.size());
             assertAll(
-                    () -> assertEquals("1", rows.get(0).get("id")),
-                    () -> assertEquals("Alice", rows.get(0).get("name")),
+                    () -> assertEquals("1", rows.getFirst().get("id")),
+                    () -> assertEquals("Alice", rows.getFirst().get("name")),
                     () -> assertEquals("2", rows.get(1).get("id")),
                     () -> assertEquals("Bob", rows.get(1).get("name"))
             );
@@ -130,7 +128,7 @@ public class CsvFileHandlerTest {
     @Test
     public void parsesHeaderlessWithRaggedLines() throws IOException {
         try (var in = getClass().getResourceAsStream("positional.csv")) {
-            var result = positionalAdapter().parse(in, "people", Set.of("1", "2", "3"));
+            var result = positionalAdapter().parse(requireNonNull(in), "people", Set.of("1", "2", "3"));
 
             // fields keep the spec order: positions 1, 2, 3
             assertEquals(
@@ -144,9 +142,9 @@ public class CsvFileHandlerTest {
 
             assertAll(
                     // fully populated line
-                    () -> assertEquals("1", rows.get(0).get("1")),
-                    () -> assertEquals("Alice", rows.get(0).get("2")),
-                    () -> assertEquals("Berlin", rows.get(0).get("3")),
+                    () -> assertEquals("1", rows.getFirst().get("1")),
+                    () -> assertEquals("Alice", rows.getFirst().get("2")),
+                    () -> assertEquals("Berlin", rows.getFirst().get("3")),
                     // extra column beyond the spec is simply ignored
                     () -> assertEquals("Bob", rows.get(1).get("2")),
                     () -> assertEquals("Hamburg", rows.get(1).get("3")),
@@ -223,10 +221,10 @@ public class CsvFileHandlerTest {
 
         var rows = result.rows().toList();
         assertAll(
-                () -> assertEquals(1L, rows.get(0).get("id")),
-                () -> assertEquals("Alice", rows.get(0).get("name")),
+                () -> assertEquals(1L, rows.getFirst().get("id")),
+                () -> assertEquals("Alice", rows.getFirst().get("name")),
                 // padded in the file, still a number
-                () -> assertEquals(new BigDecimal("12.50"), rows.get(0).get("rate")),
+                () -> assertEquals(new BigDecimal("12.50"), rows.getFirst().get("rate")),
                 () -> assertEquals(2L, rows.get(1).get("id")),
                 // an empty column is an absent value
                 () -> assertNull(rows.get(1).get("rate"))
@@ -236,15 +234,15 @@ public class CsvFileHandlerTest {
     @Test
     public void selectsOnlyMatchingRecordType() throws IOException {
         try (var in = getClass().getResourceAsStream("discriminated.csv")) {
-            var result = discriminatedAdapter().parse(in, "orders", Set.of("2", "3", "4"));
+            var result = discriminatedAdapter().parse(requireNonNull(in), "orders", Set.of("2", "3", "4"));
 
             var rows = result.rows().toList();
             // three O-lines only; the L-lines are filtered out
             assertEquals(3, rows.size());
             assertAll(
-                    () -> assertEquals("1001", rows.get(0).get("2")),
-                    () -> assertEquals("2026-01-05", rows.get(0).get("3")),
-                    () -> assertEquals("ACME", rows.get(0).get("4")),
+                    () -> assertEquals("1001", rows.getFirst().get("2")),
+                    () -> assertEquals("2026-01-05", rows.getFirst().get("3")),
+                    () -> assertEquals("ACME", rows.getFirst().get("4")),
                     () -> assertEquals("1002", rows.get(1).get("2")),
                     () -> assertEquals("GLOBEX", rows.get(1).get("4")),
                     () -> assertEquals("1003", rows.get(2).get("2")),
@@ -271,8 +269,8 @@ public class CsvFileHandlerTest {
 
         assertEquals(3, rows.size());
         assertAll(
-                () -> assertEquals("Doe, Alice", rows.get(0).get("name"), "the separator is data here"),
-                () -> assertEquals("she said \"no\"!", rows.get(0).get("note")),
+                () -> assertEquals("Doe, Alice", rows.getFirst().get("name"), "the separator is data here"),
+                () -> assertEquals("she said \"no\"!", rows.getFirst().get("note")),
                 () -> assertEquals("Roe, Bob", rows.get(1).get("name")),
                 () -> assertEquals("first line\nsecond line", rows.get(1).get("note")),
                 () -> assertEquals("plain", rows.get(2).get("name"))
@@ -409,8 +407,8 @@ public class CsvFileHandlerTest {
 
         assertEquals(2, rows.size());
         assertAll(
-                () -> assertEquals("Alice", rows.get(0).get("name"), "the banner is not the header"),
-                () -> assertEquals("plain", rows.get(0).get("note"), "the comment is cut, the value stripped"),
+                () -> assertEquals("Alice", rows.getFirst().get("name"), "the banner is not the header"),
+                () -> assertEquals("plain", rows.getFirst().get("note"), "the comment is cut, the value stripped"),
                 () -> assertEquals("a # inside quotes is data", rows.get(1).get("note"))
         );
     }
@@ -497,7 +495,7 @@ public class CsvFileHandlerTest {
                 () -> assertEquals("1", rows.getFirst().get("Id"), "and the header supplies the rest"),
                 () -> assertEquals("asdf", rows.getFirst().get("Text")),
                 // no type is declared for an implicit field, so it arrives as text
-                () -> assertEquals(String.class, rows.getFirst().get("Id").getClass())
+                () -> assertEquals(String.class, requireNonNull(rows.getFirst().get("Id")).getClass())
         );
     }
 
@@ -539,15 +537,15 @@ public class CsvFileHandlerTest {
     @Test
     public void sameFileYieldsDifferentRecordType() throws IOException {
         try (var in = getClass().getResourceAsStream("discriminated.csv")) {
-            var result = discriminatedAdapter().parse(in, "lines", Set.of("2", "3", "4", "5"));
+            var result = discriminatedAdapter().parse(requireNonNull(in), "lines", Set.of("2", "3", "4", "5"));
 
             var rows = result.rows().toList();
             // five L-lines only, with their own column layout
             assertEquals(5, rows.size());
             assertAll(
-                    () -> assertEquals("widget", rows.get(0).get("3")),
-                    () -> assertEquals("5", rows.get(0).get("4")),
-                    () -> assertEquals("9.99", rows.get(0).get("5")),
+                    () -> assertEquals("widget", rows.getFirst().get("3")),
+                    () -> assertEquals("5", rows.getFirst().get("4")),
+                    () -> assertEquals("9.99", rows.getFirst().get("5")),
                     () -> assertEquals("sprocket", rows.get(2).get("3")),
                     () -> assertEquals("flange", rows.get(4).get("3")),
                     () -> assertEquals("42.00", rows.get(4).get("5"))
