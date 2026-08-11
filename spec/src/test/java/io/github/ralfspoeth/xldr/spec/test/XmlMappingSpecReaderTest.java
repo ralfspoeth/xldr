@@ -4,7 +4,6 @@ import io.github.ralfspoeth.xldr.spec.*;
 import io.github.ralfspoeth.xldr.spec.io.XmlMappingSpecReader;
 import org.junit.jupiter.api.Test;
 
-import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 
@@ -14,7 +13,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 public class XmlMappingSpecReaderTest {
 
     @Test
-    public void readsAcompleteSpec() throws IOException {
+    public void readsAcompleteSpec() {
         var source = """
                 <?xml version='1.0'?>
                 <mappingSpec>
@@ -72,7 +71,7 @@ public class XmlMappingSpecReaderTest {
      * A spec carrying only an input parses, with no record selectors or mappings.
      */
     @Test
-    public void parsesAnInputOnlySpec() throws IOException {
+    public void parsesAnInputOnlySpec() {
         var source = """
                 <mappingSpec>
                     <input mimeType="text/csv"/>
@@ -88,7 +87,7 @@ public class XmlMappingSpecReaderTest {
      * one with a {@code var} attribute.
      */
     @Test
-    public void parsesVarsAndAVarReference() throws IOException {
+    public void parsesVarsAndAVarReference() {
         var source = """
                 <mappingSpec>
                     <input mimeType="text/csv">

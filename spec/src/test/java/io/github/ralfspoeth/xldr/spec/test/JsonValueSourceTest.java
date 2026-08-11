@@ -212,7 +212,7 @@ public class JsonValueSourceTest {
                             "fieldSeparator": ";",
                             "header": false,
                             "linesPerRecord": 2,
-                            "ns.f": "http://example.com/funds"
+                            "ns.f": "https://example.com/funds"
                         },
                         "recordSelectors": []
                     },
@@ -223,7 +223,7 @@ public class JsonValueSourceTest {
 
         assertEquals(
                 Map.of("fieldSeparator", ";", "header", "false",
-                        "linesPerRecord", "2", "ns.f", "http://example.com/funds"),
+                        "linesPerRecord", "2", "ns.f", "https://example.com/funds"),
                 input.properties());
         assertEquals("text/csv", input.mimeType());
         assertEquals("glob:*.csv", input.accepts());

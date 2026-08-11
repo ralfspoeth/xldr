@@ -40,7 +40,7 @@ public class XsdTest {
             <?xml version='1.0'?>
             <mappingSpec>
                 <input mimeType="text/xml" accepts="glob:*.xml">
-                    <properties ns.f="http://example.com/funds" dateFormat="dd.MM.yyyy"/>
+                    <properties ns.f="https://example.com/funds" dateFormat="dd.MM.yyyy"/>
                     <var name="source" constant="PD"/>
                     <var name="batch">
                         <lookup table="load_batch" column="id" keyColumn="feed" constant="funds"/>
@@ -78,7 +78,7 @@ public class XsdTest {
      * valid is one the server can actually load.
      */
     @Test
-    public void theCompleteSpecIsValidAndReadable() throws Exception {
+    public void theCompleteSpecIsValidAndReadable() {
         assertDoesNotThrow(() -> validate(COMPLETE_SPEC));
 
         var spec = new XmlMappingSpecReader().read(stream(COMPLETE_SPEC));
@@ -106,7 +106,7 @@ public class XsdTest {
      * nothing to locate. The adapters that do need one say so themselves.
      */
     @Test
-    public void aRecordSelectorMayOmitItsSelector() throws Exception {
+    public void aRecordSelectorMayOmitItsSelector() {
         var xml = """
                 <mappingSpec>
                     <input mimeType="text/csv" accepts="glob:*.csv">
@@ -148,7 +148,7 @@ public class XsdTest {
      * an unknown attribute usually is.
      */
     @Test
-    public void aCommentAttributeIsAllowedEverywhereAndIgnored() throws Exception {
+    public void aCommentAttributeIsAllowedEverywhereAndIgnored() {
         var xml = """
                 <mappingSpec comment="the fund feed">
                     <input mimeType="text/csv" accepts="glob:*.csv" comment="delivered nightly">

@@ -34,7 +34,7 @@ import static io.github.ralfspoeth.xmls.XmlFunctions.elements;
  * be transliterated between the two without renaming anything. {@code type} is
  * optional.
  * <p>
- * Elements and attributes the reader does not recognise are ignored at every
+ * Elements and attributes the reader does not recognize are ignored at every
  * level, so an author may annotate a spec - for instance with a
  * {@code <comments>} element - without breaking it. The name {@code load} is
  * reserved (it carried the commit policy once and may return) and must not be

@@ -6,6 +6,7 @@ import org.junit.jupiter.api.Test;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
+import static java.util.Objects.requireNonNull;
 import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -94,7 +95,7 @@ public class DataTypeTest {
                 case DECIMAL -> "1.75";
                 case DATE -> "2026-07-26T00:00";
             };
-            assertEquals(type.clazz(), type.parse(sample).getClass(), type.toString());
+            assertEquals(type.clazz(), requireNonNull(type.parse(sample)).getClass(), type.toString());
         }
     }
 }
