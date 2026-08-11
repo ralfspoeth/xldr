@@ -197,7 +197,7 @@ public class FixedLengthAdapterTest {
     }
 
     /**
-     * The charset is honoured when decoding the input.
+     * The charset is honored when decoding the input.
      */
     @Test
     public void decodesWithTheConfiguredCharset() throws IOException {
