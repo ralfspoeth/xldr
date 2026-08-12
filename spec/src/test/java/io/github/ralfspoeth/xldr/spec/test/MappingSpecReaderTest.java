@@ -13,12 +13,7 @@ import java.nio.file.Path;
 import java.util.List;
 
 import static io.github.ralfspoeth.xldr.spec.io.MappingSpecReader.readSpec;
-import static org.junit.jupiter.api.Assertions.assertAll;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertInstanceOf;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * Which reader reads a spec file is decided by {@link MappingSpecReader#accepts},

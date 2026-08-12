@@ -1,7 +1,7 @@
 package io.github.ralfspoeth.xldr.spec.test;
 
-import io.github.ralfspoeth.xldr.spec.ValueSource;
 import io.github.ralfspoeth.xldr.spec.FieldMappingSpec;
+import io.github.ralfspoeth.xldr.spec.ValueSource;
 import io.github.ralfspoeth.xldr.spec.VarSpec;
 import io.github.ralfspoeth.xldr.spec.io.JsonMappingSpecReader;
 import org.junit.jupiter.api.Test;

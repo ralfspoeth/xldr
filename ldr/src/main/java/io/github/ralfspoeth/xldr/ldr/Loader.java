@@ -2,27 +2,23 @@ package io.github.ralfspoeth.xldr.ldr;
 
 import io.github.ralfspoeth.xldr.ia.InputAdapter;
 import io.github.ralfspoeth.xldr.ia.Row;
-import io.github.ralfspoeth.xldr.spec.ValueSource;
 import io.github.ralfspoeth.xldr.spec.MappingSpec;
 import io.github.ralfspoeth.xldr.spec.RecordMappingSpec;
+import io.github.ralfspoeth.xldr.spec.ValueSource;
 import org.jspecify.annotations.Nullable;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.sql.*;
-import java.time.DateTimeException;
-import java.time.Instant;
-import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.time.LocalTime;
-import java.time.OffsetDateTime;
-import java.time.ZoneId;
-import java.time.ZonedDateTime;
+import java.time.*;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.TemporalAccessor;
 import java.util.*;
 import java.util.function.Function;
 import java.util.regex.Pattern;
+
+import static java.util.Objects.requireNonNull;
+import static java.util.Optional.ofNullable;
 
 /**
  * Inserts the records of a single input into the target database.
@@ -80,7 +76,7 @@ public class Loader implements AutoCloseable {
      */
     record TabCol(String table, List<String> columns, List<String> valueExprs) {
         TabCol {
-            Objects.requireNonNull(table);
+            requireNonNull(table);
             table = normalizeIdentifier(table);
             columns = columns.stream().map(Loader::normalizeIdentifier).toList();
             valueExprs = List.copyOf(valueExprs);
@@ -129,8 +125,8 @@ public class Loader implements AutoCloseable {
      *                   an expression cannot be mistaken for a var or a field.
      */
     public Loader(MappingSpec ms, Connection connection, Map<String, Object> ambient) throws SQLException {
-        this.mappingSpec = Objects.requireNonNull(ms);
-        this.connection = Objects.requireNonNull(connection);
+        this.mappingSpec = requireNonNull(ms);
+        this.connection = requireNonNull(connection);
         this.ambient = Map.copyOf(ambient);
         connection.setAutoCommit(false);
         this.varValues = evaluateVars();
@@ -144,7 +140,7 @@ public class Loader implements AutoCloseable {
     private Map<String, Object> evaluateVars() throws SQLException {
         var values = new LinkedHashMap<String, Object>();
         for (var v : mappingSpec.inputSpec().vars()) {
-            values.put(v.name(), Objects.requireNonNull(evaluate(v.source(), values)));
+            values.put(v.name(), requireNonNull(evaluate(v.source(), values)));
         }
         return values;
     }
@@ -159,7 +155,7 @@ public class Loader implements AutoCloseable {
                 }
                 yield resolved.get(v.name());
             }
-            case ValueSource.Lookup lk -> lookup(lk, Objects.requireNonNull(evaluate(lk.key(), resolved)));
+            case ValueSource.Lookup lk -> lookup(lk, requireNonNull(evaluate(lk.key(), resolved)));
             case ValueSource.Expr e -> Expression.compile(e.template()).eval(bindings(resolved, null));
             case ValueSource.Field _ -> throw new IllegalArgumentException(
                     "a var cannot read an input field: it is evaluated with no record in hand");
@@ -203,11 +199,13 @@ public class Loader implements AutoCloseable {
                 if (vars.containsKey(name)) {
                     return vars.get(name);
                 }
-                return row.get(name);
+                return ofNullable(row)
+                        .map(r->r.get(name))
+                        .orElse(null);
             }
 
             @Override
-            public Object function(String name, List<Object> args) {
+            public @Nullable Object function(String name, List<Object> args) {
                 return switch (name) {
                     case "now" -> {
                         if (!args.isEmpty()) {
@@ -235,7 +233,7 @@ public class Loader implements AutoCloseable {
      * null formats to null, so an absent date stays a SQL NULL rather than
      * becoming the text {@code "null"}.
      */
-    private String format(List<Object> args) {
+    private @Nullable String format(List<@Nullable Object> args) {
         if (args.size() != 2 || !(args.get(1) instanceof String pattern)) {
             throw new IllegalArgumentException(
                     "format(value, 'pattern') needs a value and a quoted pattern");
@@ -261,7 +259,7 @@ public class Loader implements AutoCloseable {
      * {@code LocalTime} - all three types a driver has to bind. Blank text is an
      * absent value, as everywhere else, and yields null.
      */
-    private Object parseTemporal(List<Object> args) {
+    private @Nullable Object parseTemporal(List<@Nullable Object> args) {
         if (args.size() != 2 || !(args.get(1) instanceof String pattern)) {
             throw new IllegalArgumentException(
                     "parse(text, 'pattern') needs a text and a quoted pattern");
@@ -346,7 +344,7 @@ public class Loader implements AutoCloseable {
      * @param value a value bound to a statement parameter, possibly {@code null}
      * @return the same value, or a JDBC-mandated type standing for it
      */
-    private static Object jdbcValue(Object value) {
+    private static @Nullable Object jdbcValue(@Nullable Object value) {
         return switch (value) {
             // the JVM's zone: the zone in which "now" was asked
             case Instant i -> OffsetDateTime.ofInstant(i, ZoneId.systemDefault());
@@ -355,7 +353,7 @@ public class Loader implements AutoCloseable {
         };
     }
 
-    private Object lookup(ValueSource.Lookup lk, Object key) throws SQLException {
+    private @Nullable Object lookup(ValueSource.Lookup lk, @Nullable Object key) throws SQLException {
         if (key == null) {
             // = NULL is never true, so the query could only return nothing;
             // asking spares the round trip and the drivers that will not bind an
@@ -391,8 +389,8 @@ public class Loader implements AutoCloseable {
      */
     public int loadInput(InputAdapter adapter, InputStream source, RecordMappingSpec mapping)
             throws IOException, SQLException {
-        Objects.requireNonNull(adapter);
-        Objects.requireNonNull(source);
+        requireNonNull(adapter);
+        requireNonNull(source);
         if (!mappingSpec.recordMappingSpecs().contains(mapping)) {
             throw new IllegalArgumentException("mapping is not part of this loader's mapping spec: " + mapping);
         }
@@ -403,7 +401,7 @@ public class Loader implements AutoCloseable {
 
             var columns = new ArrayList<String>(mapping.fieldMappings().size());
             var valueExprs = new ArrayList<String>(mapping.fieldMappings().size());
-            var binders = new ArrayList<Function<Row, Object>>();
+            var binders = new ArrayList<Function<Row, @Nullable Object>>();
             var fieldNames = new LinkedHashSet<String>();
             for (var fm : mapping.fieldMappings()) {
                 columns.add(fm.column());
@@ -571,7 +569,7 @@ public class Loader implements AutoCloseable {
      * {@code ?} in the generated SQL, which is what JDBC parameter numbering
      * follows - including a {@code ?} nested inside a lookup subquery.
      */
-    private String plan(ValueSource source, List<Function<Row, Object>> binders, Set<String> fieldNames) {
+    private String plan(ValueSource source, List<Function<Row, @Nullable Object>> binders, Set<String> fieldNames) {
         return switch (source) {
             case ValueSource.Field fld -> {
                 fieldNames.add(fld.fieldName());

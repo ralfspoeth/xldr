@@ -2,10 +2,7 @@ package io.github.ralfspoeth.xldr.ldr;
 
 import org.jspecify.annotations.Nullable;
 
-import java.util.ArrayList;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 
 /**
  * A compiled {@code ${...}} template: literal text interleaved with holes, each
@@ -38,7 +35,7 @@ final class Expression {
     interface Bindings {
         @Nullable Object variable(String name);
 
-        Object function(String name, List<Object> args);
+        @Nullable Object function(String name, List<Object> args);
     }
 
     private final List<Segment> segments;
@@ -69,7 +66,7 @@ final class Expression {
         }
     }
 
-    Object eval(Bindings bindings) {
+    @Nullable Object eval(Bindings bindings) {
         if (segments.size() == 1 && !(segments.getFirst() instanceof Literal)) {
             return valueOf(segments.getFirst(), bindings);
         }
@@ -81,7 +78,7 @@ final class Expression {
         return sb.toString();
     }
 
-    private static Object valueOf(Segment s, Bindings b) {
+    private static @Nullable Object valueOf(Segment s, Bindings b) {
         return switch (s) {
             case Literal l -> l.text();
             case VarRef v -> b.variable(v.name());
@@ -90,6 +87,7 @@ final class Expression {
             case Call c -> b.function(c.function(), c.args()
                     .stream()
                     .map(a -> a instanceof Segment inner ? valueOf(inner, b) : a)
+                    .filter(Objects::nonNull)
                     .toList());
         };
     }

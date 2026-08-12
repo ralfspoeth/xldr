@@ -1,11 +1,8 @@
 package io.github.ralfspoeth.xldr.xml;
 
-import io.github.ralfspoeth.xldr.ia.Field;
-import io.github.ralfspoeth.xldr.ia.Formats;
-import io.github.ralfspoeth.xldr.ia.InputAdapter;
-import io.github.ralfspoeth.xldr.ia.Result;
-import io.github.ralfspoeth.xldr.ia.Row;
+import io.github.ralfspoeth.xldr.ia.*;
 import io.github.ralfspoeth.xldr.spec.InputSpec;
+import org.jspecify.annotations.Nullable;
 import org.w3c.dom.Node;
 import org.xml.sax.SAXException;
 
@@ -109,7 +106,7 @@ class XmlFileHandler implements InputAdapter {
 
     private record XmlRow(Node node, XmlRecordSelector record) implements Row {
         @Override
-        public Object get(String name) {
+        public @Nullable Object get(String name) {
             var selector = record.fieldSelectors().get(name);
             return selector == null ? null : selector.evaluate(node);
         }

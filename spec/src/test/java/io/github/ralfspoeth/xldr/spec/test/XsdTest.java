@@ -15,11 +15,7 @@ import java.nio.file.Path;
 import java.util.List;
 
 import static io.github.ralfspoeth.xldr.spec.test.Streams.stream;
-import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * The published XSD has to keep describing what the reader accepts. A schema is
