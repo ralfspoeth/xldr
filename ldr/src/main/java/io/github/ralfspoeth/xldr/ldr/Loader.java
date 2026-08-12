@@ -205,7 +205,7 @@ public class Loader implements AutoCloseable {
             }
 
             @Override
-            public @Nullable Object function(String name, List<Object> args) {
+            public @Nullable Object function(String name, List<@Nullable Object> args) {
                 return switch (name) {
                     case "now" -> {
                         if (!args.isEmpty()) {
@@ -307,7 +307,7 @@ public class Loader implements AutoCloseable {
      * 1); {@code nextval(name, start, inc)} sets both. Sequences are shared by
      * name across the load.
      */
-    private int nextval(List<Object> args) {
+    private int nextval(List<@Nullable Object> args) {
         if (args.isEmpty() || !(args.getFirst() instanceof String name)) {
             throw new IllegalArgumentException("nextval(name[, start[, inc]]) needs a quoted sequence name");
         }

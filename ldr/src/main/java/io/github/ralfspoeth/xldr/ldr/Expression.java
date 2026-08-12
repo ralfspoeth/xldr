@@ -35,7 +35,12 @@ final class Expression {
     interface Bindings {
         @Nullable Object variable(String name);
 
-        @Nullable Object function(String name, List<Object> args);
+        /**
+         * @param args the resolved arguments, in the order written; an element is
+         *             null where the argument resolved to nothing, because
+         *             dropping it would silently change the call's arity
+         */
+        @Nullable Object function(String name, List<@Nullable Object> args);
     }
 
     private final List<Segment> segments;
@@ -83,11 +88,13 @@ final class Expression {
             case Literal l -> l.text();
             case VarRef v -> b.variable(v.name());
             // arguments are resolved before the call, innermost first, so a
-            // function sees values and never a fragment of the template
+            // function sees values and never a fragment of the template. A null
+            // stays in the list: it is what the argument resolved to, and
+            // removing it would renumber the ones behind it. Stream.toList
+            // permits nulls, which is why it and not Collectors.toList
             case Call c -> b.function(c.function(), c.args()
                     .stream()
                     .map(a -> a instanceof Segment inner ? valueOf(inner, b) : a)
-                    .filter(Objects::nonNull)
                     .toList());
         };
     }

@@ -497,6 +497,42 @@ public class LoaderTest {
     }
 
     /**
+     * A null argument is still an argument. {@code format} and {@code parse}
+     * both promise that an absent value yields null rather than the text
+     * {@code "null"}, and they can only keep that promise if the null reaches
+     * them: dropping it would leave the pattern as the only argument, and the
+     * call would be refused for the arity the author did in fact write.
+     */
+    @Test
+    public void expressionFunctionsSeeANullArgument() throws Exception {
+        try (var conn = DriverManager.getConnection(jdbcUrl);
+             var stmt = conn.createStatement()) {
+            stmt.execute("drop table if exists absent");
+            stmt.execute("create table absent(id varchar(10), born date, shown varchar(40))");
+        }
+        var mapping = new RecordMappingSpec("rows", "absent", List.of(
+                new FieldMappingSpec("id", new ValueSource.Field("id")),
+                new FieldMappingSpec("born", new ValueSource.Expr("${parse(birthdate, 'dd.MM.yyyy')}")),
+                new FieldMappingSpec("shown", new ValueSource.Expr("${format(birthdate, 'yyyy')}"))
+        ), null);
+        var spec = new MappingSpec(new InputSpec("text/csv", null, null, List.of(), List.of(), Map.of()), List.of(mapping));
+        // the row carries no birthdate at all, so both calls resolve theirs to null
+        var adapter = adapterFor(Map.of("rows", List.of(Map.of("id", "1"))));
+
+        try (var loader = new Loader(spec, DriverManager.getConnection(jdbcUrl))) {
+            assertEquals(1, loader.loadInput(adapter, InputStream.nullInputStream(), mapping));
+        }
+
+        try (var conn = DriverManager.getConnection(jdbcUrl);
+             var stmt = conn.createStatement();
+             var rs = stmt.executeQuery("select born, shown from absent")) {
+            assertTrue(rs.next());
+            assertNull(rs.getObject(1), "an absent date parses to SQL NULL");
+            assertNull(rs.getString(2), "an absent date formats to SQL NULL, not to \"null\"");
+        }
+    }
+
+    /**
      * The optional increment steps the sequence by more than one, while the
      * start still governs the first draw.
      */

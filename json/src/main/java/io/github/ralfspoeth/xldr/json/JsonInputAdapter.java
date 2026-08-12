@@ -129,12 +129,16 @@ class JsonInputAdapter implements InputAdapter {
     }
 
     private Row row(JsonValue element, RecordDef record, List<String> selected) {
+        // only the values that are there: an absent member and one that holds
+        // null are the same absent value, and Map::get answers null for both -
+        // which keeps the map's values non-null and the Row's contract intact
         Map<String, Object> values = new HashMap<>();
         for (var name : selected) {
             var field = record.fields().get(name);
-            field.path.apply(element).map(v -> valueOf(v, field.type)).ifPresent(
-                    v -> values.put(name, v)
-            );
+            field.path()
+                    .apply(element)
+                    .map(v -> valueOf(v, field.type()))
+                    .ifPresent(v -> values.put(name, v));
         }
         return values::get;
     }
