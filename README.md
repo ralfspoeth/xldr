@@ -70,7 +70,7 @@ fix their versions in one place:
             <dependency>
                 <groupId>io.github.ralfspoeth.xldr</groupId>
                 <artifactId>bom</artifactId>
-                <version>0.21</version>
+                <version>0.22</version>
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>
@@ -805,7 +805,8 @@ XPath 1.0 knows only doubles, so it would round a long integer and turn a decima
 
 A field selector is a half-open character range `left:right` over the record, counted from zero, so `0:3` is the
 first three characters. The left bound may be omitted, in which case the field starts where the previous one ended -
-a layout can therefore be written as a list of end positions:
+a layout can therefore be written as a list of end positions. The right bound is not optional: a field says where it
+ends, since the next one need not begin there and a record has no end of its own to fall back on. So:
 
     "fieldSelectors": [
         {"name": "id",   "selector": "0:3",  "type": "TEXT"},
@@ -848,9 +849,12 @@ A record selector is a range, `[Sheet!]ref:ref`, one record per row:
 * `Sheet1!B2:C4` - the cell rectangle rows 2 to 4, columns B to C, of the named sheet. Use this to leave a header row
   out of the records.
 
-A field selector addresses a cell of the record, either absolutely by column - `A`, `B` - or relatively to the
-record's anchor, the first column of the range: `R-1C+1` is one row up and one column right, which is how a record
-reaches a heading or a neighbouring cell.
+A field selector addresses a cell of the record, either absolutely by column - `A`, `B`, or a 1-based index, `3`
+being the same column as `C` - or relatively to the record's anchor, the current row at the first column of the
+range: `R-1C+1` is one row up and one column right, which is how a record reaches a heading or a neighbouring cell.
+Both offsets have to be written - `R0C+1`, not `C+1` - though the sign may be left off a positive one. A relative
+reference that lands off the sheet, `R-1C+0` on the first row, is an absent value rather than an error, so a field
+reaching for a heading that is not there loads a NULL.
 
 A spreadsheet carries typed cells, so no conversion settings apply: a date or a number arrives as one already, and a
 cell that holds text where the spec wants a number is converted from that text.

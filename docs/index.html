@@ -57,7 +57,7 @@
         <th>XML</th>
     </tr>
     <tr>
-        <td>0.21 (current)</td>
+        <td>0.21 - 0.22 (current)</td>
         <td><a href="schema/mapping-spec-0.21.json">mapping-spec-0.21.json</a></td>
         <td><a href="schema/mapping-spec-0.21.xsd">mapping-spec-0.21.xsd</a></td>
     </tr>
@@ -86,8 +86,8 @@
 <p>
     A schema is published whenever the format changes, and named after the release that changed it: the format is
     still settling before 1.0, and a spec should be validated against the schema its release reads. A release that
-    changes nothing about the format - 0.11, 0.12, 0.14 to 0.20 - keeps the previous schema rather than publishing a copy
-    of it. An older one stays where it is, so a spec pinned to it keeps validating.
+    changes nothing about the format - 0.11, 0.12, 0.14 to 0.20, 0.22 - keeps the previous schema rather than publishing
+    a copy of it. An older one stays where it is, so a spec pinned to it keeps validating.
 </p>
 
 <p>
@@ -147,6 +147,14 @@
     value is taken as its text, so <code>false</code> and <code>2</code> may be written as themselves. An adapter
     ignores any key it does not recognise, so what follows is the whole of what each one reads; the schema does not
     check these, since it cannot know which adapter will be asked.
+</p>
+
+<p>
+    The same goes for the two kinds of selector. A <em>record selector</em> says where the records are, a
+    <em>field selector</em> says where a value sits within one, and both are written in a language the adapter
+    chooses - XPath for XML, a character range for fixed length, a range of cells for Excel. The schema checks that a
+    selector is a string and nothing more, so a selector that will not compile is found when the feed comes up, or by
+    <code>bin/xldr validate</code> before that.
 </p>
 
 <pre><code>"input": {
@@ -230,10 +238,26 @@
 <p>
     A record is a line, and there is nothing to configure about that: <code>\n</code>, <code>\r\n</code> and
     <code>\r</code> all end one. Inside a quoted field the separator and the line break are ordinary characters and a
-    doubled quote is one literal quote, so a record runs over as many lines as a quoted field needs. A record selector's
-    selector is a first-column discriminator, which is how one file carrying several record types is partitioned;
-    an absent one matches every line.
+    doubled quote is one literal quote, so a record runs over as many lines as a quoted field needs.
 </p>
+
+<table>
+    <tr><th>Selector</th><th>Syntax</th><th>Example</th></tr>
+    <tr>
+        <td>record</td>
+        <td>A first-column discriminator: a line belongs to this selector when its first column equals the string.
+            Absent or empty matches every line, which is the single-record-type case a feed with a header almost
+            always wants - giving one a selector there quietly loads nothing.</td>
+        <td><code>O</code></td>
+    </tr>
+    <tr>
+        <td>field</td>
+        <td>A column name where the header is present, a 1-based position where it is absent. Positions stay absolute
+            in a discriminated file, so <code>1</code> is the discriminator column itself and a type's payload
+            usually starts at <code>2</code>.</td>
+        <td><code>amount</code>, <code>3</code></td>
+    </tr>
+</table>
 
 <h3>XML <code>text/xml</code>, <code>application/xml</code></h3>
 
@@ -249,10 +273,30 @@
 </table>
 
 <p>
-    Selectors are XPath. XML differs from the other adapters in two deliberate ways: a <code>TEXT</code> field keeps
-    an empty string rather than becoming null, because XPath cannot tell "no such element" from "an element that is
-    empty"; and an <code>FP</code> is taken through XPath's own numeric evaluation rather than from its text, which is
-    why <code>INTEGRAL</code> and <code>DECIMAL</code> are not - XPath 1.0 knows only doubles.
+    XML differs from the other adapters in two deliberate ways: a <code>TEXT</code> field keeps an empty string rather
+    than becoming null, because XPath cannot tell "no such element" from "an element that is empty"; and an
+    <code>FP</code> is taken through XPath's own numeric evaluation rather than from its text, which is why
+    <code>INTEGRAL</code> and <code>DECIMAL</code> are not - XPath 1.0 knows only doubles.
+</p>
+
+<table>
+    <tr><th>Selector</th><th>Syntax</th><th>Example</th></tr>
+    <tr>
+        <td>record</td>
+        <td>XPath 1.0, evaluated against the document; each node it selects is one record.</td>
+        <td><code>//fund</code>, <code>/portfolio/positions/position</code></td>
+    </tr>
+    <tr>
+        <td>field</td>
+        <td>XPath 1.0, evaluated against the record node, so it is written relative to it. An attribute is
+            <code>@name</code> as usual.</td>
+        <td><code>isin</code>, <code>amounts/net</code>, <code>@currency</code></td>
+    </tr>
+</table>
+
+<p>
+    A prefix used in either must be bound with an <code>ns.</code> property first; XPath 1.0 has no notion of a
+    default namespace, so an unprefixed name never matches a namespaced element.
 </p>
 
 <h3>Fixed length <code>text/plain</code></h3>
@@ -269,32 +313,85 @@
 </table>
 
 <p>
-    A field selector is a half-open character range <code>left:right</code> counted from zero. The left bound may be
-    omitted, in which case the field starts where the previous one ended, so a layout can be written as a list of end
-    positions. The adapter expects exactly one record selector and does not use its selector.
+    A line that stops short of a field's bounds is not an error - the value is whatever the line still holds, and a
+    field beyond the end of the line is null - so a producer's trailing padding is irrelevant.
 </p>
+
+<table>
+    <tr><th>Selector</th><th>Syntax</th><th>Example</th></tr>
+    <tr>
+        <td>record</td>
+        <td>None. The adapter expects exactly one record selector and never looks at its selector, a fixed-length file
+            holding one kind of record throughout; best left out.</td>
+        <td>–</td>
+    </tr>
+    <tr>
+        <td>field</td>
+        <td>A half-open character range <code>left:right</code> over the record, counted from zero, so
+            <code>0:3</code> is the first three characters. The left bound may be omitted, in which case the field
+            starts where the previous one ended - which lets a layout be written as a list of end positions. The right
+            bound is always required.</td>
+        <td><code>0:3</code>, <code>:23</code></td>
+    </tr>
+</table>
 
 <h3>JSON <code>application/json</code>, <code>text/json</code></h3>
 
 <p>
     No settings of its own, and deliberately no charset - JSON exchanged between systems is UTF-8 by definition
-    (RFC 8259). Selectors are pointers in Greyson's syntax: slash separated steps, a step being a member name,
-    <code>[n]</code> for the n-th element of an array (<code>[-1]</code> counting from the end), or
-    <code>#regex</code> to match a member by pattern. An absent record selector is the whole document. JSON carries
-    its own types, so a number arrives exactly, never rounded through a double, and <code>dateFormat</code> and
-    <code>numberFormat</code> apply only to values written as strings.
+    (RFC 8259). JSON carries its own types, so a number arrives exactly, never rounded through a double, and
+    <code>dateFormat</code> and <code>numberFormat</code> apply only to values written as strings.
 </p>
+
+<p>
+    Both selectors are pointers in Greyson's syntax: slash separated steps, where a step is a member name,
+    <code>[n]</code> for the n-th element of an array (<code>[-1]</code> counting from the end), or
+    <code>#regex</code> to match a member by pattern. Leading slashes are ignored, so <code>/data/orders</code> and
+    <code>data/orders</code> are the same pointer.
+</p>
+
+<table>
+    <tr><th>Selector</th><th>Syntax</th><th>Example</th></tr>
+    <tr>
+        <td>record</td>
+        <td>A pointer to where the records live. An array there yields one record per element, a single object
+            exactly one record. Absent or empty is the whole document, which is how a top-level array is read.</td>
+        <td><code>orders</code>, <code>data/orders</code></td>
+    </tr>
+    <tr>
+        <td>field</td>
+        <td>A pointer applied to the record, so it reaches into nested objects and arrays. A member that is absent, or
+            that holds <code>null</code>, is an absent value.</td>
+        <td><code>id</code>, <code>customer/address/city</code>, <code>tags/[0]</code></td>
+    </tr>
+</table>
 
 <h3>Excel <code>application/vnd.ms-excel</code>,
     <code>application/vnd.openxmlformats-officedocument.spreadsheetml.sheet</code></h3>
 
 <p>
     No properties. One adapter serves both <code>.xls</code> and <code>.xlsx</code>, the format being detected from
-    the file itself. A record selector is a range, <code>[Sheet!]ref:ref</code>, one record per row -
-    <code>A:C</code> is columns A to C of the first sheet, <code>Sheet1!B2:C4</code> a cell rectangle of a named
-    sheet. A field selector addresses a cell either absolutely by column, <code>A</code>, or relatively to the
-    record's anchor, <code>R-1C+1</code> being one row up and one column right.
+    the file itself.
 </p>
+
+<table>
+    <tr><th>Selector</th><th>Syntax</th><th>Example</th></tr>
+    <tr>
+        <td>record</td>
+        <td>A range, <code>[Sheet!]ref:ref</code>, one record per row, both endpoints of the same kind. Two columns
+            span every data row of the sheet; two cells are the rectangle between them, which is how a header row is
+            left out of the records. Without a sheet name, the first sheet.</td>
+        <td><code>A:C</code>, <code>Sheet1!B2:C4</code></td>
+    </tr>
+    <tr>
+        <td>field</td>
+        <td>A cell of the record, addressed either absolutely by column - a letter, or a 1-based index, both read on
+            the record's own row - or relatively in R1C1 notation, both offsets required, counted from the record's
+            anchor: the current row at the range's first column. A relative reference that falls off the sheet is an
+            absent value rather than an error.</td>
+        <td><code>A</code>, <code>3</code>, <code>R-1C+2</code></td>
+    </tr>
+</table>
 
 <h2>What they catch, and what they do not</h2>
 

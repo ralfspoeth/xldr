@@ -6,6 +6,31 @@ ways that break existing code and existing specs; those changes are listed here 
 The versions are the git tags `xldr-<version>`; the published artifacts carry the same version under the group
 `io.github.ralfspoeth.xldr`.
 
+## 0.22
+
+Nothing about the mapping-spec format changed, so `mapping-spec-0.21` remains its schema and a spec that loaded under
+0.21 loads under 0.22 unedited. What changed is what the documentation says - including two things it had been
+getting wrong - and the nullness annotations behind it.
+
+### Documentation
+
+- The schema page at [ralfspoeth.github.io/xldr](https://ralfspoeth.github.io/xldr) now documents the adapters, not
+  only the schemas: the `properties` each one reads, and the syntax of its record and field selectors, one section
+  per MIME type. It is the page someone has open while writing a spec, and until now it could tell them which schema
+  to point at but not what to write.
+- A fixed-length field selector always needs its right bound; only the left may be omitted. The README had said the
+  left one was optional without saying the right one was not.
+- An Excel field selector may be a 1-based column index - `3` is column `C` - alongside the letter and R1C1 forms.
+  Both R1C1 offsets have to be written even where one is zero, though the sign may be left off a positive one, and a
+  relative reference that lands off the sheet is an absent value rather than an error. None of this was written down.
+
+### Nullness
+
+- `@Nullable` now reaches the places the audit had left: the expression bindings and the private helpers behind them
+  in `Loader`, and `Row.get` as the XML adapter implements it. With that the annotations describe the code rather
+  than an intention, which is the point of `@NullMarked` at all - an annotation that is wrong is worse than none,
+  because tools act on it.
+
 ## 0.21
 
 The field types are renamed, which is why this release has a schema of its own. Beyond that it is a release about
