@@ -2,7 +2,10 @@ package io.github.ralfspoeth.xldr.ldr;
 
 import org.jspecify.annotations.Nullable;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Set;
 
 /**
  * A compiled {@code ${...}} template: literal text interleaved with holes, each
