@@ -1,0 +1,136 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+    The XML form of an xldr mapping specification. Reference it from a spec with
+
+        <mappingSpec xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                     xsi:noNamespaceSchemaLocation="https://ralfspoeth.github.io/xldr/schema/mapping-spec-0.23.xsd">
+
+    which an editor validates against and which the reader ignores, since a spec
+    carries no namespace of its own.
+
+    What this schema cannot express, being XSD 1.0: that a field mapping carries
+    exactly one value source, and that a var carries one that is not a
+    fieldSelector. Both are checked when the spec is read.
+
+    Every element takes an optional comment attribute, which the reader ignores.
+    An attribute this schema does not name is refused, an unknown one being far
+    more often a misspelling than an annotation - so the annotation is named.
+-->
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" elementFormDefault="qualified">
+
+    <!--
+        The reader ignores elements it does not know, but a wildcard for them
+        cannot be expressed here: XSD 1.0 forbids a content model in which an
+        element could match both a named particle and a wildcard. Annotate an XML
+        spec with XML comments, which are always allowed.
+    -->
+    <xs:element name="mappingSpec">
+        <xs:complexType>
+            <xs:sequence>
+                <xs:element name="input" type="input"/>
+                <xs:element name="mapping" type="recordMapping" minOccurs="0" maxOccurs="unbounded"/>
+            </xs:sequence>
+            <xs:attribute name="comment" type="xs:string"/>
+        </xs:complexType>
+    </xs:element>
+
+    <!-- how the input is read; how its files arrive is the feed's
+         delivery.properties, which the server owns -->
+    <xs:complexType name="input">
+        <xs:sequence>
+            <xs:element name="properties" type="properties" minOccurs="0"/>
+            <xs:element name="var" type="var" minOccurs="0" maxOccurs="unbounded"/>
+            <xs:element name="recordSelector" type="recordSelector" minOccurs="0" maxOccurs="unbounded"/>
+        </xs:sequence>
+        <xs:attribute name="mimeType" type="xs:string" use="required"/>
+        <xs:attribute name="comment" type="xs:string"/>
+    </xs:complexType>
+
+    <!--
+        The settings of the adapter the mimeType selects, e.g. fieldSeparator,
+        header, charset, dateFormat, numberFormat, locale, linesPerRecord or
+        ns.<prefix>. Which of them mean anything depends on the adapter, so any
+        attribute is allowed here.
+    -->
+    <xs:complexType name="properties">
+        <xs:anyAttribute processContents="skip"/>
+    </xs:complexType>
+
+    <xs:complexType name="recordSelector">
+        <xs:sequence>
+            <xs:element name="fieldSelector" type="fieldSelector" minOccurs="0" maxOccurs="unbounded"/>
+        </xs:sequence>
+        <xs:attribute name="name" type="xs:string" use="required"/>
+        <!--
+            optional: omit it where the whole file holds one kind of record,
+            as in a CSV with a header or a fixed-length file
+        -->
+        <xs:attribute name="selector" type="xs:string"/>
+        <xs:attribute name="comment" type="xs:string"/>
+    </xs:complexType>
+
+    <xs:complexType name="fieldSelector">
+        <xs:attribute name="name" type="xs:string" use="required"/>
+        <xs:attribute name="selector" type="xs:string" use="required"/>
+        <xs:attribute name="type" type="dataType"/>
+        <xs:attribute name="comment" type="xs:string"/>
+    </xs:complexType>
+
+    <!-- a var is evaluated with no record in hand, so fieldSelector is not among its sources -->
+    <xs:complexType name="var">
+        <xs:sequence>
+            <xs:element name="lookup" type="lookup" minOccurs="0"/>
+        </xs:sequence>
+        <xs:attribute name="name" type="xs:string" use="required"/>
+        <xs:attribute name="constant" type="xs:string"/>
+        <xs:attribute name="var" type="xs:string"/>
+        <xs:attribute name="expr" type="xs:string"/>
+        <xs:attribute name="comment" type="xs:string"/>
+    </xs:complexType>
+
+    <xs:complexType name="recordMapping">
+        <xs:sequence>
+            <xs:element name="fieldMapping" type="fieldMapping" minOccurs="0" maxOccurs="unbounded"/>
+        </xs:sequence>
+        <xs:attribute name="recordSelector" type="xs:string" use="required"/>
+        <xs:attribute name="table" type="xs:string" use="required"/>
+        <xs:attribute name="limit" type="xs:nonNegativeInteger"/>
+        <xs:attribute name="comment" type="xs:string"/>
+    </xs:complexType>
+
+    <!--
+        One target column and exactly one source, the lookup being a child
+        element. A constant here is always a string: an attribute carries no
+        type, and there is no way to write the null a JSON spec can.
+    -->
+    <xs:complexType name="fieldMapping">
+        <xs:sequence>
+            <xs:element name="lookup" type="lookup" minOccurs="0"/>
+        </xs:sequence>
+        <xs:attribute name="column" type="xs:string" use="required"/>
+        <xs:attribute name="fieldSelector" type="xs:string"/>
+        <xs:attribute name="constant" type="xs:string"/>
+        <xs:attribute name="var" type="xs:string"/>
+        <xs:attribute name="expr" type="xs:string"/>
+        <xs:attribute name="comment" type="xs:string"/>
+    </xs:complexType>
+
+    <xs:complexType name="lookup">
+        <xs:attribute name="table" type="xs:string" use="required"/>
+        <xs:attribute name="column" type="xs:string" use="required"/>
+        <xs:attribute name="keyColumn" type="xs:string" use="required"/>
+        <xs:attribute name="fieldSelector" type="xs:string"/>
+        <xs:attribute name="constant" type="xs:string"/>
+        <xs:attribute name="var" type="xs:string"/>
+        <xs:attribute name="expr" type="xs:string"/>
+        <xs:attribute name="comment" type="xs:string"/>
+    </xs:complexType>
+
+    <!-- the Java type the value is delivered as; matched case-insensitively -->
+    <xs:simpleType name="dataType">
+        <xs:restriction base="xs:string">
+            <xs:pattern value="[Tt][Ee][Xx][Tt]|[Ii][Nn][Tt][Ee][Gg][Rr][Aa][Ll]|[Ff][Pp]|[Dd][Ee][Cc][Ii][Mm][Aa][Ll]|[Dd][Aa][Tt][Ee]"/>
+        </xs:restriction>
+    </xs:simpleType>
+
+</xs:schema>

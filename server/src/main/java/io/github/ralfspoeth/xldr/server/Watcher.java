@@ -114,7 +114,10 @@ public class Watcher implements Closeable {
         statusBean = ServerStatus.register(registry, statistics);
         watchThread = Thread.ofVirtual().start(watchService);
         reconcileAll();
-        registry.active().forEach(processor::recoverWork);
+        // registered, not active: a feed whose spec was removed while a load was
+        // in flight is Pending at startup, and the file left in its work/ still
+        // has to be accounted for
+        registry.registered().forEach(processor::recoverWork);
         scanner.scheduleWithFixedDelay(
                 this::reconcileAllQuietly, scanIntervalSeconds, scanIntervalSeconds, TimeUnit.SECONDS);
         LOG.log(INFO, () -> "watching " + roots + ", reconciling every " + scanIntervalSeconds + "s");

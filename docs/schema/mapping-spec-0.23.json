@@ -1,0 +1,366 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ralfspoeth.github.io/xldr/schema/mapping-spec-0.23.json",
+  "title": "xldr mapping specification",
+  "description": "How one input file is parsed and how its records map onto database tables. Add \"$schema\" to a spec.json to have an editor validate it; the reader ignores members it does not know.",
+  "type": "object",
+  "required": [
+    "input"
+  ],
+  "properties": {
+    "input": {
+      "$ref": "#/$defs/input"
+    },
+    "mapping": {
+      "type": "array",
+      "description": "The record mappings; a spec without any parses but loads nothing.",
+      "items": {
+        "$ref": "#/$defs/recordMapping"
+      }
+    }
+  },
+  "$defs": {
+    "input": {
+      "type": "object",
+      "required": [
+        "mimeType"
+      ],
+      "description": "How an input file is turned into records. How those files arrive - which names the feed claims, and whether a marker announces them - is deployment rather than mapping and lives in the feed's delivery.properties, which the server reads.",
+      "properties": {
+        "mimeType": {
+          "type": "string",
+          "description": "Selects the input adapter.",
+          "anyOf": [
+            {
+              "enum": [
+                "text/csv",
+                "text/xml",
+                "application/xml",
+                "text/plain",
+                "application/json",
+                "text/json",
+                "application/vnd.ms-excel",
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+              ]
+            },
+            {
+              "type": "string"
+            }
+          ]
+        },
+        "properties": {
+          "type": "object",
+          "description": "Settings of the adapter the mimeType selects, e.g. fieldSeparator, header, charset, dateFormat, numberFormat, locale, linesPerRecord, ns.<prefix>. Each value is taken as its text.",
+          "additionalProperties": {
+            "type": [
+              "string",
+              "number",
+              "boolean"
+            ]
+          }
+        },
+        "recordSelectors": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/recordSelector"
+          }
+        },
+        "vars": {
+          "type": "array",
+          "description": "Values evaluated once per load and referenced from a field mapping by {\"var\": \"name\"}.",
+          "items": {
+            "$ref": "#/$defs/var"
+          }
+        }
+      }
+    },
+    "recordSelector": {
+      "type": "object",
+      "required": [
+        "name"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Referenced by a record mapping."
+        },
+        "selector": {
+          "type": "string",
+          "description": "The adapter's own syntax: an XPath, a CSV first-column discriminator, a character range, a JSON pointer, a spreadsheet range. Optional: omit it where the whole file holds one kind of record, as in a CSV with a header or a fixed-length file."
+        },
+        "fieldSelectors": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/fieldSelector"
+          }
+        },
+        "comment": {
+          "type": "string",
+          "description": "A note for whoever reads the spec next. Ignored by the reader; declared here so that an annotation is allowed where any other unknown member is refused as a likely misspelling."
+        }
+      },
+      "additionalProperties": false
+    },
+    "fieldSelector": {
+      "type": "object",
+      "required": [
+        "name",
+        "selector"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Referenced by a field mapping."
+        },
+        "selector": {
+          "type": "string"
+        },
+        "type": {
+          "$ref": "#/$defs/dataType"
+        },
+        "comment": {
+          "type": "string",
+          "description": "A note for whoever reads the spec next. Ignored by the reader; declared here so that an annotation is allowed where any other unknown member is refused as a likely misspelling."
+        }
+      },
+      "additionalProperties": false
+    },
+    "dataType": {
+      "description": "The Java type the value is delivered as; matched case-insensitively, absent means text.",
+      "anyOf": [
+        {
+          "enum": [
+            "TEXT",
+            "INTEGRAL",
+            "FP",
+            "DECIMAL",
+            "DATE"
+          ]
+        },
+        {
+          "type": "string",
+          "pattern": "^([Tt][Ee][Xx][Tt]|[Ii][Nn][Tt][Ee][Gg][Rr][Aa][Ll]|[Ff][Pp]|[Dd][Ee][Cc][Ii][Mm][Aa][Ll]|[Dd][Aa][Tt][Ee])$"
+        }
+      ]
+    },
+    "var": {
+      "type": "object",
+      "required": [
+        "name"
+      ],
+      "description": "A var is evaluated with no record in hand, so it may not read a fieldSelector.",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "constant": {
+          "$ref": "#/$defs/constant"
+        },
+        "var": {
+          "type": "string"
+        },
+        "expr": {
+          "$ref": "#/$defs/expr"
+        },
+        "lookup": {
+          "$ref": "#/$defs/lookup"
+        },
+        "comment": {
+          "type": "string",
+          "description": "A note for whoever reads the spec next. Ignored by the reader; declared here so that an annotation is allowed where any other unknown member is refused as a likely misspelling."
+        }
+      },
+      "oneOf": [
+        {
+          "required": [
+            "constant"
+          ]
+        },
+        {
+          "required": [
+            "var"
+          ]
+        },
+        {
+          "required": [
+            "expr"
+          ]
+        },
+        {
+          "required": [
+            "lookup"
+          ]
+        }
+      ],
+      "additionalProperties": false
+    },
+    "recordMapping": {
+      "type": "object",
+      "required": [
+        "recordSelector",
+        "table"
+      ],
+      "properties": {
+        "recordSelector": {
+          "type": "string",
+          "description": "The name of a record selector of the input."
+        },
+        "table": {
+          "type": "string"
+        },
+        "limit": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "At most this many records are inserted for this mapping."
+        },
+        "fieldMapping": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/fieldMapping"
+          }
+        },
+        "comment": {
+          "type": "string",
+          "description": "A note for whoever reads the spec next. Ignored by the reader; declared here so that an annotation is allowed where any other unknown member is refused as a likely misspelling."
+        }
+      },
+      "additionalProperties": false
+    },
+    "fieldMapping": {
+      "type": "object",
+      "required": [
+        "column"
+      ],
+      "description": "One target column and exactly one source for its value.",
+      "properties": {
+        "column": {
+          "type": "string"
+        },
+        "fieldSelector": {
+          "type": "string",
+          "description": "The name of a field selector of the record."
+        },
+        "constant": {
+          "$ref": "#/$defs/constant"
+        },
+        "var": {
+          "type": "string",
+          "description": "The name of an input var."
+        },
+        "expr": {
+          "$ref": "#/$defs/expr"
+        },
+        "lookup": {
+          "$ref": "#/$defs/lookup"
+        },
+        "comment": {
+          "type": "string",
+          "description": "A note for whoever reads the spec next. Ignored by the reader; declared here so that an annotation is allowed where any other unknown member is refused as a likely misspelling."
+        }
+      },
+      "oneOf": [
+        {
+          "required": [
+            "fieldSelector"
+          ]
+        },
+        {
+          "required": [
+            "constant"
+          ]
+        },
+        {
+          "required": [
+            "var"
+          ]
+        },
+        {
+          "required": [
+            "expr"
+          ]
+        },
+        {
+          "required": [
+            "lookup"
+          ]
+        }
+      ],
+      "additionalProperties": false
+    },
+    "lookup": {
+      "type": "object",
+      "required": [
+        "table",
+        "column",
+        "keyColumn"
+      ],
+      "description": "A value read from a reference table, keyed by exactly one source. A key matching no row yields NULL.",
+      "properties": {
+        "table": {
+          "type": "string"
+        },
+        "column": {
+          "type": "string",
+          "description": "The column whose value is taken."
+        },
+        "keyColumn": {
+          "type": "string",
+          "description": "The column the key is matched against."
+        },
+        "fieldSelector": {
+          "type": "string"
+        },
+        "constant": {
+          "$ref": "#/$defs/constant"
+        },
+        "var": {
+          "type": "string"
+        },
+        "expr": {
+          "$ref": "#/$defs/expr"
+        },
+        "comment": {
+          "type": "string",
+          "description": "A note for whoever reads the spec next. Ignored by the reader; declared here so that an annotation is allowed where any other unknown member is refused as a likely misspelling."
+        }
+      },
+      "oneOf": [
+        {
+          "required": [
+            "fieldSelector"
+          ]
+        },
+        {
+          "required": [
+            "constant"
+          ]
+        },
+        {
+          "required": [
+            "var"
+          ]
+        },
+        {
+          "required": [
+            "expr"
+          ]
+        }
+      ],
+      "additionalProperties": false
+    },
+    "constant": {
+      "type": [
+        "string",
+        "number",
+        "boolean",
+        "null"
+      ],
+      "description": "A fixed value; its Java type follows the JSON literal. null loads a SQL NULL into the column."
+    },
+    "expr": {
+      "type": "string",
+      "description": "A ${...} template: interpolation of xldr.* ambient values, vars and - per row - fields, plus nextval('name'[, start[, inc]]) and now().",
+      "pattern": "\\$\\{"
+    }
+  }
+}

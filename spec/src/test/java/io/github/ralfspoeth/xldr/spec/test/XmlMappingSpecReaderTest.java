@@ -17,7 +17,7 @@ public class XmlMappingSpecReaderTest {
         var source = """
                 <?xml version='1.0'?>
                 <mappingSpec>
-                    <input mimeType="text/xml" sentinel="glob:*.done">
+                    <input mimeType="text/xml">
                         <recordSelector name="fund" selector="/root/fund">
                             <fieldSelector name="id" selector="@id" type="TEXT"/>
                             <fieldSelector name="nav" selector="nav" type="decimal"/>
@@ -39,7 +39,7 @@ public class XmlMappingSpecReaderTest {
                 """;
 
         var expected = new MappingSpec(
-                new InputSpec("text/xml", "glob:*.done", null, List.of(
+                new InputSpec("text/xml", List.of(
                         new RecordSelectorSpec("fund", "/root/fund", List.of(
                                 new FieldSelectorSpec("id", "@id", DataType.TEXT),
                                 // lower case in the document, the enum is matched case-insensitively

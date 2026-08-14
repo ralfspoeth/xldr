@@ -61,19 +61,23 @@ class FileProcessor {
      * suffix), that file is loaded, and the marker is consumed. A data file
      * arriving on its own is ignored until its marker follows.
      * <p>
-     * A data file the feed does not {@link Feed#accepts accept} is left in
-     * {@code in/} untouched.
+     * A file the feed does not {@link Feed#claims claim} is left in {@code in/}
+     * untouched.
      */
-    public void onArrival(Feed feed, Path file) {
-        var sentinel = feed.sentinel();
-        if (sentinel == null) {
-            if (feed.accepts(file)) {
-                process(feed, file);
+    public void onArrival(Feed.Active feed, Path file) {
+        switch (feed.delivery()) {
+            case Delivery.Atomic atomic -> {
+                if (atomic.claims(file)) {
+                    process(feed, file);
+                }
             }
-        } else if (sentinel.isMarker(file)) {
-            sentinel.dataFileOf(file).ifPresentOrElse(
-                    data -> processSignalled(feed, file, data),
-                    () -> discardMarker(feed, file, "names no data file"));
+            case Delivery.Signalled signalled -> {
+                if (signalled.claims(file)) {
+                    signalled.sentinel().dataFileOf(file).ifPresentOrElse(
+                            data -> processSignalled(feed, file, data),
+                            () -> discardMarker(feed, file, "names no data file"));
+                }
+            }
         }
     }
 
@@ -82,7 +86,7 @@ class FileProcessor {
      * switched off in the meantime, if the file has already been claimed by
      * someone else, or if it has disappeared.
      */
-    public void process(Feed feed, Path file) {
+    public void process(Feed.Active feed, Path file) {
         if (configured(feed, file)) {
             var claimed = claimOrLog(feed, file);
             if (claimed != null) {
@@ -99,7 +103,7 @@ class FileProcessor {
      * {@code work/} (recovered at startup) and at worst an orphaned marker
      * (cleaned by the next scan), never a data file that is loaded twice.
      */
-    private void processSignalled(Feed feed, Path sentinel, Path dataFile) {
+    private void processSignalled(Feed.Active feed, Path sentinel, Path dataFile) {
         // before the marker is consumed: a feed that is no longer configured
         // must leave both files where they are
         if (configured(feed, dataFile)) {
@@ -130,7 +134,7 @@ class FileProcessor {
      * operator who has switched one off is entitled to expect that nothing more
      * is loaded from it.
      */
-    private static boolean configured(Feed feed, Path file) {
+    private static boolean configured(Feed.Active feed, Path file) {
         boolean conf = Files.exists(feed.specFile());
         if(!conf) {
             LOG.log(DEBUG, () -> "not loading " + file.getFileName()
@@ -152,7 +156,7 @@ class FileProcessor {
      * Loads an already-claimed file, under the concurrency permit, and files it
      * away afterwards.
      */
-    private void runLoad(Feed feed, Path claimed, String originalName) {
+    private void runLoad(Feed.Active feed, Path claimed, String originalName) {
         if (acquirePermit(feed, claimed)) {
             // from here the permit is held, and the finally below is what returns it
             statistics.loadStarted();
@@ -191,7 +195,7 @@ class FileProcessor {
      *
      * @return whether the permit was acquired; the caller must release it if so
      */
-    private boolean acquirePermit(Feed feed, Path claimed) {
+    private boolean acquirePermit(Feed.Active feed, Path claimed) {
         try {
             loadPermits.acquire();
             return true;
@@ -254,7 +258,7 @@ class FileProcessor {
         return target;
     }
 
-    private void hospitalise(Feed feed, Path claimed, Exception failure) throws IOException {
+    private void hospitalise(Feed.Active feed, Path claimed, Exception failure) throws IOException {
         Files.createDirectories(feed.hospital());
         var name = claimed.getFileName().toString();
         var target = unique(feed.hospital(), name);
@@ -315,31 +319,29 @@ class FileProcessor {
      * gone, cleaned up as an orphan. Data files without a marker are left where
      * they are.
      */
-    public void scanInbox(Feed feed) {
-        var sentinel = feed.sentinel();
-        List<Path> pending;
+    public void scanInbox(Feed.Active feed) {
+        List<Path> claimed;
         try (var files = Files.list(feed.in())) {
-            pending = files.filter(Files::isRegularFile)
-                    .filter(sentinel == null ? _ -> true : sentinel::isMarker)
-                    .toList();
+            // one filter for both kinds: under atomic delivery this selects the
+            // data files, under signalled delivery the markers
+            claimed = files.filter(Files::isRegularFile).filter(feed::claims).toList();
         } catch (IOException e) {
             LOG.log(WARNING, () -> "cannot list " + feed.in() + ": " + e);
             return;
         }
         try (var exec = Executors.newVirtualThreadPerTaskExecutor()) {
-            for (var file : pending) {
-                if (sentinel == null) {
-                    if (feed.accepts(file)) {
-                        exec.submit(() -> process(feed, file));
-                    }
-                } else {
-                    sentinel.dataFileOf(file).ifPresentOrElse(data -> {
-                        if (Files.exists(data)) {
-                            exec.submit(() -> processSignalled(feed, file, data));
-                        } else {
-                            discardMarker(feed, file, "orphaned, no " + data.getFileName());
-                        }
-                    }, () -> discardMarker(feed, file, "names no data file"));
+            for (var file : claimed) {
+                switch (feed.delivery()) {
+                    case Delivery.Atomic _ -> exec.submit(() -> process(feed, file));
+                    case Delivery.Signalled signalled -> signalled.sentinel()
+                            .dataFileOf(file)
+                            .ifPresentOrElse(data -> {
+                                if (Files.exists(data)) {
+                                    exec.submit(() -> processSignalled(feed, file, data));
+                                } else {
+                                    discardMarker(feed, file, "orphaned, no " + data.getFileName());
+                                }
+                            }, () -> discardMarker(feed, file, "names no data file"));
                 }
             }
         }

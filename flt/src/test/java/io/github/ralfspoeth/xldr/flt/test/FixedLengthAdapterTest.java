@@ -28,7 +28,7 @@ public class FixedLengthAdapterTest {
     private static final String MIME = "text/plain";
 
     private static InputSpec spec(FieldSelectorSpec... fields) {
-        return new InputSpec(MIME, null, null, List.of(new RecordSelectorSpec("rec", "rec", List.of(fields))), List.of(), Map.of());
+        return new InputSpec(MIME, List.of(new RecordSelectorSpec("rec", "rec", List.of(fields))), List.of(), Map.of());
     }
 
     /**
@@ -36,7 +36,7 @@ public class FixedLengthAdapterTest {
      * copy of it rather than set on the factory.
      */
     private static InputAdapter adapter(InputSpec spec, Map<String, String> properties) {
-        var configured = new InputSpec(spec.mimeType(), spec.sentinel(), spec.accepts(),
+        var configured = new InputSpec(spec.mimeType(),
                 spec.recordSelectors(), spec.vars(), properties);
         return ServiceLoader.load(InputAdapterFactory.class)
                 .stream()

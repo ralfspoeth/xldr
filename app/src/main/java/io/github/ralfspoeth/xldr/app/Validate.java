@@ -1,12 +1,13 @@
 package io.github.ralfspoeth.xldr.app;
 
 import io.github.ralfspoeth.xldr.ia.InputAdapterFactory;
+import io.github.ralfspoeth.xldr.server.Delivery;
 import io.github.ralfspoeth.xldr.spec.*;
 import org.jspecify.annotations.Nullable;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Parameters;
 
-import java.nio.file.FileSystems;
+import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
@@ -20,9 +21,9 @@ import static io.github.ralfspoeth.xldr.spec.io.MappingSpecReader.readSpec;
  * author of a spec finds out what is wrong while writing it rather than from a
  * line in the server's log after a feed silently fails to activate.
  * <p>
- * What is checked here is what can be checked from the spec alone: that it
- * parses, that its delivery rule is exactly one and its patterns compile, that
- * an adapter for the MIME type exists and accepts every selector, and that the
+ * What is checked here is what can be checked without a database: that the spec
+ * parses, that the feed's delivery.properties is there and readable, that an
+ * adapter for the MIME type exists and accepts every selector, and that the
  * names the mappings use are declared by the input. Whether the target tables
  * and columns exist is a question for the database and is left to the load.
  */
@@ -72,7 +73,7 @@ class Validate implements Callable<Integer> {
             return List.of("cannot be read: " + message(e));
         }
         var input = spec.inputSpec();
-        checkDelivery(input, problems);
+        checkDelivery(file, problems);
         checkAdapter(input, problems);
         checkCsvDiscriminator(input, problems);
         checkReferences(spec, problems);
@@ -116,30 +117,30 @@ class Validate implements Callable<Integer> {
     }
 
     /**
-     * A feed declares exactly one of the two, and the pattern has to be one
-     * {@code FileSystem.getPathMatcher} understands.
+     * How the feed's files arrive is no longer in the spec, so this looks beside
+     * it - the spec's own directory is the feed - and asks the server's reader,
+     * rather than restating rules that would then have two homes and one day
+     * disagree.
+     * <p>
+     * A missing delivery file is reported, not passed over. It is the one thing
+     * that stops a directory being a feed at all, and finding that out here is
+     * the whole point of the command.
      */
-    private static void checkDelivery(InputSpec input, List<String> problems) {
-        if ((input.sentinel() == null) == (input.accepts() == null)) {
-            problems.add("input must declare exactly one of 'accepts' or 'sentinel', found "
-                    + (input.sentinel() == null ? "neither" : "both"));
-        }
-        checkPattern("accepts", input.accepts(), problems);
-        checkPattern("sentinel", input.sentinel(), problems);
-    }
-
-    private static void checkPattern(String name, @Nullable String pattern, List<String> problems) {
-        if (pattern == null) {
+    private static void checkDelivery(Path specFile, List<String> problems) {
+        var feedDir = specFile.toAbsolutePath().getParent();
+        if (feedDir == null) {
             return;
         }
-        if (!pattern.startsWith("glob:") && !pattern.startsWith("regex:")) {
-            problems.add(name + " must start with 'glob:' or 'regex:', was: " + pattern);
+        var deliveryFile = feedDir.resolve(Delivery.FILE);
+        if (!Files.isRegularFile(deliveryFile)) {
+            problems.add("no " + Delivery.FILE + " beside the spec: without one the directory is"
+                    + " not a feed and nothing will be loaded from it");
             return;
         }
         try {
-            FileSystems.getDefault().getPathMatcher(pattern);
-        } catch (RuntimeException e) {
-            problems.add("invalid " + name + " pattern " + pattern + ": " + message(e));
+            Delivery.read(deliveryFile);
+        } catch (IOException | RuntimeException e) {
+            problems.add(Delivery.FILE + ": " + e.getMessage());
         }
     }
 

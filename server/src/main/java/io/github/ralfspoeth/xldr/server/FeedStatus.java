@@ -9,6 +9,10 @@ package io.github.ralfspoeth.xldr.server;
  * as this type.
  *
  * @param name            the feed's directory name
+ * @param state           whether it can load, or is still waiting for a mapping
+ *                        spec. A {@code PENDING} feed still counts the files
+ *                        waiting in its {@code in/}, which is where they stay
+ *                        until a spec turns up
  * @param loadsSucceeded  how many files this feed has loaded since the server started
  * @param loadsFailed     how many of its loads failed and were hospitalised
  * @param recordsLoaded   how many records it has inserted
@@ -25,6 +29,7 @@ package io.github.ralfspoeth.xldr.server;
  */
 public record FeedStatus(
         String name,
+        FeedState state,
         long loadsSucceeded,
         long loadsFailed,
         long recordsLoaded,

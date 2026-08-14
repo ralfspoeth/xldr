@@ -27,7 +27,7 @@ import static org.junit.jupiter.api.Assertions.*;
  */
 public class XsdTest {
 
-    private static final Path SCHEMA = Path.of("..", "docs", "schema", "mapping-spec-0.21.xsd");
+    private static final Path SCHEMA = Path.of("..", "docs", "schema", "mapping-spec-0.23.xsd");
 
     /**
      * Every element and attribute the reader knows, in one document.
@@ -35,7 +35,7 @@ public class XsdTest {
     private static final String COMPLETE_SPEC = """
             <?xml version='1.0'?>
             <mappingSpec>
-                <input mimeType="text/xml" accepts="glob:*.xml">
+                <input mimeType="text/xml">
                     <properties ns.f="https://example.com/funds" dateFormat="dd.MM.yyyy"/>
                     <var name="source" constant="PD"/>
                     <var name="batch">
@@ -90,7 +90,7 @@ public class XsdTest {
     public void aMinimalSpecIsValid() {
         assertDoesNotThrow(() -> validate("""
                 <mappingSpec>
-                    <input mimeType="text/csv" sentinel="glob:*.done"/>
+                    <input mimeType="text/csv"/>
                 </mappingSpec>
                 """));
     }
@@ -105,7 +105,7 @@ public class XsdTest {
     public void aRecordSelectorMayOmitItsSelector() {
         var xml = """
                 <mappingSpec>
-                    <input mimeType="text/csv" accepts="glob:*.csv">
+                    <input mimeType="text/csv">
                         <recordSelector name="people">
                             <fieldSelector name="id" selector="id" type="INTEGRAL"/>
                         </recordSelector>
@@ -131,7 +131,7 @@ public class XsdTest {
         assertDoesNotThrow(() -> validate("""
                 <mappingSpec>
                     <!-- why this feed exists -->
-                    <input mimeType="text/csv" accepts="glob:*.csv"/>
+                    <input mimeType="text/csv"/>
                 </mappingSpec>
                 """));
     }
@@ -147,7 +147,7 @@ public class XsdTest {
     public void aCommentAttributeIsAllowedEverywhereAndIgnored() {
         var xml = """
                 <mappingSpec comment="the fund feed">
-                    <input mimeType="text/csv" accepts="glob:*.csv" comment="delivered nightly">
+                    <input mimeType="text/csv" comment="delivered nightly">
                         <var name="source" constant="PD" comment="the sending system"/>
                         <recordSelector name="people" comment="one record per line">
                             <fieldSelector name="id" selector="Id" type="INTEGRAL" comment="the key"/>
@@ -169,30 +169,33 @@ public class XsdTest {
 
     /**
      * The mistakes worth catching in an editor: a missing required attribute, a
-     * misspelled one, and a delivery pattern without its glob:/regex: prefix.
+     * misspelled one, an unknown field type, and a delivery rule left behind in
+     * the spec now that it belongs to the feed's delivery.properties.
      */
     @Test
     public void catchesTheMistakesItShould() {
         assertAllInvalid("""
                 <mappingSpec>
-                    <input accepts="glob:*.csv"/>
+                    <input/>
+                </mappingSpec>
+                """);
+        // a spec still carrying the delivery rule the server now owns: refused
+        // rather than quietly ignored, so that it is moved and not merely dropped
+        assertAllInvalid("""
+                <mappingSpec>
+                    <input mimeType="text/csv" accepts="glob:*.csv"/>
                 </mappingSpec>
                 """);
         assertAllInvalid("""
                 <mappingSpec>
-                    <input mimeType="text/csv" accepts="*.csv"/>
-                </mappingSpec>
-                """);
-        assertAllInvalid("""
-                <mappingSpec>
-                    <input mimeType="text/csv" accepts="glob:*.csv">
+                    <input mimeType="text/csv">
                         <recordSelector name="r" selectr="//r"/>
                     </input>
                 </mappingSpec>
                 """);
         assertAllInvalid("""
                 <mappingSpec>
-                    <input mimeType="text/csv" accepts="glob:*.csv">
+                    <input mimeType="text/csv">
                         <recordSelector name="r" selector="//r">
                             <fieldSelector name="id" selector="@id" type="asdf"/>
                         </recordSelector>

@@ -28,7 +28,7 @@ public class JsonAdapterTest {
     private static final String MIME = "application/json";
 
     private static InputSpec spec(String recordSelector, FieldSelectorSpec... fields) {
-        return new InputSpec(MIME, null, null,
+        return new InputSpec(MIME,
                 List.of(new RecordSelectorSpec("rec", recordSelector, List.of(fields))),
                 List.of(),
                 Map.of());
@@ -39,7 +39,7 @@ public class JsonAdapterTest {
      * copy of it rather than set on the factory.
      */
     private static InputAdapter adapter(InputSpec spec, Map<String, String> properties) {
-        var configured = new InputSpec(spec.mimeType(), spec.sentinel(), spec.accepts(),
+        var configured = new InputSpec(spec.mimeType(),
                 spec.recordSelectors(), spec.vars(), properties);
         return ServiceLoader.load(InputAdapterFactory.class)
                 .stream()

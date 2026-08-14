@@ -33,7 +33,7 @@ public class CsvFileHandlerTest {
             Map.of("fieldSeparator", ",", "header", "false");
 
     private static InputSpec spec(Map<String, String> properties, RecordSelectorSpec... recordSelectors) {
-        return new InputSpec("text/csv", null, null, List.of(recordSelectors), List.of(), properties);
+        return new InputSpec("text/csv", List.of(recordSelectors), List.of(), properties);
     }
 
     // input spec mentions only id and name; the file also carries short-name/long-name.

@@ -109,21 +109,37 @@ final class ServerStatus implements ServerMXBean {
 
     @Override
     public int getFilesWaiting() {
-        return registry.active().stream().mapToInt(feed -> count(feed.in())).sum();
+        // registered, not active: a file waiting in the in/ of a feed that has
+        // no spec yet is still a file waiting
+        return registry.registered().stream().mapToInt(feed -> count(feed.in())).sum();
     }
 
     @Override
     public int getFilesInHospital() {
-        return registry.active().stream().mapToInt(feed -> countPatients(feed.hospital())).sum();
+        // registered, like getFilesWaiting: a feed that lost its spec while a
+        // load was in flight is pending, and its patients are still patients
+        return registry.registered().stream().mapToInt(feed -> countPatients(feed.hospital())).sum();
     }
 
+    /**
+     * Every registered feed, not only the ones that can load. A pending feed is
+     * the half-finished deployment worth finding, and leaving it out would also
+     * have made the totals disagree with the map: {@link #getFilesWaiting}
+     * counts every registered feed's inbox, so a file waiting in a pending one
+     * would have been in the gauge and in no row.
+     */
     @Override
     public Map<String, FeedStatus> getFeeds() {
         Map<String, FeedStatus> feeds = new LinkedHashMap<>();
-        for (var feed : registry.active()) {
+        for (var feed : registry.registered()) {
             var name = feed.name();
+            var state = switch (feed) {
+                case Feed.Active _ -> FeedState.ACTIVE;
+                case Feed.Pending _ -> FeedState.PENDING;
+            };
             feeds.put(name, new FeedStatus(
                     name,
+                    state,
                     statistics.loadsSucceeded(name),
                     statistics.loadsFailed(name),
                     statistics.recordsLoaded(name),

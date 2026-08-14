@@ -36,7 +36,7 @@ public class XmlAdapterTest {
         for (int i = 0; i < properties.length; i += 2) {
             props.put(properties[i], properties[i + 1]);
         }
-        var configured = new InputSpec(spec.mimeType(), spec.sentinel(), spec.accepts(),
+        var configured = new InputSpec(spec.mimeType(),
                 spec.recordSelectors(), spec.vars(), props);
         return factory(configured).createInputAdapter(configured);
     }
@@ -49,7 +49,7 @@ public class XmlAdapterTest {
      */
     @Test
     public void evaluatesRelativeAbsoluteAndConstantSelectors() throws IOException {
-        var spec = new InputSpec("text/xml", null, null, List.of(
+        var spec = new InputSpec("text/xml", List.of(
                 new RecordSelectorSpec("row", "/simple1/row", List.of(
                         new FieldSelectorSpec("cola", "col[@name='a']", DataType.INTEGRAL),
                         new FieldSelectorSpec("colb", "col[@name='b']", DataType.INTEGRAL),
@@ -98,7 +98,7 @@ public class XmlAdapterTest {
      */
     @Test
     public void yieldsNoRowsWhenNothingMatches() throws IOException {
-        var spec = new InputSpec("text/xml", null, null, List.of(
+        var spec = new InputSpec("text/xml", List.of(
                 new RecordSelectorSpec("none", "/simple1/nothing", List.of(
                         new FieldSelectorSpec("cola", "col[@name='a']", DataType.TEXT)
                 ))
@@ -115,7 +115,7 @@ public class XmlAdapterTest {
      */
     @Test
     public void resolvesNamespacePrefixes() throws IOException {
-        var spec = new InputSpec("text/xml", null, null, List.of(
+        var spec = new InputSpec("text/xml", List.of(
                 new RecordSelectorSpec("fund", "/f:portfolio/f:fund", List.of(
                         new FieldSelectorSpec("id", "@id", DataType.TEXT),
                         new FieldSelectorSpec("name", "f:name", DataType.TEXT),
@@ -149,7 +149,7 @@ public class XmlAdapterTest {
      */
     @Test
     public void findsNothingWithoutTheNamespaceBinding() throws IOException {
-        var spec = new InputSpec("text/xml", null, null, List.of(
+        var spec = new InputSpec("text/xml", List.of(
                 new RecordSelectorSpec("fund", "/portfolio/fund", List.of(
                         new FieldSelectorSpec("id", "@id", DataType.TEXT)
                 ))
@@ -165,7 +165,7 @@ public class XmlAdapterTest {
      */
     @Test
     public void rejectsAmalformedExpressionOnCreation() {
-        var spec = new InputSpec("text/xml", null, null, List.of(
+        var spec = new InputSpec("text/xml", List.of(
                 new RecordSelectorSpec("row", "/simple1/row[", List.of())
         ), List.of(), Map.of());
         var thrown = assertThrows(IllegalArgumentException.class, () -> adapter(spec));
@@ -178,7 +178,7 @@ public class XmlAdapterTest {
      */
     @Test
     public void rejectsAnUndeclaredFieldSelector() throws IOException {
-        var spec = new InputSpec("text/xml", null, null, List.of(
+        var spec = new InputSpec("text/xml", List.of(
                 new RecordSelectorSpec("row", "/simple1/row", List.of(
                         new FieldSelectorSpec("cola", "col[@name='a']", DataType.TEXT)
                 ))

@@ -4,10 +4,9 @@ import io.github.ralfspoeth.filews.DirectoryWatchService;
 import org.jspecify.annotations.Nullable;
 
 import java.io.IOException;
-import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.PathMatcher;
+import java.nio.file.attribute.FileTime;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Map;
@@ -15,7 +14,6 @@ import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
-import java.util.regex.PatternSyntaxException;
 
 import static io.github.ralfspoeth.xldr.spec.io.MappingSpecReader.readSpec;
 import static java.lang.System.Logger.Level.*;
@@ -65,7 +63,7 @@ class FeedRegistry {
      * lock. It is needed. Three kinds of thread call this - the one that starts
      * the server, the scanner, and a virtual thread per watch event, of which
      * there may be many at once - and every mutation of {@link #feeds} happens
-     * here, in {@code ensureActive} or in {@code deactivate}.
+     * here, in {@code ensureRegistered} or in {@code deregister}.
      * <p>
      * The readers - {@link #feedOfInbox} and {@link #active()} - deliberately do
      * not take the lock. They read a {@link ConcurrentHashMap}, so they see a
@@ -76,74 +74,89 @@ class FeedRegistry {
         reconciliation.lock();
         try {
             if (!Files.isDirectory(feedDir)) {
-                deactivate(feedDir, "directory is gone");
+                deregister(feedDir, "directory is gone");
             } else {
                 watch(feedDir);
-                MappingSpecs.find(feedDir).ifPresentOrElse(
-                        specFile -> ensureActive(feedDir, specFile),
-                        () -> deactivate(feedDir, "no mapping spec")
-                );
+                var deliveryFile = feedDir.resolve(Delivery.FILE);
+                if (Files.isRegularFile(deliveryFile)) {
+                    ensureRegistered(feedDir, deliveryFile);
+                } else {
+                    deregister(feedDir, "no " + Delivery.FILE);
+                }
             }
         } catch (IllegalStateException e) {
-            deactivate(feedDir, e.getMessage());
+            deregister(feedDir, e.getMessage());
         } catch (RuntimeException e) {
-            deactivate(feedDir, "cannot read mapping spec: " + e);
+            deregister(feedDir, "cannot read the feed's configuration: " + e);
         } finally {
             reconciliation.unlock();
         }
     }
 
-    private void ensureActive(Path feedDir, Path specFile) {
+    /**
+     * Registers the feed, or brings what is registered up to date.
+     * <p>
+     * Both files are stamped and both are compared, so a change to either takes
+     * effect: an edited {@code accepts} is no more structural than an edited
+     * selector, and waiting for a restart to honour one of them and not the
+     * other would be arbitrary. Re-reading both when either moved is simpler than
+     * tracking which one did, and cannot leave one half stale.
+     */
+    private void ensureRegistered(Path feedDir, Path deliveryFile) {
         try {
-            var modified = Files.getLastModifiedTime(specFile);
-            var current = feeds.get(feedDir);
-            if (current != null
-                    && current.specFile().equals(specFile)
-                    && current.specModified().equals(modified)) {
-                ensureDirectoriesAndWatch(current);
-            } else {
-                var mappingSpec = readSpec(specFile);
-                var sentinelSpec = mappingSpec.inputSpec().sentinel();
-                var acceptsSpec = mappingSpec.inputSpec().accepts();
-                if ((sentinelSpec == null) == (acceptsSpec == null)) {
-                    throw new IllegalStateException("input must declare exactly one of 'sentinel' or 'accepts', found "
-                            + (sentinelSpec == null ? "neither" : "both"));
-                }
-                var sentinel = sentinelSpec == null ? null : Sentinel.parse(sentinelSpec);
-                var acceptMatcher = acceptMatcher(acceptsSpec);
-                var feed = new Feed(feedDir, specFile, modified, mappingSpec, sentinel, acceptMatcher);
-                ensureDirectoriesAndWatch(feed);
-                feeds.put(feedDir, feed);
-                LOG.log(INFO,
-                        () -> (current == null ? "feed activated: " : "feed reloaded: ")
-                                + feed.name() + " (" + specFile.getFileName() + ")");
-            }
-        } catch (IOException e) {
-            deactivate(feedDir, "cannot read mapping spec: " + e.getMessage());
-        }
+            var deliveryModified = Files.getLastModifiedTime(deliveryFile);
+            var specFile = MappingSpecs.find(feedDir).orElse(null);
+            var specModified = specFile == null ? null : Files.getLastModifiedTime(specFile);
 
+            var current = feeds.get(feedDir);
+            if (unchanged(current, deliveryModified, specFile, specModified)) {
+                ensureDirectoriesAndWatch(current);
+                return;
+            }
+
+            var delivery = Delivery.read(deliveryFile);
+            Feed feed = specFile == null || specModified == null
+                    ? new Feed.Pending(feedDir, delivery, deliveryModified)
+                    : new Feed.Active(feedDir, delivery, deliveryModified,
+                    specFile, specModified, readSpec(specFile));
+            ensureDirectoriesAndWatch(feed);
+            feeds.put(feedDir, feed);
+            announce(current, feed);
+        } catch (IOException e) {
+            deregister(feedDir, "cannot read the feed's configuration: " + e.getMessage());
+        }
+    }
+
+    private static boolean unchanged(@Nullable Feed current, FileTime deliveryModified,
+                                     @Nullable Path specFile, @Nullable FileTime specModified) {
+        if (current == null || !current.deliveryModified().equals(deliveryModified)) {
+            return false;
+        }
+        return switch (current) {
+            // a spec has appeared beside a feed that had none
+            case Feed.Pending _ -> specFile == null;
+            case Feed.Active active -> active.specFile().equals(specFile)
+                    && active.specModified().equals(specModified);
+        };
     }
 
     /**
-     * Builds the accept matcher for a feed. The pattern uses the same
-     * {@code glob:} / {@code regex:} prefixes as the sentinel.
-     *
-     * @throws IllegalArgumentException if the pattern lacks a known prefix or
-     *                                  does not compile - caught by reconcile,
-     *                                  which then leaves the feed inactive
+     * Says what just happened, once, on the transition rather than on every scan.
+     * <p>
+     * A feed waiting for its spec is worth a warning - it is the most likely way
+     * for a feed not to come up, and the one that used to be silent - but
+     * repeating it every scan interval for as long as the feed waits would train
+     * whoever reads the log to ignore it.
      */
-    private static @Nullable PathMatcher acceptMatcher(@Nullable String pattern) {
-        if (pattern == null) {
-            return null;
-        }
-        if (!pattern.startsWith("glob:") && !pattern.startsWith("regex:")) {
-            throw new IllegalArgumentException(
-                    "accepts must start with 'glob:' or 'regex:', was: " + pattern);
-        }
-        try {
-            return FileSystems.getDefault().getPathMatcher(pattern);
-        } catch (PatternSyntaxException | UnsupportedOperationException e) {
-            throw new IllegalArgumentException("invalid accepts pattern: " + pattern, e);
+    private static void announce(@Nullable Feed previous, Feed feed) {
+        switch (feed) {
+            case Feed.Pending _ -> LOG.log(WARNING,
+                    () -> "feed " + feed.name() + " has a " + Delivery.FILE + " but no mapping spec "
+                            + MappingSpecs.SPEC_NAMES + "; what its producer delivers will wait in "
+                            + feed.in().getFileName() + " until one appears");
+            case Feed.Active _ -> LOG.log(INFO,
+                    () -> (previous instanceof Feed.Active ? "feed reloaded: " : "feed activated: ")
+                            + feed.name() + " (" + feed.delivery() + ")");
         }
     }
 
@@ -165,8 +178,8 @@ class FeedRegistry {
      * Called for every directory below a root, whether it holds a spec or not: a
      * directory without one is a feed waiting to be configured, and that is
      * precisely the moment the watch has to already be in place. The watch is
-     * therefore never given up while the directory exists - {@link #deactivate}
-     * releases the inbox only.
+     * therefore never given up while the directory exists -
+     * {@link #deregister(Path, String)} releases the inbox only.
      * <p>
      * A {@link java.nio.file.WatchService} reports the entries of a watched
      * directory, so this covers {@code spec.json} and {@code spec.xml} without
@@ -195,7 +208,7 @@ class FeedRegistry {
         watchService.register(feed.in());
     }
 
-    private void deactivate(Path feedDir, String reason) {
+    private void deregister(Path feedDir, String reason) {
         var removed = feeds.remove(feedDir);
         if (removed != null) {
             watchService.unregister(removed.in());
@@ -206,7 +219,24 @@ class FeedRegistry {
     }
 
     /**
-     * The feed whose {@code in/} directory this is, if it is active.
+     * The feeds that can load - those whose spec this build could read.
+     * <p>
+     * A snapshot, unlike {@link #registered()}: the filter has to walk the map
+     * anyway, so there is no view to hand back, and what the caller gets is one
+     * consistent set rather than a sequence that may change under an iterator.
+     * A registered feed still waiting for its spec is deliberately absent, which
+     * is what keeps it away from the loader.
+     */
+    public Collection<Feed.Active> active() {
+        return feeds.values()
+                .stream()
+                .filter(Feed.Active.class::isInstance)
+                .map(Feed.Active.class::cast)
+                .toList();
+    }
+
+    /**
+     * The feed whose {@code in/} directory this is, if it can load.
      * <p>
      * Derived rather than looked up in a second map. An inbox is
      * {@code <feed>/in} and {@link #feeds} is keyed by {@code <feed>}, so the
@@ -223,20 +253,25 @@ class FeedRegistry {
      * relying on it from here would be the sort of implicit invariant that comes
      * apart when the other end changes.
      */
-    public Optional<Feed> feedOfInbox(Path inbox) {
+    public Optional<Feed.Active> feedOfInbox(Path inbox) {
         // a path may have no parent, and ConcurrentHashMap.get(null) throws
         var feedDir = inbox.getParent();
         if (feedDir == null) {
             return Optional.empty();
         }
         return Optional.ofNullable(feeds.get(feedDir))
-                .filter(feed -> feed.in().equals(inbox));
+                .filter(feed -> feed.in().equals(inbox))
+                // a pending feed's inbox is watched all the same, so that its
+                // directories exist for a producer to deliver into; there is
+                // simply nothing to do with what arrives until a spec does
+                .filter(Feed.Active.class::isInstance)
+                .map(Feed.Active.class::cast);
     }
 
     /**
-     * The feeds that are active - those below a root with a spec this build
-     * could read. A directory without one, or with one that would not parse, is
-     * not here.
+     * Every feed below a root, whether or not it can load yet - a directory is
+     * here from the moment it holds a readable {@value Delivery#FILE}. A
+     * directory without one, or with one that would not parse, is not.
      * <p>
      * A live, unmodifiable view rather than a copy. Live, because the callers
      * are the periodic scan and the JMX attributes, which want the feeds as they
@@ -253,7 +288,7 @@ class FeedRegistry {
      * gauges that is what is wanted; a caller needing one consistent set should
      * copy what it gets.
      */
-    public Collection<Feed> active() {
+    public Collection<Feed> registered() {
         return Collections.unmodifiableCollection(feeds.values());
     }
 }

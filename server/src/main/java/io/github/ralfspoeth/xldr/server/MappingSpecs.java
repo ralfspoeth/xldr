@@ -13,7 +13,8 @@ final class MappingSpecs {
 
     /**
      * The accepted spec file names. A feed directory must contain exactly one of
-     * them; zero means "not a feed (yet)", more than one is ambiguous.
+     * them; zero leaves the feed pending - registered, watched, but with nothing
+     * to load with - and more than one is ambiguous.
      */
     static final List<String> SPEC_NAMES = List.of("spec.json", "spec.xml");
 

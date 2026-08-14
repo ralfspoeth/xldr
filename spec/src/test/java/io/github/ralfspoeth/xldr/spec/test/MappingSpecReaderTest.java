@@ -94,8 +94,7 @@ public class MappingSpecReaderTest {
     public void readsAspecFileInEitherFormat(@TempDir Path dir) throws IOException {
         var json = Files.writeString(dir.resolve("spec.json"), """
                 {
-                  "input": { "mimeType": "text/csv", "accepts": "glob:*.csv",
-                    "recordSelectors": [ { "name": "people",
+                  "input": { "mimeType": "text/csv", "recordSelectors": [ { "name": "people",
                       "fieldSelectors": [ { "name": "id", "selector": "id", "type": "INTEGRAL" } ] } ] },
                   "mapping": [ { "recordSelector": "people", "table": "person",
                     "fieldMapping": [ { "fieldSelector": "id", "column": "id" } ] } ]
@@ -103,7 +102,7 @@ public class MappingSpecReaderTest {
                 """);
         var xml = Files.writeString(dir.resolve("spec.xml"), """
                 <mappingSpec>
-                    <input mimeType="text/csv" accepts="glob:*.csv">
+                    <input mimeType="text/csv">
                         <recordSelector name="people">
                             <fieldSelector name="id" selector="id" type="INTEGRAL"/>
                         </recordSelector>

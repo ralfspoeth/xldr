@@ -6,6 +6,50 @@ ways that break existing code and existing specs; those changes are listed here 
 The versions are the git tags `xldr-<version>`; the published artifacts carry the same version under the group
 `io.github.ralfspoeth.xldr`.
 
+## 0.23
+
+Delivery leaves the mapping spec. Which files a feed claims, and whether a marker announces them, is a property of the
+deployment rather than of the mapping - it differs between test and production while the spec does not - and it was
+in a document that promised to travel between the two unchanged. It now lives in a `delivery.properties` beside the
+spec, which the `server` module owns and reads.
+
+### Breaking
+
+- `accepts` and `sentinel` are gone from `InputSpec` and from both readers. Every feed needs a `delivery.properties`
+  beside its spec, holding exactly one of them:
+
+      accepts = glob:*.csv
+
+  A spec still carrying either is refused by `mapping-spec-0.23` and by the readers, rather than ignored, so that it
+  is moved and not merely dropped. Nothing else about the format changed, and the schemas are published as
+  `mapping-spec-0.23`; `mapping-spec-0.21` stays where it is and goes on describing 0.21 and 0.22.
+- The delivery file is what makes a directory a feed. A directory holding only a spec is not one, and says so at
+  WARNING - it is the likeliest way for a feed not to come up, and it used to be the quietest.
+- Unknown keys in `delivery.properties` are refused rather than ignored. A properties file has no schema, and a
+  misspelled `acccepts` would otherwise leave a feed claiming nothing with nothing to say about why.
+- `FeedStatus` carries a `state`, `ACTIVE` or `PENDING`, which changes the MXBean's composite type. `getFeeds()` now
+  lists every registered feed rather than only the ones that can load - without that the totals disagreed with the
+  rows, since `getFilesWaiting()` counts the inbox of every registered feed and a file waiting in a pending one would
+  have been in the gauge and in no row. `getFilesInHospital()` counts registered feeds too, so a feed that lost its
+  spec while a load was in flight still reports its patients. `getActiveFeeds()` is unchanged and still counts only
+  the feeds that can load.
+
+### Added
+
+- A feed with a delivery file and no spec is real but pending: its directories exist and its producer may deliver, and
+  what arrives waits in `in/` until a spec appears, at which point the backlog is loaded without being delivered
+  again. The two files come from different hands and no longer have to arrive together.
+- A change to `delivery.properties` reloads the feed, as a change to the spec always has. Editing which files a feed
+  claims is no more structural than editing a selector, and neither needs a restart.
+- `bin/xldr validate` checks the delivery file beside each spec, using the server's own reader rather than a second
+  copy of the rules, and reports a missing one as the problem it is.
+
+### Changed
+
+- `Feed` is a sealed pair rather than one record with a nullable mapping spec, so a feed that cannot load yet cannot
+  be handed to the loader at all. `Delivery` is likewise sealed over its two forms, which turns "exactly one of
+  `accepts` or `sentinel`" from a check into the shape of the type.
+
 ## 0.22
 
 Nothing about the mapping-spec format changed, so `mapping-spec-0.21` remains its schema and a spec that loaded under

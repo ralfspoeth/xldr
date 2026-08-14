@@ -57,7 +57,12 @@
         <th>XML</th>
     </tr>
     <tr>
-        <td>0.21 - 0.22 (current)</td>
+        <td>0.23 (current)</td>
+        <td><a href="schema/mapping-spec-0.23.json">mapping-spec-0.23.json</a></td>
+        <td><a href="schema/mapping-spec-0.23.xsd">mapping-spec-0.23.xsd</a></td>
+    </tr>
+    <tr>
+        <td>0.21 - 0.22</td>
         <td><a href="schema/mapping-spec-0.21.json">mapping-spec-0.21.json</a></td>
         <td><a href="schema/mapping-spec-0.21.xsd">mapping-spec-0.21.xsd</a></td>
     </tr>
@@ -91,6 +96,14 @@
 </p>
 
 <p>
+    In 0.23 <code>accepts</code> and <code>sentinel</code> left the spec. How a feed's files arrive is a property of
+    the deployment rather than of the mapping - the names a producer uses differ between test and production while
+    the mapping does not - so they moved to a <code>delivery.properties</code> beside the spec, which the server reads
+    and no schema describes. A spec still carrying either is refused rather than ignored, so that it is moved and not
+    merely dropped. Nothing else about the format changed.
+</p>
+
+<p>
     In 0.21 the field types <code>STRING</code>, <code>INTEGER</code> and <code>FLOAT</code> became
     <code>TEXT</code>, <code>INTEGRAL</code> and <code>FP</code>; <code>DECIMAL</code> and <code>DATE</code> are
     unchanged, as is leaving the type out, which still means text. The names are deliberately none of Java's, so that
@@ -120,10 +133,9 @@
 <p>In a JSON spec, as a member the reader does not recognise and therefore ignores:</p>
 
 <pre><code>{
-  "$schema": "https://ralfspoeth.github.io/xldr/schema/mapping-spec-0.21.json",
+  "$schema": "https://ralfspoeth.github.io/xldr/schema/mapping-spec-0.23.json",
   "input": {
     "mimeType": "text/csv",
-    "accepts": "glob:*.csv",
     "properties": { "fieldSeparator": "," },
     "recordSelectors": [ ... ]
   },
@@ -133,8 +145,8 @@
 <p>In an XML spec, as the schema location of a document that has no namespace of its own:</p>
 
 <pre><code>&lt;mappingSpec xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-             xsi:noNamespaceSchemaLocation="https://ralfspoeth.github.io/xldr/schema/mapping-spec-0.21.xsd"&gt;
-    &lt;input mimeType="text/xml" accepts="glob:*.xml"&gt;
+             xsi:noNamespaceSchemaLocation="https://ralfspoeth.github.io/xldr/schema/mapping-spec-0.23.xsd"&gt;
+    &lt;input mimeType="text/xml"&gt;
         ...
     &lt;/input&gt;
 &lt;/mappingSpec&gt;</code></pre>
@@ -159,7 +171,6 @@
 
 <pre><code>"input": {
   "mimeType": "text/csv",
-  "accepts": "glob:*.csv",
   "properties": { "fieldSeparator": ";", "header": false, "dateFormat": "dd.MM.yyyy" },
   "recordSelectors": [ ... ]
 }</code></pre>
@@ -398,9 +409,8 @@
 <p>
     A schema checks the shape of a spec: names that are missing or misspelled, a field type that is not one of the
     five, a delivery pattern without its <code>glob:</code> or <code>regex:</code> prefix. The JSON schema also states
-    the rules that XSD 1.0 cannot - that an input declares exactly one of <code>accepts</code> and
-    <code>sentinel</code>, that a field mapping carries exactly one value source, and that a variable reads no field -
-    so it is the stricter of the two.
+    the rules that XSD 1.0 cannot - that a field mapping carries exactly one value source, and that a variable reads
+    no field - so it is the stricter of the two.
 </p>
 
 <p>

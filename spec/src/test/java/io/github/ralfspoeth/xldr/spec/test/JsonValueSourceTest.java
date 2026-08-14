@@ -206,7 +206,6 @@ public class JsonValueSourceTest {
                 {
                     "input": {
                         "mimeType": "text/csv",
-                        "accepts": "glob:*.csv",
                         "comments": "an annotation, not a setting",
                         "properties": {
                             "fieldSeparator": ";",
@@ -226,7 +225,6 @@ public class JsonValueSourceTest {
                         "linesPerRecord", "2", "ns.f", "https://example.com/funds"),
                 input.properties());
         assertEquals("text/csv", input.mimeType());
-        assertEquals("glob:*.csv", input.accepts());
     }
 
 
@@ -274,7 +272,6 @@ public class JsonValueSourceTest {
                 {
                     "input": {
                         "mimeType": "text/csv",
-                        "accepts": "glob:*.csv",
                         "recordSelectors": [
                             { "name": "people", "fieldSelectors": [ {"name": "id", "selector": "id"} ] }
                         ]

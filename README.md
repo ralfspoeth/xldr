@@ -24,14 +24,14 @@ The server is not published as an artifact; build the distribution from a checko
     mvn install
     tar xzf app/target/xldr-<version>-dist.tar.gz
 
-Then set up a feed - a directory below a root, holding a mapping spec:
+Then set up a feed - a directory below a root, holding two files: how its files arrive, and what to do with them.
 
     mkdir -p /var/lib/xldr/people
+    echo 'accepts = glob:*.csv' > /var/lib/xldr/people/delivery.properties
     cat > /var/lib/xldr/people/spec.json <<'EOF'
     {
       "input": {
         "mimeType": "text/csv",
-        "accepts": "glob:*.csv",
         "properties": { "fieldSeparator": "," },
         "recordSelectors": [
           { "name": "people", "fieldSelectors": [
@@ -70,7 +70,7 @@ fix their versions in one place:
             <dependency>
                 <groupId>io.github.ralfspoeth.xldr</groupId>
                 <artifactId>bom</artifactId>
-                <version>0.22</version>
+                <version>0.23</version>
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>
@@ -232,20 +232,21 @@ Both formats have a published schema, so an editor can check a spec before it ev
 only reports a broken spec in its log, by leaving the feed inactive. Point at the schema from the spec itself:
 
     {
-      "$schema": "https://ralfspoeth.github.io/xldr/schema/mapping-spec-0.21.json",
+      "$schema": "https://ralfspoeth.github.io/xldr/schema/mapping-spec-0.23.json",
       "input": { ... }
     }
 
     <mappingSpec xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-                 xsi:noNamespaceSchemaLocation="https://ralfspoeth.github.io/xldr/schema/mapping-spec-0.21.xsd">
+                 xsi:noNamespaceSchemaLocation="https://ralfspoeth.github.io/xldr/schema/mapping-spec-0.23.xsd">
 
 Both are ignored by the readers - `$schema` is just another unrecognised member, and `xsi:` attributes carry no
 meaning for a spec that has no namespace of its own. IntelliJ and VS Code both validate and autocomplete from them.
 
-The schemas catch what a schema can: missing or misspelled names, a `type` that is not one of the five, a delivery
-pattern without its `glob:`/`regex:` prefix, and - in JSON - an input that declares both `accepts` and `sentinel` or
-neither, a field mapping with no source or several, and a var that reads a field. The rest is checked when the spec
-is read, in particular that every selector compiles.
+The schemas catch what a schema can: missing or misspelled names, a `type` that is not one of the five, and - in
+JSON - a field mapping with no source or several, and a var that reads a field. The rest is checked when the spec is
+read, in particular that every selector compiles. How the feed's files arrive is no longer among them: that moved to
+`delivery.properties`, which the server reads and no schema describes, so a spec still carrying `accepts` or
+`sentinel` is refused rather than ignored.
 
 The XSD is the more permissive of the two, because XSD 1.0 cannot state either of those exactly-one rules. Nor can it
 allow arbitrary extra elements next to the named ones, so a longer note belongs in an XML comment rather than in an
@@ -262,7 +263,8 @@ written for `fieldSelectors` costs a record every one of its fields, and no read
 unknown is exactly what it promises.
 
 A schema is published whenever the format changes, and is named after the release that changed it:
-`mapping-spec-0.21` describes the format from 0.21, `mapping-spec-0.13` that of 0.13 to 0.20,
+`mapping-spec-0.23` describes the format from 0.23, `mapping-spec-0.21` that of 0.21 to 0.22,
+`mapping-spec-0.13` that of 0.13 to 0.20,
 `mapping-spec-0.10` that of 0.10 to 0.12, and so on. An
 earlier one stays where it is, so a spec pinned to it keeps validating.
 
@@ -306,8 +308,6 @@ record to a database column.
 An input specification contains the following pieces of information:
 
 * the MIME type, which selects the adapter;
-* exactly one of `accepts` or `sentinel`, the [delivery rule](#delivering-files) saying which arriving file is a
-  complete one - required by the server, and the only part of the spec that is about files rather than about content;
 * record selectors, each of which
     * is identified by a name,
     * has a selector specification - optional, and left out where the whole file holds one kind of record, as in a CSV
@@ -326,7 +326,6 @@ Example:
 
     "input": {
         "mimeType": "text/xml",
-        "accepts": "glob:*.xml",
         "recordSelectors": [
             {
                 "name": "xx",
@@ -517,7 +516,7 @@ the JSON format, so a spec can be transliterated between the two without renamin
 is optional here.
 
     <mappingSpec>
-        <input mimeType="text/xml" accepts="glob:*.xml">
+        <input mimeType="text/xml">
             <properties ns.f="http://example.com/funds" dateFormat="dd.MM.yyyy"/>
             <var name="source" constant="PD"/>
             <recordSelector name="fund" selector="/root/fund">
@@ -548,17 +547,24 @@ The application runs as a server watching a number of configured *roots*. A root
 be created; a feed is a directory exactly one level below a root that contains a mapping spec.
 
     <root>/<feed>/
-        spec.json           one of spec.json | spec.xml; its presence activates the feed
+        delivery.properties how files arrive; its presence makes the directory a feed
+        spec.json           one of spec.json | spec.xml; what to do with what arrives
         env.properties      optional; what this deployment supplies to the spec
         in/                 producers move input files in here
         work/               claimed, currently being loaded
         archive/2026/07/22/ loaded successfully
         hospital/           failed, together with an error log
 
-Creating a feed is `mkdir` plus dropping a spec in it; the four working directories are created by the server. Removing
-the spec deactivates the feed, replacing it reloads it - no restart in either case. Exactly one spec file must be
-present: two of them is refused rather than resolved by precedence, because loading through the wrong spec is worse
-than not loading at all.
+Creating a feed is `mkdir` plus two files; the four working directories are created by the server. The two have
+different owners and need not arrive together. `delivery.properties` is what makes the directory a feed: with it alone
+the feed is real - its directories exist and its producer may deliver - but nothing is loaded, and what arrives waits
+in `in/` until a spec appears, at which point the backlog is loaded without being delivered again. A feed in that state
+says so once in the log, at WARNING, rather than every scan.
+
+Removing the spec deactivates the feed, replacing it reloads it - and the same goes for the delivery file, since
+changing which files a feed claims is no more structural than changing a selector. No restart in either case. Exactly
+one spec file must be present: two of them is refused rather than resolved by precedence, because loading through the
+wrong spec is worse than not loading at all.
 
 Deactivating takes effect for files as well as for the feed: a file already sitting in `in/` when the spec goes is
 left there untouched, and so is a marker beside it. A load in flight when the spec is removed does run to the end -
@@ -596,17 +602,28 @@ cannot reach it.
 ### Delivering files
 
 A file must not be read while it is still being written. The server does not guess at this with size or timeout
-heuristics - the producer states when a file is complete. Each feed declares **exactly one** of two delivery rules,
-`accepts` or `sentinel`; a spec with both, or neither, does not activate a feed at all. Both patterns are passed
-straight to Java's `FileSystem.getPathMatcher`, so each carries its own `glob:` or `regex:` prefix and matches against
-the file name.
+heuristics - the producer states when a file is complete.
 
-**Atomic delivery** (`"accepts": "glob:abc*.csv"`). A file whose name matches the pattern *is* the trigger, so it must
+This is deployment rather than mapping - which names a producer uses, and whether it writes a marker, differs between
+test and production while the mapping does not - so it lives in the feed's `delivery.properties` and not in the spec:
+
+    accepts = glob:*.csv
+
+Each feed declares **exactly one** of two delivery rules, `accepts` or `sentinel`. A delivery file with both, with
+neither, or with a key the reader does not know is refused, and the directory is then not a feed at all: its working
+directories are never created, so a producer pointed at it finds nowhere to deliver rather than a hole that swallows
+files. Unknown keys are refused rather than ignored because a properties file has no schema, and a misspelled
+`acccepts` would otherwise leave a feed claiming nothing with nothing to say about why.
+
+Both patterns are passed straight to Java's `FileSystem.getPathMatcher`, so each carries its own `glob:` or `regex:`
+prefix and matches against the file name.
+
+**Atomic delivery** (`accepts = glob:abc*.csv`). A file whose name matches the pattern *is* the trigger, so it must
 appear atomically: write it under an ignored name (`*.part`, `*.tmp`, or a dot-file) and rename it in place, or write it
 outside `in/` and move it in. A same-filesystem rename is atomic; a plain write into `in/` is not, and risks a truncated
 load. A file that does not match is left in `in/` untouched.
 
-**Sentinel delivery** (`"sentinel": "glob:*.done"`). The producer writes the data file at leisure, then a marker file
+**Sentinel delivery** (`sentinel = glob:*.done`). The producer writes the data file at leisure, then a marker file
 matching the pattern. Only the marker's arrival triggers the load; the data file's own arrival is ignored. The data
 file is the marker name minus its last dotted suffix, so `report.csv.done` loads `report.csv` (glob alternation, as in
 `glob:*.{ok,ready,done}`, is comma-separated). The data file is claimed first and the marker deleted after, so a crash
@@ -675,14 +692,14 @@ target database.
 
 ### Feed configuration
 
-A feed directory holds a mapping spec - `spec.json` or `spec.xml`, exactly one - and nothing else.
+A feed directory holds a mapping spec - `spec.json` or `spec.xml`, exactly one - beside the
+`delivery.properties` that made it a feed.
 
 The settings of the adapter sit in the input's `properties`, next to the `mimeType` that chooses it - grouped rather
 than spread out, because which of them mean anything depends on that MIME type:
 
     "input": {
         "mimeType": "text/csv",
-        "accepts": "glob:*.csv",
         "properties": {
             "fieldSeparator": ";",
             "header": false,
@@ -867,13 +884,13 @@ read-only: the file system remains the way to make the server do anything.
 
 | Attribute                                        | Meaning                                                                                                                                                                              |
 |--------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `ActiveFeeds`                                    | How many feeds have a readable spec. A feed that disappears from this number has a spec the server refused.                                                                          |
+| `ActiveFeeds`                                    | How many feeds can load, having both a readable `delivery.properties` and a readable spec. A feed that drops out of this number has lost one of the two - `Feeds` says which.        |
 | `LoadsInProgress`                                | Files being loaded at this moment. Bounded by `xldr.maxConcurrentLoads`.                                                                                                             |
 | `LoadsSucceeded`, `LoadsFailed`, `RecordsLoaded` | Counted since the process started, so they are rates to be differenced.                                                                                                              |
 | `LastLoad`, `LastFailure`                        | Instants, or empty. A `LastLoad` that stops advancing on a feed that should be busy is the quiet failure worth catching.                                                             |
-| `FilesWaiting`                                   | Files sitting in any `in/`. Should fall back to zero; a number that does not is a feed not claiming what arrives - a delivery rule that matches nothing, say.                        |
+| `FilesWaiting`                                   | Files sitting in the `in/` of any registered feed, pending ones included. Should fall back to zero; a number that does not is a feed not claiming what arrives - a delivery rule that matches nothing, or a feed still waiting for its spec. |
 | `FilesInHospital`                                | Files a load failed on, not counting the `.log` written beside each. Nothing puts a file there but a failure and nothing removes one but an operator, so this is the alert to raise. |
-| `Feeds`                                          | The same, per feed, so a failing feed can be told from a quiet one.                                                                                                                  |
+| `Feeds`                                          | The same, per feed, so a failing feed can be told from a quiet one. Every registered feed, each with a `state` of `ACTIVE` or `PENDING`, so the rows add up to the totals above. `PENDING` is a feed with a delivery file and no spec: it is logged once, when it gets there, and this is what still knows tomorrow. |
 
 HikariCP's own pool statistics are separate and off by default; `pool.registerMbeans = true` in the server
 configuration turns them on, since every `pool.*` key is passed through.

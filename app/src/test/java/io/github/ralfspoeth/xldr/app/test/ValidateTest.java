@@ -33,10 +33,48 @@ public class ValidateTest {
         dir = Files.createTempDirectory("xldr-validate");
     }
 
+    /**
+     * A feed is two files now, and the command checks the pair, so every spec
+     * under test gets a delivery file it would be happy with. The delivery side
+     * has its own cases below.
+     */
     private int validate(String name, String spec) throws IOException {
+        Files.writeString(dir.resolve("delivery.properties"), "accepts = glob:*.csv\n");
+        return validateWhateverIsThere(name, spec);
+    }
+
+    private int validateWhateverIsThere(String name, String spec) throws IOException {
         var file = dir.resolve(name);
         Files.writeString(file, spec);
         return new CommandLine(new App()).execute("validate", file.toString());
+    }
+
+    private static final String MINIMAL_SPEC = """
+            {
+              "input": { "mimeType": "text/csv", "recordSelectors": [] }
+            }
+            """;
+
+    /**
+     * Without a delivery file the directory is not a feed, so nothing would ever
+     * be loaded through the spec however correct it is. That is precisely what
+     * this command exists to say before the server has to.
+     */
+    @Test
+    void reportsAmissingDeliveryFile() throws IOException {
+        assertEquals(1, validateWhateverIsThere("spec.json", MINIMAL_SPEC));
+    }
+
+    /**
+     * And one that is there but will not read - here declaring both ways of
+     * delivering - is reported with the reader's own words rather than a second
+     * copy of the rule kept in this command.
+     */
+    @Test
+    void reportsAdeliveryFileThatWillNotRead() throws IOException {
+        Files.writeString(dir.resolve("delivery.properties"),
+                "accepts = glob:*.csv\nsentinel = glob:*.done\n");
+        assertEquals(1, validateWhateverIsThere("spec.json", MINIMAL_SPEC));
     }
 
     /**
@@ -48,7 +86,6 @@ public class ValidateTest {
                 {
                   "input": {
                     "mimeType": "text/csv",
-                    "accepts": "glob:*.csv",
                     "properties": { "fieldSeparator": "," },
                     "vars": [ { "name": "source", "constant": "PD" } ],
                     "recordSelectors": [
@@ -68,42 +105,24 @@ public class ValidateTest {
     }
 
     /**
-     * The delivery rule is the check that decides whether a feed activates at
-     * all - the failure that is otherwise only visible in the server's log.
-     */
-    @Test
-    void rejectsAmissingOrDoubledDeliveryRule() throws IOException {
-        assertEquals(1, validate("neither.json", """
-                { "input": { "mimeType": "text/csv", "recordSelectors": [] } }
-                """));
-        assertEquals(1, validate("both.json", """
-                { "input": { "mimeType": "text/csv", "accepts": "glob:*.csv",
-                             "sentinel": "glob:*.done", "recordSelectors": [] } }
-                """));
-    }
-
-    /**
      * A name a mapping uses but the input does not declare would otherwise load
      * nothing, or fail half way through a load.
      */
     @Test
     void rejectsNamesTheInputDoesNotDeclare() throws IOException {
         assertEquals(1, validate("record.json", """
-                { "input": { "mimeType": "text/csv", "accepts": "glob:*.csv",
-                    "recordSelectors": [ { "name": "people" } ] },
+                { "input": { "mimeType": "text/csv", "recordSelectors": [ { "name": "people" } ] },
                   "mapping": [ { "recordSelector": "persons", "table": "t",
                                  "fieldMapping": [ { "constant": "x", "column": "c" } ] } ] }
                 """));
         assertEquals(1, validate("field.json", """
-                { "input": { "mimeType": "text/csv", "accepts": "glob:*.csv",
-                    "recordSelectors": [ { "name": "people",
+                { "input": { "mimeType": "text/csv", "recordSelectors": [ { "name": "people",
                         "fieldSelectors": [ { "name": "id", "selector": "id" } ] } ] },
                   "mapping": [ { "recordSelector": "people", "table": "t",
                                  "fieldMapping": [ { "fieldSelector": "nope", "column": "c" } ] } ] }
                 """));
         assertEquals(1, validate("var.json", """
-                { "input": { "mimeType": "text/csv", "accepts": "glob:*.csv",
-                    "recordSelectors": [ { "name": "people" } ] },
+                { "input": { "mimeType": "text/csv", "recordSelectors": [ { "name": "people" } ] },
                   "mapping": [ { "recordSelector": "people", "table": "t",
                                  "fieldMapping": [ { "var": "nope", "column": "c" } ] } ] }
                 """));
@@ -118,15 +137,13 @@ public class ValidateTest {
     @Test
     void rejectsAcsvDiscriminatorBesideAheader() throws IOException {
         assertEquals(1, validate("discriminator.json", """
-                { "input": { "mimeType": "text/csv", "accepts": "glob:*.csv",
-                    "recordSelectors": [ { "name": "people", "selector": "people",
+                { "input": { "mimeType": "text/csv", "recordSelectors": [ { "name": "people", "selector": "people",
                         "fieldSelectors": [ { "name": "id", "selector": "id" } ] } ] },
                   "mapping": [ { "recordSelector": "people", "table": "t",
                                  "fieldMapping": [ { "fieldSelector": "id", "column": "c" } ] } ] }
                 """));
         assertEquals(0, validate("headerless.json", """
-                { "input": { "mimeType": "text/csv", "accepts": "glob:*.csv",
-                    "properties": { "header": false },
+                { "input": { "mimeType": "text/csv", "properties": { "header": false },
                     "recordSelectors": [ { "name": "people", "selector": "people",
                         "fieldSelectors": [ { "name": "id", "selector": "2" } ] } ] },
                   "mapping": [ { "recordSelector": "people", "table": "t",
@@ -142,7 +159,7 @@ public class ValidateTest {
     void rejectsAselectorTheAdapterCannotUse() throws IOException {
         assertEquals(1, validate("xpath.xml", """
                 <mappingSpec>
-                    <input mimeType="text/xml" accepts="glob:*.xml">
+                    <input mimeType="text/xml">
                         <recordSelector name="r" selector="//[[">
                             <fieldSelector name="id" selector="@id"/>
                         </recordSelector>
@@ -158,8 +175,7 @@ public class ValidateTest {
     @Test
     void rejectsAnUnknownMimeType() throws IOException {
         assertEquals(1, validate("mime.json", """
-                { "input": { "mimeType": "application/x-nonesuch", "accepts": "glob:*.dat",
-                             "recordSelectors": [] } }
+                { "input": { "mimeType": "application/x-nonesuch", "recordSelectors": [] } }
                 """));
     }
 
@@ -176,8 +192,7 @@ public class ValidateTest {
     @Test
     void acceptsAnUndeclaredFieldWhereTheHeaderSuppliesIt() throws IOException {
         var spec = """
-                { "input": { "mimeType": "text/csv", "accepts": "glob:*.csv",
-                    "properties": { "fieldSeparator": ";"%s },
+                { "input": { "mimeType": "text/csv", "properties": { "fieldSeparator": ";"%s },
                     "recordSelectors": [ { "name": "all" } ] },
                   "mapping": [ { "recordSelector": "all", "table": "t",
                                  "fieldMapping": [ { "fieldSelector": "Name", "column": "c" } ] } ] }
@@ -197,8 +212,7 @@ public class ValidateTest {
     @Test
     void reportsArecordSelectorWithNoFieldSelectors() throws IOException {
         assertEquals(1, validate("empty.json", """
-                { "input": { "mimeType": "text/csv", "accepts": "glob:*.csv",
-                    "recordSelectors": [ { "name": "all",
+                { "input": { "mimeType": "text/csv", "recordSelectors": [ { "name": "all",
                         "fieldSelector": [ { "name": "n1", "selector": "Name" } ] } ] },
                   "mapping": [ { "recordSelector": "all", "table": "t",
                                  "fieldMapping": [ { "fieldSelector": "n1", "column": "c" } ] } ] }
@@ -214,7 +228,7 @@ public class ValidateTest {
     @Test
     void rejectsAspecInAnUnknownFormat() throws IOException {
         assertEquals(1, validate("spec.txt", """
-                { "input": { "mimeType": "text/csv", "accepts": "glob:*.csv", "recordSelectors": [] } }
+                { "input": { "mimeType": "text/csv", "recordSelectors": [] } }
                 """));
     }
 
@@ -224,13 +238,16 @@ public class ValidateTest {
      */
     @Test
     void checksSeveralSpecsAtOnce() throws IOException {
+        // one delivery file serves both: they share a directory, and what makes
+        // the second one bad is now its own, not the way its files would arrive
+        Files.writeString(dir.resolve("delivery.properties"), "accepts = glob:*.csv\n");
         var good = dir.resolve("good.json");
         Files.writeString(good, """
-                { "input": { "mimeType": "text/csv", "accepts": "glob:*.csv", "recordSelectors": [] } }
+                { "input": { "mimeType": "text/csv", "recordSelectors": [] } }
                 """);
         var bad = dir.resolve("bad.json");
         Files.writeString(bad, """
-                { "input": { "mimeType": "text/csv", "recordSelectors": [] } }
+                { "input": { "mimeType": "application/x-nonesuch", "recordSelectors": [] } }
                 """);
 
         assertEquals(0, new CommandLine(new App()).execute("validate", good.toString()));

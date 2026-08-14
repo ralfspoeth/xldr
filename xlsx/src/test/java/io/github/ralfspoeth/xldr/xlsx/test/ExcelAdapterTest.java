@@ -49,7 +49,7 @@ public class ExcelAdapterTest {
             dataRow(sheet, 2, 2d, "Bob", 2.5d);
         });
 
-        var spec = new InputSpec(XLSX, null, null, List.of(
+        var spec = new InputSpec(XLSX, List.of(
                 new RecordSelectorSpec("rows", "data!A2:C3", List.of(
                         new FieldSelectorSpec("id", "A", DataType.INTEGRAL),
                         new FieldSelectorSpec("name", "B", DataType.TEXT),
@@ -93,7 +93,7 @@ public class ExcelAdapterTest {
             dataRow(sheet, 3, 30d, null);
         });
 
-        var spec = new InputSpec(XLSX, null, null, List.of(
+        var spec = new InputSpec(XLSX, List.of(
                 new RecordSelectorSpec("all", "data!A:B", List.of(
                         new FieldSelectorSpec("v", "1", DataType.INTEGRAL),
                         new FieldSelectorSpec("label", "2", DataType.TEXT)
@@ -116,7 +116,7 @@ public class ExcelAdapterTest {
 
     @Test
     public void rejectsAmalformedRange() {
-        var spec = new InputSpec(XLSX, null, null, List.of(
+        var spec = new InputSpec(XLSX, List.of(
                 new RecordSelectorSpec("bad", "A2:C", List.of())
         ), List.of(), Map.of());
         assertThrows(IllegalArgumentException.class, () -> adapter(spec));
@@ -141,7 +141,7 @@ public class ExcelAdapterTest {
             dataRow(sheet, 1, 1d, "Alice");
         });
 
-        var spec = new InputSpec(XLSX, null, null, List.of(
+        var spec = new InputSpec(XLSX, List.of(
                 new RecordSelectorSpec("rows", "A2:B2", List.of(
                         new FieldSelectorSpec("id", "A", DataType.INTEGRAL),
                         new FieldSelectorSpec("name", "B", DataType.TEXT)
