@@ -25,7 +25,7 @@ public interface MappingSpecReader {
      * {@link #accepts} of the readers on the module path have to partition the
      * names between them; a name no reader claims yields nothing, and the
      * caller says what that means.
-     * <p/>
+     * <p>
      * The loader is named explicitly, and it is the one that defined this
      * interface. The one-argument {@link ServiceLoader#load(Class)} would
      * resolve against the <em>thread context</em> class loader instead - whatever
