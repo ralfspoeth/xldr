@@ -6,6 +6,28 @@ ways that break existing code and existing specs; those changes are listed here 
 The versions are the git tags `xldr-<version>`; the published artifacts carry the same version under the group
 `io.github.ralfspoeth.xldr`.
 
+## 0.24
+
+Nothing about the mapping-spec format changed, so `mapping-spec-0.23` remains its schema and a spec that loaded under
+0.23 loads under 0.24. One bug, in how the toolkit finds its own services.
+
+### Fixed
+
+- The spec readers and the input adapters are found with the loader that defined the service rather than with the
+  calling thread's context class loader. The one-argument `ServiceLoader.load(Class)` resolves against the thread
+  context loader, which is set by servlet containers, test runners and application frameworks, each to something of
+  their own - and when it is set to a loader that cannot see the xldr modules, the lookup finds nothing and says
+  nothing. `MappingSpecReader.of` then returns empty, `readSpec` refuses every spec with "unsupported mapping spec
+  format", and a feed never comes up for a reason having nothing to do with its files.
+
+  It bit exactly where it is hardest to read: a downstream integration test running under failsafe, whose unit tests
+  running under surefire found the same providers without trouble. Three call sites are affected -
+  `MappingSpecReader.of`, `LoadJob` when it builds the adapter, and `bin/xldr validate`.
+
+  Nothing in the API changes, and a deployment that was working goes on working. What changes is that one that was
+  not now works too, and that embedding the server no longer depends on what the embedding thread's context loader
+  happens to be.
+
 ## 0.23
 
 Delivery leaves the mapping spec. Which files a feed claims, and whether a marker announces them, is a property of the

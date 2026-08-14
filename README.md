@@ -70,7 +70,7 @@ fix their versions in one place:
             <dependency>
                 <groupId>io.github.ralfspoeth.xldr</groupId>
                 <artifactId>bom</artifactId>
-                <version>0.23</version>
+                <version>0.24</version>
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>
@@ -102,7 +102,8 @@ adapters are found through `ServiceLoader`, so each need only be on the module p
 to read it, since its name says which format it is in:
 
     var spec = readSpec(Path.of("/var/lib/xldr/people/spec.json"));
-    var factory = ServiceLoader.load(InputAdapterFactory.class).stream()
+    var factory = ServiceLoader.load(InputAdapterFactory.class, InputAdapterFactory.class.getClassLoader())
+            .stream()
             .map(ServiceLoader.Provider::get)
             .filter(f -> f.reads(spec.inputSpec()))
             .findFirst().orElseThrow();
@@ -120,6 +121,12 @@ to read it, since its name says which format it is in:
 `import static io.github.ralfspoeth.xldr.spec.io.MappingSpecReader.readSpec`. `MappingSpecReader.of(Path)` is the
 same lookup without the reading, for asking whether a file is a spec this build can read at all; `readSpec` insists,
 refusing an unsupported extension with an `IllegalArgumentException` before it opens anything.
+
+Note the second argument to `ServiceLoader.load` above, and use it in your own lookups. The one-argument form resolves
+against the *thread context* class loader, which a servlet container, a test runner or an application framework will
+have set to something of its own; where that loader cannot see these modules, the lookup finds no providers and
+reports nothing. Naming the loader that defined the service avoids the question, and it is what the toolkit does
+internally - so embedding `server` does not depend on what the embedding thread's context loader happens to be.
 
 ## Building and Releasing
 

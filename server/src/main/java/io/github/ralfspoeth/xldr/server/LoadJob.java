@@ -118,7 +118,10 @@ class LoadJob {
      * (and, for XML, recompile every XPath) per mapping.
      */
     private InputAdapter createInputAdapter(InputSpec inputSpec) {
-        var factory = ServiceLoader.load(InputAdapterFactory.class)
+        // the loader that defined the service, not the thread context one: see
+        // MappingSpecReader#of, where the same lookup done the other way sent a
+        // feed into a timeout with nothing wrong but the calling thread
+        var factory = ServiceLoader.load(InputAdapterFactory.class, InputAdapterFactory.class.getClassLoader())
                 .stream()
                 .map(ServiceLoader.Provider::get)
                 .filter(iaf -> iaf.reads(inputSpec))

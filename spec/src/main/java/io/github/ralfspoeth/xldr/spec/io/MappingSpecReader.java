@@ -25,12 +25,25 @@ public interface MappingSpecReader {
      * {@link #accepts} of the readers on the module path have to partition the
      * names between them; a name no reader claims yields nothing, and the
      * caller says what that means.
+     * <p/>
+     * The loader is named explicitly, and it is the one that defined this
+     * interface. The one-argument {@link ServiceLoader#load(Class)} would
+     * resolve against the <em>thread context</em> class loader instead - whatever
+     * that happens to be on the calling thread, which for a library is nobody's
+     * business but is everybody's problem. It is set by servlet containers, by
+     * test runners and by application frameworks, each to something of their own,
+     * and when it is set to a loader that cannot see this module the lookup
+     * quietly finds nothing: {@code of} returns empty, {@code readSpec} refuses
+     * every spec with "unsupported mapping spec format", and a feed never comes
+     * up for a reason that has nothing to do with the file. Asking the loader
+     * that defined the service is the answer, since it is the one that defined
+     * the providers too.
      *
      * @param path the spec file, which need not exist - only its name is read
      * @return the first reader that accepts it
      */
     static Optional<MappingSpecReader> of(Path path) {
-        return ServiceLoader.load(MappingSpecReader.class)
+        return ServiceLoader.load(MappingSpecReader.class, MappingSpecReader.class.getClassLoader())
                 .stream()
                 .map(ServiceLoader.Provider::get)
                 .filter(reader -> reader.accepts(path))
