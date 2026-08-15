@@ -150,12 +150,7 @@ class Validate implements Callable<Integer> {
      * cell reference the spec contains.
      */
     private static void checkAdapter(InputSpec input, List<String> problems) {
-        var factory = ServiceLoader.load(InputAdapterFactory.class, InputAdapterFactory.class.getClassLoader())
-                .stream()
-                .map(ServiceLoader.Provider::get)
-                .filter(f -> f.reads(input))
-                .findFirst()
-                .orElse(null);
+        var factory = InputAdapterFactory.of(input).orElse(null);
         if (factory == null) {
             problems.add("no input adapter for mime type " + input.mimeType()
                     + "; is its module on the module path?");

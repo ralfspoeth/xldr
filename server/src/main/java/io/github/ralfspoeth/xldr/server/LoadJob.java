@@ -1,9 +1,6 @@
 package io.github.ralfspoeth.xldr.server;
 
-import io.github.ralfspoeth.xldr.ia.InputAdapter;
-import io.github.ralfspoeth.xldr.ia.InputAdapterFactory;
 import io.github.ralfspoeth.xldr.ldr.Loader;
-import io.github.ralfspoeth.xldr.spec.InputSpec;
 import io.github.ralfspoeth.xldr.spec.MappingSpec;
 
 import java.io.IOException;
@@ -16,19 +13,12 @@ import static java.lang.System.Logger.Level.DEBUG;
 import static java.nio.charset.StandardCharsets.UTF_8;
 
 /**
- * Loads one file according to one {@link MappingSpec}.
+ * Loads one file of one feed.
  * <p>
- * The sequence is: pick the input adapter factory that accepts the input spec's
- * MIME type, create a single adapter for the file, and then run every record
- * mapping against it - each with a freshly opened stream, since a stream is
- * read only once.
- * <p>
- * The whole file is one transaction: {@link Loader#close()} commits, or rolls
- * back if any mapping failed.
- * <p>
- * Expressions are given two sets of ambient values: {@code xldr.} for what this
- * job knows about the load, and {@code env.} for what the feed's deployment
- * supplies through {@value #ENV_FILE}.
+ * The loading itself is {@link Loader#load}, which both front ends share. What is
+ * left here is what makes it a <em>feed's</em> file: the two ambient values a load
+ * from a directory can supply, being the file's own name and whatever the
+ * deployment put in {@value #ENV_FILE} beside the spec.
  */
 class LoadJob {
 
@@ -51,21 +41,13 @@ class LoadJob {
      * @return the total number of rows inserted across all record mappings
      */
     public int load(Path file) throws IOException, SQLException {
-        var adapter = createInputAdapter(mappingSpec.inputSpec());
         var ambient = new HashMap<String, Object>();
         ambient.put("xldr.filename", file.getFileName().toString());
         ambient.putAll(environment());
-
-        try (var connection = connectionSource.getConnection();
-             var loader = new Loader(mappingSpec, connection, ambient)) {
-            int total = 0;
-            for (var mapping : mappingSpec.recordMappingSpecs()) {
-                try (var in = Files.newInputStream(file)) {
-                    total += loader.loadInput(adapter, in, mapping);
-                }
-            }
-            return total;
-        }
+        // reopened per record mapping, which is the whole reason this takes a
+        // source rather than a stream
+        return Loader.load(mappingSpec, () -> Files.newInputStream(file),
+                ambient, connectionSource.getConnection());
     }
 
     /**
@@ -112,22 +94,4 @@ class LoadJob {
         return env;
     }
 
-    /**
-     * One adapter serves every record mapping of the file - {@code parse} takes
-     * the record selector as a parameter, so there is no reason to rebuild it
-     * (and, for XML, recompile every XPath) per mapping.
-     */
-    private InputAdapter createInputAdapter(InputSpec inputSpec) {
-        // the loader that defined the service, not the thread context one: see
-        // MappingSpecReader#of, where the same lookup done the other way sent a
-        // feed into a timeout with nothing wrong but the calling thread
-        var factory = ServiceLoader.load(InputAdapterFactory.class, InputAdapterFactory.class.getClassLoader())
-                .stream()
-                .map(ServiceLoader.Provider::get)
-                .filter(iaf -> iaf.reads(inputSpec))
-                .findFirst()
-                .orElseThrow(() -> new IllegalStateException(
-                        "no input adapter for mime type " + inputSpec.mimeType()));
-        return factory.createInputAdapter(inputSpec);
-    }
 }

@@ -32,8 +32,7 @@ final class Namespaces implements NamespaceContext {
 
     private final Map<String, String> byPrefix = new HashMap<>();
 
-    private Namespaces() {
-    }
+    private Namespaces() {}
 
     static Namespaces of(Map<String, String> properties) {
         var namespaces = new Namespaces();

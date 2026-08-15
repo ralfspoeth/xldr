@@ -70,7 +70,7 @@ fix their versions in one place:
             <dependency>
                 <groupId>io.github.ralfspoeth.xldr</groupId>
                 <artifactId>bom</artifactId>
-                <version>0.24</version>
+                <version>0.25</version>
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>
@@ -102,31 +102,32 @@ adapters are found through `ServiceLoader`, so each need only be on the module p
 to read it, since its name says which format it is in:
 
     var spec = readSpec(Path.of("/var/lib/xldr/people/spec.json"));
-    var factory = ServiceLoader.load(InputAdapterFactory.class, InputAdapterFactory.class.getClassLoader())
-            .stream()
-            .map(ServiceLoader.Provider::get)
-            .filter(f -> f.reads(spec.inputSpec()))
-            .findFirst().orElseThrow();
-    var adapter = factory.createInputAdapter(spec.inputSpec());
+    int rows = Loader.load(spec, () -> Files.newInputStream(file), Map.of(), connection);
+    // one transaction: committed, or rolled back if any mapping failed
 
-    try (var loader = new Loader(spec, connection)) {
-        for (var mapping : spec.recordMappingSpecs()) {
-            try (var in = Files.newInputStream(file)) {
-                loader.loadInput(adapter, in, mapping);
-            }
-        }
-    }   // commits, or rolls back if any mapping failed
+That is the whole of loading one input. `Loader.load` finds the adapter for the spec's MIME type, runs every record
+mapping over the input, commits, and closes the connection it was given. It is what the file server does with a file
+that has arrived and what a web application does with a request body, so it lives in `ldr` rather than in either.
+
+The input is an `InputSource` - openable, not opened - because a spec may carry several record mappings and each is
+run over the whole input. A file simply reopens; anything read from a socket has to be spooled somewhere first, and
+the interface says so rather than leaving it to be discovered from a load that quietly imported one mapping's worth
+of rows.
+
+The pieces underneath remain public for a caller that wants them: `InputAdapterFactory.of(inputSpec)` for the
+adapter, and the `Loader` constructor with `loadInput(adapter, in, mapping)` for driving the mappings by hand -
+useful when the mappings are not all wanted, or the transaction is not the whole input.
 
 `readSpec` is named to be static-imported, which is how it reads best - `readSpec(specFile)` at the call site, from
 `import static io.github.ralfspoeth.xldr.spec.io.MappingSpecReader.readSpec`. `MappingSpecReader.of(Path)` is the
 same lookup without the reading, for asking whether a file is a spec this build can read at all; `readSpec` insists,
 refusing an unsupported extension with an `IllegalArgumentException` before it opens anything.
 
-Note the second argument to `ServiceLoader.load` above, and use it in your own lookups. The one-argument form resolves
-against the *thread context* class loader, which a servlet container, a test runner or an application framework will
-have set to something of its own; where that loader cannot see these modules, the lookup finds no providers and
-reports nothing. Naming the loader that defined the service avoids the question, and it is what the toolkit does
-internally - so embedding `server` does not depend on what the embedding thread's context loader happens to be.
+Both service lookups - `MappingSpecReader.of` and `InputAdapterFactory.of` - resolve against the class loader that
+defined the service rather than the thread context one, and a caller writing its own lookup should do the same. The
+one-argument `ServiceLoader.load(Class)` uses the context loader, which a servlet container, a test runner or an
+application framework will have set to something of its own; where that loader cannot see these modules the lookup
+finds no providers and reports nothing at all.
 
 ## Building and Releasing
 

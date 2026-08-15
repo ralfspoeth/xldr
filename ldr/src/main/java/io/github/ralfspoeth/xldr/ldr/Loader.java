@@ -1,6 +1,7 @@
 package io.github.ralfspoeth.xldr.ldr;
 
 import io.github.ralfspoeth.xldr.ia.InputAdapter;
+import io.github.ralfspoeth.xldr.ia.InputAdapterFactory;
 import io.github.ralfspoeth.xldr.ia.Row;
 import io.github.ralfspoeth.xldr.spec.MappingSpec;
 import io.github.ralfspoeth.xldr.spec.RecordMappingSpec;
@@ -109,6 +110,49 @@ public class Loader implements AutoCloseable {
      */
     public Loader(MappingSpec ms, Connection connection) throws SQLException {
         this(ms, connection, Map.of());
+    }
+
+    /**
+     * Loads one whole input through one spec, as a single transaction.
+     * <p>
+     * The sequence is: find the adapter for the input spec, build one adapter for
+     * the input - {@code parse} takes the record selector as a parameter, so there
+     * is no reason to rebuild it, and for XML no reason to recompile every XPath -
+     * and then run each record mapping over the input in turn, opening it again
+     * for each because a stream is read once.
+     * <p>
+     * Everything or nothing: {@link #close()} commits at the end, or rolls back if
+     * any mapping failed. The connection is closed either way, this method having
+     * taken it over.
+     * <p>
+     * This is what both front ends do with an input once they have decided it is
+     * ready - the file server having watched a file arrive, a web application
+     * having read a request - so it lives here rather than in either of them.
+     *
+     * @param spec       the mapping spec; its input spec chooses the adapter
+     * @param source     the input, openable once per record mapping
+     * @param ambient    values expressions may read, under the reserved prefixes
+     * @param connection an open connection, closed by this method
+     * @return the total number of rows inserted, across every record mapping
+     * @throws IllegalStateException if no adapter on the module path reads the
+     *                               spec's MIME type
+     */
+    public static int load(MappingSpec spec, InputSource source,
+                           Map<String, Object> ambient, Connection connection)
+            throws IOException, SQLException {
+        var factory = InputAdapterFactory.of(spec.inputSpec())
+                .orElseThrow(() -> new IllegalStateException(
+                        "no input adapter for mime type " + spec.inputSpec().mimeType()));
+        var adapter = factory.createInputAdapter(spec.inputSpec());
+        try (var loader = new Loader(spec, connection, ambient)) {
+            int total = 0;
+            for (var mapping : spec.recordMappingSpecs()) {
+                try (var in = source.open()) {
+                    total += loader.loadInput(adapter, in, mapping);
+                }
+            }
+            return total;
+        }
     }
 
     /**

@@ -6,6 +6,40 @@ ways that break existing code and existing specs; those changes are listed here 
 The versions are the git tags `xldr-<version>`; the published artifacts carry the same version under the group
 `io.github.ralfspoeth.xldr`.
 
+## 0.25
+
+Nothing about the mapping-spec format changed, so `mapping-spec-0.23` remains its schema and a spec that loaded under
+0.24 loads under 0.25. What changed is that loading one input is now one call, in `ldr`, instead of something each
+front end assembled for itself.
+
+### Added
+
+- `Loader.load(spec, source, ambient, connection)` loads a whole input as one transaction: it finds the adapter for
+  the spec's MIME type, runs every record mapping over the input, and commits - or rolls back if any mapping failed -
+  closing the connection either way. Embedding the toolkit is now two lines rather than a dozen:
+
+      var spec = readSpec(Path.of("/var/lib/xldr/people/spec.json"));
+      int rows = Loader.load(spec, () -> Files.newInputStream(file), Map.of(), connection);
+
+  This is what the file server does with a file that has arrived, and what a web application would do with a request
+  body. It was private to `server`, wrapped around a feed directory, so the second caller would have had to depend on
+  the watcher and the feed registry to reach it.
+- `InputSource`, in `ldr`: a source an input can be opened from, more than once. Not an `InputStream` and not a
+  `Supplier<InputStream>` - a spec may carry several record mappings and each is run over the whole input, so the
+  input is opened once per mapping. A file reopens; anything read from a socket has to be spooled first. The name
+  says "again" so that nobody discovers it from a load that quietly imported one mapping's worth of rows.
+- `InputAdapterFactory.of(inputSpec)` finds the factory for an input spec, the counterpart of
+  `MappingSpecReader.of(Path)`. There were three copies of that `ServiceLoader` loop - in `LoadJob`, in
+  `bin/xldr validate`, and about to be a fourth - and knowing which factory reads a spec is knowledge about
+  factories.
+
+### Changed
+
+- `LoadJob` keeps only what makes a file a *feed's* file: the file name and the feed's `env.properties`. The loading
+  itself is the shared call.
+- The `uses io.github.ralfspoeth.xldr.ia.InputAdapterFactory` clause moves to the `ia` module, since the lookup now
+  runs there. A caller no longer declares it - putting the adapters on the module path is enough.
+
 ## 0.24
 
 Nothing about the mapping-spec format changed, so `mapping-spec-0.23` remains its schema and a spec that loaded under
