@@ -4,7 +4,7 @@
 
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <revision>0.25</revision>
+        <revision>0.26-SNAPSHOT</revision>
     </properties>
 
     <parent>
@@ -59,7 +59,7 @@
     <scm>
         <url>scm:git:https://github.com/ralfspoeth/xldr</url>
         <developerConnection>scm:git:https://github.com/ralfspoeth/xldr.git</developerConnection>
-        <tag>xldr-0.25</tag>
+        <tag>HEAD</tag>
     </scm>
 
     <dependencyManagement>
