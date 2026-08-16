@@ -75,7 +75,7 @@ public class XldrServlet extends HttpServlet {
     @Override
     public void init() throws ServletException {
         specs = SpecRegistry.read(getServletContext());
-        dataSource = dataSource(parameter("dataSource", "java:comp/env/jdbc/xldr"));
+        dataSource = dataSource();
         environment = environment();
         int concurrent = number("maxConcurrentLoads", 4);
         permits = new Semaphore(concurrent);
@@ -265,7 +265,22 @@ public class XldrServlet extends HttpServlet {
         return Map.copyOf(env);
     }
 
-    private DataSource dataSource(String jndiName) throws ServletException {
+    /**
+     * The database this servlet loads into, by default the {@code DataSource} at
+     * the JNDI name the {@code dataSource} init-param gives.
+     * <p>
+     * Protected because JNDI is the container's way and not the only way: a
+     * deployment that has its {@code DataSource} from Spring, from a CDI producer
+     * or from anywhere else overrides this and never touches a directory. It is
+     * also the seam the tests use, which is worth admitting - but a method that
+     * exists only for tests would be a different thing from one that happens to
+     * suit them.
+     */
+    protected DataSource dataSource() throws ServletException {
+        return fromJndi(parameter("dataSource", "java:comp/env/jdbc/xldr"));
+    }
+
+    private DataSource fromJndi(String jndiName) throws ServletException {
         try {
             if (new InitialContext().lookup(jndiName) instanceof DataSource found) {
                 return found;

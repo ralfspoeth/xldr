@@ -3,10 +3,9 @@
 An [xldr](https://github.com/ralfspoeth/xldr) front end for a servlet container: the
 same loading, entered over HTTP instead of by dropping a file into a directory.
 
-> **Design note, not documentation.** Nothing below is implemented yet. It is
-> written down first so that it can be argued with in a diff rather than in a
-> chat window, and so that the decisions have their reasons attached when
-> somebody asks in a year why it looks like this.
+> Written as a design note before any code existed, so that the decisions could be
+> argued with in a diff rather than in a chat window. It is now a description of
+> what is there - and the reasons stayed attached, which was the point.
 
 ## What it is
 
@@ -128,22 +127,22 @@ The `env.` convention is unchanged from the file server, so a spec moves between
 two without editing: only where the values come from differs, a properties file there
 and the container's environment here.
 
-## What xldr has to grow first
+## What it stands on
 
-`xlet` needs the operation that `LoadJob` performs in `server` - find the adapter for
-the input spec, then run every record mapping in one transaction and commit - and
-that class is package-private there, wrapped around a feed directory and a `Path`.
-Depending on `server` to reach it would drag the watcher, the registry and the file
-processor into a web application that wants none of them.
+The load itself is `Loader.load(spec, source, ambient, connection)` in xldr's `ldr`
+module - find the adapter for the input spec, run every record mapping, commit or
+roll back. It used to be private to `server`, wrapped around a feed directory, and
+came down in xldr 0.25 so that both front ends could reach it without one depending
+on the other. The file server passes a file; this passes the spooled request.
 
-So it moves down, taking a `Supplier<InputStream>` and an ambient map instead of a
-`Path` and a feed directory. `ldr` is the natural home: `Loader` already lives there
-and already means "load through a mapping spec into a connection". `server` then
-calls it with a file, `xlet` with a spooled request, and neither owns it.
+The input is an `InputSource` rather than a stream, because a spec may carry several
+record mappings and each is run over the whole input - a file reopens, a socket does
+not, which is what the spooling is for.
 
 ## Monitoring
 
-An MXBean, as in `server`, and the same `Statistics` behind it.
+*Decided, not yet built.* An MXBean, as in `server`, and the same `Statistics`
+behind it.
 
 `Statistics` turns out to divide cleanly: it holds only load counters - starts,
 finishes, rows, failures, last load, per feed and in total - while every file-shaped

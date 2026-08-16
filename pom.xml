@@ -18,6 +18,12 @@
         <maven.compiler.source>25</maven.compiler.source>
         <maven.compiler.target>25</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <!--
+            EE11 is the Jakarta release that carries Servlet 6.1, which is the API
+            this module compiles against - hence the ee11 artifacts and a 12.1 line.
+            Pairing 6.1 with Jetty's ee10 modules would not resolve.
+        -->
+        <jetty.version>12.1.12</jetty.version>
     </properties>
 
     <dependencies>
@@ -35,6 +41,36 @@
         <dependency>
             <groupId>io.github.ralfspoeth.xldr</groupId>
             <artifactId>ldr</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter-api</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <!-- one test loads for real, which needs a database and an adapter to
+             read with; the refusals need neither -->
+        <dependency>
+            <groupId>com.h2database</groupId>
+            <artifactId>h2</artifactId>
+            <version>2.4.240</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>io.github.ralfspoeth.xldr</groupId>
+            <artifactId>csv</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <!--
+            An embedded container for the integration test. Jetty rather than
+            Tomcat: it is built to be embedded, and ServletContextHandler takes a
+            resource base directly - which is what lets the test exercise the real
+            /WEB-INF/specs/ lookup rather than a fake of it.
+        -->
+        <dependency>
+            <groupId>org.eclipse.jetty.ee11</groupId>
+            <artifactId>jetty-ee11-servlet</artifactId>
+            <version>${jetty.version}</version>
+            <scope>test</scope>
         </dependency>
     </dependencies>
 
@@ -61,5 +97,6 @@
             </dependency>
         </dependencies>
     </dependencyManagement>
+
 
 </project>

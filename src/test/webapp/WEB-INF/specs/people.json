@@ -1,0 +1,18 @@
+{
+  "input": {
+    "mimeType": "text/csv",
+    "properties": { "fieldSeparator": "," },
+    "recordSelectors": [
+      { "name": "people", "fieldSelectors": [
+          {"name": "id",   "selector": "id",   "type": "TEXT"},
+          {"name": "name", "selector": "name", "type": "TEXT"}
+      ] }
+    ]
+  },
+  "mapping": [
+    { "recordSelector": "people", "table": "person", "fieldMapping": [
+        {"fieldSelector": "id",   "column": "id"},
+        {"fieldSelector": "name", "column": "name"}
+    ] }
+  ]
+}
