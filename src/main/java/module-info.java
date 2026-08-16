@@ -1,3 +1,5 @@
+import org.jspecify.annotations.NullMarked;
+
 /**
  * An xldr front end for a servlet container: one input per request, loaded through
  * a spec the deployment carries.
@@ -7,7 +9,10 @@
  * its adapters by putting them on the module path and this module needs no
  * {@code uses} of its own.
  */
+@NullMarked
 module io.github.ralfspoeth.xldr.xlet {
+    // null specs
+    requires static org.jspecify;
 
     // supplied by the container, hence provided scope in the pom
     requires jakarta.servlet;

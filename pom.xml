@@ -27,6 +27,11 @@
     </properties>
 
     <dependencies>
+        <!-- nullness -->
+        <dependency>
+            <groupId>org.jspecify</groupId>
+            <artifactId>jspecify</artifactId>
+        </dependency>
         <!-- the servlet -->
         <dependency>
             <groupId>jakarta.servlet</groupId>
@@ -97,6 +102,4 @@
             </dependency>
         </dependencies>
     </dependencyManagement>
-
-
 </project>

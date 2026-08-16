@@ -96,7 +96,7 @@ class XldrServletTest {
             return dataSource;
         }
 
-        void post(HttpServletRequest request, Fakes.Recorded response) throws IOException {
+        void post(HttpServletRequest request, Mocks.Recorded response) throws IOException {
             doPost(request, response.response());
         }
     }
@@ -111,12 +111,12 @@ class XldrServletTest {
     }
 
     private static ServletConfig configWith(Map<String, String> specs, Map<String, String> initParams) {
-        return Fakes.config(Fakes.context(specs, Map.of()), initParams);
+        return Mocks.config(Mocks.context(specs, Map.of()), initParams);
     }
 
-    private static Testable started(Map<String, String> initParams, Fakes.Counting dataSource) throws ServletException {
+    private static Testable started(Map<String, String> initParams, Mocks.Counting dataSource) throws ServletException {
         var servlet = new Testable(dataSource.dataSource());
-        servlet.init(configWith(Map.of(Fakes.SPECS + "people.json", PEOPLE_SPEC), initParams));
+        servlet.init(configWith(Map.of(Mocks.SPECS + "people.json", PEOPLE_SPEC), initParams));
         return servlet;
     }
 
@@ -129,17 +129,17 @@ class XldrServletTest {
      */
     @Test
     void refusesToStartWithoutSpecs() {
-        var servlet = new Testable(Fakes.dataSource(null).dataSource());
+        var servlet = new Testable(Mocks.dataSource(null).dataSource());
         var thrown = assertThrows(ServletException.class,
                 () -> servlet.init(configWith(Map.of(), Map.of())));
-        assertTrue(thrown.getMessage().contains(Fakes.SPECS), thrown.getMessage());
+        assertTrue(thrown.getMessage().contains(Mocks.SPECS), thrown.getMessage());
     }
 
     @Test
     void refusesASpecThatWillNotParse() {
-        var servlet = new Testable(Fakes.dataSource(null).dataSource());
+        var servlet = new Testable(Mocks.dataSource(null).dataSource());
         var thrown = assertThrows(ServletException.class, () -> servlet.init(configWith(
-                Map.of(Fakes.SPECS + "broken.json", "{ \"input\": "), Map.of())));
+                Map.of(Mocks.SPECS + "broken.json", "{ \"input\": "), Map.of())));
         assertTrue(thrown.getMessage().contains("broken.json"), thrown.getMessage());
     }
 
@@ -149,9 +149,9 @@ class XldrServletTest {
      */
     @Test
     void refusesASpecNoAdapterReads() {
-        var servlet = new Testable(Fakes.dataSource(null).dataSource());
+        var servlet = new Testable(Mocks.dataSource(null).dataSource());
         var thrown = assertThrows(ServletException.class, () -> servlet.init(configWith(
-                Map.of(Fakes.SPECS + "exotic.json", PEOPLE_SPEC.replace("text/csv", "application/x-nonesuch")),
+                Map.of(Mocks.SPECS + "exotic.json", PEOPLE_SPEC.replace("text/csv", "application/x-nonesuch")),
                 Map.of())));
         assertAll(
                 () -> assertTrue(thrown.getMessage().contains("application/x-nonesuch"), thrown.getMessage()),
@@ -165,10 +165,10 @@ class XldrServletTest {
      */
     @Test
     void refusesTwoSpecsOfTheSameName() {
-        var servlet = new Testable(Fakes.dataSource(null).dataSource());
+        var servlet = new Testable(Mocks.dataSource(null).dataSource());
         var thrown = assertThrows(ServletException.class, () -> servlet.init(configWith(
-                Map.of(Fakes.SPECS + "people.json", PEOPLE_SPEC,
-                        Fakes.SPECS + "people.xml", PEOPLE_SPEC_XML),
+                Map.of(Mocks.SPECS + "people.json", PEOPLE_SPEC,
+                        Mocks.SPECS + "people.xml", PEOPLE_SPEC_XML),
                 Map.of())));
         assertAll(
                 () -> assertTrue(thrown.getMessage().contains("people"), thrown.getMessage()),
@@ -180,10 +180,10 @@ class XldrServletTest {
 
     @Test
     void refusesAPathBelowItsMapping() throws Exception {
-        var dataSource = Fakes.dataSource(null);
-        var response = new Fakes.Recorded();
+        var dataSource = Mocks.dataSource(null);
+        var response = new Mocks.Recorded();
         started(Map.of(), dataSource).post(
-                Fakes.post("text/csv", Map.of("spec", "people"), TWO_PEOPLE, "/people", 20), response);
+                Mocks.post("text/csv", Map.of("spec", "people"), TWO_PEOPLE, "/people", 20), response);
         assertEquals(400, response.status(), response.body());
         assertEquals(0, dataSource.connectionsTaken(), "no connection should have been taken");
         assertTrue(response.body().contains("/people"), response.body());
@@ -196,19 +196,19 @@ class XldrServletTest {
      */
     @Test
     void refusesAFormEncodedRequest() throws Exception {
-        var dataSource = Fakes.dataSource(null);
-        var response = new Fakes.Recorded();
+        var dataSource = Mocks.dataSource(null);
+        var response = new Mocks.Recorded();
         started(Map.of(), dataSource).post(
-                Fakes.post("application/x-www-form-urlencoded", Map.of("spec", "people"), TWO_PEOPLE), response);
+                Mocks.post("application/x-www-form-urlencoded", Map.of("spec", "people"), TWO_PEOPLE), response);
         assertEquals(415, response.status(), response.body());
         assertEquals(0, dataSource.connectionsTaken(), "no connection should have been taken");
     }
 
     @Test
     void refusesARequestNamingNoSpec() throws Exception {
-        var dataSource = Fakes.dataSource(null);
-        var response = new Fakes.Recorded();
-        started(Map.of(), dataSource).post(Fakes.post("text/csv", Map.of(), TWO_PEOPLE), response);
+        var dataSource = Mocks.dataSource(null);
+        var response = new Mocks.Recorded();
+        started(Map.of(), dataSource).post(Mocks.post("text/csv", Map.of(), TWO_PEOPLE), response);
         assertEquals(400, response.status(), response.body());
         assertEquals(0, dataSource.connectionsTaken(), "no connection should have been taken");
         // the message lists what there is, so the caller can fix it
@@ -217,10 +217,10 @@ class XldrServletTest {
 
     @Test
     void refusesASpecItDoesNotHave() throws Exception {
-        var dataSource = Fakes.dataSource(null);
-        var response = new Fakes.Recorded();
+        var dataSource = Mocks.dataSource(null);
+        var response = new Mocks.Recorded();
         started(Map.of(), dataSource).post(
-                Fakes.post("text/csv", Map.of("spec", "salaries"), TWO_PEOPLE), response);
+                Mocks.post("text/csv", Map.of("spec", "salaries"), TWO_PEOPLE), response);
         assertEquals(404, response.status(), response.body());
         assertEquals(0, dataSource.connectionsTaken(), "no connection should have been taken");
         assertAll(
@@ -235,10 +235,10 @@ class XldrServletTest {
      */
     @Test
     void refusesAContentTypeTheAdapterDoesNotRead() throws Exception {
-        var dataSource = Fakes.dataSource(null);
-        var response = new Fakes.Recorded();
+        var dataSource = Mocks.dataSource(null);
+        var response = new Mocks.Recorded();
         started(Map.of(), dataSource).post(
-                Fakes.post("application/json", Map.of("spec", "people"), TWO_PEOPLE), response);
+                Mocks.post("application/json", Map.of("spec", "people"), TWO_PEOPLE), response);
         assertEquals(415, response.status(), response.body());
         assertEquals(0, dataSource.connectionsTaken(), "no connection should have been taken");
         assertAll(
@@ -248,10 +248,10 @@ class XldrServletTest {
 
     @Test
     void refusesABodyThatDeclaresItselfTooLarge() throws Exception {
-        var dataSource = Fakes.dataSource(null);
-        var response = new Fakes.Recorded();
+        var dataSource = Mocks.dataSource(null);
+        var response = new Mocks.Recorded();
         started(Map.of("maxBytes", "10"), dataSource).post(
-                Fakes.post("text/csv", Map.of("spec", "people"), TWO_PEOPLE, null, 5_000), response);
+                Mocks.post("text/csv", Map.of("spec", "people"), TWO_PEOPLE, null, 5_000), response);
         assertEquals(413, response.status(), response.body());
         assertEquals(0, dataSource.connectionsTaken(), "no connection should have been taken");
     }
@@ -263,10 +263,10 @@ class XldrServletTest {
      */
     @Test
     void refusesABodyThatTurnsOutTooLarge() throws Exception {
-        var dataSource = Fakes.dataSource(null);
-        var response = new Fakes.Recorded();
+        var dataSource = Mocks.dataSource(null);
+        var response = new Mocks.Recorded();
         started(Map.of("maxBytes", "10"), dataSource).post(
-                Fakes.post("text/csv", Map.of("spec", "people"), TWO_PEOPLE, null, -1L), response);
+                Mocks.post("text/csv", Map.of("spec", "people"), TWO_PEOPLE, null, -1L), response);
         assertEquals(413, response.status(), response.body());
         assertEquals(0, dataSource.connectionsTaken(), "no connection should have been taken");
         assertEquals(List.of(), rows(), "and nothing was loaded");
@@ -280,10 +280,10 @@ class XldrServletTest {
      */
     @Test
     void refusesToQueueWhenThereIsNoRoom() throws Exception {
-        var dataSource = Fakes.dataSource(null);
-        var response = new Fakes.Recorded();
+        var dataSource = Mocks.dataSource(null);
+        var response = new Mocks.Recorded();
         started(Map.of("maxConcurrentLoads", "0", "acquireTimeoutMillis", "0"), dataSource)
-                .post(Fakes.post("text/csv", Map.of("spec", "people"), TWO_PEOPLE), response);
+                .post(Mocks.post("text/csv", Map.of("spec", "people"), TWO_PEOPLE), response);
         assertEquals(503, response.status(), response.body());
         assertEquals("1", response.header("Retry-After"));
         assertEquals(0, dataSource.connectionsTaken(), "no connection should have been taken");
@@ -293,9 +293,9 @@ class XldrServletTest {
 
     @Test
     void loadsTheBodyThroughTheNamedSpec() throws Exception {
-        var response = new Fakes.Recorded();
-        started(Map.of(), Fakes.dataSource(JDBC_URL))
-                .post(Fakes.post("text/csv", Map.of("spec", "people"), TWO_PEOPLE), response);
+        var response = new Mocks.Recorded();
+        started(Map.of(), Mocks.dataSource(JDBC_URL))
+                .post(Mocks.post("text/csv", Map.of("spec", "people"), TWO_PEOPLE), response);
         assertEquals(200, response.status(), response.body());
         assertAll(
                 () -> assertTrue(response.body().contains("2"), response.body()),
@@ -308,9 +308,9 @@ class XldrServletTest {
      */
     @Test
     void ignoresTheCharsetOnTheContentType() throws Exception {
-        var response = new Fakes.Recorded();
-        started(Map.of(), Fakes.dataSource(JDBC_URL))
-                .post(Fakes.post("text/csv; charset=UTF-8", Map.of("spec", "people"), TWO_PEOPLE), response);
+        var response = new Mocks.Recorded();
+        started(Map.of(), Mocks.dataSource(JDBC_URL))
+                .post(Mocks.post("text/csv; charset=UTF-8", Map.of("spec", "people"), TWO_PEOPLE), response);
         assertEquals(200, response.status(), response.body());
         assertEquals(2, rows().size(), response.body());
     }

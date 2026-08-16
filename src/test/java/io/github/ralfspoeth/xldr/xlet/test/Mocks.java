@@ -6,6 +6,7 @@ import jakarta.servlet.ServletContext;
 import jakarta.servlet.ServletInputStream;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.jspecify.annotations.NonNull;
 
 import javax.sql.DataSource;
 import java.io.ByteArrayInputStream;
@@ -43,11 +44,11 @@ import static java.nio.charset.StandardCharsets.UTF_8;
  * of the request will see that default and fail, which is the moment to decide
  * whether the servlet ought to be asking.
  */
-final class Fakes {
+final class Mocks {
 
     static final String SPECS = "/WEB-INF/specs/";
 
-    private Fakes() {
+    private Mocks() {
     }
 
     @SuppressWarnings("unchecked")
@@ -59,7 +60,7 @@ final class Fakes {
             }
             return answer != null ? answer : defaultOf(method.getReturnType());
         };
-        return (T) Proxy.newProxyInstance(Fakes.class.getClassLoader(), new Class<?>[]{type}, handler);
+        return (T) Proxy.newProxyInstance(Mocks.class.getClassLoader(), new Class<?>[]{type}, handler);
     }
 
     /**
@@ -154,7 +155,7 @@ final class Fakes {
             }
 
             @Override
-            public int read(byte[] buffer, int offset, int length) {
+            public int read(byte @NonNull [] buffer, int offset, int length) {
                 return source.read(buffer, offset, length);
             }
 
