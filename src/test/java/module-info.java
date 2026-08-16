@@ -1,13 +1,17 @@
 /**
  * Open, because JUnit reflects on the tests. Nothing else here needs it: the
- * servlet API is faked with java.lang.reflect proxies, which ask no favours of
- * the module system.
+ * servlet API is stood in for by java.lang.reflect proxies, which ask no favours
+ * of the module system.
  */
 open module io.github.ralfspoeth.xldr.xlet.test {
 
     requires transitive io.github.ralfspoeth.xldr.xlet;
     requires jakarta.servlet;
     requires org.junit.jupiter.api;
+
+    // named here rather than inherited: the main module's requires is static and
+    // therefore not transitive, so requiring xlet brings no annotations along
+    requires static org.jspecify;
 
     // the one test that really loads: an in-memory database reached through
     // DriverManager, so that nothing here depends on a vendor's types

@@ -7,6 +7,7 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.jspecify.annotations.Nullable;
 
 import javax.naming.InitialContext;
 import javax.naming.NamingException;
@@ -219,7 +220,7 @@ public class XldrServlet extends HttpServlet {
      * Never left behind - not when the load fails, not when the body is too large,
      * and not when the client vanishes half way through the upload.
      */
-    private static void delete(Path file) {
+    private static void delete(@Nullable Path file) {
         if (file == null) {
             return;
         }
@@ -233,7 +234,7 @@ public class XldrServlet extends HttpServlet {
     /**
      * {@code text/csv; charset=UTF-8} is {@code text/csv} to an adapter.
      */
-    private static String baseType(String contentType) {
+    private static @Nullable String baseType(@Nullable String contentType) {
         if (contentType == null) {
             return null;
         }

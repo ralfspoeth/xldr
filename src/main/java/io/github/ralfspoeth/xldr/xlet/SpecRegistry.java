@@ -5,6 +5,7 @@ import io.github.ralfspoeth.xldr.spec.MappingSpec;
 import io.github.ralfspoeth.xldr.spec.io.MappingSpecReader;
 import jakarta.servlet.ServletContext;
 import jakarta.servlet.ServletException;
+import org.jspecify.annotations.Nullable;
 
 import java.io.IOException;
 import java.nio.file.Path;
@@ -111,7 +112,7 @@ final class SpecRegistry {
     /**
      * @return the spec of that name, or {@code null} if the deployment carries none
      */
-    MappingSpec get(String name) {
+    @Nullable MappingSpec get(String name) {
         return specs.get(name);
     }
 

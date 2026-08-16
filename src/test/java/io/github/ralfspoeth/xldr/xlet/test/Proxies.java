@@ -35,20 +35,20 @@ import static java.nio.charset.StandardCharsets.UTF_8;
  * The compatibility tax was for powers we had already declined.
  * <p>
  * {@link Proxy} has none of that: it makes proxies for interfaces, which is all
- * that is wanted, it is in the JDK, and it is forty lines. What is faked is small
- * anyway - five methods of a request, three of a response - because the servlet was
- * written to ask the container for as little as possible.
+ * that is wanted, it is in the JDK, and it is forty lines. What has to be stood in
+ * for is small anyway - five methods of a request, three of a response - because the
+ * servlet was written to ask the container for as little as possible.
  * <p>
  * Every method not named here returns the type's default: {@code null}, zero or
  * false. Deliberately, not lazily. A test that comes to depend on some other part
  * of the request will see that default and fail, which is the moment to decide
  * whether the servlet ought to be asking.
  */
-final class Mocks {
+final class Proxies {
 
     static final String SPECS = "/WEB-INF/specs/";
 
-    private Mocks() {
+    private Proxies() {
     }
 
     @SuppressWarnings("unchecked")
@@ -60,7 +60,7 @@ final class Mocks {
             }
             return answer != null ? answer : defaultOf(method.getReturnType());
         };
-        return (T) Proxy.newProxyInstance(Mocks.class.getClassLoader(), new Class<?>[]{type}, handler);
+        return (T) Proxy.newProxyInstance(Proxies.class.getClassLoader(), new Class<?>[]{type}, handler);
     }
 
     /**

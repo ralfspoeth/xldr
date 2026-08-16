@@ -29,8 +29,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * The servlet in a real container, over a real socket.
  * <p>
  * {@code XldrServletTest} covers the decisions; this covers the assumptions
- * underneath them, which are the things a fake cannot be wrong about on the
- * container's behalf:
+ * underneath them, which are the things no proxy can settle on the container's
+ * behalf:
  * <ul>
  *   <li>that {@code /WEB-INF/specs/} is found through
  *       {@link jakarta.servlet.ServletContext#getResourcePaths}, from a directory
@@ -50,7 +50,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * <p>
  * The {@code DataSource} still comes from {@link XldrServlet}'s
  * {@code dataSource()} seam rather than from JNDI, and deliberately so: a JNDI environment inside Jetty
- * would test Jetty's naming, and a fake {@code InitialContextFactory} would test the
+ * would test Jetty's naming, and an {@code InitialContextFactory} of our own would test the
  * two {@code throw} statements in the lookup at the price of a global system
  * property. The lookup is three lines with no branch of its own - the container
  * either has the name or it does not, and it says which at startup.
@@ -89,7 +89,7 @@ class XldrServletIT {
 
         var context = new ServletContextHandler(CONTEXT);
         // the point of this test: a real web application layout, so that
-        // /WEB-INF/specs/ is resolved by the container and not by a fake
+        // /WEB-INF/specs/ is resolved by the container and not by a proxy
         context.setBaseResourceAsPath(Path.of("src/test/webapp").toAbsolutePath());
         context.addServlet(Deployed.class, "/load");
         server.setHandler(context);
