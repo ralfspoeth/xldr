@@ -258,11 +258,26 @@ class FileProcessor {
         return target;
     }
 
+    /**
+     * The log first, the input last.
+     * <p>
+     * The other order leaves a window - short, but a window - in which
+     * {@code hospital/} holds a file with no explanation beside it, and if the
+     * process dies inside that window the file stays that way. An operator finds
+     * a failed input and nothing saying why, and {@code filesInHospital} counts
+     * it, since that gauge counts everything that is not a {@code .log}. Writing
+     * the log first costs nothing: {@link #unique} looks only for the input's own
+     * name, so the log cannot change which name the input gets, and a failure to
+     * write it leaves the input in {@code work/} for {@link #recoverWork} rather
+     * than hospitalised in silence.
+     * <p>
+     * The move is the last thing that happens either way, which makes the input's
+     * appearance the signal that this feed is done with the file.
+     */
     private void hospitalise(Feed.Active feed, Path claimed, Exception failure) throws IOException {
         Files.createDirectories(feed.hospital());
         var name = claimed.getFileName().toString();
         var target = unique(feed.hospital(), name);
-        Files.move(claimed, target);
         var log = feed.hospital().resolve(target.getFileName() + "." + LocalDateTime.now().format(STAMP) + ".log");
         var trace = new StringWriter();
         try (var out = new PrintWriter(trace)) {
@@ -277,6 +292,7 @@ class FileProcessor {
             failure.printStackTrace(out);
         }
         Files.writeString(log, trace.toString());
+        Files.move(claimed, target);
     }
 
     /**
@@ -290,7 +306,8 @@ class FileProcessor {
                 try {
                     var target = unique(feed.hospital(), file.getFileName().toString());
                     Files.createDirectories(feed.hospital());
-                    Files.move(file, target);
+                    // the log first and the move last, as in hospitalise: a file
+                    // in hospital/ is never there without its explanation
                     Files.writeString(
                             feed.hospital().resolve(target.getFileName() + ".recovered.log"),
                             """
@@ -298,6 +315,7 @@ class FileProcessor {
                                     Whether its transaction committed is unknown - check the target tables
                                     before moving it back into in/.
                                     """);
+                    Files.move(file, target);
                     LOG.log(WARNING, () -> "recovered stale claim " + file.getFileName()
                             + " [" + feed.name() + "] -> hospital");
                 } catch (IOException e) {

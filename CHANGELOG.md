@@ -43,6 +43,11 @@ spec that names nothing beyond the MIME type reads the format that MIME type mea
 
 ### Fixed
 
+- A hospitalised input has its `.log` beside it from the first moment it is visible. The file was moved into
+  `hospital/` and the log written after, so for a short window - and permanently, if the process died inside it - an
+  operator would find a failed input with nothing saying why, and `filesInHospital` would count it, that gauge
+  counting everything that is not a `.log`. The log is written first now and the move is last, which costs nothing:
+  the log is named after the input, and the input's name is chosen before either is written.
 - `validate` understands `header = present`. It read the setting with `Boolean.parseBoolean`, which knows `true` and
   `false` and makes `false` of everything else - so a spec spelling it the way the documentation recommends was taken
   for a headerless one, and skipped the discriminator check that exists for headed files exactly. The spelling most

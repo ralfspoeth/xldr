@@ -118,18 +118,14 @@ public class ServerIT {
                 1,Alice
                 """);
 
-        await("the input to be hospitalised", () -> {
-            try (var files = Files.list(feed.resolve("hospital"))) {
-                return files.anyMatch(p -> p.getFileName().toString().startsWith("bad.csv"));
-            } catch (IOException e) {
-                return false;
-            }
-        });
-        try (var files = Files.list(feed.resolve("hospital"))) {
-            var names = files.map(p -> p.getFileName().toString()).toList();
-            assertTrue(names.contains("bad.csv"), "the input itself: " + names);
-            assertTrue(names.stream().anyMatch(n -> n.endsWith(".log")), "an error log: " + names);
-        }
+        // the input itself, not merely something named after it: the log is
+        // written first and is named after the input, so `startsWith` would be
+        // satisfied by the explanation before the file it explains has arrived
+        await("the input to be hospitalised", () -> hospital(feed).contains("bad.csv"));
+
+        var names = hospital(feed);
+        assertTrue(names.contains("bad.csv"), "the input itself: " + names);
+        assertTrue(names.stream().anyMatch(n -> n.endsWith(".log")), "an error log: " + names);
         assertEquals(List.of(), selectPersons(), "nothing may have been inserted");
     }
 
@@ -646,6 +642,18 @@ public class ServerIT {
                 ManagementFactory.getPlatformMBeanServer(),
                 new ObjectName("io.github.ralfspoeth.xldr:type=Server"),
                 ServerMXBean.class);
+    }
+
+    /**
+     * The file names in a feed's {@code hospital/}, or none where the server has
+     * not created it yet - so that a poll can ask before there is anything there.
+     */
+    private static List<String> hospital(Path feed) {
+        try (var files = Files.list(feed.resolve("hospital"))) {
+            return files.map(p -> p.getFileName().toString()).toList();
+        } catch (IOException e) {
+            return List.of();
+        }
     }
 
     private static List<Path> archived(Path feed) {
