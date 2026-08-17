@@ -29,8 +29,11 @@
         <module>bom</module>
         <!-- the server, embeddable without the distribution's decisions -->
         <module>server</module>
-        <!-- app and it are part of the reactor but not published -->
+        <!-- the two front ends and the integration tests: part of the reactor,
+             so that a change to the library is checked against them at once,
+             but not published -->
         <module>app</module>
+        <module>xlet</module>
         <module>it</module>
     </modules>
     <artifactId>xldr</artifactId>

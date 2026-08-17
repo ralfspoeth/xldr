@@ -96,8 +96,9 @@ unaffected.
 
 The `bom` manages exactly the published artifacts - `spec`, `ia`, `ldr`, `server` and the adapters `csv`, `xml`,
 `xlsx`, `flt` and `json` - and deliberately no third-party versions, so importing it does not bind you to the POI, HikariCP or JDBC
-driver versions this build happens to use. `app` and `it` are not published at all: `app` is the
-distribution rather than a library, and what an application would embed is `server`. Both the spec readers and the
+driver versions this build happens to use. `app`, `xlet` and `it` are not published at all: `app` is the
+distribution rather than a library, `xlet` is a front end to read and adapt rather than to depend on, and what an
+application would embed is `server`. Both the spec readers and the
 adapters are found through `ServiceLoader`, so each need only be on the module path - naming the spec file is enough
 to read it, since its name says which format it is in:
 
@@ -148,6 +149,11 @@ modules by their dependencies:
   plus the distribution. Those are the choices a *runner* makes rather than the server's own, which is why they are
   separate - an embedder brings its own and should not inherit picocli and HikariCP for the privilege. The adapters
   are `provided` dependencies here, so they reach the module path without being bundled into `app`'s own footprint;
+* `xlet` - the other front end: one input per HTTP request, loaded through a spec the deployment carries under
+  `/WEB-INF/specs/`, for a servlet container. It is a peer of `app` rather than a part of `server` - the request *is*
+  the delivery, so nothing there watches a directory or claims a file by moving it - and it reaches the same
+  `Loader.load` from the other side. Not published: it is a front end to read and adapt to a deployment, not a
+  library to depend on. Its own README argues the design;
 * `it` - integration tests exercising the whole pipeline end to end against a local H2 database. It depends on
   `server` and the adapters, not on `app`: a test supplies its own `ConnectionSource` as a lambda, so what is
   exercised is the server rather than the way the distribution happens to run it. Tests that need no database and no

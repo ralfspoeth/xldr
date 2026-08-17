@@ -122,7 +122,10 @@ public class XldrServlet extends HttpServlet {
     private Outcome examine(HttpServletRequest req) {
         var pathInfo = req.getPathInfo();
         if (pathInfo != null && !pathInfo.equals("/")) {
-            // ignoring it would teach the next reader that the path means something
+            // only reachable under a wildcard mapping - an exact one leaves
+            // .../load/extra to the container's default servlet - which is
+            // exactly the deployment where ignoring a trailing path would teach
+            // the next reader that the path means something
             return new Outcome.Refused(400,
                     "no path expected after the servlet's mapping, got " + pathInfo);
         }

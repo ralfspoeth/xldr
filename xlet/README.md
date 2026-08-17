@@ -1,7 +1,7 @@
 # xlet
 
-An [xldr](https://github.com/ralfspoeth/xldr) front end for a servlet container: the
-same loading, entered over HTTP instead of by dropping a file into a directory.
+An xldr front end for a servlet container: the same loading, entered over HTTP
+instead of by dropping a file into a directory.
 
 > Written as a design note before any code existed, so that the decisions could be
 > argued with in a diff rather than in a chat window. It is now a description of
@@ -73,6 +73,12 @@ parsed for parameters either.
 below it. Silently ignoring a trailing path would let `…/typo?spec=x` work and teach
 the next reader that the path means something.
 
+This only arises where the deployer maps the servlet with a wildcard - `/load/*`
+rather than `/load` - since an exact mapping leaves `…/load/extra` to the
+container's default servlet, which answers a POST with `405` before this servlet is
+consulted. The check is therefore what makes a wildcard mapping safe rather than
+sloppy, and it is why the deployment is `web.xml`'s decision and not an annotation's.
+
 **The spec chooses the adapter; the request's content type is only checked.** As
 everywhere else in xldr, the adapter comes from the spec's `mimeType`, and the
 selectors were written for that adapter. The request's `Content-Type` is then put to
@@ -129,11 +135,17 @@ and the container's environment here.
 
 ## What it stands on
 
-The load itself is `Loader.load(spec, source, ambient, connection)` in xldr's `ldr`
+The load itself is `Loader.load(spec, source, ambient, connection)` in the `ldr`
 module - find the adapter for the input spec, run every record mapping, commit or
 roll back. It used to be private to `server`, wrapped around a feed directory, and
-came down in xldr 0.25 so that both front ends could reach it without one depending
-on the other. The file server passes a file; this passes the spooled request.
+came down in 0.25 so that both front ends could reach it without one depending on
+the other. The file server passes a file; this passes the spooled request.
+
+This module lived in its own repository until 0.27, which meant a change to the
+library reached it at the next version bump and was checked by whoever remembered
+to check it. In the reactor `mvn verify` checks it. It is built but not published,
+for the reason `app` is not: it is a front end to read and adapt to a deployment
+rather than a library to depend on.
 
 The input is an `InputSource` rather than a stream, because a spec may carry several
 record mappings and each is run over the whole input - a file reopens, a socket does

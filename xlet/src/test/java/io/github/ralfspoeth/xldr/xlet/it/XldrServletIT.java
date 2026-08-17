@@ -41,7 +41,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  *   <li>that a body arrives whole through a socket and a real
  *       {@code ServletInputStream}, in as many reads as the container feels like;</li>
  *   <li>and that {@code getPathInfo} is null at the servlet's own mapping and set
- *       below it, which is what the 400 depends on.</li>
+ *       below it, which is what the 400 depends on - and that it is a wildcard
+ *       mapping which makes that so, an exact one leaving the request to the
+ *       default servlet and a 405. That is the sort of thing a proxy returning
+ *       whatever the test told it to return will never point out.</li>
  * </ul>
  * <p>
  * Jetty rather than Tomcat: it is built to be embedded, a server on an ephemeral
@@ -91,7 +94,12 @@ class XldrServletIT {
         // the point of this test: a real web application layout, so that
         // /WEB-INF/specs/ is resolved by the container and not by a proxy
         context.setBaseResourceAsPath(Path.of("src/test/webapp").toAbsolutePath());
-        context.addServlet(Deployed.class, "/load");
+        // a wildcard mapping, because an exact one makes the path-info check
+        // untestable and pointless at once: with /load, a request to /load/extra
+        // never reaches this servlet at all - it falls to the container's default
+        // servlet, which answers a POST with 405. Path info exists only under a
+        // mapping like this one, which is also the mapping the check is for
+        context.addServlet(Deployed.class, "/load/*");
         server.setHandler(context);
 
         server.start();

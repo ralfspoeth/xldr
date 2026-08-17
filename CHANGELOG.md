@@ -6,6 +6,25 @@ ways that break existing code and existing specs; those changes are listed here 
 The versions are the git tags `xldr-<version>`; the published artifacts carry the same version under the group
 `io.github.ralfspoeth.xldr`.
 
+## Unreleased
+
+### Added
+
+- `xlet` is a module of this reactor, brought over with its history from its own repository. It is the other front
+  end - one input per HTTP request, loaded through a spec the deployment carries under `/WEB-INF/specs/`, for a
+  servlet container - and a peer of `app` rather than a part of `server`. Like `app` and `it` it is built but not
+  published: a front end to read and adapt to a deployment, not a library to depend on.
+
+  The reason is the release before this one. Nothing checked xlet against a change to the library until somebody
+  bumped its version and found out; when the CSV separator default changed, what stood between that and a broken
+  front end was a grep. Now `mvn verify` stands there.
+
+### Fixed
+
+- `xlet`'s integration test runs. Its POM never declared `maven-failsafe-plugin`, and the parent only manages the
+  version, so `XldrServletIT` matched no surefire pattern and no failsafe execution and was silently not executed -
+  a green build that had never started the container it claimed to test.
+
 ## 0.26
 
 Nothing about the mapping-spec format changed, so `mapping-spec-0.23` remains its schema. What changed is what the
