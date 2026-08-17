@@ -246,6 +246,25 @@ class XldrServletTest {
                 () -> assertTrue(response.body().contains("application/json"), response.body()));
     }
 
+    /**
+     * Offering nothing is a different mistake from offering the wrong thing, and
+     * gets a sentence of its own. The status is the same 415 either way - what is
+     * being tested is that the caller is told which of the two they did.
+     */
+    @Test
+    void refusesARequestWithNoContentTypeAtAll() throws Exception {
+        var dataSource = Proxies.dataSource(null);
+        var response = new Proxies.Recorded();
+        started(Map.of(), dataSource).post(
+                Proxies.post(null, Map.of("spec", "people"), TWO_PEOPLE), response);
+        assertEquals(415, response.status(), response.body());
+        assertEquals(0, dataSource.connectionsTaken(), "no connection should have been taken");
+        assertAll(
+                () -> assertTrue(response.body().contains("no Content-Type"), response.body()),
+                // and still says what the spec would have read, so the fix is obvious
+                () -> assertTrue(response.body().contains("text/csv"), response.body()));
+    }
+
     @Test
     void refusesABodyThatDeclaresItselfTooLarge() throws Exception {
         var dataSource = Proxies.dataSource(null);

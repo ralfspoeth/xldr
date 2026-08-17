@@ -86,7 +86,7 @@ other. Parameters after a `;` are stripped first.
 | `200` | loaded; the body reports how many rows |
 | `400` | no `spec` parameter, or path info where none belongs, or the input did not parse |
 | `404` | no spec of that name |
-| `415` | form-encoded, or the adapter the spec names does not read the request's content type |
+| `415` | form-encoded, no content type at all, or the adapter the spec names does not read the one offered |
 | `500` | the load failed; the transaction rolled back and nothing was inserted |
 
 Nothing is retained on failure. The caller still has the data and the response says

@@ -87,52 +87,80 @@ public class XldrServlet extends HttpServlet {
     }
 
     /**
+     * What {@link #examine} made of a request: either the load it asks for, or the
+     * refusal and the status to say it with.
+     * <p>
+     * A type for two cases is more than they would seem to need, and it earns that
+     * in the checks rather than here. Every branch of {@code examine} has to produce
+     * one of these, so the compiler settles what a chain of {@code reply(…); return;}
+     * left to the reader - that each refusal really does stop the request. A missing
+     * {@code return} used to be a 415 followed by a load.
+     */
+    private sealed interface Outcome {
+        record Refused(int status, String message) implements Outcome {}
+
+        record Accepted(String name, MappingSpec spec) implements Outcome {}
+    }
+
+    @Override
+    protected void doPost(HttpServletRequest req, HttpServletResponse resp) throws IOException {
+        switch (examine(req)) {
+            case Outcome.Refused(int status, String message) -> reply(resp, status, message);
+            case Outcome.Accepted(String name, MappingSpec spec) -> load(req, resp, name, spec);
+        }
+    }
+
+    /**
      * The order of the checks is the order of their cost: everything answerable
      * from the request line and the headers is settled before a single byte of the
      * body is read, so a request that was never going to load anything is refused
      * without having been uploaded.
+     * <p>
+     * Nothing here touches the response, which is what lets the order be argued
+     * about on its own.
      */
-    @Override
-    protected void doPost(HttpServletRequest req, HttpServletResponse resp) throws IOException {
+    private Outcome examine(HttpServletRequest req) {
         var pathInfo = req.getPathInfo();
         if (pathInfo != null && !pathInfo.equals("/")) {
             // ignoring it would teach the next reader that the path means something
-            reply(resp, 400, "no path expected after the servlet's mapping, got " + pathInfo);
-            return;
+            return new Outcome.Refused(400,
+                    "no path expected after the servlet's mapping, got " + pathInfo);
         }
         var contentType = baseType(req.getContentType());
         if (FORM_ENCODED.equals(contentType)) {
-            reply(resp, 415, FORM_ENCODED + " is never an input: send the data as its own"
+            return new Outcome.Refused(415, FORM_ENCODED + " is never an input: send the data as its own"
                     + " content type, with " + SPEC_PARAMETER + " in the query string");
-            return;
         }
         var name = req.getParameter(SPEC_PARAMETER);
         if (name == null || name.isBlank()) {
-            reply(resp, 400, "no " + SPEC_PARAMETER + " parameter; this deployment carries "
+            return new Outcome.Refused(400, "no " + SPEC_PARAMETER + " parameter; this deployment carries "
                     + specs.names());
-            return;
         }
         var spec = specs.get(name);
         if (spec == null) {
-            reply(resp, 404, "no spec named '" + name + "'; this deployment carries " + specs.names());
-            return;
+            return new Outcome.Refused(404,
+                    "no spec named '" + name + "'; this deployment carries " + specs.names());
         }
         // the spec chooses the adapter, as everywhere else in xldr; the request's
         // content type only has to be one that adapter reads. Asking the factory
         // rather than comparing strings lets a spec saying application/xml accept a
         // request saying text/xml, which is the adapter's business to know
         var factory = InputAdapterFactory.of(spec.inputSpec()).orElseThrow();
-        if (contentType == null || !factory.reads(contentType)) {
-            reply(resp, 415, "spec '" + name + "' reads " + spec.inputSpec().mimeType()
+        if (contentType == null) {
+            // a different mistake from offering the wrong one, and worth its own
+            // sentence: "the request offered null" told nobody anything
+            return new Outcome.Refused(415, "no Content-Type; spec '" + name + "' reads "
+                    + spec.inputSpec().mimeType());
+        }
+        if (!factory.reads(contentType)) {
+            return new Outcome.Refused(415, "spec '" + name + "' reads " + spec.inputSpec().mimeType()
                     + ", the request offered " + contentType);
-            return;
         }
         long declared = req.getContentLengthLong();
         if (declared > maxBytes) {
-            reply(resp, 413, "declared " + declared + " bytes, the limit is " + maxBytes);
-            return;
+            return new Outcome.Refused(413, "declared " + declared + " bytes, the limit is " + maxBytes);
         }
-        load(req, resp, name, spec);
+        return new Outcome.Accepted(name, spec);
     }
 
     /**

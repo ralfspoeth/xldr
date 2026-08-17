@@ -9,12 +9,10 @@ import org.jspecify.annotations.Nullable;
 
 import java.io.IOException;
 import java.nio.file.Path;
-import java.util.LinkedHashMap;
-import java.util.Map;
-import java.util.Set;
-import java.util.TreeSet;
+import java.util.*;
 
 import static java.lang.System.Logger.Level.INFO;
+import static java.util.Objects.requireNonNullElse;
 
 /**
  * The specs a deployment carries, read once from {@code /WEB-INF/specs/}.
@@ -41,7 +39,7 @@ final class SpecRegistry {
     private final Map<String, MappingSpec> specs;
 
     private SpecRegistry(Map<String, MappingSpec> specs) {
-        this.specs = specs;
+        this.specs = Map.copyOf(specs);
     }
 
     /**
@@ -59,8 +57,11 @@ final class SpecRegistry {
      * @throws ServletException naming the resource and what was wrong with it
      */
     static SpecRegistry read(ServletContext context) throws ServletException {
-        var resources = context.getResourcePaths(DIRECTORY);
-        if (resources == null || resources.isEmpty()) {
+        var resources = requireNonNullElse(
+                context.getResourcePaths(DIRECTORY),
+                Set.<String>of()
+        );
+        if (resources.isEmpty()) {
             throw new ServletException("no mapping specs in " + DIRECTORY
                     + ": the deployment carries nothing to load with");
         }
@@ -90,7 +91,7 @@ final class SpecRegistry {
             }
         }
         LOG.log(INFO, () -> "loaded " + specs.size() + " mapping spec(s): " + specs.keySet());
-        return new SpecRegistry(Map.copyOf(specs));
+        return new SpecRegistry(specs);
     }
 
     private static void requireAnAdapter(String resource, MappingSpec spec) throws ServletException {
