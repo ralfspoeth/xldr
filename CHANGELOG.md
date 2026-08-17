@@ -6,6 +6,64 @@ ways that break existing code and existing specs; those changes are listed here 
 The versions are the git tags `xldr-<version>`; the published artifacts carry the same version under the group
 `io.github.ralfspoeth.xldr`.
 
+## 0.26
+
+Nothing about the mapping-spec format changed, so `mapping-spec-0.23` remains its schema. What changed is what the
+CSV adapter assumes when a spec does not say: the defaults are now the ones RFC 4180 registers `text/csv` for, so a
+spec that names nothing beyond the MIME type reads the format that MIME type means.
+
+### Breaking
+
+- **The CSV `fieldSeparator` defaults to `,` instead of a tab.** A spec that relied on the tab default has to say
+  `"fieldSeparator": "\t"`. Every other setting already matched the RFC: `"` quotes a field and is doubled to escape
+  itself, and no character starts a comment, since the RFC has no comments and a `#` is therefore data.
+
+      "properties": { "fieldSeparator": "\t" }
+
+  This was the last incidental thing about the adapter. `text/csv` is a registered media type with a specification
+  behind it, and an adapter that answered to that name while reading something else made every spec carry a
+  correction for it.
+- **`charset` defaults to UTF-8 instead of the platform default**, in the fixed-length adapter as well as in CSV. Not
+  the RFC's doing - it says only that US-ASCII is common usage - but `Charset.defaultCharset()` means the same file
+  loads differently under a different `-Dfile.encoding`, which is a way for a deployment to disagree with the test
+  that proved the spec. UTF-8 reads every US-ASCII file the RFC contemplates; a feed on another encoding names it, as
+  before. It matters most for fixed-length, where the bounds are counted in characters: the wrong charset there does
+  not merely garble a value, it moves every field after the first non-ASCII byte.
+- **A field selector that names no column of the file is refused.** It used to read as null for every row. That is
+  what made the separator's default dangerous to change: a tab-separated file read with commas has exactly one
+  column, called the whole header line, so every selector misses and the load reports success over a table of nulls.
+  The message names the selector, lists the columns the header carried and says which separator they were split on:
+
+      selector 'id' names no column of this file. Its header carries 1 column(s):
+      [id\tname], split on fieldSeparator ','
+
+  A column merely missing from *some line* is still null - that is a short line, not a spec that does not fit its
+  file - and a name the spec never declared is still null under `fieldsFromHeader`, which is a question rather than
+  a claim.
+
+### Fixed
+
+- `validate` understands `header = present`. It read the setting with `Boolean.parseBoolean`, which knows `true` and
+  `false` and makes `false` of everything else - so a spec spelling it the way the documentation recommends was taken
+  for a headerless one, and skipped the discriminator check that exists for headed files exactly. The spelling most
+  likely to be written was the one spelling that got no warning. A setting that is none of the four is now reported
+  rather than guessed at.
+
+### Added
+
+- `Header` in `ia`, beside `Formats`: one reading of the `header` setting, for everyone who has to know what it says.
+  The CSV adapter is not the only one - `validate` reasons about a spec without ever creating an adapter, and cannot
+  depend on an adapter module to ask, since adapters arrive by `ServiceLoader` and any of them may be absent. Two
+  readings of one setting is one too many, and the bug above is what that costs.
+
+### Changed
+
+- The `header` default stays `present` and the `emptyLine` default stays `skip`, both now documented as xldr's
+  decisions rather than the RFC's. The RFC registers `header` as a MIME parameter and says in as many words that an
+  implementation choosing not to use it must decide for itself; a selector names a column, so a headerless file has
+  no names to offer. And by the RFC's grammar a blank line is a record of one empty field, which no implementation
+  reads it as and nobody writing a file by hand means.
+
 ## 0.25
 
 Nothing about the mapping-spec format changed, so `mapping-spec-0.23` remains its schema and a spec that loaded under

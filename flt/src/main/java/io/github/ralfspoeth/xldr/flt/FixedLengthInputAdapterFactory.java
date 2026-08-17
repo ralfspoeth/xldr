@@ -9,6 +9,7 @@ import io.github.ralfspoeth.xldr.spec.InputSpec;
 import org.jspecify.annotations.Nullable;
 
 import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Pattern;
@@ -22,7 +23,12 @@ import static java.util.stream.Collectors.toMap;
  * <p>
  * Recognised properties: {@code linesPerRecord} (one by default; the lines of a
  * record are joined and the field bounds address the joined text),
- * {@code charset}, and the shared conversion settings of {@link Formats}.
+ * {@code charset} (UTF-8 by default), and the shared conversion settings of
+ * {@link Formats}.
+ * <p>
+ * A word about the charset, because fixed-length is where it bites hardest: the
+ * bounds are counted in characters, so decoding with the wrong charset does not
+ * merely garble a value, it moves every field after the first non-ASCII byte.
  * <p>
  * A field selector is a half-open character range {@code left:right} counted
  * from zero. The left bound may be omitted, in which case the field starts where
@@ -40,7 +46,10 @@ public class FixedLengthInputAdapterFactory implements InputAdapterFactory {
         var props = spec.properties();
         return new FixedLengthInputAdapter(
                 Integer.parseInt(props.getOrDefault("linesPerRecord", "1")),
-                ofNullable(props.get("charset")).map(Charset::forName).orElse(Charset.defaultCharset()),
+                // UTF-8 rather than Charset.defaultCharset(), as in the CSV
+                // adapter: the same file has to load the same way whatever
+                // -Dfile.encoding the JVM was started with
+                ofNullable(props.get("charset")).map(Charset::forName).orElse(StandardCharsets.UTF_8),
                 Formats.of(props),
                 spec.recordSelectors()
                         .stream()

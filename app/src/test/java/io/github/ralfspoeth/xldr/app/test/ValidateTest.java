@@ -152,6 +152,44 @@ public class ValidateTest {
     }
 
     /**
+     * The same check, said the way the documentation recommends saying it. This
+     * used to pass for the wrong reason: the setting was read with
+     * {@code Boolean.parseBoolean}, which makes {@code false} of
+     * {@code "present"}, so the spec most likely to be written by someone
+     * following the README was the one spec that skipped the check.
+     */
+    @Test
+    void readsTheHeaderSettingTheWayTheAdapterDoes() throws IOException {
+        var spec = """
+                { "input": { "mimeType": "text/csv", "properties": { "header": "%s" },
+                    "recordSelectors": [ { "name": "people", "selector": "people",
+                        "fieldSelectors": [ { "name": "id", "selector": "id" } ] } ] },
+                  "mapping": [ { "recordSelector": "people", "table": "t",
+                                 "fieldMapping": [ { "fieldSelector": "id", "column": "c" } ] } ] }
+                """;
+        assertEquals(1, validate("present.json", spec.formatted("present")));
+        assertEquals(1, validate("true.json", spec.formatted("true")));
+        assertEquals(0, validate("absent.json", spec.formatted("absent")));
+        assertEquals(0, validate("false.json", spec.formatted("false")));
+    }
+
+    /**
+     * And a setting that is none of the four is reported rather than guessed at.
+     * The adapter refuses it outright, so validating the spec as though it said
+     * something else would be validating a spec that cannot load.
+     */
+    @Test
+    void rejectsAheaderSettingThatIsNeither() throws IOException {
+        assertEquals(1, validate("yes.json", """
+                { "input": { "mimeType": "text/csv", "properties": { "header": "yes" },
+                    "recordSelectors": [ { "name": "people",
+                        "fieldSelectors": [ { "name": "id", "selector": "id" } ] } ] },
+                  "mapping": [ { "recordSelector": "people", "table": "t",
+                                 "fieldMapping": [ { "fieldSelector": "id", "column": "c" } ] } ] }
+                """));
+    }
+
+    /**
      * The adapter itself has the last word on a selector: an XPath that does not
      * compile is reported here rather than when the first file arrives.
      */

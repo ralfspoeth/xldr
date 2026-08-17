@@ -83,9 +83,11 @@ class CsvFileHandler implements InputAdapter {
 
     /**
      * One data line, read by field name: a mapping names a field, and the field
-     * says which column it is. A column the line does not have at all is null;
-     * one it has is converted according to the field's declared
-     * {@link DataType}, which strips it and treats a blank as absent.
+     * says which column it is. A column this particular line stops short of is
+     * null - lines are ragged in real files, and that is not the spec's fault;
+     * a selector that matched no column of the header at all was refused long
+     * before here. One the line has is converted according to the field's
+     * declared {@link DataType}, which strips it and treats a blank as absent.
      */
     private record Line(String[] values, Map<String, Integer> positions, Map<String, DataType> types,
                         Formats formats) implements Row {
@@ -114,7 +116,7 @@ class CsvFileHandler implements InputAdapter {
         // closes it once every record mapping of the file has been read
         var lines = new BufferedReader(new InputStreamReader(source, charset));
 
-        ToIntFunction<String> index;
+        Index index;
         // what the header cost, so that a later complaint can name the line of
         // the file rather than the line of the remainder
         long linesRead = 0;
@@ -154,23 +156,79 @@ class CsvFileHandler implements InputAdapter {
      * Where {@code fieldsFromHeader} is set, a name the spec does not declare is
      * looked for among the columns as it stands, as if the spec had declared it
      * with a selector equal to its name.
+     * <p>
+     * A declared selector that resolves to no column at all is refused, because
+     * there is no reading of the file under which that spec is right: every row
+     * would carry a null for it and the load would report success over a column
+     * of nothing. The commonest cause is the separator - read a tab-separated
+     * file with commas and the whole header is one column - which is why the
+     * message says which separator was in use. A column merely missing from
+     * <em>some line</em> is still null: that is a short line, not a spec that
+     * does not fit its file.
+     * <p>
+     * The {@code fieldsFromHeader} names are exempt. They are by definition the
+     * ones the spec did not declare, so asking for one the header has not got is
+     * a question rather than a claim, and null is the answer.
      *
      * @param wanted the field names the mapping uses
-     * @param index  resolves a selector to a column position, or -1 for a column
-     *               this file does not have
+     * @param index  resolves a selector to a column position
+     * @throws IllegalArgumentException naming a declared selector that matches no
+     *                                  column, and what the file offered instead
      */
     private Map<String, Integer> positions(
-            Collection<FieldSelectorSpec> fieldSelectors, Set<String> wanted, ToIntFunction<String> index) {
+            Collection<FieldSelectorSpec> fieldSelectors, Set<String> wanted, Index index) {
         Map<String, Integer> positions = new HashMap<>();
         for (var fs : fieldSelectors) {
-            positions.putIfAbsent(fs.name(), index.applyAsInt(fs.selector()));
+            // computeIfAbsent, so that a name declared twice resolves its first
+            // selector only - the second is never read from, so it is not judged
+            positions.computeIfAbsent(fs.name(), _ -> index.require(fs.selector()));
         }
         if (fieldsFromHeader) {
             for (var name : wanted) {
-                positions.computeIfAbsent(name, index::applyAsInt);
+                positions.computeIfAbsent(name, index.of()::applyAsInt);
             }
         }
         return positions;
+    }
+
+    /**
+     * How a selector finds its column, and what there was to choose from.
+     *
+     * @param of        the resolution itself, -1 where nothing matches
+     * @param columns   the header's columns, or {@code null} where the file has no
+     *                  header and a selector is a position instead
+     * @param separator what the columns were split on, which is the setting a
+     *                  reader will want to check first
+     */
+    private record Index(ToIntFunction<String> of, @Nullable List<String> columns, String separator) {
+
+        int require(String selector) {
+            int column = of.applyAsInt(selector);
+            if (column >= 0) {
+                return column;
+            }
+            throw new IllegalArgumentException(complaint(selector));
+        }
+
+        private String complaint(String selector) {
+            if (columns == null) {
+                return "selector '" + selector + "' is not a column position;"
+                        + " a file read without a header is selected from by 1-based column number";
+            }
+            return "selector '" + selector + "' names no column of this file."
+                    + " Its header carries " + columns.size() + " column(s): "
+                    + columns.stream().map(Index::visible).collect(Collectors.joining(", ", "[", "]"))
+                    + ", split on fieldSeparator '" + visible(separator) + "'";
+        }
+
+        /**
+         * A separator gone wrong puts the whole header in one column, and a
+         * message printing that column raw would hide the very characters that
+         * explain it.
+         */
+        private static String visible(String column) {
+            return column.replace("\t", "\\t").replace("\r", "\\r").replace("\n", "\\n");
+        }
     }
 
     /**
@@ -344,25 +402,25 @@ class CsvFileHandler implements InputAdapter {
      * The header is read as one line: a column name is quoted often enough, but
      * one that runs over a line break is not a thing a producer writes.
      */
-    private ToIntFunction<String> indexOfHeader(String headerLine) {
+    private Index indexOfHeader(String headerLine) {
         Map<String, Integer> index = new HashMap<>();
         var headers = Csv.scan(headerLine, fieldSeparator, quote, comment).fields();
         for (int i = 0; i < headers.length; i++) {
             index.putIfAbsent(headers[i], i);
         }
-        return selector -> index.getOrDefault(selector, -1);
+        return new Index(selector -> index.getOrDefault(selector, -1), List.of(headers), fieldSeparator);
     }
 
     /**
      * Without a header a selector is a 1-based column position.
      */
-    private static ToIntFunction<String> positionalIndex() {
-        return selector -> {
+    private Index positionalIndex() {
+        return new Index(selector -> {
             try {
                 return Integer.parseInt(selector.strip()) - 1;
             } catch (NumberFormatException e) {
                 return -1;
             }
-        };
+        }, null, fieldSeparator);
     }
 }

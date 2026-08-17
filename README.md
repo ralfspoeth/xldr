@@ -70,7 +70,7 @@ fix their versions in one place:
             <dependency>
                 <groupId>io.github.ralfspoeth.xldr</groupId>
                 <artifactId>bom</artifactId>
-                <version>0.25</version>
+                <version>0.26</version>
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>
@@ -739,17 +739,31 @@ Excel needs none of these: a spreadsheet carries typed cells, so a date or a num
 
 | Key                | Default          | Meaning                                                                                                                                                                                                                                                                                                                                          |
 |--------------------|------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `fieldSeparator`   | tab              | Column separator.                                                                                                                                                                                                                                                                                                                                |
+| `fieldSeparator`   | `,`              | Column separator. A tab-separated file says `"\t"`.                                                                                                                                                                                                                                                                                              |
 | `header`           | `present`        | Whether the first row names the columns: `present`/`true`, or `absent`/`false`. A field selector's `selector` is a column name where the header is present and a 1-based position where it is absent (`"1"` → first column); its `name` is what a mapping calls it by, as in every adapter. Anything else is refused rather than read as absent. |
 | `quote`            | `"`              | What opens and closes a quoted field. Empty switches quoting off, leaving quotes as ordinary characters.                                                                                                                                                                                                                                         |
 | `comment`          | none             | What begins a comment outside a quoted field. Unset, no character does.                                                                                                                                                                                                                                                                          |
 | `fieldsFromHeader` | `false`          | Whether a field the record selector does not declare is the column of that name. Needs a header.                                                                                                                                                                                                                                                 |
 | `emptyLine`        | `skip`           | What an empty line means: `skip`, or `stop` to end the data there.                                                                                                                                                                                                                                                                               |
-| `charset`          | platform default | Character set, e.g. `UTF-8`.                                                                                                                                                                                                                                                                                                                     |
+| `charset`          | `UTF-8`          | Character set, e.g. `ISO-8859-1`. Not the platform default: the same file has to load the same way whatever the JVM was started with.                                                                                                                                                                                                            |
+
+**The defaults are RFC 4180's**, so a spec that says nothing beyond `text/csv` reads the format the MIME type is
+registered for. Two of them the RFC does not decide. It registers `header` as a MIME parameter and then says in as
+many words that an implementation choosing not to use it must decide for itself; `present` is xldr's answer, because
+a selector names a column and a headerless file has no names to offer. And by the RFC's own grammar a blank line is
+a record of one empty field, which no implementation reads it as and nobody writing a file by hand means — hence
+`emptyLine = skip`.
+
+**A selector that names no column of the file is refused**, rather than read as null for every row. A tab-separated
+file read with commas has exactly one column, called the whole header line, so every selector misses and the load
+would otherwise report success over a table of nulls. The message names the selector, lists the columns the header
+actually carried and says which separator they were split on. A column merely missing from *some line* is still
+null: that is a short line, not a spec that does not fit its file.
 
 A record is a line, and there is nothing to configure about that: a file may end its lines with `\n`, `\r\n` or `\r`
-and is read the same way, so a file written on Windows loads on Linux unchanged. The lines are read as the loader
-consumes them, so the size of a file is not the size of the memory it needs.
+and is read the same way, so a file written on Windows loads on Linux unchanged. That is more liberal than the RFC,
+which says CRLF, and is the "be liberal in what you accept" its own interoperability note asks for. The lines are
+read as the loader consumes them, so the size of a file is not the size of the memory it needs.
 
 Inside a **quoted field** the separator and the line break are ordinary characters, and a doubled quote is one
 literal quote - so `"Doe, Alice"` is one value, `"she said ""no"""` is `she said "no"`, and a record runs over as
@@ -826,7 +840,7 @@ XPath 1.0 knows only doubles, so it would round a long integer and turn a decima
 | Key | Default | Meaning |
 |-----|---------|---------|
 | `linesPerRecord` | `1` | How many lines make up one record. Lines are joined, and the field bounds address the joined text, so a field may sit on the second line. A file that ends mid-record is an error. |
-| `charset` | platform default | Character set, e.g. `UTF-8`. |
+| `charset` | `UTF-8` | Character set, e.g. `ISO-8859-1`. Not the platform default: the bounds are counted in characters, so the wrong charset does not merely garble a value, it moves every field after the first non-ASCII byte. |
 
 A field selector is a half-open character range `left:right` over the record, counted from zero, so `0:3` is the
 first three characters. The left bound may be omitted, in which case the field starts where the previous one ended -

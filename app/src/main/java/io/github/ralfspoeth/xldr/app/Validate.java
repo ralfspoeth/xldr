@@ -1,5 +1,6 @@
 package io.github.ralfspoeth.xldr.app;
 
+import io.github.ralfspoeth.xldr.ia.Header;
 import io.github.ralfspoeth.xldr.ia.InputAdapterFactory;
 import io.github.ralfspoeth.xldr.server.Delivery;
 import io.github.ralfspoeth.xldr.spec.*;
@@ -99,19 +100,35 @@ class Validate implements Callable<Integer> {
      * equals it, nothing matches, and the load reports success over zero records.
      * That is the quietest way a spec can be wrong, so it is worth a word even
      * though the combination is not strictly illegal - a headered file may carry
-     * a type column, in which case the fix is to say {@code header=false} or to
+     * a type column, in which case the fix is to say {@code header=absent} or to
      * drop the selector.
+     * <p>
+     * The setting is read through {@link Header}, which is the adapter's own
+     * reading of it. This used to be a {@code Boolean.parseBoolean} here, which
+     * knows {@code true} and {@code false} and nothing else - so a spec saying
+     * {@code header=present}, the spelling the documentation recommends, was
+     * taken for a headerless one and skipped the very check it needed.
      */
     private static void checkCsvDiscriminator(InputSpec input, List<String> problems) {
-        // a header is the default, so an absent property means there is one
-        if ("text/csv".equals(input.mimeType())
-                && Boolean.parseBoolean(input.properties().getOrDefault("header", "true"))) {
+        if (!"text/csv".equals(input.mimeType())) {
+            return;
+        }
+        Header header;
+        try {
+            header = Header.of(input.properties().get(Header.SETTING));
+        } catch (IllegalArgumentException e) {
+            // the adapter would refuse this outright, so say so here rather than
+            // guess at what was meant and validate the wrong spec
+            problems.add(e.getMessage());
+            return;
+        }
+        if (header.present()) {
             input.recordSelectors().stream()
                     .filter(rs -> rs.selector() != null && !rs.selector().isBlank())
                     .forEach(rs -> problems.add("record selector '" + rs.name() + "': a CSV selector is a"
                             + " first-column discriminator, and with a header no line's first column will equal '"
                             + rs.selector() + "', so nothing would load. Drop the selector, or set the"
-                            + " 'header' property to false if the file really does name its record type in"
+                            + " 'header' property to absent if the file really does name its record type in"
                             + " the first column."));
         }
     }

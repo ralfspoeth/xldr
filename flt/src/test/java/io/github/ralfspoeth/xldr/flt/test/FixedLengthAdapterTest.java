@@ -211,6 +211,39 @@ public class FixedLengthAdapterTest {
     }
 
     /**
+     * UTF-8 where the spec says nothing, rather than whatever
+     * {@code -Dfile.encoding} the JVM happened to start with - so a file loads
+     * the same way on the machine that tested the spec and the one that runs it.
+     * <p>
+     * Fixed-length is where this bites hardest, and the second half of the test
+     * is the reason it is worth a default rather than a convention. The bounds
+     * are counted in characters: {@code ü} is two bytes, so reading UTF-8 bytes
+     * as latin-1 makes it two characters and every field after it has moved.
+     * Not a garbled value - a garbled record, and one that still parses.
+     */
+    @Test
+    public void decodesAsUtf8WhenTheSpecSaysNothing() throws IOException {
+        var spec = spec(
+                new FieldSelectorSpec("city", "0:6", DataType.TEXT),
+                new FieldSelectorSpec("id", "6:9", DataType.TEXT));
+        var bytes = "Zürich007".getBytes(UTF_8);
+
+        var byDefault = adapter(spec, Map.of())
+                .parse(new ByteArrayInputStream(bytes), "rec", Set.of("city", "id"))
+                .rows().toList().getFirst();
+        assertAll(
+                () -> assertEquals("Zürich", byDefault.get("city")),
+                () -> assertEquals("007", byDefault.get("id")));
+
+        var asLatin1 = adapter(spec, Map.of("charset", "ISO-8859-1"))
+                .parse(new ByteArrayInputStream(bytes), "rec", Set.of("city", "id"))
+                .rows().toList().getFirst();
+        assertAll(
+                () -> assertNotEquals("Zürich", asLatin1.get("city"), "one byte too many, so one character short"),
+                () -> assertEquals("h00", asLatin1.get("id"), "and the field after it has slid left by one"));
+    }
+
+    /**
      * A selector that is not a {@code left:right} pair names itself in the error.
      */
     @Test

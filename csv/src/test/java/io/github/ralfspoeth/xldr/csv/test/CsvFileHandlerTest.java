@@ -527,6 +527,100 @@ public class CsvFileHandlerTest {
         assertThrows(IllegalArgumentException.class, () -> adapterFor(spec));
     }
 
+    /**
+     * A spec that says nothing beyond {@code text/csv} reads the format the MIME
+     * type is registered for: commas, a header, and double quotes around a field
+     * that carries one of them. Every other test here names its separator, so
+     * this is the only one that would notice the default changing.
+     */
+    @Test
+    public void theDefaultsAreTheOnesRfc4180Registers() throws IOException {
+        var spec = spec(Map.of(),
+                new RecordSelectorSpec("people", null, List.of(
+                        new FieldSelectorSpec("id", "id", DataType.TEXT),
+                        new FieldSelectorSpec("name", "name", DataType.TEXT))));
+        var rows = rowsOf(spec, """
+                id,name
+                1,Alice
+                2,"Bull, John"
+                """, "id", "name");
+
+        assertAll(
+                () -> assertEquals(2, rows.size(), "the first line was the header"),
+                () -> assertEquals("Alice", rows.getFirst().get("name")),
+                () -> assertEquals("Bull, John", rows.get(1).get("name"), "quoted, so the comma is data"));
+    }
+
+    /**
+     * UTF-8 whatever the JVM was started with. {@code Charset.defaultCharset()}
+     * would make the same file load differently under a different
+     * {@code -Dfile.encoding}, which is a difference between a deployment and the
+     * test that passed - so the two encodings are asserted against each other
+     * rather than against the platform, which this test cannot change.
+     */
+    @Test
+    public void theDefaultCharsetIsUtf8() throws IOException {
+        var csv = "id,name\n1,Müller\n";
+        var spec = spec(Map.of(),
+                new RecordSelectorSpec("people", null, List.of(
+                        new FieldSelectorSpec("id", "id", DataType.TEXT),
+                        new FieldSelectorSpec("name", "name", DataType.TEXT))));
+
+        assertEquals("Müller", first(spec, csv.getBytes(StandardCharsets.UTF_8)).get("name"));
+        assertNotEquals("Müller", first(spec, csv.getBytes(StandardCharsets.ISO_8859_1)).get("name"),
+                "latin-1 bytes are not what this reads");
+
+        var latin1 = spec(Map.of("charset", "ISO-8859-1"),
+                new RecordSelectorSpec("people", null, List.of(
+                        new FieldSelectorSpec("id", "id", DataType.TEXT),
+                        new FieldSelectorSpec("name", "name", DataType.TEXT))));
+        assertEquals("Müller", first(latin1, csv.getBytes(StandardCharsets.ISO_8859_1)).get("name"),
+                "and a feed on another encoding still says so");
+    }
+
+    /**
+     * The refusal that makes the separator's default safe to change. A
+     * tab-separated file read with commas has one column, called the whole header
+     * line, and every selector resolves to nothing - which used to be a table of
+     * nulls and a load reporting success.
+     */
+    @Test
+    public void aSelectorNamingNoColumnIsRefused() {
+        var spec = spec(Map.of(),
+                new RecordSelectorSpec("people", null, List.of(
+                        new FieldSelectorSpec("id", "id", DataType.TEXT),
+                        new FieldSelectorSpec("name", "name", DataType.TEXT))));
+        var thrown = assertThrows(IllegalArgumentException.class,
+                () -> rowsOf(spec, "id\tname\n1\tAlice\n", "id", "name"));
+
+        assertAll(
+                () -> assertTrue(thrown.getMessage().contains("id"), thrown.getMessage()),
+                // the tab is shown as an escape, or the message would hide the
+                // one character that explains it
+                () -> assertTrue(thrown.getMessage().contains("\\t"), thrown.getMessage()),
+                () -> assertTrue(thrown.getMessage().contains("fieldSeparator"), thrown.getMessage()));
+    }
+
+    /**
+     * Without a header a selector is a column number, so a name is not a selector
+     * that missed - it is a spec written for a file that has a header.
+     */
+    @Test
+    public void aNameIsRefusedAsAselectorWithoutAheader() {
+        var spec = spec(Map.of("header", "absent"),
+                new RecordSelectorSpec("people", null, List.of(
+                        new FieldSelectorSpec("name", "name", DataType.TEXT))));
+        var thrown = assertThrows(IllegalArgumentException.class,
+                () -> rowsOf(spec, "1,Alice\n", "name"));
+        assertTrue(thrown.getMessage().contains("column"), thrown.getMessage());
+    }
+
+    private static Row first(InputSpec spec, byte[] csv) throws IOException {
+        try (var in = new ByteArrayInputStream(csv)) {
+            return adapterFor(spec).parse(in, "people", Set.of("id", "name")).rows().toList().getFirst();
+        }
+    }
+
     private static List<Row> rowsOf(InputSpec spec, String csv, String... fields) throws IOException {
         try (var in = new ByteArrayInputStream(csv.getBytes(StandardCharsets.UTF_8))) {
             return adapterFor(spec).parse(in, "people", Set.of(fields)).rows().toList();

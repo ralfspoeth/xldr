@@ -57,7 +57,7 @@
         <th>XML</th>
     </tr>
     <tr>
-        <td>0.23 - 0.25 (current)</td>
+        <td>0.23 - 0.26 (current)</td>
         <td><a href="schema/mapping-spec-0.23.json">mapping-spec-0.23.json</a></td>
         <td><a href="schema/mapping-spec-0.23.xsd">mapping-spec-0.23.xsd</a></td>
     </tr>
@@ -91,7 +91,7 @@
 <p>
     A schema is published whenever the format changes, and named after the release that changed it: the format is
     still settling before 1.0, and a spec should be validated against the schema its release reads. A release that
-    changes nothing about the format - 0.11, 0.12, 0.14 to 0.20, 0.22, 0.24, 0.25 - keeps the previous schema rather than publishing
+    changes nothing about the format - 0.11, 0.12, 0.14 to 0.20, 0.22, 0.24 to 0.26 - keeps the previous schema rather than publishing
     a copy of it. An older one stays where it is, so a spec pinned to it keeps validating.
 </p>
 
@@ -215,7 +215,8 @@
 
 <table>
     <tr><th>Key</th><th>Default</th><th>Meaning</th></tr>
-    <tr><td><code>fieldSeparator</code></td><td>tab</td><td>Column separator.</td></tr>
+    <tr><td><code>fieldSeparator</code></td><td><code>,</code></td>
+        <td>Column separator. A tab-separated file says <code>"\t"</code>.</td></tr>
     <tr>
         <td><code>header</code></td>
         <td><code>present</code></td>
@@ -243,13 +244,33 @@
         <td><code>skip</code></td>
         <td>What an empty line means: <code>skip</code>, or <code>stop</code> to end the data there.</td>
     </tr>
-    <tr><td><code>charset</code></td><td>platform default</td><td>Character set, e.g. <code>UTF-8</code>.</td></tr>
+    <tr><td><code>charset</code></td><td><code>UTF-8</code></td>
+        <td>Character set, e.g. <code>ISO-8859-1</code>. Not the platform default: the same file has to load the same
+            way whatever the JVM was started with.</td></tr>
 </table>
 
 <p>
+    <strong>The defaults are RFC 4180's</strong>, so a spec that says nothing beyond <code>text/csv</code> reads the
+    format the MIME type is registered for. Two of them the RFC does not decide. It registers <code>header</code> as a
+    MIME parameter and then says in as many words that an implementation choosing not to use it must decide for
+    itself; <code>present</code> is xldr's answer, because a selector names a column and a headerless file has no
+    names to offer. And by the RFC's own grammar a blank line is a record of one empty field, which no implementation
+    reads it as and nobody writing a file by hand means - hence <code>emptyLine = skip</code>.
+</p>
+
+<p>
+    <strong>A selector that names no column of the file is refused</strong>, rather than read as null for every row.
+    A tab-separated file read with commas has exactly one column, called the whole header line, so every selector
+    misses and the load would otherwise report success over a table of nulls. The message names the selector, lists
+    the columns the header actually carried and says which separator they were split on. A column merely missing from
+    <em>some line</em> is still null: that is a short line, not a spec that does not fit its file.
+</p>
+
+<p>
     A record is a line, and there is nothing to configure about that: <code>\n</code>, <code>\r\n</code> and
-    <code>\r</code> all end one. Inside a quoted field the separator and the line break are ordinary characters and a
-    doubled quote is one literal quote, so a record runs over as many lines as a quoted field needs.
+    <code>\r</code> all end one - more liberal than the RFC, which says CRLF. Inside a quoted field the separator and
+    the line break are ordinary characters and a doubled quote is one literal quote, so a record runs over as many
+    lines as a quoted field needs.
 </p>
 
 <table>
@@ -320,7 +341,10 @@
         <td>How many lines make up one record. They are joined and the field bounds address the joined text, so a
             field may sit on the second line. A file ending mid-record is an error.</td>
     </tr>
-    <tr><td><code>charset</code></td><td>platform default</td><td>Character set, e.g. <code>UTF-8</code>.</td></tr>
+    <tr><td><code>charset</code></td><td><code>UTF-8</code></td>
+        <td>Character set, e.g. <code>ISO-8859-1</code>. Not the platform default: the bounds are counted in
+            characters, so the wrong charset does not merely garble a value, it moves every field after the first
+            non-ASCII byte.</td></tr>
 </table>
 
 <p>
