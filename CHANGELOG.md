@@ -6,7 +6,11 @@ ways that break existing code and existing specs; those changes are listed here 
 The versions are the git tags `xldr-<version>`; the published artifacts carry the same version under the group
 `io.github.ralfspoeth.xldr`.
 
-## Unreleased
+## 0.31
+
+Nothing about the mapping-spec format changed, so `mapping-spec-0.23` remains its schema and a spec that loaded under
+0.30 loads under 0.31. Nothing about the published artifacts changed either: this is the distribution's layout, and
+what it says about which parts of it a deployment is meant to choose.
 
 ### Changed
 
