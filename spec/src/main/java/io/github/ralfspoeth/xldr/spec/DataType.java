@@ -53,6 +53,7 @@ public enum DataType {
     }
 
     /**
+     * The class instance of which represent this data type.
      * @return the Java class values of this type are delivered as
      */
     public Class<?> clazz() {
