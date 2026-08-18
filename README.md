@@ -203,9 +203,16 @@ invoked through - installing `/usr/local/bin/xldr` pointing into `/opt/xldr` wor
 before starting, so a wrong `JAVA_HOME` is reported as such rather than as an `UnsupportedClassVersionError` naming a
 class file version. `JAVA_OPTS` carries extra VM options.
 
-`jlink` is deliberately not used: several runtime dependencies - the Oracle JDBC driver, 
-HikariCP, picocli, SLF4J, POI - are automatic modules, which `jlink` cannot link into an image. The module-path distribution sidesteps that while
-keeping the modular layout and its service binding intact.
+`jlink` is deliberately not used, and the reason has narrowed since it was first written down: HikariCP, picocli and
+both SLF4J jars all carry a real `module-info` today, so `lib/` would link. What still would not are **the JDBC
+drivers** - PostgreSQL, Oracle and H2 are all automatic modules, and no vendor ships a real one - and the tail of
+POI's dependencies, `SparseBitSet`, `commons-math3` and `curvesapi`. `jlink` refuses an automatic module outright.
+
+That is not a passing inconvenience but the same point `drivers/` and `xl/` are making: which database a deployment
+talks to and whether it reads spreadsheets are the deployment's decisions, and an image would have to make both of
+them at build time. An image is also built for one platform by the JDK that links it, where this archive runs
+wherever there is a JVM. The module-path distribution keeps the modular layout and its service binding intact and
+leaves both choices where they belong.
 
 ### Releasing
 
