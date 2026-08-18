@@ -1,6 +1,7 @@
 package io.github.ralfspoeth.xldr.xlet.it;
 
 import io.github.ralfspoeth.xldr.xlet.XldrServlet;
+import jakarta.servlet.ServletException;
 import org.eclipse.jetty.ee11.servlet.ServletContextHandler;
 import org.eclipse.jetty.server.Server;
 import org.eclipse.jetty.server.ServerConnector;
@@ -71,14 +72,23 @@ class XldrServletIT {
      * thing the container builds.
      */
     public static class Deployed extends XldrServlet {
+        /**
+         * The deployed servlet knows a datasource.
+         * @return the data source associated with the servlet
+         */
         @Override
         protected DataSource dataSource() {
             return (DataSource) java.lang.reflect.Proxy.newProxyInstance(
                     Deployed.class.getClassLoader(),
                     new Class<?>[]{DataSource.class},
-                    (_, method, _) -> "getConnection".equals(method.getName())
-                            ? DriverManager.getConnection(JDBC_URL)
-                            : null);
+                    (_, method, _) -> {
+                        if("getConnection".equals(method.getName())) {
+                            return DriverManager.getConnection(JDBC_URL);
+                        } else {
+                            throw new ServletException("Cannot get a connection");
+                        }
+                    }
+            );
         }
     }
 

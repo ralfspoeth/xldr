@@ -307,6 +307,7 @@ public class XldrServlet extends HttpServlet {
      * also the seam the tests use, which is worth admitting - but a method that
      * exists only for tests would be a different thing from one that happens to
      * suit them.
+     * @throws ServletException whenever fromJndi throws
      */
     protected DataSource dataSource() throws ServletException {
         return fromJndi(parameter("dataSource", "java:comp/env/jdbc/xldr"));
