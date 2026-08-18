@@ -6,7 +6,11 @@ ways that break existing code and existing specs; those changes are listed here 
 The versions are the git tags `xldr-<version>`; the published artifacts carry the same version under the group
 `io.github.ralfspoeth.xldr`.
 
-## Unreleased
+## 0.27
+
+Nothing about the mapping-spec format changed, so `mapping-spec-0.23` remains its schema and a spec that loaded under
+0.26 loads under 0.27. What changed is the shape of the build: the servlet front end is part of it, and is therefore
+checked against the library on every `mvn verify` rather than at whatever later moment somebody bumped its version.
 
 ### Added
 
@@ -24,6 +28,21 @@ The versions are the git tags `xldr-<version>`; the published artifacts carry th
 - `xlet`'s integration test runs. Its POM never declared `maven-failsafe-plugin`, and the parent only manages the
   version, so `XldrServletIT` matched no surefire pattern and no failsafe execution and was silently not executed -
   a green build that had never started the container it claimed to test.
+- `refusesAPathBelowTheMapping`, once that test could run, expected a `400` and got a `405`. The servlet was deployed
+  at an exact mapping, so a request below it never reached the servlet at all and the container's default servlet
+  answered the POST. Path info exists only under a wildcard mapping, which is both where the check applies and the
+  deployment the test now builds. Nothing in the servlet changed; the test had been describing a deployment in which
+  the branch it tested was unreachable.
+
+### Changed
+
+- Javadoc runs DocLint as `all,-missing`, from plumbum 3.0.3. The other four groups have each caught something real -
+  a `{@link}` to a member the referring class could not see, a `<p/>` - while `missing` reports an absent `@param`,
+  `@return` or `@throws`, and the documentation here is prose with a tag added where it says something the prose does
+  not. Subtracting the one group rather than passing `none` is the point: a short list gets read, a silent one is not
+  a list.
+- The `DataType` constants document themselves - which Java class each is delivered as - rather than leaving it to
+  the enum's own comment, and the modules carry a `name`, so the reactor's output says which is which.
 
 ## 0.26
 
