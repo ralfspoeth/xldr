@@ -2,8 +2,10 @@ package io.github.ralfspoeth.xldr.csv;
 
 import io.github.ralfspoeth.xldr.ia.*;
 import io.github.ralfspoeth.xldr.spec.DataType;
+import io.github.ralfspoeth.xldr.spec.Discriminator;
 import io.github.ralfspoeth.xldr.spec.FieldSelectorSpec;
 import io.github.ralfspoeth.xldr.spec.InputSpec;
+import io.github.ralfspoeth.xldr.spec.Selector;
 import org.jspecify.annotations.Nullable;
 
 import java.io.BufferedReader;
@@ -131,27 +133,44 @@ class CsvFileHandler implements InputAdapter {
             index = positionalIndex();
         }
 
+        // nothing to point at in a flat file, so a selector here is a spec
+        // written before the discriminator existed
+        record.refuseSelector("a flat file has no place to point at");
+
         var types = typesOf(record.fieldSelectors());
         var positions = positions(record.fieldSelectors(), fieldSelectors, index);
-        // the record selector's selector, if set, is the value the first column
-        // must equal for a line to belong to this record type - the discriminator
-        // of an interleaved, headerless file; absent means every line matches
-        var discriminator = record.selector();
-        var rows = lines.lines()
+        // which lines are of this kind. Absent means every line is, which is what
+        // a file holding one record type looks like
+        var discriminator = record.discriminator();
+        var rows = discriminator == null
+                ? lines.lines().gather(records(linesRead))
+                : filtered(lines, linesRead, discriminator, index.require(discriminator.column()));
+        return new Result(fields, rows.map(values -> (Row) new Line(values, positions, types, formats)));
+    }
+
+    /**
+     * The lines of one kind.
+     * <p>
+     * The discriminating column is resolved once, through the same {@link Index}
+     * the field selectors use - so it may be named or counted, it works with a
+     * header or without one, and one that names no column of the file is refused
+     * here rather than quietly matching nothing for the length of a load.
+     */
+    private Stream<String[]> filtered(BufferedReader lines, long linesRead,
+                                      Discriminator discriminator, int at) {
+        return lines.lines()
                 .gather(records(linesRead))
-                .filter(values -> matches(discriminator, values))
-                .map(values -> (Row) new Line(values, positions, types, formats));
-        return new Result(fields, rows);
+                .filter(values -> discriminator.accepts(at < values.length ? values[at] : null));
     }
 
     /**
      * Which column each field sits in, resolved once for the file.
      * <p>
-     * A field's {@code selector} says where to read it - a column name where the
-     * file has a header, a 1-based position where it has none - and its
-     * {@code name} is what a mapping calls it by, exactly as in every other
-     * adapter. The two are the same word often enough that a spec can leave them
-     * alike, but they need not be.
+     * A field says where to read it with a {@code selector}, which names a column
+     * and so wants a header, or with a {@code column}, which counts them and works
+     * either way; its {@code name} is what a mapping calls it by, exactly as in
+     * every other adapter. The two are the same word often enough that a spec can
+     * leave them alike, but they need not be.
      * <p>
      * Where {@code fieldsFromHeader} is set, a name the spec does not declare is
      * looked for among the columns as it stands, as if the spec had declared it
@@ -194,31 +213,57 @@ class CsvFileHandler implements InputAdapter {
     /**
      * How a selector finds its column, and what there was to choose from.
      *
-     * @param of        the resolution itself, -1 where nothing matches
+     * @param of        resolves a column <em>name</em>, -1 where the header has
+     *                  none such - or where there is no header, names being
+     *                  something only a header has
      * @param columns   the header's columns, or {@code null} where the file has no
-     *                  header and a selector is a position instead
+     *                  header
      * @param separator what the columns were split on, which is the setting a
      *                  reader will want to check first
      */
     private record Index(ToIntFunction<String> of, @Nullable List<String> columns, String separator) {
 
-        int require(String selector) {
-            int column = of.applyAsInt(selector);
-            if (column >= 0) {
-                return column;
-            }
-            throw new IllegalArgumentException(complaint(selector));
+        /**
+         * The column a selector means, or a refusal saying why the file has no
+         * such thing.
+         * <p>
+         * A {@link Selector.Column} is arithmetic and needs no header - which is
+         * the point of having it - though where there <em>is</em> a header it is
+         * checked against its width, the header being what says how wide the file
+         * is. A {@link Selector.Text} names a column, so it needs a header to name
+         * one in.
+         */
+        int require(Selector selector) {
+            return switch (selector) {
+                case Selector.Column(int index) -> {
+                    if (columns != null && index > columns.size()) {
+                        throw new IllegalArgumentException("column " + index + " of a file whose header"
+                                + " carries only " + columns.size() + ": " + shown());
+                    }
+                    yield index - 1;
+                }
+                case Selector.Text(var name) -> named(name);
+            };
         }
 
-        private String complaint(String selector) {
+        private int named(String name) {
             if (columns == null) {
-                return "selector '" + selector + "' is not a column position;"
-                        + " a file read without a header is selected from by 1-based column number";
+                throw new IllegalArgumentException("selector '" + name + "' names a column, but this"
+                        + " input is read without a header and so has no column names."
+                        + " Count the column instead: \"column\": <n>");
             }
-            return "selector '" + selector + "' names no column of this file."
-                    + " Its header carries " + columns.size() + " column(s): "
-                    + columns.stream().map(Index::visible).collect(Collectors.joining(", ", "[", "]"))
-                    + ", split on fieldSeparator '" + visible(separator) + "'";
+            int column = of.applyAsInt(name);
+            if (column < 0) {
+                throw new IllegalArgumentException("selector '" + name + "' names no column of this"
+                        + " file. Its header carries " + columns.size() + " column(s): " + shown()
+                        + ", split on fieldSeparator '" + visible(separator) + "'");
+            }
+            return column;
+        }
+
+        private String shown() {
+            return columns == null ? "[]"
+                    : columns.stream().map(Index::visible).collect(Collectors.joining(", ", "[", "]"));
         }
 
         /**
@@ -335,11 +380,6 @@ class CsvFileHandler implements InputAdapter {
         return fs.dataType() == null ? DataType.TEXT : fs.dataType();
     }
 
-    private static boolean matches(@Nullable String discriminator, String[] values) {
-        return discriminator == null || discriminator.isBlank()
-                || (values.length > 0 && discriminator.strip().equals(values[0].strip()));
-    }
-
     /**
      * The fields this parse resolves: those the record selector declares and the
      * mapping asks for, and - where the header supplies them - those it asks for
@@ -412,15 +452,12 @@ class CsvFileHandler implements InputAdapter {
     }
 
     /**
-     * Without a header a selector is a 1-based column position.
+     * Without a header there are no column names, so nothing resolves one and
+     * every field has to count instead. The function is here only to keep
+     * {@link Index} one shape; it is never consulted, {@code require} refusing a
+     * name before it would be.
      */
     private Index positionalIndex() {
-        return new Index(selector -> {
-            try {
-                return Integer.parseInt(selector.strip()) - 1;
-            } catch (NumberFormatException e) {
-                return -1;
-            }
-        }, null, fieldSeparator);
+        return new Index(_ -> -1, null, fieldSeparator);
     }
 }

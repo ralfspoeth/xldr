@@ -34,6 +34,13 @@ import java.util.function.Predicate;
  * field; {@code emptyLine} defaults to {@code skip} instead, which is what every
  * implementation does and what anyone editing a file by hand expects.
  * <p>
+ * A field says where it sits with a {@code selector}, naming a column, or with a
+ * {@code column}, counting them from one. A name wants a header to name something
+ * in; a count works either way, and is the only way to address a headerless file.
+ * Which records are of a kind is a {@code discriminator} on the record selector -
+ * a column and a value or a pattern - and a record selector with none takes every
+ * line, which is what a file holding one kind of record looks like.
+ * <p>
  * Recognised properties: {@code fieldSeparator} (a comma by default),
  * {@link Header} ({@code present}/{@code true} by default, or
  * {@code absent}/{@code false}), {@code quote} (a double quote by default,

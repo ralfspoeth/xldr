@@ -54,10 +54,12 @@ public class PipelineIT {
                   { "name": "loadId", "expr": "${xldr.filename}#${nextval('batch')}" }
                 ],
                 "recordSelectors": [
-                  { "name": "line", "selector": "L", "fieldSelectors": [
-                      { "name": "2", "selector": "2" },
-                      { "name": "3", "selector": "3" },
-                      { "name": "4", "selector": "4" }
+                  { "name": "line",
+                    "discriminator": { "column": 1, "equals": "L" },
+                    "fieldSelectors": [
+                      { "name": "2", "column": 2 },
+                      { "name": "3", "column": 3 },
+                      { "name": "4", "column": 4 }
                   ] }
                 ]
               },

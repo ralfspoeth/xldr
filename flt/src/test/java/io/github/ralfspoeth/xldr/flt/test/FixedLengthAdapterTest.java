@@ -7,6 +7,7 @@ import io.github.ralfspoeth.xldr.spec.DataType;
 import io.github.ralfspoeth.xldr.spec.FieldSelectorSpec;
 import io.github.ralfspoeth.xldr.spec.InputSpec;
 import io.github.ralfspoeth.xldr.spec.RecordSelectorSpec;
+import io.github.ralfspoeth.xldr.spec.Selector;
 import org.junit.jupiter.api.Test;
 
 import java.io.ByteArrayInputStream;
@@ -250,5 +251,19 @@ public class FixedLengthAdapterTest {
     public void rejectsAmalformedSelector() {
         var spec = spec(new FieldSelectorSpec("id", "0-3", DataType.TEXT));
         assertThrows(IllegalArgumentException.class, () -> adapter(spec, Map.of()));
+    }
+
+    /**
+     * A fixed-length record has offsets, not columns, so a spec that counts
+     * columns here has confused this format with a separated one. Refused when
+     * the adapter is built, and told which of the two it is.
+     */
+    @Test
+    public void rejectsAcolumn() {
+        var spec = spec(new FieldSelectorSpec("id", new Selector.Column(1), DataType.TEXT));
+        var thrown = assertThrows(IllegalArgumentException.class, () -> adapter(spec, Map.of()));
+        assertAll(
+                () -> assertTrue(thrown.getMessage().contains("character range"), thrown.getMessage()),
+                () -> assertTrue(thrown.getMessage().contains("'id'"), thrown.getMessage()));
     }
 }

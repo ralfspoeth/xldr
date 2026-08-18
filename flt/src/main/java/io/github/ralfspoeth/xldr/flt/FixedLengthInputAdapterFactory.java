@@ -54,7 +54,9 @@ public class FixedLengthInputAdapterFactory implements InputAdapterFactory {
                 spec.recordSelectors()
                         .stream()
                         .flatMap(rs -> rs.fieldSelectors().stream())
-                        .map(fs -> Map.entry(fs.name(), parse(fs.selector(), fs.dataType())))
+                        .map(fs -> Map.entry(fs.name(), parse(
+                                fs.requireText("a fixed-length field is a character range, left:right"),
+                                fs.dataType())))
                         .gather(Gatherer.<Map.Entry<String, Bounds>, AtomicInteger, Map.Entry<String, Bounds>>ofSequential(
                                 AtomicInteger::new,
                                 (left, e, ds) ->

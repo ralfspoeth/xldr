@@ -1,5 +1,8 @@
 package io.github.ralfspoeth.xldr.spec.test;
 
+import io.github.ralfspoeth.xldr.spec.Discriminator;
+import io.github.ralfspoeth.xldr.spec.FieldSelectorSpec;
+import io.github.ralfspoeth.xldr.spec.Selector;
 import io.github.ralfspoeth.xldr.spec.io.XmlMappingSpecReader;
 import org.junit.jupiter.api.Test;
 import org.xml.sax.SAXException;
@@ -27,7 +30,7 @@ import static org.junit.jupiter.api.Assertions.*;
  */
 public class XsdTest {
 
-    private static final Path SCHEMA = Path.of("..", "docs", "schema", "mapping-spec-0.23.xsd");
+    private static final Path SCHEMA = Path.of("..", "docs", "schema", "mapping-spec-0.32.xsd");
 
     /**
      * Every element and attribute the reader knows, in one document.
@@ -81,6 +84,82 @@ public class XsdTest {
         assertTrue(spec.inputSpec().properties().containsKey("ns.f"));
         assertTrue(spec.recordMappingSpecs().stream()
                 .anyMatch(m -> m.fieldMappings().size() == 5));
+    }
+
+    /**
+     * A field may count its column instead of naming one, and the schema has to
+     * say so - otherwise an editor flags a spec the reader loads happily, which
+     * is the drift this class exists to catch.
+     */
+    @Test
+    public void aFieldSelectorMayCountItsColumn() {
+        var xml = """
+                <mappingSpec>
+                    <input mimeType="text/csv">
+                        <properties header="absent"/>
+                        <recordSelector name="people">
+                            <fieldSelector name="id" column="1" type="INTEGRAL"/>
+                            <fieldSelector name="name" column="2"/>
+                        </recordSelector>
+                    </input>
+                </mappingSpec>
+                """;
+        assertDoesNotThrow(() -> validate(xml));
+
+        var fields = new XmlMappingSpecReader().read(stream(xml))
+                .inputSpec().recordSelectors().iterator().next().fieldSelectors();
+        assertEquals(
+                List.of(new Selector.Column(1), new Selector.Column(2)),
+                fields.stream().map(FieldSelectorSpec::selector).toList());
+    }
+
+    /**
+     * The payoff of two names rather than one attribute of two types: the schema
+     * types {@code column}, so a spec counting a column called {@code first} is
+     * refused by an editor before it is ever read.
+     */
+    @Test
+    public void theSchemaTypesAColumnAsANumber() {
+        assertThrows(Exception.class, () -> validate("""
+                <mappingSpec>
+                    <input mimeType="text/csv">
+                        <recordSelector name="people">
+                            <fieldSelector name="id" column="first"/>
+                        </recordSelector>
+                    </input>
+                </mappingSpec>
+                """));
+    }
+
+    /**
+     * And a flat record selector may carry a discriminator, saying which lines
+     * are of its kind.
+     */
+    @Test
+    public void aRecordSelectorMayCarryADiscriminator() {
+        var xml = """
+                <mappingSpec>
+                    <input mimeType="text/csv">
+                        <properties header="absent"/>
+                        <recordSelector name="orders">
+                            <discriminator column="1" equals="O"/>
+                            <fieldSelector name="id" column="2"/>
+                        </recordSelector>
+                        <recordSelector name="lines">
+                            <discriminator selector="kind" matches="L[0-9]+"/>
+                            <fieldSelector name="id" column="2"/>
+                        </recordSelector>
+                    </input>
+                </mappingSpec>
+                """;
+        assertDoesNotThrow(() -> validate(xml));
+
+        var selectors = new XmlMappingSpecReader().read(stream(xml))
+                .inputSpec().recordSelectors().stream().toList();
+        assertAll(
+                () -> assertEquals(new Discriminator.Equals(new Selector.Column(1), "O"),
+                        selectors.getFirst().discriminator()),
+                () -> assertInstanceOf(Discriminator.Matches.class, selectors.get(1).discriminator()));
     }
 
     /**

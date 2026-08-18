@@ -5,9 +5,13 @@ import io.github.ralfspoeth.json.data.JsonNull;
 import io.github.ralfspoeth.json.data.JsonObject;
 import io.github.ralfspoeth.json.data.JsonValue;
 import io.github.ralfspoeth.json.query.Pointer;
-import io.github.ralfspoeth.json.query.Selector;
 import io.github.ralfspoeth.xldr.spec.*;
 import org.jspecify.annotations.Nullable;
+
+// Greyson exports a Selector of its own, and so does the spec now. Only one of
+// the two can wear the bare name, and it should be the one this file is building:
+// what is wanted from Greyson's is the single method below.
+import static io.github.ralfspoeth.json.query.Selector.all;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -41,7 +45,7 @@ public class JsonMappingSpecReader implements MappingSpecReader {
         return Greyson.readValue(new InputStreamReader(src))
                 .map(v -> new MappingSpec(
                         PTR.member("input").apply(v).map(JsonMappingSpecReader::inputSpec).orElseThrow(),
-                        PTR.member("mapping").select(Selector.all()).apply(v).map(JsonMappingSpecReader::recordMappingSpec).toList()
+                        PTR.member("mapping").select(all()).apply(v).map(JsonMappingSpecReader::recordMappingSpec).toList()
                 ))
                 .orElseThrow();
     }
@@ -50,12 +54,12 @@ public class JsonMappingSpecReader implements MappingSpecReader {
         return new InputSpec(
                 PTR.member("mimeType").stringOrThrow(is),
                 PTR.member("recordSelectors")
-                        .select(Selector.all())
+                        .select(all())
                         .apply(is)
                         .map(JsonMappingSpecReader::recordSelectorSpec)
                         .toList(),
                 PTR.member("vars")
-                        .select(Selector.all())
+                        .select(all())
                         .apply(is)
                         .map(JsonMappingSpecReader::varSpec)
                         .toList(),
@@ -98,7 +102,7 @@ public class JsonMappingSpecReader implements MappingSpecReader {
                 PTR.member("recordSelector").stringOrThrow(element),
                 PTR.member("table").stringOrThrow(element),
                 PTR.member("fieldMapping")
-                        .select(Selector.all())
+                        .select(all())
                         .apply(element)
                         .map(JsonMappingSpecReader::fieldMappingSpec)
                         .toList(),
@@ -180,32 +184,100 @@ public class JsonMappingSpecReader implements MappingSpecReader {
     }
 
     /**
-     * The {@code selector} is optional: an adapter that reads a single kind of
-     * record from a whole file - a CSV with a header, a fixed-length file - has
-     * nothing to locate, and omitting it says so.
+     * Both ways of selecting records are optional, and no record selector has
+     * both. A {@code selector} points at records in a tree or a sheet; a
+     * {@code discriminator} picks lines out of a flat file; and neither says that
+     * the whole input holds one kind of record, which a CSV with a header or a
+     * fixed-length file usually does.
      */
     private static RecordSelectorSpec recordSelectorSpec(JsonValue rs) {
         return new RecordSelectorSpec(
                 PTR.member("name").stringOrThrow(rs),
                 PTR.member("selector").stringValue(rs).orElse(null),
+                discriminator(rs),
                 PTR.member("fieldSelectors")
-                        .select(Selector.all())
+                        .select(all())
                         .apply(rs)
                         .map(JsonMappingSpecReader::fieldSelectorSpec)
                         .toList()
         );
     }
 
+    /**
+     * A discriminator says where to look and what for: exactly one of
+     * {@code column} and {@code selector}, and exactly one of {@code equals} and
+     * {@code matches}.
+     */
+    private static @Nullable Discriminator discriminator(JsonValue rs) {
+        var d = PTR.member("discriminator").apply(rs).orElse(null);
+        if (d == null) {
+            return null;
+        }
+        var where = selector(d, "a discriminator");
+        // any scalar, so that a record type written 1 rather than "1" is a
+        // discriminator rather than a puzzle
+        var literal = PTR.member("equals").apply(d).flatMap(JsonMappingSpecReader::text);
+        var regex = PTR.member("matches").stringValue(d);
+        if (literal.isPresent() && regex.isPresent()) {
+            throw new IllegalArgumentException(
+                    "a discriminator tests equals or matches, not both: " + d);
+        }
+        if (literal.isPresent()) {
+            return new Discriminator.Equals(where, literal.get());
+        }
+        if (regex.isPresent()) {
+            return Discriminator.matching(where, regex.get());
+        }
+        throw new IllegalArgumentException("a discriminator needs equals or matches; "
+                + where + " on its own says where to look and not what for: " + d);
+    }
+
     private static FieldSelectorSpec fieldSelectorSpec(JsonValue fs) {
         return new FieldSelectorSpec(
                 PTR.member("name").stringOrThrow(fs),
-                PTR.member("selector").stringOrThrow(fs),
+                selector(fs, "a field selector"),
                 PTR.member("type")
                         .stringValue(fs)
                         .map(String::toUpperCase)
                         .map(DataType::valueOf)
                         .orElse(null)
         );
+    }
+
+    /**
+     * Exactly one of {@code selector} - the adapter's own syntax - and
+     * {@code column}, a position counted from one.
+     * <p>
+     * Two names rather than one of two JSON types, because the XML format cannot
+     * tell {@code selector="3"} from a number and would have had to guess. A
+     * {@code column} that is not a number is refused here rather than coerced, for
+     * the same reason: {@code "column": "1"} is a spec that means the other thing.
+     */
+    private static Selector selector(JsonValue v, String what) {
+        var text = PTR.member("selector").stringValue(v);
+        var column = PTR.member("column").apply(v);
+        if (text.isPresent() && column.isPresent()) {
+            throw new IllegalArgumentException(what + " has both a selector and a column,"
+                    + " which are two answers to one question: " + v);
+        }
+        if (text.isPresent()) {
+            return new Selector.Text(text.get());
+        }
+        if (column.isPresent()) {
+            return new Selector.Column(columnIndex(column.get(), what));
+        }
+        throw new IllegalArgumentException(what + " needs a selector or a column: " + v);
+    }
+
+    private static int columnIndex(JsonValue value, String what) {
+        var number = value.decimal().orElseThrow(() -> new IllegalArgumentException(
+                what + ": a column is a whole number counted from one, was " + value));
+        try {
+            return number.intValueExact();
+        } catch (ArithmeticException e) {
+            throw new IllegalArgumentException(
+                    what + ": a column is a whole number counted from one, was " + number, e);
+        }
     }
 
     private static final Pointer PTR = Pointer.self();

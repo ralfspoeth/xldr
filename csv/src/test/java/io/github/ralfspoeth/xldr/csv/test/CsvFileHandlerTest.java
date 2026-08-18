@@ -5,9 +5,11 @@ import io.github.ralfspoeth.xldr.ia.InputAdapter;
 import io.github.ralfspoeth.xldr.ia.InputAdapterFactory;
 import io.github.ralfspoeth.xldr.ia.Row;
 import io.github.ralfspoeth.xldr.spec.DataType;
+import io.github.ralfspoeth.xldr.spec.Discriminator;
 import io.github.ralfspoeth.xldr.spec.FieldSelectorSpec;
 import io.github.ralfspoeth.xldr.spec.InputSpec;
 import io.github.ralfspoeth.xldr.spec.RecordSelectorSpec;
+import io.github.ralfspoeth.xldr.spec.Selector;
 import org.junit.jupiter.api.Test;
 
 import java.io.ByteArrayInputStream;
@@ -55,29 +57,36 @@ public class CsvFileHandlerTest {
             ))
     );
 
-    // no header: columns are addressed by 1-based position ("1" -> col 0, ...)
+    /** a column, counted from one, which is the only way to address a headerless file */
+    private static FieldSelectorSpec at(int column) {
+        return new FieldSelectorSpec(String.valueOf(column), new Selector.Column(column), DataType.TEXT);
+    }
+
+    /** the first column holds this, which is how the record types tell themselves apart */
+    private static Discriminator firstColumnIs(String literal) {
+        return new Discriminator.Equals(new Selector.Column(1), literal);
+    }
+
+    // no header: fields are addressed by column, and named after it here only
+    // because a name has to be something
     private static final InputSpec POSITIONAL_SPEC = spec(HEADERLESS,
-            new RecordSelectorSpec("people", null, List.of(
-                    new FieldSelectorSpec("1", "1", DataType.TEXT),
-                    new FieldSelectorSpec("2", "2", DataType.TEXT),
-                    new FieldSelectorSpec("3", "3", DataType.TEXT)
-            ))
+            new RecordSelectorSpec("people", null, List.of(at(1), at(2), at(3)))
     );
 
-    // one headerless file, two interleaved record types keyed by the first column:
-    // the record selector's `selector` is the discriminator the first column must equal.
-    // positions stay absolute, so "1" is the discriminator column itself.
+    // one headerless file, two interleaved record types keyed by the first
+    // column. Positions stay absolute, so column 1 is the discriminator itself
+    // and the fields start at 2.
     private static final InputSpec DISCRIMINATED_SPEC = spec(HEADERLESS,
-            new RecordSelectorSpec("orders", "O", List.of(
-                    new FieldSelectorSpec("2", "2", DataType.TEXT),   // order id
-                    new FieldSelectorSpec("3", "3", DataType.TEXT),   // date
-                    new FieldSelectorSpec("4", "4", DataType.TEXT)    // customer
+            new RecordSelectorSpec("orders", null, firstColumnIs("O"), List.of(
+                    at(2),   // order id
+                    at(3),   // date
+                    at(4)    // customer
             )),
-            new RecordSelectorSpec("lines", "L", List.of(
-                    new FieldSelectorSpec("2", "2", DataType.TEXT),   // order id
-                    new FieldSelectorSpec("3", "3", DataType.TEXT),   // product
-                    new FieldSelectorSpec("4", "4", DataType.TEXT),   // qty
-                    new FieldSelectorSpec("5", "5", DataType.TEXT)    // price
+            new RecordSelectorSpec("lines", null, firstColumnIs("L"), List.of(
+                    at(2),   // order id
+                    at(3),   // product
+                    at(4),   // qty
+                    at(5)    // price
             ))
     );
 
@@ -342,9 +351,7 @@ public class CsvFileHandlerTest {
                         new FieldSelectorSpec("id", "id", DataType.TEXT),
                         new FieldSelectorSpec("name", "name", DataType.TEXT))));
         var withoutHeader = spec(Map.of("fieldSeparator", ",", "header", "absent"),
-                new RecordSelectorSpec("people", null, List.of(
-                        new FieldSelectorSpec("1", "1", DataType.TEXT),
-                        new FieldSelectorSpec("2", "2", DataType.TEXT))));
+                new RecordSelectorSpec("people", null, List.of(at(1), at(2))));
 
         var named = rowsOf(withHeader, "id,name\n1,Alice\n", "id", "name");
         assertEquals("Alice", named.getFirst().get("name"));
@@ -454,15 +461,17 @@ public class CsvFileHandlerTest {
     }
 
     /**
-     * The same, without a header: the selector is the 1-based column position,
-     * and the name stays the mapping's handle.
+     * The same, without a header: the field counts its column, and the name
+     * stays the mapping's handle. The two were harder to tell apart when a
+     * position was written as text - {@code selector="3"} looked like the other
+     * kind of selector and was one only because of a property elsewhere.
      */
     @Test
-    public void aFieldsSelectorIsApositionWithoutAheader() throws IOException {
+    public void aFieldCountsItsColumnWithoutAheader() throws IOException {
         var spec = spec(Map.of("fieldSeparator", ";", "header", "absent"),
                 new RecordSelectorSpec("people", null, List.of(
-                        new FieldSelectorSpec("name", "3", DataType.TEXT),
-                        new FieldSelectorSpec("id", "1", DataType.INTEGRAL)
+                        new FieldSelectorSpec("name", new Selector.Column(3), DataType.TEXT),
+                        new FieldSelectorSpec("id", new Selector.Column(1), DataType.INTEGRAL)
                 )));
         var rows = rowsOf(spec, "1;;Hello;asdf\n", "name", "id");
 
@@ -604,20 +613,6 @@ public class CsvFileHandlerTest {
     }
 
     /**
-     * Without a header a selector is a column number, so a name is not a selector
-     * that missed - it is a spec written for a file that has a header.
-     */
-    @Test
-    public void aNameIsRefusedAsAselectorWithoutAheader() {
-        var spec = spec(Map.of("header", "absent"),
-                new RecordSelectorSpec("people", null, List.of(
-                        new FieldSelectorSpec("name", "name", DataType.TEXT))));
-        var thrown = assertThrows(IllegalArgumentException.class,
-                () -> rowsOf(spec, "1,Alice\n", "name"));
-        assertTrue(thrown.getMessage().contains("column"), thrown.getMessage());
-    }
-
-    /**
      * The other registered type says three things RFC 4180 leaves open, so a TSV
      * spec carries no properties at all: tabs separate the fields, the first line
      * is the names, and there is no quoting - a TSV field cannot contain a tab, so
@@ -680,15 +675,146 @@ public class CsvFileHandlerTest {
         }
     }
 
+    /**
+     * A column counts, so it works whether or not the file names its columns -
+     * which is new. A header that names a column {@code 3} is now sayable and
+     * distinct from the third column, and this is the file where that used to be
+     * impossible.
+     */
+    @Test
+    public void aColumnCountsEvenWhereTheColumnsHaveNames() throws IOException {
+        var counted = spec(Map.of(),
+                new RecordSelectorSpec("people", null, List.of(
+                        new FieldSelectorSpec("second", new Selector.Column(2), DataType.TEXT))));
+        var named = spec(Map.of(),
+                new RecordSelectorSpec("people", null, List.of(
+                        new FieldSelectorSpec("second", "3", DataType.TEXT))));
+        var csv = """
+                1,2,3
+                a,b,c
+                """;
+        assertAll(
+                () -> assertEquals("b", rowsOf(counted, csv, "second").getFirst().get("second"),
+                        "the second column"),
+                () -> assertEquals("c", rowsOf(named, csv, "second").getFirst().get("second"),
+                        "the column named 3"));
+    }
+
+    /**
+     * Names are something only a header has, so a headerless file cannot be
+     * selected from by one. This used to be a {@code parseInt} returning -1,
+     * which said nothing about what to do instead.
+     */
+    @Test
+    public void aNameNeedsAHeaderToNameSomethingIn() {
+        var spec = spec(Map.of("header", "absent"),
+                new RecordSelectorSpec("people", null, List.of(
+                        new FieldSelectorSpec("who", "name", DataType.TEXT))));
+        var thrown = assertThrows(IllegalArgumentException.class,
+                () -> rowsOf(spec, "1,Alice\n", "who"));
+        assertAll(
+                () -> assertTrue(thrown.getMessage().contains("no column names"), thrown.getMessage()),
+                () -> assertTrue(thrown.getMessage().contains("\"column\""), thrown.getMessage()));
+    }
+
+    /**
+     * With a header there is something to check a count against, so a column
+     * past the end of it is a spec that does not fit its file. Without one there
+     * is nothing to check against, and a short line is simply short.
+     */
+    @Test
+    public void aColumnBeyondTheHeaderIsRefused() {
+        var spec = spec(Map.of(),
+                new RecordSelectorSpec("people", null, List.of(
+                        new FieldSelectorSpec("far", new Selector.Column(9), DataType.TEXT))));
+        var thrown = assertThrows(IllegalArgumentException.class,
+                () -> rowsOf(spec, "id,name\n1,Alice\n", "far"));
+        assertTrue(thrown.getMessage().contains("only 2"), thrown.getMessage());
+    }
+
+    /**
+     * A headed file may perfectly well carry a type column, and then a
+     * discriminator is exactly right rather than almost certainly wrong. This is
+     * the file that showed the old first-column-only rule was too narrow.
+     */
+    @Test
+    public void aDiscriminatorMayNameItsColumnInAHeadedFile() throws IOException {
+        var spec = spec(Map.of(),
+                new RecordSelectorSpec("ones",
+                        null,
+                        new Discriminator.Equals(new Selector.Text("A"), "1"),
+                        List.of(new FieldSelectorSpec("b", "B", DataType.TEXT))));
+        var rows = rowsOf(spec, """
+                A,B,C
+                1,one,One
+                1,two,Two
+                2,one,Two
+                2,two,One
+                """, "ones", Set.of("b"));
+
+        assertAll(
+                () -> assertEquals(2, rows.size(), "only the rows whose A is 1"),
+                () -> assertEquals("one", rows.getFirst().get("b")),
+                () -> assertEquals("two", rows.get(1).get("b")));
+    }
+
+    /**
+     * And it may match rather than equal, which is what a family of record types
+     * sharing a prefix needs.
+     */
+    @Test
+    public void aDiscriminatorMayMatchAPattern() throws IOException {
+        var spec = spec(Map.of("header", "absent"),
+                new RecordSelectorSpec("orders",
+                        null,
+                        Discriminator.matching(new Selector.Column(1), "O[0-9]+"),
+                        List.of(at(2))));
+        var rows = rowsOf(spec, """
+                O1,first
+                L1,a line
+                O2,second
+                OX,not a number
+                """, "orders", Set.of("2"));
+
+        assertAll(
+                () -> assertEquals(2, rows.size()),
+                () -> assertEquals("first", rows.getFirst().get("2")),
+                () -> assertEquals("second", rows.get(1).get("2")));
+    }
+
+    /**
+     * The migration tripwire. A spec written before the two parted says
+     * {@code "selector": "O"} where it now means a discriminator; ignoring it
+     * would leave every line matching every record selector, and a load reporting
+     * a great many rows.
+     */
+    @Test
+    public void aFlatRecordSelectorWithASelectorIsRefused() {
+        var spec = spec(Map.of("header", "absent"),
+                new RecordSelectorSpec("orders", "O", List.of(at(2))));
+        var thrown = assertThrows(IllegalArgumentException.class,
+                () -> rowsOf(spec, "O,first\n", "orders", Set.of("2")));
+        assertAll(
+                () -> assertTrue(thrown.getMessage().contains("no place to point at"), thrown.getMessage()),
+                // and says what to write instead
+                () -> assertTrue(thrown.getMessage().contains("discriminator"), thrown.getMessage()));
+    }
+
     private static Row first(InputSpec spec, byte[] csv) throws IOException {
         try (var in = new ByteArrayInputStream(csv)) {
             return adapterFor(spec).parse(in, "people", Set.of("id", "name")).rows().toList().getFirst();
         }
     }
 
+    /** the common case: one record selector, and it is called people */
     private static List<Row> rowsOf(InputSpec spec, String csv, String... fields) throws IOException {
+        return rowsOf(spec, csv, "people", Set.of(fields));
+    }
+
+    private static List<Row> rowsOf(InputSpec spec, String csv, String recordSelector, Set<String> fields)
+            throws IOException {
         try (var in = new ByteArrayInputStream(csv.getBytes(StandardCharsets.UTF_8))) {
-            return adapterFor(spec).parse(in, "people", Set.of(fields)).rows().toList();
+            return adapterFor(spec).parse(in, recordSelector, fields).rows().toList();
         }
     }
 

@@ -45,13 +45,25 @@ sealed interface CellRef {
             return new AbsoluteColumn(CellReference.convertColStringToIndex(s.toUpperCase()));
         }
         if (DIGITS.matcher(s).matches()) {
-            var index = Integer.parseInt(s);
-            if (index < 1) {
-                throw new IllegalArgumentException("column index must be 1-based: " + selector);
-            }
-            return new AbsoluteColumn(index - 1);
+            // a spec written before `column` existed said its column index here,
+            // which still works and still means the same thing
+            return column(Integer.parseInt(s));
         }
         throw new IllegalArgumentException("not a valid Excel field selector: " + selector);
+    }
+
+    /**
+     * A column of the sheet, counted from one as a person counts them.
+     * <p>
+     * The same thing a digit selector has always meant, reachable now without
+     * writing the number down as text first - which is what a spec says when it
+     * carries a {@code column} rather than a {@code selector}.
+     */
+    static CellRef column(int index) {
+        if (index < 1) {
+            throw new IllegalArgumentException("a column is counted from 1, was: " + index);
+        }
+        return new AbsoluteColumn(index - 1);
     }
 
     record AbsoluteColumn(int column) implements CellRef {

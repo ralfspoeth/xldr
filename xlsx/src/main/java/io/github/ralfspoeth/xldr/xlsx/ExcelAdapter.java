@@ -6,6 +6,7 @@ import io.github.ralfspoeth.xldr.ia.Result;
 import io.github.ralfspoeth.xldr.ia.Row;
 import io.github.ralfspoeth.xldr.spec.DataType;
 import io.github.ralfspoeth.xldr.spec.InputSpec;
+import io.github.ralfspoeth.xldr.spec.Selector;
 import org.apache.poi.ss.usermodel.*;
 import org.jspecify.annotations.Nullable;
 
@@ -36,10 +37,14 @@ class ExcelAdapter implements InputAdapter {
      * always wanted together - keeping them in two maps under the same key only
      * created lookups that can, as far as any reader or checker can tell, come
      * back with nothing.
+     * <p>
+     * Called {@code Mapped} rather than {@code Column} because
+     * {@link Selector.Column} is a different thing a few lines below, and one of
+     * the two would then have had to be read carefully to be told from the other.
      */
-    private record Column(Field field, CellRef ref) {}
+    private record Mapped(Field field, CellRef ref) {}
 
-    private record RecordDef(Range range, Map<String, Column> columns) {}
+    private record RecordDef(Range range, Map<String, Mapped> columns) {}
 
     private final Map<String, RecordDef> records = new LinkedHashMap<>();
 
@@ -47,12 +52,16 @@ class ExcelAdapter implements InputAdapter {
         for (var rss : spec.recordSelectors()) {
             // a sheet range has to point somewhere, so this input cannot omit it
             var range = Range.parse(rss.requireSelector());
-            var columns = new LinkedHashMap<String, Column>();
+            var columns = new LinkedHashMap<String, Mapped>();
             for (var fss : rss.fieldSelectors()) {
                 var type = fss.dataType() == null ? DataType.TEXT : fss.dataType();
-                columns.put(fss.name(), new Column(
-                        new Field(fss.name(), type.clazz()),
-                        CellRef.parse(fss.selector())));
+                // a sheet is one of the two formats that really has columns, so
+                // this adapter takes either way of naming one
+                var ref = switch (fss.selector()) {
+                    case Selector.Text(var s) -> CellRef.parse(s);
+                    case Selector.Column(int index) -> CellRef.column(index);
+                };
+                columns.put(fss.name(), new Mapped(new Field(fss.name(), type.clazz()), ref));
             }
             if (records.putIfAbsent(rss.name(), new RecordDef(range, columns)) != null) {
                 throw new IllegalArgumentException("duplicate record selector " + rss.name());
@@ -99,7 +108,7 @@ class ExcelAdapter implements InputAdapter {
                     rows.add(values::get);
                 }
             }
-            var fields = selected.stream().map(Column::field).toList();
+            var fields = selected.stream().map(Mapped::field).toList();
             return new Result(fields, rows.stream());
         }
     }

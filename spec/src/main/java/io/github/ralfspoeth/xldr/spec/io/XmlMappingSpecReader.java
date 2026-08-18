@@ -2,6 +2,7 @@ package io.github.ralfspoeth.xldr.spec.io;
 
 import io.github.ralfspoeth.xldr.spec.*;
 import io.github.ralfspoeth.xmls.Xml;
+import org.jspecify.annotations.Nullable;
 import org.w3c.dom.Element;
 
 import java.io.InputStream;
@@ -110,14 +111,23 @@ public class XmlMappingSpecReader implements MappingSpecReader {
     }
 
     /**
-     * The {@code selector} is optional: an adapter that reads a single kind of
-     * record from a whole file - a CSV with a header, a fixed-length file - has
-     * nothing to locate, and omitting it says so.
+     * Both ways of selecting records are optional, and no record selector has
+     * both. A {@code selector} attribute points at records in a tree or a sheet;
+     * a {@code <discriminator>} child picks lines out of a flat file; and neither
+     * says that the whole input holds one kind of record, which a CSV with a
+     * header or a fixed-length file usually does.
+     *
+     * <pre>
+     * &lt;recordSelector name="orders"&gt;
+     *     &lt;discriminator column="1" equals="O"/&gt;
+     * &lt;/recordSelector&gt;
+     * </pre>
      */
     private static RecordSelectorSpec recordSelectorSpec(Element recordSelector) {
         return new RecordSelectorSpec(
                 required(recordSelector, "name"),
                 attributeValue("selector").apply(recordSelector).orElse(null),
+                discriminator(recordSelector),
                 elements("fieldSelector")
                         .apply(recordSelector)
                         .map(XmlMappingSpecReader::fieldSelectorSpec)
@@ -125,16 +135,79 @@ public class XmlMappingSpecReader implements MappingSpecReader {
         );
     }
 
+    /**
+     * A discriminator says where to look and what for: exactly one of
+     * {@code column} and {@code selector}, and exactly one of {@code equals} and
+     * {@code matches}.
+     */
+    private static @Nullable Discriminator discriminator(Element recordSelector) {
+        var element = elements("discriminator").apply(recordSelector).findFirst().orElse(null);
+        if (element == null) {
+            return null;
+        }
+        var where = selector(element, "a discriminator");
+        var literal = attributeValue("equals").apply(element);
+        var regex = attributeValue("matches").apply(element);
+        if (literal.isPresent() && regex.isPresent()) {
+            throw new IllegalArgumentException("a discriminator tests equals or matches, not both: '"
+                    + literal.get() + "' and /" + regex.get() + "/");
+        }
+        if (literal.isPresent()) {
+            return new Discriminator.Equals(where, literal.get());
+        }
+        if (regex.isPresent()) {
+            return Discriminator.matching(where, regex.get());
+        }
+        throw new IllegalArgumentException("a discriminator needs equals or matches; "
+                + where + " on its own says where to look and not what for");
+    }
+
     private static FieldSelectorSpec fieldSelectorSpec(Element fieldSelector) {
         return new FieldSelectorSpec(
                 required(fieldSelector, "name"),
-                required(fieldSelector, "selector"),
+                selector(fieldSelector, "a field selector"),
                 attributeValue("type")
                         .apply(fieldSelector)
                         .map(type -> type.toUpperCase(Locale.ROOT))
                         .map(DataType::valueOf)
                         .orElse(null)
         );
+    }
+
+    /**
+     * Exactly one of {@code selector} - the adapter's own syntax - and
+     * {@code column}, a position counted from one.
+     * <p>
+     * This is the reason the format uses two names rather than one attribute of
+     * two types: an XML attribute is text, so {@code selector="3"} could only ever
+     * have been told from a column by guessing at its shape, and a header naming a
+     * column {@code 3} would have made the guess wrong. Here the two are different
+     * attributes and the schema types the second, so {@code column="first"} does
+     * not reach this code at all.
+     */
+    private static Selector selector(Element element, String what) {
+        var text = attributeValue("selector").apply(element);
+        var column = attributeValue("column").apply(element);
+        if (text.isPresent() && column.isPresent()) {
+            throw new IllegalArgumentException(what + " has both selector='" + text.get()
+                    + "' and column='" + column.get() + "', which are two answers to one question");
+        }
+        if (text.isPresent()) {
+            return new Selector.Text(text.get());
+        }
+        if (column.isPresent()) {
+            return new Selector.Column(columnIndex(column.get(), what));
+        }
+        throw new IllegalArgumentException(what + " needs a selector or a column");
+    }
+
+    private static int columnIndex(String value, String what) {
+        try {
+            return Integer.parseInt(value.strip());
+        } catch (NumberFormatException e) {
+            throw new IllegalArgumentException(
+                    what + ": a column is a whole number counted from one, was '" + value + "'", e);
+        }
     }
 
     private static RecordMappingSpec recordMappingSpec(Element mapping) {

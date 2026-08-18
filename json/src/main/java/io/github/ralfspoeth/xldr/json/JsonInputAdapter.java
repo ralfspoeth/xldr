@@ -70,7 +70,8 @@ class JsonInputAdapter implements InputAdapter {
     private static RecordDef recordDef(RecordSelectorSpec rs) {
         Map<String, FieldDef> fields = new HashMap<>();
         for (var fs : rs.fieldSelectors()) {
-            fields.putIfAbsent(fs.name(), new FieldDef(pointer(fs.selector()), typeOf(fs)));
+            fields.putIfAbsent(fs.name(), new FieldDef(
+                    pointer(fs.requireText("a JSON field is addressed by a pointer")), typeOf(fs)));
         }
         // selector(), not requireSelector(): for this adapter an absent one is
         // an answer rather than an omission - the document itself is the record

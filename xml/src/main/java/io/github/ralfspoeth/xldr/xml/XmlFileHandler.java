@@ -54,10 +54,11 @@ class XmlFileHandler implements InputAdapter {
                 throw new IllegalArgumentException("duplicate record selector " + recordSpec.name());
             }
             for (var fieldSpec : recordSpec.fieldSelectors()) {
+                var expression = fieldSpec.requireText("an XML field is addressed by an XPath");
                 record.add(new XmlFieldSelector(
                         fieldSpec.name(),
-                        fieldSpec.selector(),
-                        compile(xpath, fieldSpec.selector()),
+                        expression,
+                        compile(xpath, expression),
                         fieldSpec.dataType(),
                         formats));
             }
