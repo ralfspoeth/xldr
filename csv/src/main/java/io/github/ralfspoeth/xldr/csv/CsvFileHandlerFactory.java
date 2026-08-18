@@ -12,9 +12,11 @@ import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.function.Predicate;
 
 /**
- * Creates CSV adapters.
+ * Creates adapters for the two registered separated-value media types,
+ * {@code text/csv} and {@code text/tab-separated-values}.
  * <p>
  * The defaults are RFC 4180's, so a spec that says nothing beyond
  * {@code text/csv} reads the format the MIME type is registered for: fields
@@ -40,13 +42,33 @@ import java.util.Map;
  * {@code fieldsFromHeader} (off by default; with it, a field the spec does not
  * declare is the column of that name), {@code charset} (UTF-8 by default), and
  * the shared conversion settings of {@link Formats}.
+ * <p>
+ * <strong>{@code text/tab-separated-values} settles three of those by itself.</strong>
+ * Its registration is shorter than RFC 4180 and stricter: fields are separated by
+ * a tab, a field <em>cannot contain</em> a tab and therefore needs no quoting
+ * mechanism at all, and the first line is the field names rather than optionally
+ * so. A spec naming that type need say none of the three, and a spec contradicting
+ * one of them is refused rather than quietly obeyed - the type is a claim about
+ * what the file is, and a spec that disagrees with it has one of the two wrong.
+ * A file that is tab-separated without being TSV - quoted fields, or no header -
+ * is {@code text/csv} with {@code "fieldSeparator": "\t"}, which is what that type
+ * is for. Everything the registration does not mention is still open: a comment
+ * character, {@code emptyLine}, {@code charset} and the {@link Formats} settings.
  */
 public class CsvFileHandlerFactory implements InputAdapterFactory {
 
     /** the property by which a feed says that its header names its fields */
     private static final String FIELDS_FROM_HEADER = "fieldsFromHeader";
 
-    private static final List<String> ACCEPT = List.of("text/csv");
+    private static final String FIELD_SEPARATOR = "fieldSeparator";
+    private static final String QUOTE = "quote";
+
+    static final String CSV = "text/csv";
+    static final String TSV = "text/tab-separated-values";
+
+    private static final List<String> ACCEPT = List.of(CSV, TSV);
+
+    private static final String TAB = "\t";
 
     @Override
     public boolean reads(String mimeType) {
@@ -56,8 +78,12 @@ public class CsvFileHandlerFactory implements InputAdapterFactory {
     @Override
     public InputAdapter createInputAdapter(InputSpec spec) {
         var properties = spec.properties();
+        boolean tsv = TSV.equals(spec.mimeType());
+        if (tsv) {
+            refuseWhatTheTypeHasSettled(properties);
+        }
         return new CsvFileHandler(
-                properties.getOrDefault("fieldSeparator", ","),
+                properties.getOrDefault(FIELD_SEPARATOR, tsv ? TAB : ","),
                 // UTF-8 rather than Charset.defaultCharset(): the same file has to
                 // load the same way whatever -Dfile.encoding the container was
                 // started with, and UTF-8 reads every US-ASCII file the RFC
@@ -66,13 +92,44 @@ public class CsvFileHandlerFactory implements InputAdapterFactory {
                         ? Charset.forName(properties.get("charset"))
                         : StandardCharsets.UTF_8,
                 Header.of(properties.get(Header.SETTING)).present(),
-                character("quote", properties.get("quote"), '"'),
+                // no quoting for TSV, a field there being unable to hold a tab
+                character(QUOTE, properties.get(QUOTE), tsv ? null : '"'),
                 character("comment", properties.get("comment"), null),
                 EmptyLine.of(properties.get("emptyLine")),
                 fieldsFromHeader(properties),
                 Formats.of(properties),
                 spec
         );
+    }
+
+    /**
+     * The three things {@value #TSV} decides for itself. A spec may repeat any of
+     * them - saying a tab separator for a TSV file is redundant, not wrong - but
+     * may not contradict one.
+     * <p>
+     * Refusing rather than obeying, because the media type is a claim about what
+     * the file is: a spec that names TSV and then asks for semicolons describes
+     * two different files, and whichever of the two the adapter picked, it would
+     * be guessing. Refusing at adapter creation puts that in front of the author
+     * rather than in a table of nulls.
+     */
+    private static void refuseWhatTheTypeHasSettled(Map<String, String> properties) {
+        settled(FIELD_SEPARATOR, properties.get(FIELD_SEPARATOR), TAB::equals,
+                "a tab separates fields");
+        settled(QUOTE, properties.get(QUOTE), String::isEmpty,
+                "there is no quoting, a field being unable to contain a tab");
+        settled(Header.SETTING, properties.get(Header.SETTING), s -> Header.of(s).present(),
+                "the first line is the field names");
+    }
+
+    private static void settled(String name, @Nullable String setting,
+                                Predicate<String> agrees, String what) {
+        if (setting != null && !agrees.test(setting)) {
+            throw new IllegalArgumentException(TSV + " settles " + name + ": " + what
+                    + ", but the spec says '" + setting + "'. A file that is tab-separated"
+                    + " without being TSV - quoted fields, or no header - is " + CSV
+                    + " with a fieldSeparator of \\t.");
+        }
     }
 
     /**

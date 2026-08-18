@@ -741,7 +741,7 @@ their canonical form.
 
 Excel needs none of these: a spreadsheet carries typed cells, so a date or a number arrives as one already.
 
-**CSV** (`text/csv`):
+**CSV** (`text/csv`, `text/tab-separated-values`):
 
 | Key                | Default          | Meaning                                                                                                                                                                                                                                                                                                                                          |
 |--------------------|------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
@@ -759,6 +759,19 @@ many words that an implementation choosing not to use it must decide for itself;
 a selector names a column and a headerless file has no names to offer. And by the RFC's own grammar a blank line is
 a record of one empty field, which no implementation reads it as and nobody writing a file by hand means — hence
 `emptyLine = skip`.
+
+**`text/tab-separated-values` settles three of those by itself.** Its IANA registration is shorter than RFC 4180 and
+stricter: a tab separates the fields, a field *cannot contain* a tab and so needs no quoting mechanism at all, and the
+first line is the field names rather than optionally so. A spec naming that type therefore carries no properties:
+
+    { "input": { "mimeType": "text/tab-separated-values", "recordSelectors": [ … ] } }
+
+A spec may repeat what the type already says - a tab separator for a TSV file is redundant, not wrong - but one that
+contradicts it is refused. The type is a claim about what the file is, so a spec naming TSV and then asking for
+semicolons describes two different files, and obeying either would be a guess. A file that is tab-separated *without*
+being TSV - quoted fields, or no header - is `text/csv` with `"fieldSeparator": "\t"`, which is what that type is for.
+Everything the registration does not mention stays open: a comment character, `emptyLine`, `charset` and the
+conversion settings.
 
 **A selector that names no column of the file is refused**, rather than read as null for every row. A tab-separated
 file read with commas has exactly one column, called the whole header line, so every selector misses and the load

@@ -96,6 +96,15 @@
 </p>
 
 <p>
+    One consequence worth knowing. The JSON schema lists the known <code>mimeType</code> values, but as an
+    <code>anyOf</code> beside a plain string, so the list is what an editor offers rather than what the schema
+    permits - any type validates, and must, since an adapter may come from anywhere. The list therefore names the
+    adapters that existed when the schema was published and lags behind ones added since, which is why
+    <code>text/tab-separated-values</code>, added in 0.27, is not in <code>mapping-spec-0.23</code>. A spec using it
+    validates; autocompletion simply will not suggest it until the next release that changes the format.
+</p>
+
+<p>
     In 0.23 <code>accepts</code> and <code>sentinel</code> left the spec. How a feed's files arrive is a property of
     the deployment rather than of the mapping - the names a producer uses differ between test and production while
     the mapping does not - so they moved to a <code>delivery.properties</code> beside the spec, which the server reads
@@ -211,7 +220,7 @@
 
 <p>Excel needs none of these: a spreadsheet carries typed cells, so a date or a number arrives as one already.</p>
 
-<h3>CSV <code>text/csv</code></h3>
+<h3>CSV <code>text/csv</code>, <code>text/tab-separated-values</code></h3>
 
 <table>
     <tr><th>Key</th><th>Default</th><th>Meaning</th></tr>
@@ -256,6 +265,17 @@
     itself; <code>present</code> is xldr's answer, because a selector names a column and a headerless file has no
     names to offer. And by the RFC's own grammar a blank line is a record of one empty field, which no implementation
     reads it as and nobody writing a file by hand means - hence <code>emptyLine = skip</code>.
+</p>
+
+<p>
+    <strong><code>text/tab-separated-values</code> settles three of those by itself.</strong> Its IANA registration is
+    shorter than RFC 4180 and stricter: a tab separates the fields, a field <em>cannot contain</em> a tab and so needs
+    no quoting mechanism at all, and the first line is the field names rather than optionally so. A spec naming that
+    type therefore carries no properties at all. It may repeat what the type already says - a tab separator for a TSV
+    file is redundant, not wrong - but one that contradicts it is refused, the type being a claim about what the file
+    is. A file that is tab-separated <em>without</em> being TSV - quoted fields, or no header - is
+    <code>text/csv</code> with <code>"fieldSeparator": "\t"</code>. Everything the registration does not mention stays
+    open: a comment character, <code>emptyLine</code>, <code>charset</code> and the conversion settings.
 </p>
 
 <p>

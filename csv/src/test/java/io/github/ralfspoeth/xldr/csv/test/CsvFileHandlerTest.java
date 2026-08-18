@@ -615,6 +615,69 @@ public class CsvFileHandlerTest {
         assertTrue(thrown.getMessage().contains("column"), thrown.getMessage());
     }
 
+    /**
+     * The other registered type says three things RFC 4180 leaves open, so a TSV
+     * spec carries no properties at all: tabs separate the fields, the first line
+     * is the names, and there is no quoting - a TSV field cannot contain a tab, so
+     * nothing needs escaping and a double quote is an ordinary character.
+     */
+    @Test
+    public void tabSeparatedValuesNeedsNoPropertiesAtAll() throws IOException {
+        var spec = new InputSpec("text/tab-separated-values",
+                List.of(new RecordSelectorSpec("people", null, List.of(
+                        new FieldSelectorSpec("id", "id", DataType.TEXT),
+                        new FieldSelectorSpec("name", "name", DataType.TEXT)))),
+                List.of(), Map.of());
+        var rows = rowsOf(spec, "id\tname\n1\tAlice\n2\t\"Bull, John\"\n", "id", "name");
+
+        assertAll(
+                () -> assertEquals(2, rows.size(), "the first line was the names"),
+                () -> assertEquals("Alice", rows.getFirst().get("name")),
+                () -> assertEquals("\"Bull, John\"", rows.get(1).get("name"),
+                        "no quoting, so the quotes are part of the value"));
+    }
+
+    /**
+     * A spec may repeat what the type already says - a tab separator for a TSV
+     * file is redundant, not wrong - but not contradict it. Obeying the
+     * contradiction would mean picking one of two descriptions of the file and
+     * calling it right; the message points at the type that does allow it.
+     */
+    @Test
+    public void tabSeparatedValuesRefusesAspecThatContradictsIt() {
+        assertAll(
+                () -> assertEquals("\t", tsvSeparatorOf(Map.of("fieldSeparator", "\t")),
+                        "saying what the type says is allowed"),
+                () -> refuses(Map.of("fieldSeparator", ";"), "fieldSeparator"),
+                () -> refuses(Map.of("quote", "\""), "quote"),
+                () -> refuses(Map.of("header", "absent"), "header"));
+    }
+
+    private static void refuses(Map<String, String> properties, String setting) {
+        var thrown = assertThrows(IllegalArgumentException.class,
+                () -> tsvSeparatorOf(properties));
+        assertAll(
+                () -> assertTrue(thrown.getMessage().contains(setting), thrown.getMessage()),
+                // and says which type would have accepted it
+                () -> assertTrue(thrown.getMessage().contains("text/csv"), thrown.getMessage()));
+    }
+
+    /**
+     * Builds a TSV adapter and reports the separator it reads with, so that the
+     * allowed case is asserted on rather than merely not throwing.
+     */
+    private static String tsvSeparatorOf(Map<String, String> properties) throws IOException {
+        var spec = new InputSpec("text/tab-separated-values",
+                List.of(new RecordSelectorSpec("people", null, List.of(
+                        new FieldSelectorSpec("a", "a", DataType.TEXT),
+                        new FieldSelectorSpec("b", "b", DataType.TEXT)))),
+                List.of(), properties);
+        try (var in = new ByteArrayInputStream("a\tb\n1\t2\n".getBytes(StandardCharsets.UTF_8))) {
+            var row = adapterFor(spec).parse(in, "people", Set.of("a", "b")).rows().toList().getFirst();
+            return "1".equals(row.get("a")) && "2".equals(row.get("b")) ? "\t" : "something else";
+        }
+    }
+
     private static Row first(InputSpec spec, byte[] csv) throws IOException {
         try (var in = new ByteArrayInputStream(csv)) {
             return adapterFor(spec).parse(in, "people", Set.of("id", "name")).rows().toList().getFirst();

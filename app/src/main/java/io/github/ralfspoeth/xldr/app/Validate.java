@@ -16,6 +16,7 @@ import java.util.concurrent.Callable;
 import java.util.stream.Collectors;
 
 import static io.github.ralfspoeth.xldr.spec.io.MappingSpecReader.readSpec;
+import static java.util.stream.Collectors.toMap;
 
 /**
  * Checks mapping specs without a database and without a server, so that the
@@ -82,13 +83,22 @@ class Validate implements Callable<Integer> {
     }
 
     /**
+     * The two media types the separated-value adapter reads. Restated here because
+     * this command reasons about a spec without creating an adapter and cannot
+     * depend on the module that owns them - the same reason {@link Header} had to
+     * come down into {@code ia}. If a third one appears, this is the second place
+     * to change, and the first place to look when it was not.
+     */
+    private static final Set<String> SEPARATED_VALUES = Set.of("text/csv", "text/tab-separated-values");
+
+    /**
      * Whether the input lets a mapping name a field its record selector does not
      * declare, the CSV adapter taking such a name for the column of that name.
      * Nothing here can check those: which columns a file has is a property of
      * the file, not of the spec.
      */
     private static boolean fieldsFromHeader(InputSpec input) {
-        return "text/csv".equals(input.mimeType())
+        return SEPARATED_VALUES.contains(input.mimeType())
                 && Boolean.parseBoolean(input.properties().getOrDefault("fieldsFromHeader", "false"));
     }
 
@@ -108,9 +118,13 @@ class Validate implements Callable<Integer> {
      * knows {@code true} and {@code false} and nothing else - so a spec saying
      * {@code header=present}, the spelling the documentation recommends, was
      * taken for a headerless one and skipped the very check it needed.
+     * <p>
+     * It matters more for {@code text/tab-separated-values} than for
+     * {@code text/csv}: that type has a header always, so a discriminator there is
+     * not almost always a mistake but certainly one.
      */
     private static void checkCsvDiscriminator(InputSpec input, List<String> problems) {
-        if (!"text/csv".equals(input.mimeType())) {
+        if (!SEPARATED_VALUES.contains(input.mimeType())) {
             return;
         }
         Header header;
@@ -190,7 +204,7 @@ class Validate implements Callable<Integer> {
         var input = spec.inputSpec();
         var recordSelectors = input.recordSelectors()
                 .stream()
-                .collect(Collectors.toMap(RecordSelectorSpec::name, rs -> rs, (a, b) -> a));
+                .collect(toMap(RecordSelectorSpec::name, rs -> rs, (a, b) -> a));
 
         var declaredVars = new LinkedHashSet<String>();
         for (var v : input.vars()) {

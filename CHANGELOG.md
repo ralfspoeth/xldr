@@ -9,10 +9,31 @@ The versions are the git tags `xldr-<version>`; the published artifacts carry th
 ## 0.27
 
 Nothing about the mapping-spec format changed, so `mapping-spec-0.23` remains its schema and a spec that loaded under
-0.26 loads under 0.27. What changed is the shape of the build: the servlet front end is part of it, and is therefore
-checked against the library on every `mvn verify` rather than at whatever later moment somebody bumped its version.
+0.26 loads under 0.27. What changed is the shape of the build - the servlet front end is part of it, and is therefore
+checked against the library on every `mvn verify` rather than at whatever later moment somebody bumped its version -
+and the CSV adapter answers to the second of the two registered separated-value media types.
 
 ### Added
+
+- The CSV adapter reads `text/tab-separated-values`, and that type settles three settings by itself. Its IANA
+  registration is shorter than RFC 4180 and stricter: a tab separates the fields, a field *cannot contain* a tab and
+  so needs no quoting mechanism at all, and the first line is the field names rather than optionally so. A spec
+  naming the type therefore carries no properties:
+
+      { "input": { "mimeType": "text/tab-separated-values", "recordSelectors": [ … ] } }
+
+  A spec may repeat what the type already says - a tab separator for a TSV file is redundant, not wrong - but one
+  that contradicts it is refused at adapter creation. The media type is a claim about what the file is, so a spec
+  naming TSV and then asking for semicolons describes two different files and obeying either would be a guess. A file
+  that is tab-separated *without* being TSV - quoted fields, or no header - is `text/csv` with
+  `"fieldSeparator": "\t"`, which is what that type is for, and the refusal says so.
+
+  This is where the tab default went when `text/csv` took the comma in 0.26. A format now has a name instead of a
+  correction.
+
+  `mapping-spec-0.23` does not list the new type, and does not need to: its `mimeType` list is an `anyOf` beside a
+  plain string, so it is what an editor offers rather than what the schema permits. A TSV spec validates; only
+  autocompletion is a release behind.
 
 - `xlet` is a module of this reactor, brought over with its history from its own repository. It is the other front
   end - one input per HTTP request, loaded through a spec the deployment carries under `/WEB-INF/specs/`, for a
@@ -43,6 +64,9 @@ checked against the library on every `mvn verify` rather than at whatever later 
   a list.
 - The `DataType` constants document themselves - which Java class each is delivered as - rather than leaving it to
   the enum's own comment, and the modules carry a `name`, so the reactor's output says which is which.
+- The integration tests write their output to `target/failsafe-reports/*-output.txt` instead of the console. A load
+  the tests fail on purpose logs a warning, `System.Logger` reaches JUL, JUL writes to stderr, and `release:prepare`
+  logs a forked build's stderr as `[ERROR]` - so a release ended in a screenful of errors from a build that passed.
 
 ## 0.26
 

@@ -152,6 +152,25 @@
                     </executions>
                 </plugin>
                 <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-failsafe-plugin</artifactId>
+                    <configuration>
+                        <!-- The integration tests run a real server, and it logs.
+                             System.Logger reaches JUL, JUL's ConsoleHandler writes
+                             to stderr, and release:prepare logs a forked build's
+                             stderr as [ERROR] - so every WARNING an IT provokes on
+                             purpose reads as a failure in the release output. The
+                             output goes to target/failsafe-reports/*-output.txt
+                             instead, where it can be read when it is wanted.
+
+                             Managed here rather than configured in each module, so
+                             that declaring the plugin is all a module has to do.
+                             The version, the executions and enableAssertions come
+                             from plumbum and are merged with this. -->
+                        <redirectTestOutputToFile>true</redirectTestOutputToFile>
+                    </configuration>
+                </plugin>
+                <plugin>
                     <groupId>org.codehaus.mojo</groupId>
                     <artifactId>versions-maven-plugin</artifactId>
                 </plugin>
