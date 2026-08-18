@@ -5,6 +5,7 @@ import jakarta.servlet.ServletException;
 import org.eclipse.jetty.ee11.servlet.ServletContextHandler;
 import org.eclipse.jetty.server.Server;
 import org.eclipse.jetty.server.ServerConnector;
+import org.jspecify.annotations.NonNull;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
@@ -22,9 +23,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
-import static org.junit.jupiter.api.Assertions.assertAll;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * The servlet in a real container, over a real socket.
@@ -77,7 +76,7 @@ class XldrServletIT {
          * @return the data source associated with the servlet
          */
         @Override
-        protected DataSource dataSource() {
+        protected @NonNull DataSource dataSource() {
             return (DataSource) java.lang.reflect.Proxy.newProxyInstance(
                     Deployed.class.getClassLoader(),
                     new Class<?>[]{DataSource.class},
