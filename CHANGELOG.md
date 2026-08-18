@@ -6,12 +6,10 @@ ways that break existing code and existing specs; those changes are listed here 
 The versions are the git tags `xldr-<version>`; the published artifacts carry the same version under the group
 `io.github.ralfspoeth.xldr`.
 
-## 0.27
+## 0.28
 
-Nothing about the mapping-spec format changed, so `mapping-spec-0.23` remains its schema and a spec that loaded under
-0.26 loads under 0.27. What changed is the shape of the build - the servlet front end is part of it, and is therefore
-checked against the library on every `mvn verify` rather than at whatever later moment somebody bumped its version -
-and the CSV adapter answers to the second of the two registered separated-value media types.
+Nothing about the mapping-spec format changed, so `mapping-spec-0.23` remains its schema. What changed is that the
+CSV adapter answers to the second of the two registered separated-value media types.
 
 ### Added
 
@@ -34,6 +32,26 @@ and the CSV adapter answers to the second of the two registered separated-value 
   `mapping-spec-0.23` does not list the new type, and does not need to: its `mimeType` list is an `anyOf` beside a
   plain string, so it is what an editor offers rather than what the schema permits. A TSV spec validates; only
   autocompletion is a release behind.
+
+### Fixed
+
+- `validate` applies its two CSV checks to `text/tab-separated-values` as well. It had the one media type written
+  into both, so a TSV spec skipped them - including the first-column discriminator warning, which matters more for
+  that type than for CSV, TSV having a header always: a discriminator there is certainly wrong rather than probably.
+
+### Changed
+
+- The integration tests write their output to `target/failsafe-reports/*-output.txt` instead of the console. A load
+  the tests fail on purpose logs a warning, `System.Logger` reaches JUL, JUL writes to stderr, and `release:prepare`
+  logs a forked build's stderr as `[ERROR]` - so a release ended in a screenful of errors from a build that passed.
+
+## 0.27
+
+Nothing about the mapping-spec format changed, so `mapping-spec-0.23` remains its schema and a spec that loaded under
+0.26 loads under 0.27. What changed is the shape of the build: the servlet front end is part of it, and is therefore
+checked against the library on every `mvn verify` rather than at whatever later moment somebody bumped its version.
+
+### Added
 
 - `xlet` is a module of this reactor, brought over with its history from its own repository. It is the other front
   end - one input per HTTP request, loaded through a spec the deployment carries under `/WEB-INF/specs/`, for a
@@ -64,9 +82,6 @@ and the CSV adapter answers to the second of the two registered separated-value 
   a list.
 - The `DataType` constants document themselves - which Java class each is delivered as - rather than leaving it to
   the enum's own comment, and the modules carry a `name`, so the reactor's output says which is which.
-- The integration tests write their output to `target/failsafe-reports/*-output.txt` instead of the console. A load
-  the tests fail on purpose logs a warning, `System.Logger` reaches JUL, JUL writes to stderr, and `release:prepare`
-  logs a forked build's stderr as `[ERROR]` - so a release ended in a screenful of errors from a build that passed.
 
 ## 0.26
 
