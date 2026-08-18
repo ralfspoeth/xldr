@@ -6,7 +6,12 @@ ways that break existing code and existing specs; those changes are listed here 
 The versions are the git tags `xldr-<version>`; the published artifacts carry the same version under the group
 `io.github.ralfspoeth.xldr`.
 
-## Unreleased
+## 0.30
+
+Nothing about the mapping-spec format changed, so `mapping-spec-0.23` remains its schema and a spec that loaded under
+0.29 loads under 0.30. Both front ends now say what they have loaded through the same counters, one command is gone
+because everything it checked is checked earlier by something that knows more, and the distribution keeps Apache POI
+in a directory a deployment can delete.
 
 ### Added
 
