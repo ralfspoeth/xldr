@@ -9,6 +9,17 @@
     </formats>
     <baseDirectory>xldr-${project.version}</baseDirectory>
 
+    <!--
+        Four directories on the module path, and the division is between what has
+        to be there and what a deployment chooses.
+
+        lib/ is the first: the application, the toolkit and what they need at run
+        time. Remove anything from it and nothing starts. The other three hold
+        service providers, one directory per kind of choice - which formats
+        (modules/), whether Excel (xl/), which database (drivers/) - and each is
+        found by JPMS service binding rather than by any code naming it, so
+        adding and removing them is a matter of moving jars.
+    -->
     <dependencySets>
         <!-- the application jar plus everything it needs at run time -->
         <dependencySet>
@@ -16,22 +27,34 @@
             <useProjectArtifact>true</useProjectArtifact>
             <scope>runtime</scope>
         </dependencySet>
-        <!-- the input adapters, provided so that a deployment can drop the
-             formats it does not read -->
+        <!--
+            The input adapters, so that a deployment can drop the formats it does
+            not read.
+
+            Named one by one rather than selected by scope, because `provided`
+            here does not mean what it looks like: the assembly plugin's scope
+            filter is inclusive downward, so `provided` selects compile *and*
+            provided and would take ia, spec, xmls and Greyson json along with
+            the adapters. That was always true - both sets used to write to lib/,
+            where a jar copied twice to one path is a jar - and only became
+            visible when the directories parted.
+
+            The list is also the invariant: what belongs here is an adapter that
+            needs nothing but the toolkit already in lib/. One that brings a
+            library of its own gets a directory of its own, as xlsx does, so that
+            deleting the format deletes the library with it. That is why no
+            transitive filtering is wanted here - there is nothing to follow.
+        -->
         <dependencySet>
-            <outputDirectory>lib</outputDirectory>
+            <outputDirectory>modules</outputDirectory>
             <useProjectArtifact>false</useProjectArtifact>
             <scope>provided</scope>
-            <!-- so that excluding xlsx below excludes what xlsx drags in, rather
-                 than leaving twenty POI jars here to be listed one by one and
-                 re-listed whenever POI changes its mind -->
-            <useTransitiveFiltering>true</useTransitiveFiltering>
-            <excludes>
-                <exclude>io.github.ralfspoeth.xldr:xlsx</exclude>
-                <exclude>org.postgresql:postgresql</exclude>
-                <exclude>com.oracle.database.jdbc:ojdbc17</exclude>
-                <exclude>com.h2database:h2</exclude>
-            </excludes>
+            <includes>
+                <include>io.github.ralfspoeth.xldr:csv</include>
+                <include>io.github.ralfspoeth.xldr:flt</include>
+                <include>io.github.ralfspoeth.xldr:json</include>
+                <include>io.github.ralfspoeth.xldr:xml</include>
+            </includes>
         </dependencySet>
         <!-- Excel, in a directory of its own, because it is most of the
              distribution by weight: POI brings xmlbeans, curvesapi, four commons

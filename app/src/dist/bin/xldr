@@ -6,12 +6,14 @@
 #   cd /var/lib/xldr && /opt/xldr/bin/xldr
 #   /opt/xldr/bin/xldr --dir /var/lib/xldr
 #
-# lib/ holds the application and the input adapters, drivers/ the JDBC drivers,
-# and xl/ the Excel adapter with the Apache POI libraries it needs. All three go
-# on the module path: JPMS service binding resolves the adapters (uses/provides
-# InputAdapterFactory) and the driver (java.sql uses Driver) from there, so no
-# --add-modules is needed. Put your own driver jar in drivers/ and remove the
-# ones you do not target; delete xl/ whole if you read no spreadsheets.
+# lib/ holds the application and the toolkit - what has to be there. The other
+# three hold what a deployment chooses: modules/ the input adapters, xl/ the
+# Excel adapter with the Apache POI libraries it needs, drivers/ the JDBC
+# drivers. All four go on the module path, and JPMS service binding resolves the
+# adapters (uses/provides InputAdapterFactory) and the driver (java.sql uses
+# Driver) from there, so no --add-modules is needed. Add and remove by moving
+# jars: your own driver into drivers/, a format out of modules/, xl/ deleted
+# whole if you read no spreadsheets.
 #
 # java is taken from JAVA_HOME when that is set, and from PATH otherwise.
 # JAVA_OPTS may carry extra VM options, e.g.
@@ -55,13 +57,16 @@ if [ -n "$version" ] && [ "$version" -lt "$required" ]; then
     fail "Java $required or later is required, but $java is $version"
 fi
 
-# drivers/ and xl/ may be absent, or empty, and both are fine: a deployment that
-# talks to no database has nothing to put in the one, and a deployment that
-# reads no spreadsheets deletes the other. Only lib/ has to be there, which is
-# checked above.
-modules=$here/lib
-[ -d "$here/drivers" ] && modules=$modules:$here/drivers
-[ -d "$here/xl" ] && modules=$modules:$here/xl
+# modules/, xl/ and drivers/ may each be absent, or empty, and all of that is
+# fine: they hold what a deployment chooses - the formats it reads, whether it
+# reads spreadsheets, the database it talks to - and choosing none of something
+# is a choice. Only lib/ has to be there, which is checked above. A server with
+# no adapters starts and refuses to activate any feed, which is loud in the right
+# place.
+modulepath=$here/lib
+[ -d "$here/modules" ] && modulepath=$modulepath:$here/modules
+[ -d "$here/xl" ] && modulepath=$modulepath:$here/xl
+[ -d "$here/drivers" ] && modulepath=$modulepath:$here/drivers
 
-exec "$java" ${JAVA_OPTS:-} -Dxldr.home="$here" -p "$modules" \
+exec "$java" ${JAVA_OPTS:-} -Dxldr.home="$here" -p "$modulepath" \
     -m io.github.ralfspoeth.xldr.app/io.github.ralfspoeth.xldr.app.App "$@"

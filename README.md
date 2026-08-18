@@ -171,9 +171,10 @@ carry the concrete version rather than a literal `${revision}`.
 
     xldr-<version>/
         bin/xldr, bin/xldr.cmd   launchers
-        lib/                     the application, and the input adapters
-        drivers/                 the JDBC drivers - yours goes here
+        lib/                     the application and the toolkit
+        modules/                 the input adapters
         xl/                      the Excel adapter and Apache POI
+        drivers/                 the JDBC drivers - yours goes here
         conf/                    sample xldr.properties and logging.properties
         README.md
 
@@ -182,21 +183,29 @@ and runs with
     cd /etc/xldr && /opt/xldr/bin/xldr        # xldr.properties here
     /opt/xldr/bin/xldr --dir /etc/xldr        # or named
 
-The launcher puts all three of `lib/`, `drivers/` and `xl/` on the module path; JPMS service binding then resolves
+**The division is between what has to be there and what a deployment chooses.** `lib/` is the first: remove anything
+from it and nothing starts. The other three hold service providers, one directory per kind of choice - which formats,
+whether Excel, which database - and the launcher puts all four on the module path. JPMS service binding then resolves
 the input adapters (via the `uses`/`provides` of `InputAdapterFactory`) and the JDBC driver (via `java.sql`'s
-`uses java.sql.Driver`) from there. A driver is nothing but another service provider, so **installing your own is
-copying its jar into `drivers/`** - no classpath to edit, no setting to change. Removing the ones you do not target
-is the same operation in reverse, and worth doing before passing a distribution on to anyone else: the Oracle driver
-is proprietary and not yours to redistribute. An empty `drivers/`, or none at all, is fine.
+`uses java.sql.Driver`), so choosing is a matter of moving jars and nothing else: no classpath to edit, no setting to
+change. Each of the three may be empty, or absent altogether - choosing none of something is a choice, and a server
+with no adapters starts and then refuses to activate any feed, which is loud in the right place.
 
-`xl/` is separate for a different reason: weight. Apache POI brings xmlbeans, curvesapi, several commons libraries
-and log4j-api, which together were most of `lib/` and made it hard to see what the toolkit is actually made of. It is
-named for the format rather than for the library, as `drivers/` is: what a deployment decides is whether it reads
-spreadsheets, and POI is how that happens to be done.
-**A deployment that reads no spreadsheets deletes `xl/` whole** and starts as before. The `xlsx` adapter lives in
-there with them, which is what makes the directory droppable rather than merely tidy - left behind in `lib/` with
-its `requires` unsatisfiable, it would stop the JVM before `main`, since service binding resolves a provider's own
-dependencies and a missing one is a `FindException` rather than a quietly absent format.
+**Installing your own driver is copying its jar into `drivers/`.** Removing the ones you do not target is the same
+operation in reverse, and worth doing before passing a distribution on to anyone else: the Oracle driver is
+proprietary and not yours to redistribute.
+
+**`xl/` is Excel, kept apart for weight.** Apache POI brings xmlbeans, curvesapi, several commons libraries and
+log4j-api, which together were most of the distribution and made it hard to see what the toolkit is actually made of.
+It is named for the format rather than for the library, as `drivers/` is: what a deployment decides is whether it
+reads spreadsheets, and POI is how that happens to be done. A deployment that reads none **deletes `xl/` whole**. The
+`xlsx` adapter lives in there rather than in `modules/` with the other formats, which is what makes the directory
+droppable rather than merely tidy - left among them with its `requires` unsatisfiable, it would stop the JVM before
+`main`, since service binding resolves a provider's own dependencies and a missing one is a `FindException` rather
+than a quietly absent format.
+
+Nothing in the distribution is compile-time-only. `jspecify` is not shipped: every module declares
+`requires static org.jspecify`, which is a claim made to the compiler, and no annotation of it is read at run time.
 
 The launcher takes `java` from `JAVA_HOME` when that is set and from `PATH` otherwise, follows any symlink it was
 invoked through - installing `/usr/local/bin/xldr` pointing into `/opt/xldr` works - and checks the JVM is new enough

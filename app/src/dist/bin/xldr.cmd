@@ -6,11 +6,13 @@ rem named by --dir:
 rem   cd C:\xldr\feeds && C:\xldr\bin\xldr.cmd
 rem   C:\xldr\bin\xldr.cmd --dir C:\xldr\feeds
 rem
-rem lib\ holds the application and the input adapters, drivers\ the JDBC
-rem drivers, and xl\ the Excel adapter with the Apache POI libraries it needs.
-rem All three go on the module path, where JPMS service binding finds the
-rem adapters and the driver. Put your own driver jar in drivers\ and remove the
-rem ones you do not target; delete xl\ whole if you read no spreadsheets.
+rem lib\ holds the application and the toolkit - what has to be there. The other
+rem three hold what a deployment chooses: modules\ the input adapters, xl\ the
+rem Excel adapter with the Apache POI libraries it needs, drivers\ the JDBC
+rem drivers. All four go on the module path, where JPMS service binding finds
+rem the adapters and the driver. Add and remove by moving jars: your own driver
+rem into drivers\, a format out of modules\, xl\ deleted whole if you read no
+rem spreadsheets.
 rem
 rem java is taken from JAVA_HOME when that is set, and from PATH otherwise.
 rem JAVA_OPTS may carry extra VM options.
@@ -32,10 +34,12 @@ if defined JAVA_HOME if not exist "%JAVA_HOME%\bin\java.exe" (
     exit /b 1
 )
 
-rem drivers\ and xl\ may be absent, or empty, and both are fine
-set "MODULES=%HERE%\lib"
-if exist "%HERE%\drivers" set "MODULES=%MODULES%;%HERE%\drivers"
-if exist "%HERE%\xl" set "MODULES=%MODULES%;%HERE%\xl"
+rem modules\, xl\ and drivers\ may each be absent, or empty, and all of that is
+rem fine: choosing none of something is a choice. Only lib\ has to be there.
+set "MODULEPATH=%HERE%\lib"
+if exist "%HERE%\modules" set "MODULEPATH=%MODULEPATH%;%HERE%\modules"
+if exist "%HERE%\xl" set "MODULEPATH=%MODULEPATH%;%HERE%\xl"
+if exist "%HERE%\drivers" set "MODULEPATH=%MODULEPATH%;%HERE%\drivers"
 
 "%JAVA%" %JAVA_OPTS% -Dxldr.home="%HERE%" -p "%MODULES%" ^
     -m io.github.ralfspoeth.xldr.app/io.github.ralfspoeth.xldr.app.App %*

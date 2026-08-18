@@ -6,6 +6,19 @@ ways that break existing code and existing specs; those changes are listed here 
 The versions are the git tags `xldr-<version>`; the published artifacts carry the same version under the group
 `io.github.ralfspoeth.xldr`.
 
+## Unreleased
+
+### Changed
+
+- The distribution separates what has to be there from what a deployment chooses. `lib/` keeps the application and
+  the toolkit - remove anything from it and nothing starts - while the input adapters move to `modules/`, beside the
+  two directories that already held a choice: `xl/` for Excel and `drivers/` for the database. One directory per kind
+  of choice, each resolved by service binding, so choosing is moving jars.
+
+  `jspecify` is no longer shipped. It is `provided` for a reason: every module declares `requires static
+  org.jspecify`, which is a claim made to the compiler, and nothing reads those annotations at run time. It had been
+  travelling with the adapters, where it would now have implied it was a format.
+
 ## 0.30
 
 Nothing about the mapping-spec format changed, so `mapping-spec-0.23` remains its schema and a spec that loaded under
