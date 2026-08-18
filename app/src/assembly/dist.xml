@@ -1,3 +1,4 @@
+<?xml version='1.0'?>
 <assembly xmlns="http://maven.apache.org/ASSEMBLY/2.2.0"
           xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
           xsi:schemaLocation="http://maven.apache.org/ASSEMBLY/2.2.0 http://maven.apache.org/xsd/assembly-2.2.0.xsd">
@@ -21,11 +22,41 @@
             <outputDirectory>lib</outputDirectory>
             <useProjectArtifact>false</useProjectArtifact>
             <scope>provided</scope>
+            <!-- so that excluding xlsx below excludes what xlsx drags in, rather
+                 than leaving twenty POI jars here to be listed one by one and
+                 re-listed whenever POI changes its mind -->
+            <useTransitiveFiltering>true</useTransitiveFiltering>
             <excludes>
+                <exclude>io.github.ralfspoeth.xldr:xlsx</exclude>
                 <exclude>org.postgresql:postgresql</exclude>
                 <exclude>com.oracle.database.jdbc:ojdbc17</exclude>
                 <exclude>com.h2database:h2</exclude>
             </excludes>
+        </dependencySet>
+        <!-- Excel, in a directory of its own, because it is most of the
+             distribution by weight: POI brings xmlbeans, curvesapi, four commons
+             libraries and log4j-api, and lib/ was largely them. Separating it
+             makes what the toolkit is made of legible again.
+
+             Named for the format rather than for the library that reads it, as
+             drivers/ is: what a deployment decides is whether it loads
+             spreadsheets, and Apache POI is how that happens to be done.
+
+             The adapter goes with them rather than staying in lib/, which is
+             what makes the directory droppable rather than merely separate. A
+             deployment reading no spreadsheets deletes xl/ and the server
+             starts; leaving xlsx behind, its `requires` unsatisfiable, would
+             stop the JVM before main - service binding resolves a provider's
+             own dependencies, and a missing one is a FindException, not a
+             quietly absent format. -->
+        <dependencySet>
+            <outputDirectory>xl</outputDirectory>
+            <useProjectArtifact>false</useProjectArtifact>
+            <scope>provided</scope>
+            <useTransitiveFiltering>true</useTransitiveFiltering>
+            <includes>
+                <include>io.github.ralfspoeth.xldr:xlsx</include>
+            </includes>
         </dependencySet>
         <!-- the JDBC drivers, in a directory of their own: which database a
              deployment feeds is its own business, so this is where it adds the

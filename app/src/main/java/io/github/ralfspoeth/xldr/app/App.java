@@ -24,17 +24,24 @@ import static java.lang.System.Logger.Level.INFO;
  * Entry point: starts the server and watches the configured roots until the
  * process is asked to stop.
  * <p>
- * Running the server is what the command does on its own: {@code xldr} reads
- * {@code xldr.properties} from the working directory, or from the one named by
- * {@code --dir}. {@code xldr validate <spec>} checks specs instead, without a
- * database or a server.
+ * Running the server is what the command does, and all it does: {@code xldr}
+ * reads {@code xldr.properties} from the working directory, or from the one named
+ * by {@code --dir}.
+ * <p>
+ * There was a {@code validate} subcommand, removed in 0.30. What it checked has
+ * since moved to the places that know: an adapter refuses a selector naming no
+ * column of the file, {@code SpecRegistry} refuses a spec the deployment cannot
+ * load, and a feed that cannot activate says so. Those are earlier, or more
+ * authoritative, than a command somebody has to remember to run. What was left
+ * was one heuristic - a record selector's discriminator beside a header - and it
+ * was wrong often enough to argue about, a headed file being perfectly entitled
+ * to carry a type column.
  */
 @Command(
         name = "xldr",
         mixinStandardHelpOptions = true,
         versionProvider = App.ManifestVersion.class,
-        description = "Watches the configured roots and loads files that appear into the target database.",
-        subcommands = Validate.class
+        description = "Watches the configured roots and loads files that appear into the target database."
 )
 public class App implements Callable<Integer> {
 

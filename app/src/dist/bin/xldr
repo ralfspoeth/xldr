@@ -6,11 +6,12 @@
 #   cd /var/lib/xldr && /opt/xldr/bin/xldr
 #   /opt/xldr/bin/xldr --dir /var/lib/xldr
 #
-# lib/ holds the application and the input adapters, drivers/ the JDBC drivers.
-# Both go on the module path: JPMS service binding resolves the adapters
-# (uses/provides InputAdapterFactory) and the driver (java.sql uses Driver) from
-# there, so no --add-modules is needed. Put your own driver jar in drivers/ and
-# remove the ones you do not target.
+# lib/ holds the application and the input adapters, drivers/ the JDBC drivers,
+# and xl/ the Excel adapter with the Apache POI libraries it needs. All three go
+# on the module path: JPMS service binding resolves the adapters (uses/provides
+# InputAdapterFactory) and the driver (java.sql uses Driver) from there, so no
+# --add-modules is needed. Put your own driver jar in drivers/ and remove the
+# ones you do not target; delete xl/ whole if you read no spreadsheets.
 #
 # java is taken from JAVA_HOME when that is set, and from PATH otherwise.
 # JAVA_OPTS may carry extra VM options, e.g.
@@ -54,10 +55,13 @@ if [ -n "$version" ] && [ "$version" -lt "$required" ]; then
     fail "Java $required or later is required, but $java is $version"
 fi
 
-# drivers/ may be absent, or empty, and both are fine: a deployment that talks
-# to no database has nothing to put there.
+# drivers/ and xl/ may be absent, or empty, and both are fine: a deployment that
+# talks to no database has nothing to put in the one, and a deployment that
+# reads no spreadsheets deletes the other. Only lib/ has to be there, which is
+# checked above.
 modules=$here/lib
 [ -d "$here/drivers" ] && modules=$modules:$here/drivers
+[ -d "$here/xl" ] && modules=$modules:$here/xl
 
 exec "$java" ${JAVA_OPTS:-} -Dxldr.home="$here" -p "$modules" \
     -m io.github.ralfspoeth.xldr.app/io.github.ralfspoeth.xldr.app.App "$@"

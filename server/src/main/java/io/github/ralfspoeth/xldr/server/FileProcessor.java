@@ -1,5 +1,6 @@
 package io.github.ralfspoeth.xldr.server;
 
+import io.github.ralfspoeth.xldr.ldr.Statistics;
 import org.jspecify.annotations.Nullable;
 
 import java.io.IOException;

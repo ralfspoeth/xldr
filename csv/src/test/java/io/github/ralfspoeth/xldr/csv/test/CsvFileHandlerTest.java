@@ -500,7 +500,9 @@ public class CsvFileHandlerTest {
 
     /**
      * Without the property nothing changes: an undeclared name is a column the
-     * record does not have, which is what lets {@code validate} report it.
+     * record does not have, and so reads as null - the mapping asked for a name
+     * the spec never declared, which without this property is a mistake nobody
+     * has claimed is deliberate.
      */
     @Test
     public void anUndeclaredFieldIsNothingWithoutTheProperty() throws IOException {

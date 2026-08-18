@@ -2,6 +2,7 @@ package io.github.ralfspoeth.xldr.xlet;
 
 import io.github.ralfspoeth.xldr.ia.InputAdapterFactory;
 import io.github.ralfspoeth.xldr.ldr.Loader;
+import io.github.ralfspoeth.xldr.ldr.Statistics;
 import io.github.ralfspoeth.xldr.spec.MappingSpec;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServlet;
@@ -72,6 +73,9 @@ public class XldrServlet extends HttpServlet {
     private Semaphore permits;
     private long acquireTimeoutMillis;
     private long maxBytes;
+    private Statistics statistics;
+    private XletStatus status;
+    private AutoCloseable unregister;
 
     @Override
     public void init() throws ServletException {
@@ -82,8 +86,30 @@ public class XldrServlet extends HttpServlet {
         permits = new Semaphore(concurrent);
         acquireTimeoutMillis = number("acquireTimeoutMillis", 2_000);
         maxBytes = number("maxBytes", 64L * 1024 * 1024);
+        statistics = new Statistics();
+        status = new XletStatus(specs, statistics, concurrent, acquireTimeoutMillis, maxBytes);
+        unregister = status.register(getServletContext().getContextPath(), getServletName());
         LOG.log(INFO, () -> "xldr ready: " + specs.names()
                 + ", at most " + concurrent + " concurrent load(s), at most " + maxBytes + " bytes each");
+    }
+
+    /**
+     * Unregisters the MXBean, which is the whole of what this servlet has to undo.
+     * <p>
+     * Not housekeeping: the platform {@code MBeanServer} outlives the web
+     * application, so a bean left behind holds a strong reference to a class
+     * loaded by this application's class loader, and every redeploy would then
+     * leak that loader and everything under it. Nothing else here needs undoing -
+     * the {@code DataSource} belongs to the container, the specs are immutable,
+     * and a load in flight holds no state on this object.
+     */
+    @Override
+    public void destroy() {
+        try {
+            unregister.close();
+        } catch (Exception e) {
+            LOG.log(WARNING, () -> "could not unregister the statistics bean: " + e);
+        }
     }
 
     /**
@@ -105,7 +131,12 @@ public class XldrServlet extends HttpServlet {
     @Override
     protected void doPost(HttpServletRequest req, HttpServletResponse resp) throws IOException {
         switch (examine(req)) {
-            case Outcome.Refused(int status, String message) -> reply(resp, status, message);
+            case Outcome.Refused(int code, String message) -> {
+                // counted here and only here, which the sealed pair is what makes
+                // possible: every refusal arrives at this one arm
+                status.requestRefused();
+                reply(resp, code, message);
+            }
             case Outcome.Accepted(String name, MappingSpec spec) -> load(req, resp, name, spec);
         }
     }
@@ -183,30 +214,46 @@ public class XldrServlet extends HttpServlet {
             acquired = permits.tryAcquire(acquireTimeoutMillis, TimeUnit.MILLISECONDS);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
+            // counted with the timeouts: both are this deployment turning a
+            // request away rather than the caller having sent anything wrong,
+            // and a 503 that appeared in no counter would make the totals lie
+            status.loadRejected();
             reply(resp, 503, "interrupted while waiting to start");
             return;
         }
         if (!acquired) {
+            status.loadRejected();
             resp.setHeader("Retry-After", "1");
             reply(resp, 503, "too many loads in progress; try again");
             return;
         }
+        statistics.loadStarted();
         Path spooled = null;
         try {
             spooled = spool(req.getInputStream());
             var rows = load(spec, name, spooled);
+            statistics.loaded(name, rows);
             LOG.log(INFO, () -> "loaded " + rows + " row(s) through '" + name + "'");
             reply(resp, 200, "loaded " + rows + " row(s)");
         } catch (BodyTooLarge e) {
+            // refused rather than failed, and for the same reason the declared
+            // length is: the body was never acceptable, and no load was attempted
+            // - this one only found out while reading it
+            status.requestRefused();
             reply(resp, 413, e.getMessage());
         } catch (IllegalArgumentException e) {
-            // the input did not parse: the caller's data, not our configuration
+            // the input did not parse: the caller's data, not our configuration.
+            // A load was attempted and did not finish, so it counts as a failure -
+            // the counter says a load went wrong, not whose fault it was
+            statistics.failed(name);
             LOG.log(WARNING, () -> "rejected input for '" + name + "': " + e);
             reply(resp, 400, String.valueOf(e.getMessage()));
         } catch (Exception e) {
+            statistics.failed(name);
             LOG.log(ERROR, () -> "load failed for '" + name + "': " + e);
             reply(resp, 500, "the load failed and was rolled back: " + e);
         } finally {
+            statistics.loadFinished();
             permits.release();
             delete(spooled);
         }

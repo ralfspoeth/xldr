@@ -152,12 +152,14 @@ modules by their dependencies:
 * `xlet` - the other front end: one input per HTTP request, loaded through a spec the deployment carries under
   `/WEB-INF/specs/`, for a servlet container. It is a peer of `app` rather than a part of `server` - the request *is*
   the delivery, so nothing there watches a directory or claims a file by moving it - and it reaches the same
-  `Loader.load` from the other side. Not published: it is a front end to read and adapt to a deployment, not a
-  library to depend on. Its own README argues the design;
+  `Loader.load` from the other side, and reports what it has loaded through an MXBean of its own, named after the
+  context it is deployed at so that two deployments do not collide. Not published: it is a front end to read and
+  adapt to a deployment, not a library to depend on. Its own README argues the design;
 * `it` - integration tests exercising the whole pipeline end to end against a local H2 database. It depends on
   `server` and the adapters, not on `app`: a test supplies its own `ConnectionSource` as a lambda, so what is
   exercised is the server rather than the way the distribution happens to run it. Tests that need no database and no
-  server - `validate`, and where the configuration is looked for - live in `app` and run under surefire.
+  server - where the configuration is looked for, and what is said when it is not there - live in `app` and run
+  under surefire.
 
 `revision` is a CI-friendly version property resolved by the `flatten-maven-plugin`, so the installed and deployed POMs
 carry the concrete version rather than a literal `${revision}`.
@@ -171,6 +173,7 @@ carry the concrete version rather than a literal `${revision}`.
         bin/xldr, bin/xldr.cmd   launchers
         lib/                     the application, and the input adapters
         drivers/                 the JDBC drivers - yours goes here
+        xl/                      the Excel adapter and Apache POI
         conf/                    sample xldr.properties and logging.properties
         README.md
 
@@ -179,12 +182,21 @@ and runs with
     cd /etc/xldr && /opt/xldr/bin/xldr        # xldr.properties here
     /opt/xldr/bin/xldr --dir /etc/xldr        # or named
 
-The launcher puts both `lib/` and `drivers/` on the module path; JPMS service binding then resolves the input
-adapters (via the `uses`/`provides` of `InputAdapterFactory`) and the JDBC driver (via `java.sql`'s
+The launcher puts all three of `lib/`, `drivers/` and `xl/` on the module path; JPMS service binding then resolves
+the input adapters (via the `uses`/`provides` of `InputAdapterFactory`) and the JDBC driver (via `java.sql`'s
 `uses java.sql.Driver`) from there. A driver is nothing but another service provider, so **installing your own is
 copying its jar into `drivers/`** - no classpath to edit, no setting to change. Removing the ones you do not target
 is the same operation in reverse, and worth doing before passing a distribution on to anyone else: the Oracle driver
 is proprietary and not yours to redistribute. An empty `drivers/`, or none at all, is fine.
+
+`xl/` is separate for a different reason: weight. Apache POI brings xmlbeans, curvesapi, several commons libraries
+and log4j-api, which together were most of `lib/` and made it hard to see what the toolkit is actually made of. It is
+named for the format rather than for the library, as `drivers/` is: what a deployment decides is whether it reads
+spreadsheets, and POI is how that happens to be done.
+**A deployment that reads no spreadsheets deletes `xl/` whole** and starts as before. The `xlsx` adapter lives in
+there with them, which is what makes the directory droppable rather than merely tidy - left behind in `lib/` with
+its `requires` unsatisfiable, it would stop the JVM before `main`, since service binding resolves a provider's own
+dependencies and a missing one is a `FindException` rather than a quietly absent format.
 
 The launcher takes `java` from `JAVA_HOME` when that is set and from `PATH` otherwise, follows any symlink it was
 invoked through - installing `/usr/local/bin/xldr` pointing into `/opt/xldr` works - and checks the JVM is new enough
@@ -283,18 +295,15 @@ A schema is published whenever the format changes, and is named after the releas
 earlier one stays where it is, so a spec pinned to it keeps validating.
 
 What a schema cannot see is whether the spec makes sense as a whole - whether a mapping names a record selector the
-input actually declares, or whether the adapter accepts the selectors. The distribution checks that:
+input actually declares, or whether the adapter accepts the selectors. There was a `bin/xldr validate` for that,
+removed in 0.30, because the checks worth having had migrated one by one to the places that know: an adapter refuses
+a selector naming no column of the file it is reading, a feed that cannot activate says why, and `xlet` refuses to
+deploy at all with a spec it cannot load. Each of those is earlier than a command, or better informed, and none of
+them can be forgotten.
 
-    bin/xldr validate /var/lib/xldr/people/spec.json
-    bin/xldr validate /var/lib/xldr/*/spec.json
-
-It reads each spec the way the server would, then reports everything wrong with it rather than only the first thing:
-a delivery rule that is missing or doubled, a pattern without its prefix, a MIME type no adapter on the module path
-reads, a selector that adapter refuses to compile, and any record selector, field selector or var a mapping names but
-the input does not declare. It also reports the one mistake that would otherwise pass for a healthy load: a CSV
-record selector given a discriminator although the feed has a header, which matches no line and loads nothing.
-Nothing is loaded and no database is touched. The exit code is 0 when every spec is good
-and 1 otherwise, so it fits a CI job or a pre-commit hook for whoever authors the specs.
+What went with it was one check nothing else makes - a CSV record selector given a discriminator although the file
+has a header, which is legal and usually a mistake - and it went because *usually* is the problem: a headed file may
+perfectly well carry a type column whose values are what the discriminator selects on.
 
 Reading different file types is supported by providing a specific adapter per MIME type. There may be more than one
 adapter per MIME type on the module path; it's then however unspecified which one will be selected. A future enhancement
@@ -806,10 +815,10 @@ named as the mapping wants them declares no field selectors at all:
     "recordSelectors": [ { "name": "people" } ]
 
 A declared field still wins, which is how a column is renamed or given a type; an implicit one has no `type`
-and so arrives as text. It is off by default because `bin/xldr validate` reports a mapping naming a field no
-record selector declares - the check that catches `fieldSelector` written for `fieldSelectors` - and it cannot
-tell that from a column name without a file in hand. Saying `fieldsFromHeader` in the spec is what tells it,
-for that feed and no other.
+and so arrives as text. It is off by default because a mapping naming a field no record selector declares is
+usually a mistake - it is what `fieldSelector` written for `fieldSelectors` looks like - and nothing can tell that
+from a column name without a file in hand. Saying `fieldsFromHeader` in the spec is what tells it, for that feed
+and no other.
 
 A **comment** runs from the comment character to the end of the record, and only outside a quoted field - inside one
 the character is data, which is why the comment is found by the same scan that reads the fields rather than by
@@ -935,6 +944,12 @@ read-only: the file system remains the way to make the server do anything.
 
 HikariCP's own pool statistics are separate and off by default; `pool.registerMbeans = true` in the server
 configuration turns them on, since every `pool.*` key is passed through.
+
+`xlet` registers its own bean, at `io.github.ralfspoeth.xldr:type=Loader,context="…",name="…"` - named after the
+deployment, because a web application can be deployed twice in one JVM and a fixed name would let only the first of
+them register. The load counters are the same ones, `Statistics` having moved into `ldr` so that both front ends
+share it; what differs is that it has no files to count and two things to add, a refusal count and a rejection count.
+Its own README says why those two are kept apart.
 
 ### Logging
 

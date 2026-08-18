@@ -91,17 +91,24 @@ final class Proxies {
     }
 
     // ---- context and config -------------------------------------------------
-
     /**
-     * A context whose {@value #SPECS} holds the given resources, keyed by their
-     * full resource path.
-     * <p>
-     * {@code getResourceAsStream} answers with a new stream each time rather than
-     * a fixed one: a stream handed out twice is empty the second time.
+     * A context path per call, because the servlet registers an MXBean named
+     * after it. Two deployments at one path is precisely the collision that
+     * naming is there to prevent, so tests that shared a path would leave every
+     * registration after the first refused - quietly, registration being best
+     * effort - and each test would then be reading the first test's bean.
      */
+    private static final AtomicInteger CONTEXTS = new AtomicInteger();
+
     static ServletContext context(Map<String, String> specsByResourcePath, Map<String, String> initParams) {
+        return context(specsByResourcePath, initParams, "/test-" + CONTEXTS.incrementAndGet());
+    }
+
+    static ServletContext context(Map<String, String> specsByResourcePath, Map<String, String> initParams,
+                                  String contextPath) {
         var paths = new LinkedHashSet<>(specsByResourcePath.keySet());
         return proxy(ServletContext.class, Map.of(
+                "getContextPath", contextPath,
                 "getResourcePaths", (Answer) args -> SPECS.equals(args[0]) ? paths : null,
                 "getResourceAsStream", (Answer) args -> {
                     var body = specsByResourcePath.get((String) args[0]);

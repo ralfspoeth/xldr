@@ -7,9 +7,10 @@ rem   cd C:\xldr\feeds && C:\xldr\bin\xldr.cmd
 rem   C:\xldr\bin\xldr.cmd --dir C:\xldr\feeds
 rem
 rem lib\ holds the application and the input adapters, drivers\ the JDBC
-rem drivers. Both go on the module path, where JPMS service binding finds the
+rem drivers, and xl\ the Excel adapter with the Apache POI libraries it needs.
+rem All three go on the module path, where JPMS service binding finds the
 rem adapters and the driver. Put your own driver jar in drivers\ and remove the
-rem ones you do not target.
+rem ones you do not target; delete xl\ whole if you read no spreadsheets.
 rem
 rem java is taken from JAVA_HOME when that is set, and from PATH otherwise.
 rem JAVA_OPTS may carry extra VM options.
@@ -31,9 +32,10 @@ if defined JAVA_HOME if not exist "%JAVA_HOME%\bin\java.exe" (
     exit /b 1
 )
 
-rem drivers\ may be absent, or empty, and both are fine
+rem drivers\ and xl\ may be absent, or empty, and both are fine
 set "MODULES=%HERE%\lib"
 if exist "%HERE%\drivers" set "MODULES=%MODULES%;%HERE%\drivers"
+if exist "%HERE%\xl" set "MODULES=%MODULES%;%HERE%\xl"
 
 "%JAVA%" %JAVA_OPTS% -Dxldr.home="%HERE%" -p "%MODULES%" ^
     -m io.github.ralfspoeth.xldr.app/io.github.ralfspoeth.xldr.app.App %*

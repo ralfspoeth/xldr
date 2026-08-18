@@ -14,8 +14,6 @@ module io.github.ralfspoeth.xldr.app {
     opens io.github.ralfspoeth.xldr.app to info.picocli;
 
     requires io.github.ralfspoeth.xldr.server;
-    requires io.github.ralfspoeth.xldr.ia;
-    requires io.github.ralfspoeth.xldr.spec;
     requires java.sql;
     requires java.logging;
     requires com.zaxxer.hikari;
@@ -23,6 +21,4 @@ module io.github.ralfspoeth.xldr.app {
     requires org.slf4j.jul;
 
     requires static org.jspecify;
-
-    uses io.github.ralfspoeth.xldr.ia.InputAdapterFactory;
 }

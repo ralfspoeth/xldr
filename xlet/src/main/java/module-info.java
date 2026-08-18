@@ -24,6 +24,10 @@ module io.github.ralfspoeth.xldr.xlet {
     // the DataSource comes from the container's directory
     requires java.naming;
 
+    // the statistics are an MXBean, as in the file server: no dependency, and a
+    // Prometheus JMX exporter reads it without either side knowing about the other
+    requires java.management;
+
     exports io.github.ralfspoeth.xldr.xlet;
 
     uses io.github.ralfspoeth.xldr.ia.InputAdapterFactory;

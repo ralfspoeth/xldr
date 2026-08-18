@@ -1,5 +1,7 @@
 package io.github.ralfspoeth.xldr.server;
 
+import io.github.ralfspoeth.xldr.ldr.Statistics;
+
 import javax.management.JMException;
 import javax.management.ObjectName;
 import javax.management.StandardMBean;

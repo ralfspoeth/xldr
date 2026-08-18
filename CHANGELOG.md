@@ -6,6 +6,69 @@ ways that break existing code and existing specs; those changes are listed here 
 The versions are the git tags `xldr-<version>`; the published artifacts carry the same version under the group
 `io.github.ralfspoeth.xldr`.
 
+## Unreleased
+
+### Added
+
+- `xlet` reports what it has loaded, over JMX, as
+  `io.github.ralfspoeth.xldr:type=Loader,context="/xldr",name="xldr"`. The counters are the file server's -
+  succeeded, failed, records, last load, in progress, in total and per spec - plus the two things HTTP adds:
+  `RequestsRefused`, a caller sending something we will not take, and `LoadsRejected`, a `503` because no permit came
+  free, which is this deployment's limit rather than the caller's mistake. Counting them apart is the point; an
+  operator who could not tell them apart would go looking at the database for a client's error.
+
+  `MaxConcurrentLoads`, `AcquireTimeoutMillis` and `MaxBytes` are exposed beside them, because a rejection count
+  means nothing on its own: next to `LoadsInProgress` at the maximum it is a limit too low or a database too slow,
+  and next to one that is not it is an acquire timeout too short. Judging that should not require opening `web.xml`.
+
+  The object name carries the context path and the servlet name, both quoted, so that two deployments of the same
+  WAR - or one beside the standalone server - each register rather than the second being refused. The bean is
+  unregistered in `destroy()`: left behind, it holds a strong reference to a class loaded by the web application's
+  loader, and every redeploy would leak that loader and everything under it.
+
+### Changed
+
+- The distribution puts Apache POI, and the `xlsx` adapter that needs it, in an `xl/` directory of their own. POI
+  brings xmlbeans, curvesapi, several commons libraries and log4j-api, which together were most of `lib/` and made
+  it hard to see what the toolkit is made of. A deployment that reads no spreadsheets now deletes `xl/` whole; the
+  launcher puts it on the module path when it is there and does not mind when it is not, as with `drivers/`. Named
+  for the format rather than for the library that reads it, as `drivers/` is.
+
+  The adapter goes with the libraries rather than staying in `lib/`, which is the difference between droppable and
+  merely separate: left behind with its `requires` unsatisfiable, it would stop the JVM before `main`, service
+  binding resolving a provider's own dependencies and a missing one being a `FindException` rather than a quietly
+  absent format.
+- `Statistics` moved from `server` to `ldr`, and is public. Loading is what it counts and `ldr` is what loads, so
+  both front ends can reach it without one depending on the other - the same move `Loader.load` made in 0.25, for
+  the same reason. It divided cleanly: nothing file-shaped came with it, because the file server's `filesWaiting`
+  and `filesInHospital` are not counters at all but are computed from the directories when asked, the directories
+  being the truth. The one thing that changed is the key, which counted per feed and now counts per name - the feed
+  in the file server, the spec in the servlet.
+
+### Breaking
+
+- **`bin/xldr validate` is gone**, and with it the `validate` subcommand, `Validate` and its tests. It was written
+  when an unloadable spec surfaced late; since then the checks worth having migrated one at a time to the places
+  that know. An adapter refuses a selector naming no column of the file it is reading (0.26), `SpecRegistry` refuses
+  a spec the deployment cannot load and the servlet does not start (0.27), and a feed that cannot activate says why.
+  Each is earlier than a command, or better informed, and none of them can be forgotten.
+
+  What went with it is the one check nothing else makes: a CSV record selector given a discriminator although the
+  file has a header, which is legal and often a mistake. It went because *often* is the problem. A headed file may
+  perfectly well carry a type column:
+
+      A,B,C
+      1,one,One
+      1,two,Two
+
+  where `1` is a perfectly good discriminator. The check would only get worse as the discriminator grows - naming a
+  column other than the first, or matching a pattern - since then the presence of a header says nothing at all about
+  whether a discriminator belongs.
+
+  `app` no longer requires `ia` or `spec`, and its `uses InputAdapterFactory` is gone too: that had always been
+  redundant, the lookup living in `ia`, which declares its own. The adapters remain `provided` dependencies, so the
+  distribution still ships them.
+
 ## 0.29
 
 Nothing about the mapping-spec format changed, so `mapping-spec-0.23` remains its schema and a spec that loaded under

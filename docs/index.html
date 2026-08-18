@@ -174,8 +174,8 @@
     The same goes for the two kinds of selector. A <em>record selector</em> says where the records are, a
     <em>field selector</em> says where a value sits within one, and both are written in a language the adapter
     chooses - XPath for XML, a character range for fixed length, a range of cells for Excel. The schema checks that a
-    selector is a string and nothing more, so a selector that will not compile is found when the feed comes up, or by
-    <code>bin/xldr validate</code> before that.
+    selector is a string and nothing more, so a selector that will not compile is found when the feed comes up - or,
+    in a servlet container, when the application is deployed, which refuses to start with a spec it cannot load.
 </p>
 
 <pre><code>"input": {
@@ -458,15 +458,11 @@
 </p>
 
 <p>
-    What no schema can see is whether the spec makes sense as a whole. The toolkit checks that:
-</p>
-
-<pre><code>bin/xldr validate /var/lib/xldr/*/spec.json</code></pre>
-
-<p>
-    which reports a MIME type no adapter reads, a selector the adapter refuses to compile, and every record selector,
-    field selector or variable a mapping names but the input does not declare - without a database and without
-    starting a server.
+    What no schema can see is whether the spec makes sense as a whole. There was a <code>bin/xldr validate</code> for
+    that, removed in 0.30: the checks worth having had moved one at a time into the places that know. A MIME type no
+    adapter reads stops a feed activating and stops a servlet deploying; a selector the adapter cannot compile does
+    the same; a selector naming no column of the file it is reading is refused by the adapter as it reads. Each of
+    those is earlier than a command, or better informed, and none of them can be forgotten to be run.
 </p>
 
 <footer>

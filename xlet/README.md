@@ -153,28 +153,58 @@ not, which is what the spooling is for.
 
 ## Monitoring
 
-*Decided, not yet built.* An MXBean, as in `server`, and the same `Statistics`
-behind it.
+An MXBean, as in `server`, over the same `Statistics` - which came down into `ldr`
+to make that possible.
 
-`Statistics` turns out to divide cleanly: it holds only load counters - starts,
-finishes, rows, failures, last load, per feed and in total - while every file-shaped
-gauge (`filesWaiting`, `filesInHospital`, the per-feed map) is computed in
-`ServerStatus` from the `FeedRegistry` rather than stored. So it moves down with the
-load operation and carries no file concepts along; `server` keeps its gauges, and
-this module exposes the counters plus whatever HTTP has to add.
+`Statistics` divided cleanly, as the design note predicted it would. It holds only
+load counters - starts, finishes, rows, failures, last load, per name and in total -
+while every file-shaped gauge (`filesWaiting`, `filesInHospital`) is computed in
+`ServerStatus` from the `FeedRegistry` rather than stored, because the directories
+are the truth and a count kept beside them could disagree with them. So the counters
+moved down with the load operation and carried no file concepts along. The one thing
+that changed in the move is the key: it counted per *feed*, and now counts per
+*name*, which is the feed there and the spec here.
+
+| what | where it comes from |
+|---|---|
+| `LoadsSucceeded`, `LoadsFailed`, `RecordsLoaded`, `LastLoad`, `LastFailure`, `LoadsInProgress` | `Statistics`, shared with the file server |
+| `RequestsRefused` | this module: a `400`, `404`, `413` or `415` - the caller sent something we will not take |
+| `LoadsRejected` | this module: a `503` - no permit came free, which is *our* limit and not their mistake |
+| `MaxConcurrentLoads`, `AcquireTimeoutMillis`, `MaxBytes` | the init-params, so a reading can be judged without opening `web.xml` |
+| `Specs` | one row per deployed spec, loaded or not |
+
+The last two rows are the ones the file server has no use for. Rejections rising
+mean nothing on their own: next to `LoadsInProgress` sitting at the maximum they are
+a concurrency limit too low or a database too slow, and next to one that is not they
+are an acquire timeout too short. Exposing the dials beside the reading is what makes
+that judgement possible from a console.
+
+Refusals and failures are counted apart on purpose. They answer different questions -
+whether callers are sending the wrong thing, and whether this deployment is breaking -
+and an operator who could not tell them apart would go looking at the database for
+what is a client's mistake. A body that turns out too large mid-upload counts as a
+refusal, like the one that declared itself too large: no load was attempted, this one
+only found out while reading.
 
 Two things a container demands that a single process does not:
 
-**The object name must carry the context path.** `ServerStatus` registers a fixed
-name, which is right for one JVM running one server and wrong here: two deployments
-of the same WAR, or a WAR beside the standalone server, and the second registration
-throws `InstanceAlreadyExistsException`. `…:type=Loader,context=/xldr` is the
-convention the containers use for their own beans.
+**The object name carries the deployment.** `ServerStatus` registers a fixed name,
+which is right for one JVM running one server and wrong here: two deployments of the
+same WAR, or a WAR beside the standalone server, and the second registration throws
+`InstanceAlreadyExistsException` - so the first to come up would be the only one
+anybody could see. The name is
+`io.github.ralfspoeth.xldr:type=Loader,context="/xldr",name="xldr"`, both values
+quoted rather than trusted: a context path contains a `/` and may contain worse, and
+`ObjectName.quote` is the only thing that knows the whole list.
 
-**And it must be unregistered in `destroy()`.** Otherwise the platform
-`MBeanServer` holds a strong reference to a class loaded by the web application's
-loader, and every redeploy leaks a classloader. `ServerStatus.register` already
-returns an `AutoCloseable` for exactly this; it only has to be closed.
+**And it is unregistered in `destroy()`.** Otherwise the platform `MBeanServer`
+holds a strong reference to a class loaded by the web application's loader, and every
+redeploy leaks a classloader. `register` returns an `AutoCloseable` for exactly that,
+and `destroy` closes it - which is the whole of what this servlet has to undo.
+
+Registration is best effort. The bean exists whether or not JMX will take it, so a
+management server that refuses costs the deployment its statistics and nothing else -
+never a load, and never a null check on the loading path.
 
 Why JMX and not something newer: it costs no dependency, which is the same reason
 this project uses `System.Logger` and `ServiceLoader`, and it forecloses nothing -

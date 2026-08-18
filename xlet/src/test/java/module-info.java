@@ -17,6 +17,10 @@ open module io.github.ralfspoeth.xldr.xlet.test {
     // DriverManager, so that nothing here depends on a vendor's types
     requires java.sql;
 
+    // the statistics are read the way a monitor reads them, off the platform
+    // MBeanServer by object name, rather than off the object behind them
+    requires java.management;
+
     // and an adapter for it to read with. Named here rather than used directly:
     // requiring it is what puts it in the graph, and the lookup inside ia then
     // finds it - which is exactly how a deployment chooses its formats
