@@ -11,6 +11,7 @@
     </parent>
 
     <artifactId>xlet</artifactId>
+    <name>xlet</name>
 
     <properties>
         <!--
@@ -44,6 +45,11 @@
     </build>
 
     <dependencies>
+        <!-- Greyson -->
+        <dependency>
+            <groupId>io.github.ralfspoeth</groupId>
+            <artifactId>json</artifactId>
+        </dependency>
         <!-- nullness -->
         <dependency>
             <groupId>org.jspecify</groupId>

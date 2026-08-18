@@ -20,10 +20,30 @@ import static java.util.Objects.requireNonNull;
  */
 public enum DataType {
 
+    /**
+     * A date/time field; no timezone;
+     * wraps a {@link LocalDateTime}.
+     */
     DATE(LocalDateTime.class),
+    /**
+     * Textual content; represented by
+     * {@link String}
+     */
     TEXT(String.class),
+    /**
+     * 64-bit integral value, represented by a
+     * {@link Long}.
+     */
     INTEGRAL(Long.class),
+    /**
+     * 64-bit floating point value
+     * represented by a {@link Double}.
+     */
     FP(Double.class),
+    /**
+     * Decimal value, represented by
+     * {@link BigDecimal}.
+     */
     DECIMAL(BigDecimal.class);
 
     private final Class<?> clazz;
@@ -77,6 +97,8 @@ public enum DataType {
     /**
      * An ISO timestamp, or a plain ISO date - which is midnight of that day, the
      * timestamp this type declares.
+     * @param s the timestamp string
+     * @return a date/time instance
      */
     private static LocalDateTime dateTime(String s) {
         try {
