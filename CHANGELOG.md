@@ -6,6 +6,18 @@ ways that break existing code and existing specs; those changes are listed here 
 The versions are the git tags `xldr-<version>`; the published artifacts carry the same version under the group
 `io.github.ralfspoeth.xldr`.
 
+## 0.29
+
+Nothing about the mapping-spec format changed, so `mapping-spec-0.23` remains its schema and a spec that loaded under
+0.28 loads under 0.29. One fix, to the build rather than to anything it produces.
+
+### Fixed
+
+- The unit tests write what a test logged to `target/surefire-reports/*-output.txt` too. 0.28 did this for the
+  integration tests and stopped there, so the next release still ended in red: the unit tests start the servlet as
+  well, and it says hello through `System.Logger`, which reaches JUL, which writes to stderr, which
+  `release:prepare` logs as `[ERROR]`. Both runners now redirect.
+
 ## 0.28
 
 Nothing about the mapping-spec format changed, so `mapping-spec-0.23` remains its schema. What changed is that the

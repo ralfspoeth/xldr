@@ -151,22 +151,36 @@
                         </execution>
                     </executions>
                 </plugin>
+                <!--
+                    Both test runners write what a test logged to a file rather
+                    than to the console.
+
+                    The servlet and the server log through System.Logger, which
+                    reaches JUL, whose ConsoleHandler writes to stderr; and
+                    release:prepare logs a forked build's stderr as [ERROR]. So an
+                    INFO line from a servlet starting up, or a WARNING an
+                    integration test provokes on purpose, reads as a failure in the
+                    release output of a build that passed. The lines go to
+                    target/{surefire,failsafe}-reports/*-output.txt instead, where
+                    they can be read when they are wanted.
+
+                    Both, because the first attempt configured only failsafe and
+                    the next release still shouted - the unit tests start the
+                    servlet too, and it says hello. Set on each plugin rather than
+                    through the shared maven.test.redirectTestOutputToFile
+                    property, so that reading this file tells you it is on.
+                -->
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-surefire-plugin</artifactId>
+                    <configuration>
+                        <redirectTestOutputToFile>true</redirectTestOutputToFile>
+                    </configuration>
+                </plugin>
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-failsafe-plugin</artifactId>
                     <configuration>
-                        <!-- The integration tests run a real server, and it logs.
-                             System.Logger reaches JUL, JUL's ConsoleHandler writes
-                             to stderr, and release:prepare logs a forked build's
-                             stderr as [ERROR] - so every WARNING an IT provokes on
-                             purpose reads as a failure in the release output. The
-                             output goes to target/failsafe-reports/*-output.txt
-                             instead, where it can be read when it is wanted.
-
-                             Managed here rather than configured in each module, so
-                             that declaring the plugin is all a module has to do.
-                             The version, the executions and enableAssertions come
-                             from plumbum and are merged with this. -->
                         <redirectTestOutputToFile>true</redirectTestOutputToFile>
                     </configuration>
                 </plugin>

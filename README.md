@@ -70,7 +70,7 @@ fix their versions in one place:
             <dependency>
                 <groupId>io.github.ralfspoeth.xldr</groupId>
                 <artifactId>bom</artifactId>
-                <version>0.28</version>
+                <version>0.29</version>
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>
