@@ -6,6 +6,21 @@ ways that break existing code and existing specs; those changes are listed here 
 The versions are the git tags `xldr-<version>`; the published artifacts carry the same version under the group
 `io.github.ralfspoeth.xldr`.
 
+## Unreleased
+
+### Added
+
+- A [tutorial](docs/tutorial/README.md) for the people who write the specs, which is the audience the README serves
+  worst: it is a reference, organised by feature, and a first-time author needs a path rather than a map. Eleven
+  pages under `docs/tutorial`, each adding one thing to the spec built by the page before - setting up, a first
+  `spec.json` and `delivery.properties`, the same spec in XML, then constants, variables, lookups, expressions,
+  types and notation, a file with no header, several kinds of record, and what the three kinds of failure look
+  like.
+
+  Every page shows whole files rather than fragments, so what a reader copies is something that can go straight
+  into a feed, and each page changes only what it is about rather than reprinting the input for the fifth time.
+  Nothing about the code changed.
+
 ## 0.32
 
 The first change to the mapping-spec format since 0.23, so `mapping-spec-0.32` is published and `mapping-spec-0.23`

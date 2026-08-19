@@ -60,6 +60,12 @@ A file moved into `/var/lib/xldr/people/in/` is now loaded into `person` and fil
 [Configuration](#configuration) for the full set of settings, and [Delivering files](#delivering-files) for why the
 file must be *moved* rather than written in place.
 
+**Writing the spec is the actual work**, and this README is the reference rather than the path through it. For that,
+see the [tutorial](docs/tutorial/README.md). It is eleven short pages, each adding one thing to the spec built by
+the page before: constants, variables, lookups, expressions, types and notation, counting a headerless file's
+components, and separating several kinds of record into several tables. Each page shows whole files rather than
+fragments, so what you copy is something you can put straight into a feed.
+
 ### Using the toolkit as a library
 
 The library modules are published to Maven Central under the group `io.github.ralfspoeth.xldr`. Import the `bom` to
@@ -228,8 +234,8 @@ leaves both choices where they belong.
 Publishing goes through the Central Portal via the `central-publishing-maven-plugin`, inherited from the `plumbum`
 parent. The plugin bundles the whole reactor into a single deployment, so the `xldr` parent POM, the `bom` and the
 nine library modules - `spec`, `ia`, `ldr`, `server`, `csv`, `xml`, `xlsx`, `flt`, `json` - are published together. `app` (an
-executable, not a library) and `it` (integration tests) each set `skipPublishing` on the plugin, so they are left out
-of the bundle.
+executable, not a library) and `it` (integration tests) each set `skipPublishing` on the plugin, so they are left
+out of the bundle.
 
 A plain deploy therefore publishes everything in one go:
 
