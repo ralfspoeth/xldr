@@ -4,15 +4,20 @@ import io.github.ralfspoeth.xldr.spec.io.JsonMappingSpecReader;
 import io.github.ralfspoeth.xldr.spec.io.MappingSpecReader;
 import io.github.ralfspoeth.xldr.spec.io.XmlMappingSpecReader;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.function.Executable;
 import org.junit.jupiter.api.io.TempDir;
 
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
+
 import java.util.List;
 
 import static io.github.ralfspoeth.xldr.spec.io.MappingSpecReader.readSpec;
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
@@ -114,6 +119,39 @@ public class MappingSpecReaderTest {
                 """);
 
         assertEquals(readSpec(json), readSpec(xml));
+    }
+
+    /**
+     * A {@code limit} is a whole number in both formats, and it was not always:
+     * the XML reader parsed the attribute and threw on anything else, while the
+     * JSON reader asked for an int and read {@code "100"} as no limit at all - a
+     * spec that meant to load a thousand rows and loaded the file. The rule now
+     * lives in one place, so the two cannot answer differently.
+     */
+    @Test
+    public void aLimitIsAWholeNumberInEitherFormat() {
+        assertAll(
+                () -> assertRefused(() -> JSON.read(bytes("""
+                        { "input": { "mimeType": "text/csv", "recordSelectors": [] },
+                          "mapping": [ { "recordSelector": "people", "table": "person",
+                            "limit": "100", "fieldMapping": [] } ] }
+                        """))),
+                () -> assertRefused(() -> XML.read(bytes("""
+                        <mappingSpec>
+                            <input mimeType="text/csv"/>
+                            <mapping recordSelector="people" table="person" limit="100 rows"/>
+                        </mappingSpec>
+                        """))));
+    }
+
+    private static InputStream bytes(String spec) {
+        return new ByteArrayInputStream(spec.getBytes(UTF_8));
+    }
+
+    private static void assertRefused(Executable read) {
+        var thrown = assertThrows(IllegalArgumentException.class, read);
+        assertTrue(String.valueOf(thrown.getMessage()).contains("whole number"),
+                () -> "expected a message about a whole number, was: " + thrown.getMessage());
     }
 
     /**

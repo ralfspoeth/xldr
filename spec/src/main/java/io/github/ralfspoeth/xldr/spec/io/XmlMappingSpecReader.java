@@ -10,6 +10,7 @@ import java.nio.file.Path;
 import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 
 import static io.github.ralfspoeth.xmls.XmlFunctions.attributeValue;
 import static io.github.ralfspoeth.xmls.XmlFunctions.elements;
@@ -135,79 +136,25 @@ public class XmlMappingSpecReader implements MappingSpecReader {
         );
     }
 
-    /**
-     * A discriminator says where to look and what for: exactly one of
-     * {@code nth} and {@code selector}, and exactly one of {@code equals} and
-     * {@code matches}.
-     */
+    /** A {@code <discriminator>} child, where there is one. */
     private static @Nullable Discriminator discriminator(Element recordSelector) {
-        var element = elements("discriminator").apply(recordSelector).findFirst().orElse(null);
-        if (element == null) {
-            return null;
-        }
-        var where = selector(element, "a discriminator");
-        var literal = attributeValue("equals").apply(element);
-        var regex = attributeValue("matches").apply(element);
-        if (literal.isPresent() && regex.isPresent()) {
-            throw new IllegalArgumentException("a discriminator tests equals or matches, not both: '"
-                    + literal.get() + "' and /" + regex.get() + "/");
-        }
-        if (literal.isPresent()) {
-            return new Discriminator.Equals(where, literal.get());
-        }
-        if (regex.isPresent()) {
-            return Discriminator.matching(where, regex.get());
-        }
-        throw new IllegalArgumentException("a discriminator needs equals or matches; "
-                + where + " on its own says where to look and not what for");
+        return elements("discriminator")
+                .apply(recordSelector)
+                .findFirst()
+                .map(d -> node(d).discriminator())
+                .orElse(null);
     }
 
     private static FieldSelectorSpec fieldSelectorSpec(Element fieldSelector) {
         return new FieldSelectorSpec(
                 required(fieldSelector, "name"),
-                selector(fieldSelector, "a field selector"),
+                node(fieldSelector).selector("a field selector"),
                 attributeValue("type")
                         .apply(fieldSelector)
                         .map(type -> type.toUpperCase(Locale.ROOT))
                         .map(DataType::valueOf)
                         .orElse(null)
         );
-    }
-
-    /**
-     * Exactly one of {@code selector} - the adapter's own syntax - and
-     * {@code nth}, a component counted from one.
-     * <p>
-     * This is the reason the format uses two names rather than one attribute of
-     * two types: an XML attribute is text, so {@code selector="3"} could only ever
-     * have been told from a count by guessing at its shape, and a header naming a
-     * column {@code 3} would have made the guess wrong. Here the two are different
-     * attributes and the schema types the second, so {@code nth="first"} does not
-     * reach this code at all.
-     */
-    private static Selector selector(Element element, String what) {
-        var text = attributeValue("selector").apply(element);
-        var nth = attributeValue("nth").apply(element);
-        if (text.isPresent() && nth.isPresent()) {
-            throw new IllegalArgumentException(what + " has both selector='" + text.get()
-                    + "' and nth='" + nth.get() + "', which are two answers to one question");
-        }
-        if (text.isPresent()) {
-            return new Selector.Text(text.get());
-        }
-        if (nth.isPresent()) {
-            return new Selector.Nth(wholeNumber(nth.get(), what));
-        }
-        throw new IllegalArgumentException(what + " needs a selector or an nth");
-    }
-
-    private static int wholeNumber(String value, String what) {
-        try {
-            return Integer.parseInt(value.strip());
-        } catch (NumberFormatException e) {
-            throw new IllegalArgumentException(
-                    what + ": nth is a whole number counted from one, was '" + value + "'", e);
-        }
     }
 
     private static RecordMappingSpec recordMappingSpec(Element mapping) {
@@ -218,58 +165,92 @@ public class XmlMappingSpecReader implements MappingSpecReader {
                         .apply(mapping)
                         .map(fm -> new FieldMappingSpec(required(fm, "column"), valueSource(fm)))
                         .toList(),
-                attributeValue("limit").apply(mapping).map(Integer::valueOf).orElse(null)
+                node(mapping).whole("limit").orElse(null)
         );
     }
 
     /**
      * A field mapping carries exactly one source: a {@code fieldSelector},
      * {@code constant}, {@code var} or {@code expr} attribute, or a child
-     * {@code <lookup>} element. A constant in XML is always a string - attribute
-     * values carry no type.
+     * {@code <lookup>} element. Which one, and the refusal when it is not one, is
+     * {@link SpecNode#source()}; where the lookup sits is this format's business.
      */
     private static ValueSource valueSource(Element fm) {
-        var lookup = elements("lookup").apply(fm).findFirst();
-        if (lookup.isPresent()) {
-            if (hasBasicSource(fm)) {
-                throw new IllegalArgumentException("a <lookup> field mapping must carry no source attribute");
+        var lookup = elements("lookup").apply(fm).findFirst().orElse(null);
+        if (lookup == null) {
+            return node(fm).source();
+        }
+        if (node(fm).hasSource()) {
+            throw new IllegalArgumentException("a <lookup> field mapping must carry no source attribute");
+        }
+        return new ValueSource.Lookup(
+                required(lookup, "table"),
+                required(lookup, "column"),
+                required(lookup, "keyColumn"),
+                node(lookup).source());
+    }
+
+    /**
+     * This format's answers to the five questions {@link SpecNode} asks, which is
+     * all it takes to inherit the rules about what a spec may say.
+     * <p>
+     * An attribute is text and carries no type of its own, so {@code string} and
+     * {@code scalar} are the same question here and a constant is always a string.
+     * The distinction JSON draws between {@code "1"} and {@code 1} is drawn in this
+     * format by which attribute was written, which is the reason the format has
+     * both {@code selector} and {@code nth} rather than one attribute read two
+     * ways.
+     */
+    private record Node(Element element) implements SpecNode {
+
+        @Override
+        public Optional<String> string(String name) {
+            return attributeValue(name).apply(element);
+        }
+
+        @Override
+        public Optional<String> scalar(String name) {
+            return string(name);
+        }
+
+        @Override
+        public Optional<Integer> whole(String name) {
+            return string(name).map(value -> wholeNumber(name, value));
+        }
+
+        @Override
+        public Optional<ValueSource.Constant> constant() {
+            return string("constant").map(ValueSource.Constant::new);
+        }
+
+        /**
+         * The element as written, attributes and all. A complaint about
+         * {@code <fieldSelector name="id"/>} is worth little without the name, and
+         * a spec has enough of them that the tag on its own does not locate one.
+         */
+        @Override
+        public String shown() {
+            var text = new StringBuilder("<").append(element.getNodeName());
+            var attributes = element.getAttributes();
+            for (int i = 0; i < attributes.getLength(); i++) {
+                var attribute = attributes.item(i);
+                text.append(' ').append(attribute.getNodeName())
+                        .append("=\"").append(attribute.getNodeValue()).append('"');
             }
-            var lk = lookup.get();
-            return new ValueSource.Lookup(
-                    required(lk, "table"),
-                    required(lk, "column"),
-                    required(lk, "keyColumn"),
-                    basicSource(lk));
+            return text.append("/>").toString();
         }
-        return basicSource(fm);
     }
 
-    private static boolean hasBasicSource(Element e) {
-        return attributeValue("fieldSelector").apply(e).isPresent()
-                || attributeValue("constant").apply(e).isPresent()
-                || attributeValue("var").apply(e).isPresent()
-                || attributeValue("expr").apply(e).isPresent();
+    private static SpecNode node(Element element) {
+        return new Node(element);
     }
 
-    private static ValueSource basicSource(Element e) {
-        var field = attributeValue("fieldSelector").apply(e);
-        var constant = attributeValue("constant").apply(e);
-        var varRef = attributeValue("var").apply(e);
-        var expr = attributeValue("expr").apply(e);
-
-        var present = (field.isPresent() ? 1 : 0) + (constant.isPresent() ? 1 : 0)
-                + (varRef.isPresent() ? 1 : 0) + (expr.isPresent() ? 1 : 0);
-        if (present != 1) {
-            throw new IllegalArgumentException("needs exactly one of fieldSelector, constant, var, expr");
-        }
-        if (field.isPresent()) {
-            return new ValueSource.Field(field.get());
-        } else if (varRef.isPresent()) {
-            return new ValueSource.Var(varRef.get());
-        } else if (expr.isPresent()) {
-            return new ValueSource.Expr(expr.get());
-        } else {
-            return new ValueSource.Constant(constant.get());
+    private static int wholeNumber(String name, String value) {
+        try {
+            return Integer.parseInt(value.strip());
+        } catch (NumberFormatException e) {
+            throw new IllegalArgumentException(
+                    name + " is a whole number, was '" + value + "'", e);
         }
     }
 

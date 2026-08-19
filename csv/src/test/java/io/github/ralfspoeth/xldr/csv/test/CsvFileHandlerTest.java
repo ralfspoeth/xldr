@@ -682,7 +682,7 @@ public class CsvFileHandlerTest {
      * impossible.
      */
     @Test
-    public void countingWorksEvenWhereTheColumnsHaveNames() throws IOException {
+    public void countingWorksEvenWhereTheColumnsHaveNames() {
         var counted = spec(Map.of(),
                 new RecordSelectorSpec("people", null, List.of(
                         new FieldSelectorSpec("second", new Selector.Nth(2), DataType.TEXT))));
@@ -798,6 +798,27 @@ public class CsvFileHandlerTest {
                 () -> assertTrue(thrown.getMessage().contains("no place to point at"), thrown.getMessage()),
                 // and says what to write instead
                 () -> assertTrue(thrown.getMessage().contains("discriminator"), thrown.getMessage()));
+    }
+
+    /**
+     * A name the spec does not declare is refused here as it is by xlsx, xml and
+     * json. It used to answer with no rows, which is indistinguishable from a file
+     * that held none - so a mapping with a typo in its {@code recordSelector} was
+     * a green load of nothing on a CSV feed and a refusal on any other input. What
+     * makes it worth refusing rather than tolerating is that nothing else looks:
+     * no one checks a mapping's record selector against the ones the input
+     * declares, so this call is where the two names first meet.
+     */
+    @Test
+    public void anUndeclaredRecordSelectorIsRefused() {
+        var spec = spec(Map.of(), new RecordSelectorSpec("people", null,
+                List.of(new FieldSelectorSpec("id", "id", DataType.TEXT))));
+        var thrown = assertThrows(IllegalArgumentException.class,
+                () -> rowsOf(spec, "id\n1\n", "peple", Set.of("id")));
+        assertAll(
+                () -> assertTrue(thrown.getMessage().contains("peple"), thrown.getMessage()),
+                // and what the spec does declare, the typo being the likely cause
+                () -> assertTrue(thrown.getMessage().contains("people"), thrown.getMessage()));
     }
 
     private static Row first(InputSpec spec, byte[] csv) throws IOException {

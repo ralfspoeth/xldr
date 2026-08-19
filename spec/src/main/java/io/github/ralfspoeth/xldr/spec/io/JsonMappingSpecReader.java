@@ -8,9 +8,9 @@ import io.github.ralfspoeth.json.query.Pointer;
 import io.github.ralfspoeth.xldr.spec.*;
 import org.jspecify.annotations.Nullable;
 
-// Greyson exports a Selector of its own, and so does the spec now. Only one of
-// the two can wear the bare name, and it should be the one this file is building:
-// what is wanted from Greyson's is the single method below.
+// Greyson exports a Selector of its own, and so does the spec. A static member
+// import takes the one method wanted from Greyson's without importing the type,
+// so the bare name still means the spec's wherever it is written.
 import static io.github.ralfspoeth.json.query.Selector.all;
 
 import java.io.IOException;
@@ -106,7 +106,9 @@ public class JsonMappingSpecReader implements MappingSpecReader {
                         .apply(element)
                         .map(JsonMappingSpecReader::fieldMappingSpec)
                         .toList(),
-                PTR.member("limit").intValue(element).stream().boxed().findFirst().orElse(null)
+                // through the node, so that "limit": "100" is refused here rather
+                // than read as no limit at all - the XML reader always refused it
+                node(element).whole("limit").orElse(null)
         );
     }
 
@@ -117,54 +119,22 @@ public class JsonMappingSpecReader implements MappingSpecReader {
     /**
      * A field mapping carries exactly one source: {@code fieldSelector},
      * {@code constant}, {@code var}, {@code expr}, or a {@code lookup} object.
+     * Which one, and the refusal when it is not one, is
+     * {@link SpecNode#source()}; where the lookup sits is this format's business.
      */
     private static ValueSource valueSource(JsonValue fm) {
-        var lookup = PTR.member("lookup").apply(fm);
-        if (lookup.isPresent()) {
-            if (hasBasicSource(fm)) {
-                throw new IllegalArgumentException("a lookup mapping must carry no other source: " + fm);
-            }
-            return new ValueSource.Lookup(
-                    PTR.member("table").stringOrThrow(lookup.get()),
-                    PTR.member("column").stringOrThrow(lookup.get()),
-                    PTR.member("keyColumn").stringOrThrow(lookup.get()),
-                    basicSource(lookup.get()));
+        var lookup = PTR.member("lookup").apply(fm).orElse(null);
+        if (lookup == null) {
+            return node(fm).source();
         }
-        return basicSource(fm);
-    }
-
-    private static boolean hasBasicSource(JsonValue v) {
-        return PTR.member("fieldSelector").stringValue(v).isPresent()
-                || PTR.member("constant").apply(v).isPresent()
-                || PTR.member("var").stringValue(v).isPresent()
-                || PTR.member("expr").stringValue(v).isPresent();
-    }
-
-    /**
-     * Exactly one of {@code fieldSelector}, {@code constant}, {@code var} or
-     * {@code expr}.
-     */
-    private static ValueSource basicSource(JsonValue v) {
-        var field = PTR.member("fieldSelector").stringValue(v);
-        var constant = PTR.member("constant").apply(v);
-        var varRef = PTR.member("var").stringValue(v);
-        var expr = PTR.member("expr").stringValue(v);
-
-        var present = (field.isPresent() ? 1 : 0) + (constant.isPresent() ? 1 : 0)
-                + (varRef.isPresent() ? 1 : 0) + (expr.isPresent() ? 1 : 0);
-        if (present != 1) {
-            throw new IllegalArgumentException(
-                    "needs exactly one of fieldSelector, constant, var, expr: " + v);
+        if (node(fm).hasSource()) {
+            throw new IllegalArgumentException("a lookup mapping must carry no other source: " + fm);
         }
-        if (field.isPresent()) {
-            return new ValueSource.Field(field.get());
-        } else if (varRef.isPresent()) {
-            return new ValueSource.Var(varRef.get());
-        } else if (expr.isPresent()) {
-            return new ValueSource.Expr(expr.get());
-        } else {
-            return new ValueSource.Constant(constantValue(constant.get()));
-        }
+        return new ValueSource.Lookup(
+                PTR.member("table").stringOrThrow(lookup),
+                PTR.member("column").stringOrThrow(lookup),
+                PTR.member("keyColumn").stringOrThrow(lookup),
+                node(lookup).source());
     }
 
     /**
@@ -203,39 +173,18 @@ public class JsonMappingSpecReader implements MappingSpecReader {
         );
     }
 
-    /**
-     * A discriminator says where to look and what for: exactly one of
-     * {@code nth} and {@code selector}, and exactly one of {@code equals} and
-     * {@code matches}.
-     */
+    /** A {@code discriminator} member, where there is one. */
     private static @Nullable Discriminator discriminator(JsonValue rs) {
-        var d = PTR.member("discriminator").apply(rs).orElse(null);
-        if (d == null) {
-            return null;
-        }
-        var where = selector(d, "a discriminator");
-        // any scalar, so that a record type written 1 rather than "1" is a
-        // discriminator rather than a puzzle
-        var literal = PTR.member("equals").apply(d).flatMap(JsonMappingSpecReader::text);
-        var regex = PTR.member("matches").stringValue(d);
-        if (literal.isPresent() && regex.isPresent()) {
-            throw new IllegalArgumentException(
-                    "a discriminator tests equals or matches, not both: " + d);
-        }
-        if (literal.isPresent()) {
-            return new Discriminator.Equals(where, literal.get());
-        }
-        if (regex.isPresent()) {
-            return Discriminator.matching(where, regex.get());
-        }
-        throw new IllegalArgumentException("a discriminator needs equals or matches; "
-                + where + " on its own says where to look and not what for: " + d);
+        return PTR.member("discriminator")
+                .apply(rs)
+                .map(d -> node(d).discriminator())
+                .orElse(null);
     }
 
     private static FieldSelectorSpec fieldSelectorSpec(JsonValue fs) {
         return new FieldSelectorSpec(
                 PTR.member("name").stringOrThrow(fs),
-                selector(fs, "a field selector"),
+                node(fs).selector("a field selector"),
                 PTR.member("type")
                         .stringValue(fs)
                         .map(String::toUpperCase)
@@ -245,38 +194,55 @@ public class JsonMappingSpecReader implements MappingSpecReader {
     }
 
     /**
-     * Exactly one of {@code selector} - the adapter's own syntax - and
-     * {@code nth}, a component counted from one.
+     * This format's answers to the five questions {@link SpecNode} asks, which is
+     * all it takes to inherit the rules about what a spec may say.
      * <p>
-     * Two names rather than one of two JSON types, because the XML format cannot
-     * tell {@code selector="3"} from a number and would have had to guess. An
-     * {@code nth} that is not a number is refused here rather than coerced, for
-     * the same reason: {@code "nth": "1"} is a spec that means the other thing.
+     * The one that carries weight is {@link #string}: it reads a JSON string and
+     * nothing else, so {@code "nth": "1"} does not resolve as a count and
+     * {@code "selector": 3} does not resolve as a name. Only {@code equals} takes
+     * a scalar of any kind.
      */
-    private static Selector selector(JsonValue v, String what) {
-        var text = PTR.member("selector").stringValue(v);
-        var nth = PTR.member("nth").apply(v);
-        if (text.isPresent() && nth.isPresent()) {
-            throw new IllegalArgumentException(what + " has both a selector and an nth,"
-                    + " which are two answers to one question: " + v);
+    private record Node(JsonValue value) implements SpecNode {
+
+        @Override
+        public Optional<String> string(String name) {
+            return PTR.member(name).stringValue(value);
         }
-        if (text.isPresent()) {
-            return new Selector.Text(text.get());
+
+        @Override
+        public Optional<String> scalar(String name) {
+            return PTR.member(name).apply(value).flatMap(JsonMappingSpecReader::text);
         }
-        if (nth.isPresent()) {
-            return new Selector.Nth(wholeNumber(nth.get(), what));
+
+        @Override
+        public Optional<Integer> whole(String name) {
+            return PTR.member(name).apply(value).map(v -> wholeNumber(name, v));
         }
-        throw new IllegalArgumentException(what + " needs a selector or an nth: " + v);
+
+        @Override
+        public Optional<ValueSource.Constant> constant() {
+            return PTR.member("constant")
+                    .apply(value)
+                    .map(v -> new ValueSource.Constant(constantValue(v)));
+        }
+
+        @Override
+        public String shown() {
+            return String.valueOf(value);
+        }
     }
 
-    private static int wholeNumber(JsonValue value, String what) {
+    private static SpecNode node(JsonValue value) {
+        return new Node(value);
+    }
+
+    private static int wholeNumber(String name, JsonValue value) {
         var number = value.decimal().orElseThrow(() -> new IllegalArgumentException(
-                what + ": nth is a whole number counted from one, was " + value));
+                name + " is a whole number, was " + value));
         try {
             return number.intValueExact();
         } catch (ArithmeticException e) {
-            throw new IllegalArgumentException(
-                    what + ": nth is a whole number counted from one, was " + number, e);
+            throw new IllegalArgumentException(name + " is a whole number, was " + number, e);
         }
     }
 

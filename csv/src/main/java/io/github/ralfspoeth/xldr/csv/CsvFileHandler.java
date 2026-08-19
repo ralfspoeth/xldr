@@ -1,11 +1,7 @@
 package io.github.ralfspoeth.xldr.csv;
 
 import io.github.ralfspoeth.xldr.ia.*;
-import io.github.ralfspoeth.xldr.spec.DataType;
-import io.github.ralfspoeth.xldr.spec.Discriminator;
-import io.github.ralfspoeth.xldr.spec.FieldSelectorSpec;
-import io.github.ralfspoeth.xldr.spec.InputSpec;
-import io.github.ralfspoeth.xldr.spec.Selector;
+import io.github.ralfspoeth.xldr.spec.*;
 import org.jspecify.annotations.Nullable;
 
 import java.io.BufferedReader;
@@ -103,16 +99,32 @@ class CsvFileHandler implements InputAdapter {
         }
     }
 
+    /**
+     * The record selectors the spec declares, for a complaint about one it does
+     * not. Ordered as written, a spec being easier to check against a list in the
+     * order its author typed it.
+     */
+    private List<String> declaredNames() {
+        return inputSpec.recordSelectors().stream().map(RecordSelectorSpec::name).toList();
+    }
+
+    /**
+     * A name the spec does not declare is refused, as it is by every other
+     * adapter. This used to answer with an empty result, which reads as a
+     * successful load of a file that happened to hold nothing - so a mapping
+     * naming {@code peple} would report success over zero rows on a CSV feed and
+     * be refused outright on any other. Nothing cross-checks a mapping's
+     * {@code recordSelector} against the declared ones, which makes this the
+     * place the typo has to surface.
+     */
     @Override
     public Result parse(InputStream source, String recordSelector, Set<String> fieldSelectors) throws IOException {
         var record = inputSpec.recordSelectors()
                 .stream()
                 .filter(rss -> rss.name().equals(recordSelector))
                 .findFirst()
-                .orElse(null);
-        if (record == null) {
-            return new Result(List.of(), Stream.empty());
-        }
+                .orElseThrow(() -> new IllegalArgumentException("no record selector named "
+                        + recordSelector + "; the input spec declares " + declaredNames()));
         var fields = fields(recordSelector, fieldSelectors);
         // the reader is not closed here: the stream belongs to the caller, who
         // closes it once every record mapping of the file has been read
@@ -145,7 +157,7 @@ class CsvFileHandler implements InputAdapter {
         var rows = discriminator == null
                 ? lines.lines().gather(records(linesRead))
                 : filtered(lines, linesRead, discriminator, index.require(discriminator.at()));
-        return new Result(fields, rows.map(values -> (Row) new Line(values, positions, types, formats)));
+        return new Result(fields, rows.map(values -> new Line(values, positions, types, formats)));
     }
 
     /**

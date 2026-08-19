@@ -49,12 +49,28 @@ doing has a name of its own.
   record sits; `nth: 3` is the third column of the range, so `data!C2:F10` makes it E. They agree only for a range
   starting at column A. The digit form of `selector` is unchanged and kept for the specs that use it.
 
+- **A `limit` is a whole number in both formats.** The XML reader parsed the attribute and threw on anything else;
+  the JSON reader asked for an int and read `"limit": "100"` as *no limit* - a spec meaning to cap at a hundred rows
+  that loaded the file. Both refuse it now. Nothing here changes for a spec that wrote the number unquoted.
+
+- **A CSV record selector the input does not declare is refused**, as it already was by xlsx, xml and json. It used
+  to answer with no rows, which is indistinguishable from a file that held none, so a mapping with a typo in its
+  `recordSelector` was a green load of nothing on a CSV feed and a refusal on any other input. Nothing cross-checks
+  a mapping against the record selectors the input declares, which makes the adapter the place the two names first
+  meet.
+
 ### Changed
 
 - `mapping-spec-0.32` carries `nth`, `discriminator`, and the exactly-one-of rules in the JSON schema, XSD 1.0 being
   unable to express them - so the JSON schema is now the stricter of the two by one more rule. Both schemas type
   `nth` as an integer, which is the payoff of two names: `nth="first"` is refused by an editor before any adapter
   sees it.
+
+- The two spec readers no longer carry a copy each of the rules about what a spec may say. A package-private
+  `SpecNode` asks a format five questions - how to read a named value as text, as any scalar, as a whole number, as
+  a constant, and how to show itself in a complaint - and the three exactly-one-of rules are written once against
+  those. The traversal stays per format, that being where the two genuinely differ and where a mistake is a failing
+  test rather than a slow divergence. The `limit` above is what the duplication had already cost.
 
 ## 0.31
 
