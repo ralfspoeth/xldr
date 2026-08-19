@@ -205,7 +205,7 @@ public class JsonMappingSpecReader implements MappingSpecReader {
 
     /**
      * A discriminator says where to look and what for: exactly one of
-     * {@code column} and {@code selector}, and exactly one of {@code equals} and
+     * {@code nth} and {@code selector}, and exactly one of {@code equals} and
      * {@code matches}.
      */
     private static @Nullable Discriminator discriminator(JsonValue rs) {
@@ -246,37 +246,37 @@ public class JsonMappingSpecReader implements MappingSpecReader {
 
     /**
      * Exactly one of {@code selector} - the adapter's own syntax - and
-     * {@code column}, a position counted from one.
+     * {@code nth}, a component counted from one.
      * <p>
      * Two names rather than one of two JSON types, because the XML format cannot
-     * tell {@code selector="3"} from a number and would have had to guess. A
-     * {@code column} that is not a number is refused here rather than coerced, for
-     * the same reason: {@code "column": "1"} is a spec that means the other thing.
+     * tell {@code selector="3"} from a number and would have had to guess. An
+     * {@code nth} that is not a number is refused here rather than coerced, for
+     * the same reason: {@code "nth": "1"} is a spec that means the other thing.
      */
     private static Selector selector(JsonValue v, String what) {
         var text = PTR.member("selector").stringValue(v);
-        var column = PTR.member("column").apply(v);
-        if (text.isPresent() && column.isPresent()) {
-            throw new IllegalArgumentException(what + " has both a selector and a column,"
+        var nth = PTR.member("nth").apply(v);
+        if (text.isPresent() && nth.isPresent()) {
+            throw new IllegalArgumentException(what + " has both a selector and an nth,"
                     + " which are two answers to one question: " + v);
         }
         if (text.isPresent()) {
             return new Selector.Text(text.get());
         }
-        if (column.isPresent()) {
-            return new Selector.Column(columnIndex(column.get(), what));
+        if (nth.isPresent()) {
+            return new Selector.Nth(wholeNumber(nth.get(), what));
         }
-        throw new IllegalArgumentException(what + " needs a selector or a column: " + v);
+        throw new IllegalArgumentException(what + " needs a selector or an nth: " + v);
     }
 
-    private static int columnIndex(JsonValue value, String what) {
+    private static int wholeNumber(JsonValue value, String what) {
         var number = value.decimal().orElseThrow(() -> new IllegalArgumentException(
-                what + ": a column is a whole number counted from one, was " + value));
+                what + ": nth is a whole number counted from one, was " + value));
         try {
             return number.intValueExact();
         } catch (ArithmeticException e) {
             throw new IllegalArgumentException(
-                    what + ": a column is a whole number counted from one, was " + number, e);
+                    what + ": nth is a whole number counted from one, was " + number, e);
         }
     }
 

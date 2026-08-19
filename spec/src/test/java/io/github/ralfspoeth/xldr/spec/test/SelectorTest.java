@@ -62,16 +62,16 @@ class SelectorTest {
         return Objects.requireNonNull(d, "the record selector carried no discriminator");
     }
 
-    // ---- a field selector is a name or a column ------------------------------
+    // ---- a field selector names a component or counts one ---------------------
 
     @Test
-    void bothFormatsReadAColumn() throws IOException {
+    void bothFormatsCount() throws IOException {
         assertAll(
-                () -> assertEquals(new Selector.Column(2), onlyFieldSelector(json("""
-                        { "name": "who", "fieldSelectors": [ { "name": "id", "column": 2 } ] }
+                () -> assertEquals(new Selector.Nth(2), onlyFieldSelector(json("""
+                        { "name": "who", "fieldSelectors": [ { "name": "id", "nth": 2 } ] }
                         """))),
-                () -> assertEquals(new Selector.Column(2), onlyFieldSelector(xml("""
-                        <recordSelector name="who"><fieldSelector name="id" column="2"/></recordSelector>
+                () -> assertEquals(new Selector.Nth(2), onlyFieldSelector(xml("""
+                        <recordSelector name="who"><fieldSelector name="id" nth="2"/></recordSelector>
                         """))));
     }
 
@@ -88,22 +88,22 @@ class SelectorTest {
 
     /**
      * The case the whole change exists for: a header may name a column
-     * {@code "3"}, and that is now sayable and distinct from the third column.
+     * {@code "3"}, and that is now sayable and distinct from the third one.
      */
     @Test
-    void aColumnNamedThreeIsNotTheThirdColumn() throws IOException {
+    void aColumnNamedThreeIsNotTheThirdComponent() throws IOException {
         assertAll(
                 () -> assertEquals(new Selector.Text("3"), onlyFieldSelector(json("""
                         { "name": "who", "fieldSelectors": [ { "name": "id", "selector": "3" } ] }
                         """))),
-                () -> assertEquals(new Selector.Column(3), onlyFieldSelector(json("""
-                        { "name": "who", "fieldSelectors": [ { "name": "id", "column": 3 } ] }
+                () -> assertEquals(new Selector.Nth(3), onlyFieldSelector(json("""
+                        { "name": "who", "fieldSelectors": [ { "name": "id", "nth": 3 } ] }
                         """))),
                 () -> assertEquals(new Selector.Text("3"), onlyFieldSelector(xml("""
                         <recordSelector name="who"><fieldSelector name="id" selector="3"/></recordSelector>
                         """))),
-                () -> assertEquals(new Selector.Column(3), onlyFieldSelector(xml("""
-                        <recordSelector name="who"><fieldSelector name="id" column="3"/></recordSelector>
+                () -> assertEquals(new Selector.Nth(3), onlyFieldSelector(xml("""
+                        <recordSelector name="who"><fieldSelector name="id" nth="3"/></recordSelector>
                         """))));
     }
 
@@ -111,20 +111,20 @@ class SelectorTest {
     void bothTogetherAreRefused() {
         assertAll(
                 () -> assertRefused("two answers to one question", () -> json("""
-                        { "name": "who", "fieldSelectors": [ { "name": "id", "selector": "id", "column": 1 } ] }
+                        { "name": "who", "fieldSelectors": [ { "name": "id", "selector": "id", "nth": 1 } ] }
                         """)),
                 () -> assertRefused("two answers to one question", () -> xml("""
-                        <recordSelector name="who"><fieldSelector name="id" selector="id" column="1"/></recordSelector>
+                        <recordSelector name="who"><fieldSelector name="id" selector="id" nth="1"/></recordSelector>
                         """)));
     }
 
     @Test
     void neitherIsRefused() {
         assertAll(
-                () -> assertRefused("needs a selector or a column", () -> json("""
+                () -> assertRefused("needs a selector or an nth", () -> json("""
                         { "name": "who", "fieldSelectors": [ { "name": "id" } ] }
                         """)),
-                () -> assertRefused("needs a selector or a column", () -> xml("""
+                () -> assertRefused("needs a selector or an nth", () -> xml("""
                         <recordSelector name="who"><fieldSelector name="id"/></recordSelector>
                         """)));
     }
@@ -134,27 +134,27 @@ class SelectorTest {
      * the ambiguity back one level down, where it would be harder to see.
      */
     @Test
-    void aColumnHasToBeAWholeNumber() {
+    void nthHasToBeAWholeNumber() {
         assertAll(
                 () -> assertRefused("whole number", () -> json("""
-                        { "name": "who", "fieldSelectors": [ { "name": "id", "column": "1" } ] }
+                        { "name": "who", "fieldSelectors": [ { "name": "id", "nth": "1" } ] }
                         """)),
                 () -> assertRefused("whole number", () -> json("""
-                        { "name": "who", "fieldSelectors": [ { "name": "id", "column": 1.5 } ] }
+                        { "name": "who", "fieldSelectors": [ { "name": "id", "nth": 1.5 } ] }
                         """)),
                 () -> assertRefused("whole number", () -> xml("""
-                        <recordSelector name="who"><fieldSelector name="id" column="first"/></recordSelector>
+                        <recordSelector name="who"><fieldSelector name="id" nth="first"/></recordSelector>
                         """)));
     }
 
     @Test
-    void columnsAreCountedFromOne() {
+    void componentsAreCountedFromOne() {
         assertAll(
                 () -> assertRefused("counted from 1", () -> json("""
-                        { "name": "who", "fieldSelectors": [ { "name": "id", "column": 0 } ] }
+                        { "name": "who", "fieldSelectors": [ { "name": "id", "nth": 0 } ] }
                         """)),
                 () -> assertRefused("counted from 1", () -> xml("""
-                        <recordSelector name="who"><fieldSelector name="id" column="0"/></recordSelector>
+                        <recordSelector name="who"><fieldSelector name="id" nth="0"/></recordSelector>
                         """)));
     }
 
@@ -164,17 +164,17 @@ class SelectorTest {
     void bothFormatsReadADiscriminator() throws IOException {
         assertAll(
                 () -> assertEquals(
-                        new Discriminator.Equals(new Selector.Column(1), "O"),
+                        new Discriminator.Equals(new Selector.Nth(1), "O"),
                         onlyDiscriminator(json("""
-                                { "name": "orders", "discriminator": { "column": 1, "equals": "O" },
-                                  "fieldSelectors": [ { "name": "id", "column": 2 } ] }
+                                { "name": "orders", "discriminator": { "nth": 1, "equals": "O" },
+                                  "fieldSelectors": [ { "name": "id", "nth": 2 } ] }
                                 """))),
                 () -> assertEquals(
-                        new Discriminator.Equals(new Selector.Column(1), "O"),
+                        new Discriminator.Equals(new Selector.Nth(1), "O"),
                         onlyDiscriminator(xml("""
                                 <recordSelector name="orders">
-                                    <discriminator column="1" equals="O"/>
-                                    <fieldSelector name="id" column="2"/>
+                                    <discriminator nth="1" equals="O"/>
+                                    <fieldSelector name="id" nth="2"/>
                                 </recordSelector>
                                 """))));
     }
@@ -185,13 +185,13 @@ class SelectorTest {
      * old first-column-only rule was too narrow.
      */
     @Test
-    void aDiscriminatorMayNameItsColumn() throws IOException {
+    void aDiscriminatorMayNameWhatItTests() throws IOException {
         var d = onlyDiscriminator(json("""
                 { "name": "ones", "discriminator": { "selector": "A", "equals": "1" },
                   "fieldSelectors": [ { "name": "b", "selector": "B" } ] }
                 """));
         assertAll(
-                () -> assertEquals(new Selector.Text("A"), d.column()),
+                () -> assertEquals(new Selector.Text("A"), d.at()),
                 () -> assertTrue(d.accepts("1")),
                 () -> assertFalse(d.accepts("2")));
     }
@@ -199,8 +199,8 @@ class SelectorTest {
     @Test
     void aPatternIsCompiledWhenTheSpecIsRead() throws IOException {
         var d = onlyDiscriminator(json("""
-                { "name": "orders", "discriminator": { "column": 1, "matches": "^O[0-9]+$" },
-                  "fieldSelectors": [ { "name": "id", "column": 2 } ] }
+                { "name": "orders", "discriminator": { "nth": 1, "matches": "^O[0-9]+$" },
+                  "fieldSelectors": [ { "name": "id", "nth": 2 } ] }
                 """));
         assertAll(
                 () -> assertInstanceOf(Discriminator.Matches.class, d),
@@ -213,8 +213,8 @@ class SelectorTest {
     @Test
     void aPatternThatDoesNotCompileIsRefusedThere() {
         assertRefused("does not compile", () -> json("""
-                { "name": "orders", "discriminator": { "column": 1, "matches": "^O[0-9" },
-                  "fieldSelectors": [ { "name": "id", "column": 2 } ] }
+                { "name": "orders", "discriminator": { "nth": 1, "matches": "^O[0-9" },
+                  "fieldSelectors": [ { "name": "id", "nth": 2 } ] }
                 """));
     }
 
@@ -222,8 +222,8 @@ class SelectorTest {
     @Test
     void equalsTakesAnyScalar() throws IOException {
         assertTrue(onlyDiscriminator(json("""
-                { "name": "ones", "discriminator": { "column": 1, "equals": 1 },
-                  "fieldSelectors": [ { "name": "b", "column": 2 } ] }
+                { "name": "ones", "discriminator": { "nth": 1, "equals": 1 },
+                  "fieldSelectors": [ { "name": "b", "nth": 2 } ] }
                 """)).accepts("1"));
     }
 
@@ -231,23 +231,23 @@ class SelectorTest {
     void aDiscriminatorNeedsExactlyOneTest() {
         assertAll(
                 () -> assertRefused("not both", () -> json("""
-                        { "name": "o", "discriminator": { "column": 1, "equals": "O", "matches": "O.*" },
-                          "fieldSelectors": [ { "name": "id", "column": 2 } ] }
+                        { "name": "o", "discriminator": { "nth": 1, "equals": "O", "matches": "O.*" },
+                          "fieldSelectors": [ { "name": "id", "nth": 2 } ] }
                         """)),
                 () -> assertRefused("not both", () -> xml("""
                         <recordSelector name="o">
-                            <discriminator column="1" equals="O" matches="O.*"/>
-                            <fieldSelector name="id" column="2"/>
+                            <discriminator nth="1" equals="O" matches="O.*"/>
+                            <fieldSelector name="id" nth="2"/>
                         </recordSelector>
                         """)),
                 () -> assertRefused("needs equals or matches", () -> json("""
-                        { "name": "o", "discriminator": { "column": 1 },
-                          "fieldSelectors": [ { "name": "id", "column": 2 } ] }
+                        { "name": "o", "discriminator": { "nth": 1 },
+                          "fieldSelectors": [ { "name": "id", "nth": 2 } ] }
                         """)),
                 () -> assertRefused("needs equals or matches", () -> xml("""
                         <recordSelector name="o">
-                            <discriminator column="1"/>
-                            <fieldSelector name="id" column="2"/>
+                            <discriminator nth="1"/>
+                            <fieldSelector name="id" nth="2"/>
                         </recordSelector>
                         """)));
     }
@@ -260,13 +260,13 @@ class SelectorTest {
     void aRecordSelectorCannotBothPointAndFilter() {
         assertAll(
                 () -> assertRefused("no input is read both ways", () -> json("""
-                        { "name": "o", "selector": "//order", "discriminator": { "column": 1, "equals": "O" },
-                          "fieldSelectors": [ { "name": "id", "column": 2 } ] }
+                        { "name": "o", "selector": "//order", "discriminator": { "nth": 1, "equals": "O" },
+                          "fieldSelectors": [ { "name": "id", "nth": 2 } ] }
                         """)),
                 () -> assertRefused("no input is read both ways", () -> xml("""
                         <recordSelector name="o" selector="//order">
-                            <discriminator column="1" equals="O"/>
-                            <fieldSelector name="id" column="2"/>
+                            <discriminator nth="1" equals="O"/>
+                            <fieldSelector name="id" nth="2"/>
                         </recordSelector>
                         """)));
     }
@@ -279,13 +279,13 @@ class SelectorTest {
      * be asked not being one that answered.
      */
     @Test
-    void valuesAreStrippedAndAnAbsentColumnMatchesNothing() {
-        var equals = new Discriminator.Equals(new Selector.Column(1), "O");
+    void valuesAreStrippedAndAnAbsentComponentMatchesNothing() {
+        var equals = new Discriminator.Equals(new Selector.Nth(1), "O");
         assertAll(
                 () -> assertTrue(equals.accepts("  O  ")),
                 () -> assertFalse(equals.accepts("")),
                 () -> assertFalse(equals.accepts(null)),
-                () -> assertFalse(Discriminator.matching(new Selector.Column(1), "O.*").accepts(null)));
+                () -> assertFalse(Discriminator.matching(new Selector.Nth(1), "O.*").accepts(null)));
     }
 
     /**

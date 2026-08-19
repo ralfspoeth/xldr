@@ -9,15 +9,22 @@ import java.util.regex.Pattern;
  * A field selector: which cell of a record to read, relative to the record's
  * anchor (its top-left cell - the current row at the range's first column).
  * <p>
- * Two notations:
+ * Three notations, of which the first two are written as a {@code selector} and
+ * the third as an {@code nth}:
  * <ul>
  *   <li>an absolute column - a letter such as {@code A} or {@code AA}, or a
  *       1-based index such as {@code 3} (= column C) - read on the record's own
- *       row;</li>
+ *       row, wherever in the sheet that row happens to be;</li>
  *   <li>relative R1C1 - {@code R±r C±c} with both offsets present, e.g.
  *       {@code R-1C+2}: the cell {@code r} rows and {@code c} columns from the
- *       anchor, so a record can reach a neighbouring cell.</li>
+ *       anchor, so a record can reach a neighbouring cell;</li>
+ *   <li>{@code nth} - the n-th column <em>of the record</em>, which is the
+ *       anchor plus n-1 and so follows the range rather than the sheet.</li>
  * </ul>
+ * The first and the third read the same for a range starting at column A and
+ * differ for every other range. The digit notation is the older of the two and
+ * kept for the specs that use it; {@code nth} is the one that means the same
+ * thing here as it does in every other adapter.
  */
 sealed interface CellRef {
 
@@ -45,25 +52,33 @@ sealed interface CellRef {
             return new AbsoluteColumn(CellReference.convertColStringToIndex(s.toUpperCase()));
         }
         if (DIGITS.matcher(s).matches()) {
-            // a spec written before `column` existed said its column index here,
-            // which still works and still means the same thing
-            return column(Integer.parseInt(s));
+            var index = Integer.parseInt(s);
+            if (index < 1) {
+                throw new IllegalArgumentException("column index must be 1-based: " + selector);
+            }
+            return new AbsoluteColumn(index - 1);
         }
         throw new IllegalArgumentException("not a valid Excel field selector: " + selector);
     }
 
     /**
-     * A column of the sheet, counted from one as a person counts them.
+     * The n-th column <em>of the record</em>, counted from one.
      * <p>
-     * The same thing a digit selector has always meant, reachable now without
-     * writing the number down as text first - which is what a spec says when it
-     * carries a {@code column} rather than a {@code selector}.
+     * Not the same as the digit selector above, and the difference is the point.
+     * {@code selector="3"} is column C of the sheet wherever the record sits;
+     * {@code nth="3"} is the third column of the range the record selector named,
+     * so a range at {@code data!C2:F10} makes it column E. A count that meant
+     * different columns in two ranges would not be the n-th component of a
+     * record, which is what {@code nth} means everywhere else in the toolkit.
+     * <p>
+     * It is therefore {@link Relative} with no row offset: the anchor is where
+     * counting starts.
      */
-    static CellRef column(int index) {
-        if (index < 1) {
-            throw new IllegalArgumentException("a column is counted from 1, was: " + index);
+    static CellRef nth(int n) {
+        if (n < 1) {
+            throw new IllegalArgumentException("a component is counted from 1, was: " + n);
         }
-        return new AbsoluteColumn(index - 1);
+        return new Relative(0, n - 1);
     }
 
     record AbsoluteColumn(int column) implements CellRef {

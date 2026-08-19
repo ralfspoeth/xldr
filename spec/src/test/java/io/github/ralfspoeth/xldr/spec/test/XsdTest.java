@@ -87,19 +87,19 @@ public class XsdTest {
     }
 
     /**
-     * A field may count its column instead of naming one, and the schema has to
-     * say so - otherwise an editor flags a spec the reader loads happily, which
-     * is the drift this class exists to catch.
+     * A field may count its component instead of naming one, and the schema has
+     * to say so - otherwise an editor flags a spec the reader loads happily,
+     * which is the drift this class exists to catch.
      */
     @Test
-    public void aFieldSelectorMayCountItsColumn() {
+    public void aFieldSelectorMayCountInsteadOfNaming() {
         var xml = """
                 <mappingSpec>
                     <input mimeType="text/csv">
                         <properties header="absent"/>
                         <recordSelector name="people">
-                            <fieldSelector name="id" column="1" type="INTEGRAL"/>
-                            <fieldSelector name="name" column="2"/>
+                            <fieldSelector name="id" nth="1" type="INTEGRAL"/>
+                            <fieldSelector name="name" nth="2"/>
                         </recordSelector>
                     </input>
                 </mappingSpec>
@@ -109,22 +109,22 @@ public class XsdTest {
         var fields = new XmlMappingSpecReader().read(stream(xml))
                 .inputSpec().recordSelectors().iterator().next().fieldSelectors();
         assertEquals(
-                List.of(new Selector.Column(1), new Selector.Column(2)),
+                List.of(new Selector.Nth(1), new Selector.Nth(2)),
                 fields.stream().map(FieldSelectorSpec::selector).toList());
     }
 
     /**
      * The payoff of two names rather than one attribute of two types: the schema
-     * types {@code column}, so a spec counting a column called {@code first} is
+     * types {@code nth}, so a spec counting a component called {@code first} is
      * refused by an editor before it is ever read.
      */
     @Test
-    public void theSchemaTypesAColumnAsANumber() {
+    public void theSchemaTypesNthAsANumber() {
         assertThrows(Exception.class, () -> validate("""
                 <mappingSpec>
                     <input mimeType="text/csv">
                         <recordSelector name="people">
-                            <fieldSelector name="id" column="first"/>
+                            <fieldSelector name="id" nth="first"/>
                         </recordSelector>
                     </input>
                 </mappingSpec>
@@ -142,12 +142,12 @@ public class XsdTest {
                     <input mimeType="text/csv">
                         <properties header="absent"/>
                         <recordSelector name="orders">
-                            <discriminator column="1" equals="O"/>
-                            <fieldSelector name="id" column="2"/>
+                            <discriminator nth="1" equals="O"/>
+                            <fieldSelector name="id" nth="2"/>
                         </recordSelector>
                         <recordSelector name="lines">
                             <discriminator selector="kind" matches="L[0-9]+"/>
-                            <fieldSelector name="id" column="2"/>
+                            <fieldSelector name="id" nth="2"/>
                         </recordSelector>
                     </input>
                 </mappingSpec>
@@ -157,7 +157,7 @@ public class XsdTest {
         var selectors = new XmlMappingSpecReader().read(stream(xml))
                 .inputSpec().recordSelectors().stream().toList();
         assertAll(
-                () -> assertEquals(new Discriminator.Equals(new Selector.Column(1), "O"),
+                () -> assertEquals(new Discriminator.Equals(new Selector.Nth(1), "O"),
                         selectors.getFirst().discriminator()),
                 () -> assertInstanceOf(Discriminator.Matches.class, selectors.get(1).discriminator()));
     }

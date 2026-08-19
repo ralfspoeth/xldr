@@ -93,7 +93,7 @@ public record RecordSelectorSpec(
         if (selector != null) {
             throw new IllegalArgumentException("record selector '" + name + "' has a selector, '"
                     + selector + "', but " + what + ". A value the records are recognised by is a"
-                    + " discriminator: { \"column\": 1, \"equals\": \"" + selector + "\" }");
+                    + " discriminator: { \"nth\": 1, \"equals\": \"" + selector + "\" }");
         }
     }
 }

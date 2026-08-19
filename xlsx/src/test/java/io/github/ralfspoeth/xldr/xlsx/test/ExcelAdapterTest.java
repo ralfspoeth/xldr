@@ -7,6 +7,7 @@ import io.github.ralfspoeth.xldr.spec.DataType;
 import io.github.ralfspoeth.xldr.spec.FieldSelectorSpec;
 import io.github.ralfspoeth.xldr.spec.InputSpec;
 import io.github.ralfspoeth.xldr.spec.RecordSelectorSpec;
+import io.github.ralfspoeth.xldr.spec.Selector;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.junit.jupiter.api.Test;
@@ -158,6 +159,53 @@ public class ExcelAdapterTest {
                 () -> assertEquals(1L, rows.getFirst().get("id")),
                 () -> assertEquals("Alice", rows.getFirst().get("name"))
         );
+    }
+
+    /**
+     * The two notations that look alike and are not.
+     * <p>
+     * {@code selector="1"} is column A of the sheet, wherever the record sits.
+     * {@code nth="1"} is the first column <em>of the record</em>, which is the
+     * range's own first column - so for a range at {@code C2:D3} the two are
+     * three columns apart. They agree only for a range starting at column A,
+     * which is why this test does not use one: every other fixture here would
+     * pass whichever way {@code nth} had been implemented.
+     * <p>
+     * Anchor-relative is the one that matches what {@code nth} means in every
+     * other adapter - the n-th component of the record the record selector
+     * identified, not the n-th of whatever contains it.
+     */
+    @Test
+    public void nthCountsFromTheRangeAndAdigitSelectorFromTheSheet() throws IOException {
+        var xlsx = workbook(sheet -> {
+            header(sheet, 0, "far", "left", "id", "name");
+            dataRow(sheet, 1, "A1", "B1", "1", "Alice");
+            dataRow(sheet, 2, "A2", "B2", "2", "Bob");
+        });
+
+        var spec = new InputSpec(XLSX, List.of(
+                new RecordSelectorSpec("rows", "data!C2:D3", List.of(
+                        new FieldSelectorSpec("counted", new Selector.Nth(1), DataType.TEXT),
+                        new FieldSelectorSpec("alsoCounted", new Selector.Nth(2), DataType.TEXT),
+                        new FieldSelectorSpec("absoluteDigit", "1", DataType.TEXT),
+                        new FieldSelectorSpec("absoluteLetter", "C", DataType.TEXT)
+                ))
+        ), List.of(), Map.of());
+
+        var rows = adapter(spec)
+                .parse(new ByteArrayInputStream(xlsx), "rows",
+                        Set.of("counted", "alsoCounted", "absoluteDigit", "absoluteLetter"))
+                .rows().toList();
+
+        assertEquals(2, rows.size());
+        var first = rows.getFirst();
+        assertAll(
+                () -> assertEquals("1", first.get("counted"), "the range's first column is C"),
+                () -> assertEquals("Alice", first.get("alsoCounted"), "and its second is D"),
+                () -> assertEquals("A1", first.get("absoluteDigit"), "while a digit selector is column A"),
+                () -> assertEquals("1", first.get("absoluteLetter"), "as a letter says outright"),
+                () -> assertNotEquals(first.get("counted"), first.get("absoluteDigit"),
+                        "the two notations differ, which is the whole of this test"));
     }
 
     private static byte[] workbook(SheetContent content) throws IOException {

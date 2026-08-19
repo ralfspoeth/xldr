@@ -3,13 +3,18 @@ package io.github.ralfspoeth.xldr.json;
 import io.github.ralfspoeth.json.Greyson;
 import io.github.ralfspoeth.json.data.JsonValue;
 import io.github.ralfspoeth.json.query.Pointer;
-import io.github.ralfspoeth.json.query.Selector;
 import io.github.ralfspoeth.xldr.ia.*;
 import io.github.ralfspoeth.xldr.spec.DataType;
 import io.github.ralfspoeth.xldr.spec.FieldSelectorSpec;
 import io.github.ralfspoeth.xldr.spec.InputSpec;
 import io.github.ralfspoeth.xldr.spec.RecordSelectorSpec;
+import io.github.ralfspoeth.xldr.spec.Selector;
 import org.jspecify.annotations.Nullable;
+
+// Greyson exports a Selector of its own, and so does the spec. Only one can wear
+// the bare name, and here it should be the one a field selector is written in:
+// what is wanted from Greyson's is the single method below.
+import static io.github.ralfspoeth.json.query.Selector.all;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -32,14 +37,16 @@ import static java.nio.charset.StandardCharsets.UTF_8;
  * <p>
  * The record selector addresses the records: {@code orders}, or
  * {@code data/orders} for a nested document. An empty selector is the document
- * itself. What it addresses is then fanned out with {@link Selector#all()}, so
- * an array yields one record per element, while a single object yields exactly
- * one record.
+ * itself. What it addresses is then fanned out with Greyson's {@code all()}
+ * selector, so an array yields one record per element, while a single object
+ * yields exactly one record.
  * <p>
  * A field selector is applied to the record, so {@code id} reads one of its
  * members, {@code customer/address/city} reaches into a nested object and
  * {@code tags/[0]} into a nested array. A member that is absent, or that holds
- * {@code null}, yields {@code null}.
+ * {@code null}, yields {@code null}. A field may also say {@code nth} instead,
+ * which is the n-th element of a record that is an array - and {@code null} for
+ * one that is an object, a JSON object having no n-th member to speak of.
  * <p>
  * Numbers keep their exact value: a JSON number is taken as a {@code BigDecimal}
  * and narrowed to the declared type rather than being reparsed from text, so a
@@ -70,8 +77,7 @@ class JsonInputAdapter implements InputAdapter {
     private static RecordDef recordDef(RecordSelectorSpec rs) {
         Map<String, FieldDef> fields = new HashMap<>();
         for (var fs : rs.fieldSelectors()) {
-            fields.putIfAbsent(fs.name(), new FieldDef(
-                    pointer(fs.requireText("a JSON field is addressed by a pointer")), typeOf(fs)));
+            fields.putIfAbsent(fs.name(), new FieldDef(pointerOf(fs), typeOf(fs)));
         }
         // selector(), not requireSelector(): for this adapter an absent one is
         // an answer rather than an omission - the document itself is the record
@@ -81,6 +87,28 @@ class JsonInputAdapter implements InputAdapter {
 
     private static DataType typeOf(FieldSelectorSpec fs) {
         return fs.dataType() == null ? DataType.TEXT : fs.dataType();
+    }
+
+    /**
+     * The pointer a field selector means.
+     * <p>
+     * A {@code selector} is one already. An {@code nth} is the n-th component of
+     * the record, which for JSON means the n-th element of an array - and this
+     * syntax already has {@code [i]} for that, so counting costs one step rather
+     * than a second way of reading. The step is 0-based where {@code nth} counts
+     * from one, which is the whole of the translation.
+     * <p>
+     * A record that turns out to be an <em>object</em> yields {@code null} for
+     * it, and rightly: a JSON object is unordered by specification, so there is no
+     * n-th member to speak of. That is a fact about the data rather than about the
+     * spec - the next record may be an array - which is why it is a null here and
+     * not a refusal when the adapter is built.
+     */
+    private static Pointer pointerOf(FieldSelectorSpec fs) {
+        return switch (fs.selector()) {
+            case Selector.Text(var path) -> pointer(path);
+            case Selector.Nth nth -> pointer("[" + nth.index() + "]");
+        };
     }
 
     /**
@@ -123,7 +151,7 @@ class JsonInputAdapter implements InputAdapter {
 
         // the elements of the selected array are the records, in document order
         Stream<Row> rows = record.path()
-                .select(Selector.all())
+                .select(all())
                 .apply(document)
                 .map(element -> row(element, record, selected));
         return new Result(fields, rows);

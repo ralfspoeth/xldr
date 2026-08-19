@@ -55,11 +55,11 @@ public class PipelineIT {
                 ],
                 "recordSelectors": [
                   { "name": "line",
-                    "discriminator": { "column": 1, "equals": "L" },
+                    "discriminator": { "nth": 1, "equals": "L" },
                     "fieldSelectors": [
-                      { "name": "2", "column": 2 },
-                      { "name": "3", "column": 3 },
-                      { "name": "4", "column": 4 }
+                      { "name": "2", "nth": 2 },
+                      { "name": "3", "nth": 3 },
+                      { "name": "4", "nth": 4 }
                   ] }
                 ]
               },

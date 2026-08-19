@@ -144,7 +144,7 @@ class CsvFileHandler implements InputAdapter {
         var discriminator = record.discriminator();
         var rows = discriminator == null
                 ? lines.lines().gather(records(linesRead))
-                : filtered(lines, linesRead, discriminator, index.require(discriminator.column()));
+                : filtered(lines, linesRead, discriminator, index.require(discriminator.at()));
         return new Result(fields, rows.map(values -> (Row) new Line(values, positions, types, formats)));
     }
 
@@ -167,10 +167,10 @@ class CsvFileHandler implements InputAdapter {
      * Which column each field sits in, resolved once for the file.
      * <p>
      * A field says where to read it with a {@code selector}, which names a column
-     * and so wants a header, or with a {@code column}, which counts them and works
-     * either way; its {@code name} is what a mapping calls it by, exactly as in
-     * every other adapter. The two are the same word often enough that a spec can
-     * leave them alike, but they need not be.
+     * and so wants a header, or with an {@code nth}, which counts the fields of
+     * the line and works either way. Its {@code name} is what a mapping calls it
+     * by, exactly as in every other adapter - the two are the same word often
+     * enough that a spec can leave them alike, but they need not be.
      * <p>
      * Where {@code fieldsFromHeader} is set, a name the spec does not declare is
      * looked for among the columns as it stands, as if the spec had declared it
@@ -227,20 +227,20 @@ class CsvFileHandler implements InputAdapter {
          * The column a selector means, or a refusal saying why the file has no
          * such thing.
          * <p>
-         * A {@link Selector.Column} is arithmetic and needs no header - which is
-         * the point of having it - though where there <em>is</em> a header it is
+         * A {@link Selector.Nth} is arithmetic and needs no header - which is the
+         * point of having it - though where there <em>is</em> a header it is
          * checked against its width, the header being what says how wide the file
          * is. A {@link Selector.Text} names a column, so it needs a header to name
          * one in.
          */
         int require(Selector selector) {
             return switch (selector) {
-                case Selector.Column(int index) -> {
-                    if (columns != null && index > columns.size()) {
-                        throw new IllegalArgumentException("column " + index + " of a file whose header"
-                                + " carries only " + columns.size() + ": " + shown());
+                case Selector.Nth nth -> {
+                    if (columns != null && nth.n() > columns.size()) {
+                        throw new IllegalArgumentException(nth + " of a line whose header carries only "
+                                + columns.size() + ": " + shown());
                     }
-                    yield index - 1;
+                    yield nth.index();
                 }
                 case Selector.Text(var name) -> named(name);
             };
@@ -250,7 +250,7 @@ class CsvFileHandler implements InputAdapter {
             if (columns == null) {
                 throw new IllegalArgumentException("selector '" + name + "' names a column, but this"
                         + " input is read without a header and so has no column names."
-                        + " Count the column instead: \"column\": <n>");
+                        + " Count the field instead: \"nth\": <n>");
             }
             int column = of.applyAsInt(name);
             if (column < 0) {

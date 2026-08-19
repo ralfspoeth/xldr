@@ -1,7 +1,9 @@
 package io.github.ralfspoeth.xldr.xml;
 
 import io.github.ralfspoeth.xldr.ia.*;
+import io.github.ralfspoeth.xldr.spec.FieldSelectorSpec;
 import io.github.ralfspoeth.xldr.spec.InputSpec;
+import io.github.ralfspoeth.xldr.spec.Selector;
 import org.jspecify.annotations.Nullable;
 import org.w3c.dom.Node;
 import org.xml.sax.SAXException;
@@ -54,7 +56,7 @@ class XmlFileHandler implements InputAdapter {
                 throw new IllegalArgumentException("duplicate record selector " + recordSpec.name());
             }
             for (var fieldSpec : recordSpec.fieldSelectors()) {
-                var expression = fieldSpec.requireText("an XML field is addressed by an XPath");
+                var expression = expressionOf(fieldSpec);
                 record.add(new XmlFieldSelector(
                         fieldSpec.name(),
                         expression,
@@ -119,6 +121,27 @@ class XmlFileHandler implements InputAdapter {
             xpath.setNamespaceContext(namespaces);
         }
         return xpath;
+    }
+
+    /**
+     * The XPath a field selector means.
+     * <p>
+     * A {@code selector} is one already. An {@code nth} is the n-th component of
+     * the record, which for an element is its n-th child element - and XPath
+     * spells that {@code *[n]}, so counting costs this adapter one expression
+     * rather than a second way of reading. The predicate is 1-based, as
+     * {@code nth} is, so the two numbers are the same number.
+     * <p>
+     * Nobody with an XPath to hand would reach for it; it is here because
+     * {@code nth} means the same thing in every format, and an exception for the
+     * one format where it is merely unfashionable would be an exception to
+     * remember.
+     */
+    private static String expressionOf(FieldSelectorSpec fieldSpec) {
+        return switch (fieldSpec.selector()) {
+            case Selector.Text(var xpath) -> xpath;
+            case Selector.Nth nth -> "*[" + nth.n() + "]";
+        };
     }
 
     private static javax.xml.xpath.XPathExpression compile(XPath xpath, String selector) {

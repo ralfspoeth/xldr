@@ -6,6 +6,56 @@ ways that break existing code and existing specs; those changes are listed here 
 The versions are the git tags `xldr-<version>`; the published artifacts carry the same version under the group
 `io.github.ralfspoeth.xldr`.
 
+## Unreleased
+
+The first change to the mapping-spec format since 0.23, so `mapping-spec-0.32` is published and `mapping-spec-0.23`
+is frozen. A selector used to be a string whose meaning came from somewhere else; now each of the two things it was
+doing has a name of its own.
+
+### Breaking
+
+- **A field selector says `selector` or `nth`, exactly one.** `selector` keeps its meaning - the adapter's own
+  syntax, an XPath, a character range, a JSON pointer, a cell reference, the name of a column. `nth` counts from one
+  and means **the n-th component of the record the record selector identified**: the n-th field of a separated line,
+  the n-th column of a spreadsheet record counted from its range, the n-th element of a JSON array, the n-th child
+  element. A fixed-length record has offsets and no components, so `nth` is refused there when the adapter is built.
+
+      "selector": "1"   with header absent   ->  "nth": 1
+
+  It used to be that `"3"` meant *the column named 3* where a CSV file had a header and *the third column* where it
+  had not, decided by a property several lines away - so a file whose header really did name a column `3` could not
+  be addressed at all. Two names rather than one attribute of two types, because XML cannot express the second: an
+  attribute is text, so a reader would have had to guess by shape, and the two formats would have quietly stopped
+  meaning the same thing. And **not** `column`, which a field mapping has always used for the database column it
+  writes to.
+
+  Where the *data* has no n-th component - a JSON record that is an object, a line with fewer fields - the value is
+  `null`, only the data being able to say so. Where the *format* has none, the spec is refused.
+
+- **A flat record selector says `discriminator`, not `selector`.** A record selector's `selector` was doing two
+  unrelated jobs: for XML, JSON and Excel it *locates* records, while for a flat file every line is a candidate and
+  the question is which to keep. The second now has its own element, and says both things the old form could not -
+  which component, and whether by value or by pattern:
+
+      "selector": "O"   ->  "discriminator": { "nth": 1, "equals": "O" }
+
+  Exactly one of `nth` and `selector` for where, exactly one of `equals` and `matches` for what. A pattern matches
+  the whole value and is compiled when the adapter is built. Naming the component is what makes a *headed* file with
+  a type column readable - the case that, a release ago, made the `validate` heuristic indefensible. A spec still
+  carrying a `selector` on a flat input is named and refused, since ignoring it would leave every line matching every
+  record selector.
+
+- **An Excel `nth` counts from the record's range, not from the sheet.** `selector: "3"` is column C wherever the
+  record sits; `nth: 3` is the third column of the range, so `data!C2:F10` makes it E. They agree only for a range
+  starting at column A. The digit form of `selector` is unchanged and kept for the specs that use it.
+
+### Changed
+
+- `mapping-spec-0.32` carries `nth`, `discriminator`, and the exactly-one-of rules in the JSON schema, XSD 1.0 being
+  unable to express them - so the JSON schema is now the stricter of the two by one more rule. Both schemas type
+  `nth` as an integer, which is the payoff of two names: `nth="first"` is refused by an editor before any adapter
+  sees it.
+
 ## 0.31
 
 Nothing about the mapping-spec format changed, so `mapping-spec-0.23` remains its schema and a spec that loaded under

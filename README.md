@@ -305,7 +305,8 @@ written for `fieldSelectors` costs a record every one of its fields, and no read
 unknown is exactly what it promises.
 
 A schema is published whenever the format changes, and is named after the release that changed it:
-`mapping-spec-0.23` describes the format from 0.23, `mapping-spec-0.21` that of 0.21 to 0.22,
+`mapping-spec-0.32` describes the format from 0.32, `mapping-spec-0.23` that of 0.23 to 0.31,
+`mapping-spec-0.21` that of 0.21 to 0.22,
 `mapping-spec-0.13` that of 0.13 to 0.20,
 `mapping-spec-0.10` that of 0.10 to 0.12, and so on. An
 earlier one stays where it is, so a spec pinned to it keeps validating.
@@ -319,7 +320,9 @@ them can be forgotten.
 
 What went with it was one check nothing else makes - a CSV record selector given a discriminator although the file
 has a header, which is legal and usually a mistake - and it went because *usually* is the problem: a headed file may
-perfectly well carry a type column whose values are what the discriminator selects on.
+perfectly well carry a type column whose values are what the discriminator selects on. In 0.32 that stopped being a
+grey area at all: a discriminator may name the component it tests, so a headed file with a type column is what the
+feature is *for*.
 
 Reading different file types is supported by providing a specific adapter per MIME type. There may be more than one
 adapter per MIME type on the module path; it's then however unspecified which one will be selected. A future enhancement
@@ -349,17 +352,49 @@ An input specification contains the following pieces of information:
 * the MIME type, which selects the adapter;
 * record selectors, each of which
     * is identified by a name,
-    * has a selector specification - optional, and left out where the whole file holds one kind of record, as in a CSV
-      with a header or a fixed-length file - and
+    * says which records are its own - a `selector` for an input that has to be *pointed at*, or a
+      [`discriminator`](#which-records-are-of-a-kind) for a flat one where every line is a candidate. Both are
+      optional, and neither is written where the whole file holds one kind of record, as in a CSV with a header or a
+      fixed-length file. No record selector carries both: no input is read both ways;
     * has related field selectors, which in turn
         * are identified by a name,
-        * a selector description,
+        * say where the value sits - a `selector` or an [`nth`](#where-a-value-sits), exactly one of the two,
         * and, optionally, a [data type](#field-types);
 * optionally [variables](#variables), values computed once per load;
 * optionally `properties`, the [settings of the adapter](#feed-configuration) the MIME type selects.
 
-The meaning of a selector is the adapter's: an XPath for XML, a column position or discriminator for CSV, a character
-range for a fixed-length file, a pointer for JSON, a cell range for a spreadsheet.
+### Where a value sits
+
+A field says it in one of two ways, and exactly one.
+
+A **`selector`** is the adapter's own syntax: an XPath for XML, a character range for a fixed-length file, a pointer
+for JSON, a cell reference for a spreadsheet, the name of a column for CSV.
+
+An **`nth`** counts, from one. It is *the n-th component of the record the record selector identified*, and each
+adapter only has to say what its records are made of:
+
+| input | the n-th component |
+|---|---|
+| CSV, TSV | the n-th field of the line |
+| Excel | the n-th column of the record's **range**, counted from the range's own first column |
+| JSON | the n-th element, where the record is an array |
+| XML | the n-th child element |
+| fixed length | nothing - a fixed-length record has offsets and no components, so `nth` there is refused |
+
+    { "name": "id", "selector": "id" }        <fieldSelector name="id" selector="id"/>
+    { "name": "id", "nth": 1 }                <fieldSelector name="id" nth="1"/>
+
+**Two names rather than one attribute of two types**, because the XML format cannot express the second: an attribute
+is text, `selector="3"` is the only thing writable, and a reader deciding by *looks like a number* would have kept
+exactly the ambiguity this removes - while a header that really does name a column `3` makes the guess wrong. Two
+names cost nothing and let both schemas type `nth` as an integer, so `nth="first"` is refused before any adapter sees
+it. And **not** `column`: a field *mapping* has always used that word for the database column it writes to, and the
+two would have sat a line apart meaning opposite ends of the same value.
+
+Where the *data* has no n-th component - a JSON record that turns out to be an object, which is unordered by
+specification, or a line with fewer fields than that - the value is `null`, because only the data could have said so
+and the next record may differ. Where the *format* has none, the spec is refused when the adapter is built, the spec
+alone having proved it wrong.
 
 Example:
 
@@ -771,7 +806,7 @@ Excel needs none of these: a spreadsheet carries typed cells, so a date or a num
 | Key                | Default          | Meaning                                                                                                                                                                                                                                                                                                                                          |
 |--------------------|------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `fieldSeparator`   | `,`              | Column separator. A tab-separated file says `"\t"`.                                                                                                                                                                                                                                                                                              |
-| `header`           | `present`        | Whether the first row names the columns: `present`/`true`, or `absent`/`false`. A field selector's `selector` is a column name where the header is present and a 1-based position where it is absent (`"1"` → first column); its `name` is what a mapping calls it by, as in every adapter. Anything else is refused rather than read as absent. |
+| `header`           | `present`        | Whether the first row names the columns: `present`/`true`, or `absent`/`false`. A field selector's `selector` names a column and so needs a header; its `nth` counts the fields and works either way, which is the only way to address a headerless file. Its `name` is what a mapping calls it by, as in every adapter. Anything else is refused rather than read as absent. |
 | `quote`            | `"`              | What opens and closes a quoted field. Empty switches quoting off, leaving quotes as ordinary characters.                                                                                                                                                                                                                                         |
 | `comment`          | none             | What begins a comment outside a quoted field. Unset, no character does.                                                                                                                                                                                                                                                                          |
 | `fieldsFromHeader` | `false`          | Whether a field the record selector does not declare is the column of that name. Needs a header.                                                                                                                                                                                                                                                 |
@@ -853,20 +888,37 @@ An **empty line** is nothing at all by default and the file goes on. With `empty
 instead, for a feed that writes a trailer - a checksum, a record count - after a blank line. A comment line never
 stops anything, whatever is left of it once the comment is taken off.
 
-For CSV a record selector's `selector` is a *first-column discriminator*. Headerless feeds often interleave several
-record types in one file, the first column naming the type and the columns that follow varying in number, meaning and
-type per type. A line belongs to a record selector only when its first column equals that selector's `selector`; an
-absent or empty `selector` matches every line, which is the single-record-type case and what a feed with a header
-almost always wants - giving one a `selector` there quietly loads nothing. Positions stay absolute, so `"1"`
-is the discriminator column itself and a type's payload fields usually start at `"2"`. Several record selectors thus
-partition one file, each mapping its own type to its own table:
+### Which records are of a kind
+
+A flat file has nowhere to point at - every line is a candidate - so a record selector for one carries a
+**`discriminator`** instead: which component of the line to look at, and what its value has to be.
 
     "recordSelectors": [
-        { "name": "orders", "selector": "O",
-          "fieldSelectors": [ {"name": "2", ...}, {"name": "3", ...}, {"name": "4", ...} ] },
-        { "name": "lines",  "selector": "L",
-          "fieldSelectors": [ {"name": "2", ...}, {"name": "3", ...}, {"name": "4", ...}, {"name": "5", ...} ] }
+        { "name": "orders",
+          "discriminator": { "nth": 1, "equals": "O" },
+          "fieldSelectors": [ {"name": "id", "nth": 2}, {"name": "date", "nth": 3} ] },
+        { "name": "lines",
+          "discriminator": { "nth": 1, "equals": "L" },
+          "fieldSelectors": [ {"name": "id", "nth": 2}, {"name": "sku", "nth": 3}, {"name": "qty", "nth": 4} ] }
     ]
+
+Headerless feeds often interleave several record types in one file, the first component naming the type and the ones
+that follow varying in number, meaning and type per type. Several record selectors thus partition one file, each
+mapping its own type to its own table. Counting stays absolute within the line, so component 1 is the discriminator
+itself and a type's payload usually starts at 2.
+
+Exactly one of `nth` and `selector` says **where** to look - so the discriminating component may be named where the
+file has a header, which is what makes a *headed* file with a type column readable:
+
+    "discriminator": { "selector": "kind", "equals": "O" }
+
+And exactly one of `equals` and `matches` says **what for**. A pattern matches the whole value, `matches` rather than
+`find`, so anchoring is not something to remember; it is compiled when the adapter is built, so one that will not
+compile is a spec that does not deploy rather than a load that dies half way through a file.
+
+A record selector with no discriminator takes every line, which is the single-record-type case and what a feed with a
+header almost always wants. A discriminating component that names nothing in the file is refused rather than left to
+match nothing for the length of a load.
 
 **XML** (`text/xml`, `application/xml`):
 
@@ -900,6 +952,8 @@ ends, since the next one need not begin there and a record has no end of its own
 A line that stops short of a field's bounds is not an error: the value is whatever the line still holds, and a field
 beyond the end of the line is null. Together with the stripping every type does, that makes a producer's trailing
 padding irrelevant. The adapter expects exactly one record selector; its `selector` is not used and is best left out.
+A field here says `selector` and never `nth`: a fixed-length record is a stretch of characters with declared bounds
+rather than components to count, so counting is refused when the adapter is built.
 
 **JSON** (`application/json`, `text/json`): no settings of its own, and deliberately no charset - JSON exchanged
 between systems is UTF-8 by definition (RFC 8259), so a document is always read as such.
@@ -919,6 +973,11 @@ applied to the record, so `id` reads one of its members, `customer/address/city`
         ] }
     ]
 
+A field may also say `nth` instead, which is the n-th element of a record that is an array - the same thing
+`[n-1]` says as a pointer, written the way every other adapter writes it. A record that turns out to be an *object*
+yields `null` for it: a JSON object is unordered by specification, so there is no n-th member to speak of, and since
+only the document can say so it is a null rather than a refusal.
+
 A member that is absent, or that holds `null`, is an absent value. JSON carries its own types, so a number arrives as
 a number - exactly, never rounded through a double - and the shared `dateFormat` and `numberFormat` settings apply
 only to values written as strings.
@@ -932,12 +991,18 @@ A record selector is a range, `[Sheet!]ref:ref`, one record per row:
 * `Sheet1!B2:C4` - the cell rectangle rows 2 to 4, columns B to C, of the named sheet. Use this to leave a header row
   out of the records.
 
-A field selector addresses a cell of the record, either absolutely by column - `A`, `B`, or a 1-based index, `3`
-being the same column as `C` - or relatively to the record's anchor, the current row at the first column of the
-range: `R-1C+1` is one row up and one column right, which is how a record reaches a heading or a neighbouring cell.
-Both offsets have to be written - `R0C+1`, not `C+1` - though the sign may be left off a positive one. A relative
-reference that lands off the sheet, `R-1C+0` on the first row, is an absent value rather than an error, so a field
-reaching for a heading that is not there loads a NULL.
+A field selector addresses a cell of the record. Its `selector` is either absolute by column - `A`, `B`, or a 1-based
+index, `3` being the same column as `C` - or relative to the record's anchor, the current row at the first column of
+the range: `R-1C+1` is one row up and one column right, which is how a record reaches a heading or a neighbouring
+cell. Both offsets have to be written - `R0C+1`, not `C+1` - though the sign may be left off a positive one. A
+relative reference that lands off the sheet, `R-1C+0` on the first row, is an absent value rather than an error, so a
+field reaching for a heading that is not there loads a NULL.
+
+**An `nth` counts from the range, not from the sheet**, which is where it parts company with the digit form of
+`selector`. For a range at `data!C2:D3`, `nth: 1` is column C and `selector: "1"` is column A; they agree only for a
+range starting at column A. `nth` is the one that means here what it means in every other adapter - the n-th
+component of the record the record selector identified, not the n-th of whatever contains it - and the digit form is
+kept for the specs that already use it.
 
 A spreadsheet carries typed cells, so no conversion settings apply: a date or a number arrives as one already, and a
 cell that holds text where the spec wants a number is converted from that text.

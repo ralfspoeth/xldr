@@ -33,16 +33,16 @@ public record FieldSelectorSpec(
      * of a column.
      *
      * @throws IllegalArgumentException naming the field and what it was given
-     *                                  instead, since a spec saying
-     *                                  {@code column} to an XPath adapter has
-     *                                  confused two formats
+     *                                  instead, since a spec counting components
+     *                                  of a record that has none has confused two
+     *                                  formats
      */
     public String requireText(String what) {
         return switch (selector) {
             case Selector.Text(var value) -> value;
-            case Selector.Column c -> throw new IllegalArgumentException(
-                    "field selector '" + name + "' is " + c + ", but " + what
-                            + " - use 'selector' rather than 'column'");
+            case Selector.Nth nth -> throw new IllegalArgumentException(
+                    "field selector '" + name + "' asks for " + nth + ", but " + what
+                            + " - use 'selector' rather than 'nth'");
         };
     }
 }

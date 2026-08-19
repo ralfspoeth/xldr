@@ -7,6 +7,7 @@ import io.github.ralfspoeth.xldr.spec.DataType;
 import io.github.ralfspoeth.xldr.spec.FieldSelectorSpec;
 import io.github.ralfspoeth.xldr.spec.InputSpec;
 import io.github.ralfspoeth.xldr.spec.RecordSelectorSpec;
+import io.github.ralfspoeth.xldr.spec.Selector;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
@@ -64,7 +65,7 @@ public class XmlAdapterTest {
         var wanted = Set.of("cola", "colb", "firstcow", "lastcow", "source", "missing");
 
         try (var in = getClass().getResourceAsStream("simple1.xml")) {
-            var result = adapter(spec).parse(in, "row", wanted);
+            var result = adapter(spec).parse(Objects.requireNonNull(in), "row", wanted);
 
             // fields keep the order of the spec, not of the requested set
             assertEquals(
@@ -89,6 +90,42 @@ public class XmlAdapterTest {
                     // a name with no selector at all
                     () -> assertNull(rows.get(0).get("nosuchfield"))
             );
+        }
+    }
+
+    /**
+     * A field may count instead of naming, and for an element the n-th component
+     * is its n-th child element. XPath spells that {@code *[n]} and its predicate
+     * counts from one exactly as {@code nth} does, so the translation is the
+     * identity and the two agree by construction rather than by arithmetic.
+     * <p>
+     * Nobody with an XPath to hand would write this; it exists because
+     * {@code nth} means the same thing in every format, and an exception here
+     * would be one more thing to remember.
+     */
+    @Test
+    public void countsChildElementsWhenAFieldSaysNth() throws IOException {
+        var spec = new InputSpec("text/xml", List.of(
+                new RecordSelectorSpec("row", "/simple1/row", List.of(
+                        new FieldSelectorSpec("first", new Selector.Nth(1), DataType.INTEGRAL),
+                        new FieldSelectorSpec("second", new Selector.Nth(2), DataType.INTEGRAL),
+                        // past the end of the children: absent, as a short line is
+                        new FieldSelectorSpec("third", new Selector.Nth(3), DataType.TEXT)
+                ))),
+                List.of(), Map.of());
+
+        try (var in = getClass().getResourceAsStream("simple1.xml")) {
+            var rows = adapter(spec).parse(in, "row", Set.of("first", "second", "third"))
+                    .rows().toList();
+
+            assertEquals(2, rows.size());
+            assertAll(
+                    () -> assertEquals(25L, rows.getFirst().get("first")),
+                    () -> assertEquals(33L, rows.getFirst().get("second")),
+                    () -> assertEquals(181L, rows.get(1).get("first")),
+                    () -> assertEquals(77L, rows.get(1).get("second")),
+                    // a row has two children, so the third is nothing at all
+                    () -> assertEquals("", rows.getFirst().get("third")));
         }
     }
 

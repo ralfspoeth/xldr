@@ -7,6 +7,7 @@ import io.github.ralfspoeth.xldr.spec.DataType;
 import io.github.ralfspoeth.xldr.spec.FieldSelectorSpec;
 import io.github.ralfspoeth.xldr.spec.InputSpec;
 import io.github.ralfspoeth.xldr.spec.RecordSelectorSpec;
+import io.github.ralfspoeth.xldr.spec.Selector;
 import org.junit.jupiter.api.Test;
 
 import java.io.ByteArrayInputStream;
@@ -244,6 +245,58 @@ public class JsonAdapterTest {
                 () -> assertEquals("new", row.get("id")),
                 () -> assertEquals("a", row.get("first"))
         );
+    }
+
+    /**
+     * A field may count instead of naming, and for JSON the n-th component of a
+     * record is the n-th element of an array. This syntax already had {@code [i]}
+     * for that, so counting is a step rather than a second way of reading - the
+     * only translation being that a step is 0-based where {@code nth} counts from
+     * one.
+     */
+    @Test
+    public void countsTheElementsOfAnArrayRecord() throws IOException {
+        var spec = spec("rows",
+                new FieldSelectorSpec("id", new Selector.Nth(1), DataType.TEXT),
+                new FieldSelectorSpec("name", new Selector.Nth(2), DataType.TEXT),
+                // past the end of this record's array
+                new FieldSelectorSpec("spare", new Selector.Nth(9), DataType.TEXT));
+
+        var rows = adapter(spec, Map.of()).parse(in("""
+                { "rows": [ ["1", "Alice"], ["2", "Bob"] ] }
+                """), "rec", Set.of("id", "name", "spare")).rows().toList();
+
+        assertEquals(2, rows.size());
+        assertAll(
+                () -> assertEquals("1", rows.getFirst().get("id")),
+                () -> assertEquals("Alice", rows.getFirst().get("name")),
+                () -> assertEquals("2", rows.get(1).get("id")),
+                () -> assertEquals("Bob", rows.get(1).get("name")),
+                () -> assertNull(rows.getFirst().get("spare")));
+    }
+
+    /**
+     * And a record that turns out to be an <em>object</em> has no n-th member to
+     * speak of, a JSON object being unordered by specification - so counting
+     * yields null rather than whichever member the parser happened to keep first.
+     * <p>
+     * A null and not a refusal, because this is a fact about the data: the same
+     * spec against the next document may meet arrays throughout, and only the
+     * document can say.
+     */
+    @Test
+    public void countingAnObjectRecordYieldsNull() throws IOException {
+        var spec = spec("rows",
+                new FieldSelectorSpec("counted", new Selector.Nth(1), DataType.TEXT),
+                new FieldSelectorSpec("named", "id", DataType.TEXT));
+
+        var row = adapter(spec, Map.of()).parse(in("""
+                { "rows": [ { "id": "1", "name": "Alice" } ] }
+                """), "rec", Set.of("counted", "named")).rows().toList().getFirst();
+
+        assertAll(
+                () -> assertNull(row.get("counted"), "an object has no first element"),
+                () -> assertEquals("1", row.get("named"), "and naming still works"));
     }
 
     @Test

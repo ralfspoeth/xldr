@@ -38,9 +38,8 @@ class ExcelAdapter implements InputAdapter {
      * created lookups that can, as far as any reader or checker can tell, come
      * back with nothing.
      * <p>
-     * Called {@code Mapped} rather than {@code Column} because
-     * {@link Selector.Column} is a different thing a few lines below, and one of
-     * the two would then have had to be read carefully to be told from the other.
+     * Called {@code Mapped} rather than {@code Column} because a column is what a
+     * field mapping writes <em>to</em>, and this is where one is read from.
      */
     private record Mapped(Field field, CellRef ref) {}
 
@@ -55,11 +54,12 @@ class ExcelAdapter implements InputAdapter {
             var columns = new LinkedHashMap<String, Mapped>();
             for (var fss : rss.fieldSelectors()) {
                 var type = fss.dataType() == null ? DataType.TEXT : fss.dataType();
-                // a sheet is one of the two formats that really has columns, so
-                // this adapter takes either way of naming one
+                // an absolute cell reference, or a count from the record's own
+                // first column - the two differ wherever a range does not start
+                // at column A, which is why both exist
                 var ref = switch (fss.selector()) {
                     case Selector.Text(var s) -> CellRef.parse(s);
-                    case Selector.Column(int index) -> CellRef.column(index);
+                    case Selector.Nth nth -> CellRef.nth(nth.n());
                 };
                 columns.put(fss.name(), new Mapped(new Field(fss.name(), type.clazz()), ref));
             }

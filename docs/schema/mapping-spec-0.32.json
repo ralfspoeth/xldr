@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://ralfspoeth.github.io/xldr/schema/mapping-spec-0.23.json",
+  "$id": "https://ralfspoeth.github.io/xldr/schema/mapping-spec-0.32.json",
   "title": "xldr mapping specification",
   "description": "How one input file is parsed and how its records map onto database tables. Add \"$schema\" to a spec.json to have an editor validate it; the reader ignores members it does not know.",
   "type": "object",
@@ -123,7 +123,7 @@
         },
         "selector": {
           "type": "string",
-          "description": "The adapter's own syntax: an XPath, a character range, a JSON pointer, a cell reference, or the name of a column. Exactly one of selector and column."
+          "description": "The adapter's own syntax: an XPath, a character range, a JSON pointer, a cell reference, or the name of a column. Exactly one of selector and nth."
         },
         "type": {
           "$ref": "#/$defs/dataType"
@@ -132,10 +132,10 @@
           "type": "string",
           "description": "A note for whoever reads the spec next. Ignored by the reader; declared here so that an annotation is allowed where any other unknown member is refused as a likely misspelling."
         },
-        "column": {
+        "nth": {
           "type": "integer",
           "minimum": 1,
-          "description": "A column, counted from one, for the formats that have columns - separated values and spreadsheets. Exactly one of selector and column."
+          "description": "The n-th component of the record, counted from one: the n-th field of a separated line, the n-th column of a spreadsheet record counted from its range, the n-th element of a JSON array, the n-th child element. Exactly one of selector and nth."
         }
       },
       "additionalProperties": false,
@@ -146,13 +146,13 @@
           ],
           "not": {
             "required": [
-              "column"
+              "nth"
             ]
           }
         },
         {
           "required": [
-            "column"
+            "nth"
           ],
           "not": {
             "required": [
@@ -401,16 +401,11 @@
     },
     "discriminator": {
       "type": "object",
-      "description": "Which records of a flat input are of this kind: where to look, and what the value has to be. Exactly one of column and selector, and exactly one of equals and matches.",
+      "description": "Which records of a flat input are of this kind: which component of the record to look at, and what its value has to be. Exactly one of nth and selector, and exactly one of equals and matches.",
       "properties": {
-        "column": {
-          "type": "integer",
-          "minimum": 1,
-          "description": "The discriminating column, counted from one."
-        },
         "selector": {
           "type": "string",
-          "description": "The discriminating column by name, which needs a header."
+          "description": "The component tested, by name, which needs a header."
         },
         "equals": {
           "type": [
@@ -427,12 +422,17 @@
         "comment": {
           "type": "string",
           "description": "A note for whoever reads the spec next."
+        },
+        "nth": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "The component tested, counted from one."
         }
       },
       "oneOf": [
         {
           "required": [
-            "column"
+            "nth"
           ],
           "not": {
             "required": [
@@ -446,7 +446,7 @@
           ],
           "not": {
             "required": [
-              "column"
+              "nth"
             ]
           }
         }

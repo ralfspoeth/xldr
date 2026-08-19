@@ -119,7 +119,7 @@ public class XmlMappingSpecReader implements MappingSpecReader {
      *
      * <pre>
      * &lt;recordSelector name="orders"&gt;
-     *     &lt;discriminator column="1" equals="O"/&gt;
+     *     &lt;discriminator nth="1" equals="O"/&gt;
      * &lt;/recordSelector&gt;
      * </pre>
      */
@@ -137,7 +137,7 @@ public class XmlMappingSpecReader implements MappingSpecReader {
 
     /**
      * A discriminator says where to look and what for: exactly one of
-     * {@code column} and {@code selector}, and exactly one of {@code equals} and
+     * {@code nth} and {@code selector}, and exactly one of {@code equals} and
      * {@code matches}.
      */
     private static @Nullable Discriminator discriminator(Element recordSelector) {
@@ -176,37 +176,37 @@ public class XmlMappingSpecReader implements MappingSpecReader {
 
     /**
      * Exactly one of {@code selector} - the adapter's own syntax - and
-     * {@code column}, a position counted from one.
+     * {@code nth}, a component counted from one.
      * <p>
      * This is the reason the format uses two names rather than one attribute of
      * two types: an XML attribute is text, so {@code selector="3"} could only ever
-     * have been told from a column by guessing at its shape, and a header naming a
+     * have been told from a count by guessing at its shape, and a header naming a
      * column {@code 3} would have made the guess wrong. Here the two are different
-     * attributes and the schema types the second, so {@code column="first"} does
-     * not reach this code at all.
+     * attributes and the schema types the second, so {@code nth="first"} does not
+     * reach this code at all.
      */
     private static Selector selector(Element element, String what) {
         var text = attributeValue("selector").apply(element);
-        var column = attributeValue("column").apply(element);
-        if (text.isPresent() && column.isPresent()) {
+        var nth = attributeValue("nth").apply(element);
+        if (text.isPresent() && nth.isPresent()) {
             throw new IllegalArgumentException(what + " has both selector='" + text.get()
-                    + "' and column='" + column.get() + "', which are two answers to one question");
+                    + "' and nth='" + nth.get() + "', which are two answers to one question");
         }
         if (text.isPresent()) {
             return new Selector.Text(text.get());
         }
-        if (column.isPresent()) {
-            return new Selector.Column(columnIndex(column.get(), what));
+        if (nth.isPresent()) {
+            return new Selector.Nth(wholeNumber(nth.get(), what));
         }
-        throw new IllegalArgumentException(what + " needs a selector or a column");
+        throw new IllegalArgumentException(what + " needs a selector or an nth");
     }
 
-    private static int columnIndex(String value, String what) {
+    private static int wholeNumber(String value, String what) {
         try {
             return Integer.parseInt(value.strip());
         } catch (NumberFormatException e) {
             throw new IllegalArgumentException(
-                    what + ": a column is a whole number counted from one, was '" + value + "'", e);
+                    what + ": nth is a whole number counted from one, was '" + value + "'", e);
         }
     }
 

@@ -57,14 +57,14 @@ public class CsvFileHandlerTest {
             ))
     );
 
-    /** a column, counted from one, which is the only way to address a headerless file */
+    /** the n-th field of the line, which is the only way to address a headerless file */
     private static FieldSelectorSpec at(int column) {
-        return new FieldSelectorSpec(String.valueOf(column), new Selector.Column(column), DataType.TEXT);
+        return new FieldSelectorSpec(String.valueOf(column), new Selector.Nth(column), DataType.TEXT);
     }
 
     /** the first column holds this, which is how the record types tell themselves apart */
     private static Discriminator firstColumnIs(String literal) {
-        return new Discriminator.Equals(new Selector.Column(1), literal);
+        return new Discriminator.Equals(new Selector.Nth(1), literal);
     }
 
     // no header: fields are addressed by column, and named after it here only
@@ -467,11 +467,11 @@ public class CsvFileHandlerTest {
      * kind of selector and was one only because of a property elsewhere.
      */
     @Test
-    public void aFieldCountsItsColumnWithoutAheader() throws IOException {
+    public void aFieldCountsItsComponentWithoutAheader() throws IOException {
         var spec = spec(Map.of("fieldSeparator", ";", "header", "absent"),
                 new RecordSelectorSpec("people", null, List.of(
-                        new FieldSelectorSpec("name", new Selector.Column(3), DataType.TEXT),
-                        new FieldSelectorSpec("id", new Selector.Column(1), DataType.INTEGRAL)
+                        new FieldSelectorSpec("name", new Selector.Nth(3), DataType.TEXT),
+                        new FieldSelectorSpec("id", new Selector.Nth(1), DataType.INTEGRAL)
                 )));
         var rows = rowsOf(spec, "1;;Hello;asdf\n", "name", "id");
 
@@ -682,10 +682,10 @@ public class CsvFileHandlerTest {
      * impossible.
      */
     @Test
-    public void aColumnCountsEvenWhereTheColumnsHaveNames() throws IOException {
+    public void countingWorksEvenWhereTheColumnsHaveNames() throws IOException {
         var counted = spec(Map.of(),
                 new RecordSelectorSpec("people", null, List.of(
-                        new FieldSelectorSpec("second", new Selector.Column(2), DataType.TEXT))));
+                        new FieldSelectorSpec("second", new Selector.Nth(2), DataType.TEXT))));
         var named = spec(Map.of(),
                 new RecordSelectorSpec("people", null, List.of(
                         new FieldSelectorSpec("second", "3", DataType.TEXT))));
@@ -714,7 +714,7 @@ public class CsvFileHandlerTest {
                 () -> rowsOf(spec, "1,Alice\n", "who"));
         assertAll(
                 () -> assertTrue(thrown.getMessage().contains("no column names"), thrown.getMessage()),
-                () -> assertTrue(thrown.getMessage().contains("\"column\""), thrown.getMessage()));
+                () -> assertTrue(thrown.getMessage().contains("\"nth\""), thrown.getMessage()));
     }
 
     /**
@@ -723,10 +723,10 @@ public class CsvFileHandlerTest {
      * is nothing to check against, and a short line is simply short.
      */
     @Test
-    public void aColumnBeyondTheHeaderIsRefused() {
+    public void countingPastTheHeaderIsRefused() {
         var spec = spec(Map.of(),
                 new RecordSelectorSpec("people", null, List.of(
-                        new FieldSelectorSpec("far", new Selector.Column(9), DataType.TEXT))));
+                        new FieldSelectorSpec("far", new Selector.Nth(9), DataType.TEXT))));
         var thrown = assertThrows(IllegalArgumentException.class,
                 () -> rowsOf(spec, "id,name\n1,Alice\n", "far"));
         assertTrue(thrown.getMessage().contains("only 2"), thrown.getMessage());
@@ -767,7 +767,7 @@ public class CsvFileHandlerTest {
         var spec = spec(Map.of("header", "absent"),
                 new RecordSelectorSpec("orders",
                         null,
-                        Discriminator.matching(new Selector.Column(1), "O[0-9]+"),
+                        Discriminator.matching(new Selector.Nth(1), "O[0-9]+"),
                         List.of(at(2))));
         var rows = rowsOf(spec, """
                 O1,first

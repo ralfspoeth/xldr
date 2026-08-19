@@ -57,7 +57,12 @@
         <th>XML</th>
     </tr>
     <tr>
-        <td>0.23 - 0.31 (current)</td>
+        <td>0.32 (current)</td>
+        <td><a href="schema/mapping-spec-0.32.json">mapping-spec-0.32.json</a></td>
+        <td><a href="schema/mapping-spec-0.32.xsd">mapping-spec-0.32.xsd</a></td>
+    </tr>
+    <tr>
+        <td>0.23 - 0.31</td>
         <td><a href="schema/mapping-spec-0.23.json">mapping-spec-0.23.json</a></td>
         <td><a href="schema/mapping-spec-0.23.xsd">mapping-spec-0.23.xsd</a></td>
     </tr>
@@ -99,9 +104,16 @@
     One consequence worth knowing. The JSON schema lists the known <code>mimeType</code> values, but as an
     <code>anyOf</code> beside a plain string, so the list is what an editor offers rather than what the schema
     permits - any type validates, and must, since an adapter may come from anywhere. The list therefore names the
-    adapters that existed when the schema was published and lags behind ones added since, which is why
-    <code>text/tab-separated-values</code>, added in 0.28, is not in <code>mapping-spec-0.23</code>. A spec using it
-    validates; autocompletion simply will not suggest it until the next release that changes the format.
+    adapters that existed when the schema was published and lags behind ones added since. That is how
+    <code>text/tab-separated-values</code> spent four releases missing from the list while validating perfectly well:
+    added to the adapter in 0.28, it reached the schema only in 0.32, the first release since to change the format at
+    all.
+</p>
+
+<p>
+    In 0.32 a field selector gained <code>nth</code>, a record selector gained <code>discriminator</code>, and the
+    two ways of saying where a value sits became two names rather than one attribute meaning different things in
+    different files. See the README for what each adapter counts.
 </p>
 
 <p>
@@ -142,7 +154,7 @@
 <p>In a JSON spec, as a member the reader does not recognise and therefore ignores:</p>
 
 <pre><code>{
-  "$schema": "https://ralfspoeth.github.io/xldr/schema/mapping-spec-0.23.json",
+  "$schema": "https://ralfspoeth.github.io/xldr/schema/mapping-spec-0.32.json",
   "input": {
     "mimeType": "text/csv",
     "properties": { "fieldSeparator": "," },
@@ -154,7 +166,7 @@
 <p>In an XML spec, as the schema location of a document that has no namespace of its own:</p>
 
 <pre><code>&lt;mappingSpec xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-             xsi:noNamespaceSchemaLocation="https://ralfspoeth.github.io/xldr/schema/mapping-spec-0.23.xsd"&gt;
+             xsi:noNamespaceSchemaLocation="https://ralfspoeth.github.io/xldr/schema/mapping-spec-0.32.xsd"&gt;
     &lt;input mimeType="text/xml"&gt;
         ...
     &lt;/input&gt;
@@ -230,8 +242,9 @@
         <td><code>header</code></td>
         <td><code>present</code></td>
         <td>Whether the first row names the columns: <code>present</code>/<code>true</code>, or
-            <code>absent</code>/<code>false</code>. A field selector is a column name where the header is present and
-            a 1-based position where it is absent. Anything else is refused rather than read as absent.</td>
+            <code>absent</code>/<code>false</code>. A field's <code>selector</code> names a column and so needs a
+            header; its <code>nth</code> counts the fields and works either way, which is the only way to address a
+            headerless file. Anything else is refused rather than read as absent.</td>
     </tr>
     <tr>
         <td><code>quote</code></td>
@@ -297,17 +310,19 @@
     <tr><th>Selector</th><th>Syntax</th><th>Example</th></tr>
     <tr>
         <td>record</td>
-        <td>A first-column discriminator: a line belongs to this selector when its first column equals the string.
-            Absent or empty matches every line, which is the single-record-type case a feed with a header almost
-            always wants - giving one a selector there quietly loads nothing.</td>
-        <td><code>O</code></td>
+        <td>A <code>discriminator</code> rather than a selector, a flat file having nowhere to point at: which
+            component to look at - <code>nth</code> or <code>selector</code>, exactly one - and what its value has to
+            be - <code>equals</code> or <code>matches</code>, exactly one. A record selector with none takes every
+            line, which is the single-record-type case a feed with a header almost always wants.</td>
+        <td><code>{ "nth": 1, "equals": "O" }</code></td>
     </tr>
     <tr>
         <td>field</td>
-        <td>A column name where the header is present, a 1-based position where it is absent. Positions stay absolute
-            in a discriminated file, so <code>1</code> is the discriminator column itself and a type's payload
-            usually starts at <code>2</code>.</td>
-        <td><code>amount</code>, <code>3</code></td>
+        <td><code>selector</code> names a column and needs a header; <code>nth</code> counts the fields of the line
+            from one and works either way. Counting stays absolute within the line, so in a discriminated file
+            component <code>1</code> is the discriminator itself and a type's payload usually starts at
+            <code>2</code>.</td>
+        <td><code>"selector": "amount"</code>, <code>"nth": 3</code></td>
     </tr>
 </table>
 

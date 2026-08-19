@@ -260,7 +260,7 @@ public class FixedLengthAdapterTest {
      */
     @Test
     public void rejectsAcolumn() {
-        var spec = spec(new FieldSelectorSpec("id", new Selector.Column(1), DataType.TEXT));
+        var spec = spec(new FieldSelectorSpec("id", new Selector.Nth(1), DataType.TEXT));
         var thrown = assertThrows(IllegalArgumentException.class, () -> adapter(spec, Map.of()));
         assertAll(
                 () -> assertTrue(thrown.getMessage().contains("character range"), thrown.getMessage()),
