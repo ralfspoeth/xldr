@@ -747,6 +747,11 @@ public class ServerIT {
      * field selector is a character range, and the second one omits its left
      * bound to continue where the first ended. The id is typed, so the padding
      * zeroes do not reach the database.
+     * <p>
+     * The record selector carries no {@code selector}: a fixed-length file has
+     * nowhere to point at, and one written here is refused when the adapter is
+     * built. This spec used to carry {@code "selector": "people"}, which the
+     * adapter read and discarded.
      */
     private static final String FIXED_LENGTH_SPEC = """
             {
@@ -756,7 +761,6 @@ public class ServerIT {
                 "recordSelectors": [
                   {
                     "name": "people",
-                    "selector": "people",
                     "fieldSelectors": [
                       {"name": "id", "selector": "0:3", "type": "INTEGRAL"},
                       {"name": "name", "selector": ":13", "type": "TEXT"}

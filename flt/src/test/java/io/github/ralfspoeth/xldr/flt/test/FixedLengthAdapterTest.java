@@ -28,8 +28,14 @@ public class FixedLengthAdapterTest {
 
     private static final String MIME = "text/plain";
 
+    /**
+     * No selector: a fixed-length file has nowhere to point at, and one written
+     * here is refused when the adapter is built. It used to say {@code "rec"},
+     * which the adapter ignored - the fixture and the format disagreed and
+     * nothing noticed.
+     */
     private static InputSpec spec(FieldSelectorSpec... fields) {
-        return new InputSpec(MIME, List.of(new RecordSelectorSpec("rec", "rec", List.of(fields))), List.of(), Map.of());
+        return new InputSpec(MIME, List.of(new RecordSelectorSpec("rec", null, List.of(fields))), List.of(), Map.of());
     }
 
     /**
@@ -265,5 +271,80 @@ public class FixedLengthAdapterTest {
         assertAll(
                 () -> assertTrue(thrown.getMessage().contains("character range"), thrown.getMessage()),
                 () -> assertTrue(thrown.getMessage().contains("'id'"), thrown.getMessage()));
+    }
+
+    // ---- what this format cannot mean ---------------------------------------
+
+    /**
+     * A record selector with a {@code selector} is refused, as it is by the CSV
+     * adapter. It was read and discarded here, so a spec transliterated from an
+     * XML or JSON one kept an XPath that had stopped meaning anything - and the
+     * fixture in this very class carried {@code "rec"} for exactly that reason.
+     */
+    @Test
+    public void rejectsAselectorOnTheRecordSelector() {
+        var spec = new InputSpec(MIME, List.of(new RecordSelectorSpec("rec", "//record",
+                List.of(new FieldSelectorSpec("id", "0:3", DataType.TEXT)))), List.of(), Map.of());
+        var thrown = assertThrows(IllegalArgumentException.class, () -> adapter(spec, Map.of()));
+        assertAll(
+                () -> assertTrue(thrown.getMessage().contains("no place to point at"), thrown.getMessage()),
+                () -> assertTrue(thrown.getMessage().contains("//record"), thrown.getMessage()));
+    }
+
+    /**
+     * Two record selectors are refused rather than merged.
+     * <p>
+     * They used to be flattened into one map of bounds keyed by field name, which
+     * did two silent things: a name declared in both kept whichever came last,
+     * and - worse - the rule that an omitted left bound continues from the
+     * previous field ran <em>across</em> the two. Here {@code b}'s {@code ":6"}
+     * would have continued from {@code a}'s {@code 0:3} rather than starting at
+     * zero, so the second layout came out anchored to the first one's fields. The
+     * load reported rows and the columns were shifted.
+     */
+    @Test
+    public void rejectsAsecondRecordSelector() {
+        var spec = new InputSpec(MIME, List.of(
+                new RecordSelectorSpec("a", null, List.of(new FieldSelectorSpec("f", "0:3", DataType.TEXT))),
+                new RecordSelectorSpec("b", null, List.of(new FieldSelectorSpec("g", ":6", DataType.TEXT)))
+        ), List.of(), Map.of());
+        var thrown = assertThrows(IllegalArgumentException.class, () -> adapter(spec, Map.of()));
+        assertAll(
+                () -> assertTrue(thrown.getMessage().contains("one record selector"), thrown.getMessage()),
+                // naming both, so the author knows which one to lose
+                () -> assertTrue(thrown.getMessage().contains("a"), thrown.getMessage()),
+                () -> assertTrue(thrown.getMessage().contains("b"), thrown.getMessage()));
+    }
+
+    /**
+     * A name the spec does not declare is refused, as it is by every other
+     * adapter. This one ignored the argument altogether and read the same fields
+     * whatever it was handed, so a mapping naming a record selector that did not
+     * exist loaded the whole file as though it did - and nothing else looks: no
+     * one checks a mapping's record selector against the input's.
+     */
+    @Test
+    public void rejectsAnUndeclaredRecordSelector() {
+        var adapter = adapter(spec(new FieldSelectorSpec("id", "0:3", DataType.TEXT)), Map.of());
+        var thrown = assertThrows(IllegalArgumentException.class,
+                () -> adapter.parse(in("001\n"), "nope", Set.of("id")));
+        assertAll(
+                () -> assertTrue(thrown.getMessage().contains("nope"), thrown.getMessage()),
+                () -> assertTrue(thrown.getMessage().contains("rec"), thrown.getMessage()));
+    }
+
+    /**
+     * And a field the record selector does not declare. This used to reach
+     * {@code FLRow.get}, where a map lookup returned null and the next line
+     * dereferenced it - so the answer to "what is column {@code qty}?" was a
+     * NullPointerException from inside a stream, rather than a sentence naming
+     * the field.
+     */
+    @Test
+    public void rejectsAnUndeclaredField() {
+        var adapter = adapter(spec(new FieldSelectorSpec("id", "0:3", DataType.TEXT)), Map.of());
+        var thrown = assertThrows(IllegalArgumentException.class,
+                () -> adapter.parse(in("001\n"), "rec", Set.of("id", "qty")).rows().toList());
+        assertTrue(thrown.getMessage().contains("qty"), thrown.getMessage());
     }
 }

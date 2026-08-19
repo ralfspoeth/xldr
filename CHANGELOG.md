@@ -6,7 +6,7 @@ ways that break existing code and existing specs; those changes are listed here 
 The versions are the git tags `xldr-<version>`; the published artifacts carry the same version under the group
 `io.github.ralfspoeth.xldr`.
 
-## Unreleased
+## 0.32
 
 The first change to the mapping-spec format since 0.23, so `mapping-spec-0.32` is published and `mapping-spec-0.23`
 is frozen. A selector used to be a string whose meaning came from somewhere else; now each of the two things it was
@@ -58,6 +58,21 @@ doing has a name of its own.
   `recordSelector` was a green load of nothing on a CSV feed and a refusal on any other input. Nothing cross-checks
   a mapping against the record selectors the input declares, which makes the adapter the place the two names first
   meet.
+
+- **The fixed-length adapter refuses four things it used to ignore**, which is the same consistency reached from
+  further back - it did not look at the record selector at all.
+
+  A name it does not declare, as above. A `selector` on the record selector, as the CSV adapter does; specs written
+  before the discriminator existed carry one, and this adapter read and discarded it. A field the record selector
+  does not declare, which used to reach a map lookup and come back as a `NullPointerException` from inside a stream.
+  And a **second record selector**: the two used to be flattened into one layout, so a field name declared in both
+  kept whichever the stream yielded last, and the rule that an omitted left bound continues from the previous field
+  ran *across* the two - a layout written as a list of end positions came out anchored to a field of the other record
+  selector, silently, with the load reporting rows the whole time.
+
+  Every line of a fixed-length file has the same layout, so there is nothing for a second record selector to select.
+  A file that interleaves record types needs a `discriminator`, which this adapter does not have yet; the README no
+  longer implies otherwise.
 
 ### Changed
 

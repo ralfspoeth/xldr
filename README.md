@@ -70,7 +70,7 @@ fix their versions in one place:
             <dependency>
                 <groupId>io.github.ralfspoeth.xldr</groupId>
                 <artifactId>bom</artifactId>
-                <version>0.31</version>
+                <version>0.32</version>
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>
@@ -274,12 +274,12 @@ Both formats have a published schema, so an editor can check a spec before it ev
 only reports a broken spec in its log, by leaving the feed inactive. Point at the schema from the spec itself:
 
     {
-      "$schema": "https://ralfspoeth.github.io/xldr/schema/mapping-spec-0.23.json",
+      "$schema": "https://ralfspoeth.github.io/xldr/schema/mapping-spec-0.32.json",
       "input": { ... }
     }
 
     <mappingSpec xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-                 xsi:noNamespaceSchemaLocation="https://ralfspoeth.github.io/xldr/schema/mapping-spec-0.23.xsd">
+                 xsi:noNamespaceSchemaLocation="https://ralfspoeth.github.io/xldr/schema/mapping-spec-0.32.xsd">
 
 Both are ignored by the readers - `$schema` is just another unrecognised member, and `xsi:` attributes carry no
 meaning for a spec that has no namespace of its own. IntelliJ and VS Code both validate and autocomplete from them.
@@ -920,6 +920,12 @@ A record selector with no discriminator takes every line, which is the single-re
 header almost always wants. A discriminating component that names nothing in the file is refused rather than left to
 match nothing for the length of a load.
 
+**Separated files only, for now.** A fixed-length file is flat too and has the same need - a record type in columns 1
+to 2 is the classic layout - but the fixed-length adapter has no discriminator yet, so it takes exactly one record
+selector and reads every line as one kind of record. A second one is refused rather than merged, which is what it
+used to be: the fields of both went into one layout, and the rule that an omitted left bound continues from the
+previous field ran across the two, so the second record type came out anchored to the first one's fields.
+
 **XML** (`text/xml`, `application/xml`):
 
 | Key           | Default | Meaning                                                                                                                                                                                                           |
@@ -951,9 +957,14 @@ ends, since the next one need not begin there and a record has no end of its own
 
 A line that stops short of a field's bounds is not an error: the value is whatever the line still holds, and a field
 beyond the end of the line is null. Together with the stripping every type does, that makes a producer's trailing
-padding irrelevant. The adapter expects exactly one record selector; its `selector` is not used and is best left out.
-A field here says `selector` and never `nth`: a fixed-length record is a stretch of characters with declared bounds
-rather than components to count, so counting is refused when the adapter is built.
+padding irrelevant.
+
+The adapter takes exactly one record selector, and a second is refused: every line of the file has the same layout,
+so there is nothing to tell one kind from another - that is what a [`discriminator`](#which-records-are-of-a-kind)
+would be for, and this adapter has none yet. That one record selector carries no `selector` either, a fixed-length
+file having nowhere to point at, and one written there is refused rather than ignored. A field says `selector` and
+never `nth`: a fixed-length record is a stretch of characters with declared bounds rather than components to count,
+so counting too is refused when the adapter is built.
 
 **JSON** (`application/json`, `text/json`): no settings of its own, and deliberately no charset - JSON exchanged
 between systems is UTF-8 by definition (RFC 8259), so a document is always read as such.

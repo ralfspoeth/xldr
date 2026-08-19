@@ -6,6 +6,7 @@ import io.github.ralfspoeth.xldr.ia.InputAdapter;
 import io.github.ralfspoeth.xldr.ia.InputAdapterFactory;
 import io.github.ralfspoeth.xldr.spec.DataType;
 import io.github.ralfspoeth.xldr.spec.InputSpec;
+import io.github.ralfspoeth.xldr.spec.RecordSelectorSpec;
 import org.jspecify.annotations.Nullable;
 
 import java.nio.charset.Charset;
@@ -44,6 +45,10 @@ public class FixedLengthInputAdapterFactory implements InputAdapterFactory {
     @Override
     public InputAdapter createInputAdapter(InputSpec spec) {
         var props = spec.properties();
+        var record = only(spec);
+        // nothing to point at in a fixed-length file, so a selector here is a
+        // spec written for a format that has records to locate
+        record.refuseSelector("a fixed-length file has no place to point at");
         return new FixedLengthInputAdapter(
                 Integer.parseInt(props.getOrDefault("linesPerRecord", "1")),
                 // UTF-8 rather than Charset.defaultCharset(), as in the CSV
@@ -51,9 +56,9 @@ public class FixedLengthInputAdapterFactory implements InputAdapterFactory {
                 // -Dfile.encoding the JVM was started with
                 ofNullable(props.get("charset")).map(Charset::forName).orElse(StandardCharsets.UTF_8),
                 Formats.of(props),
-                spec.recordSelectors()
+                record.name(),
+                record.fieldSelectors()
                         .stream()
-                        .flatMap(rs -> rs.fieldSelectors().stream())
                         .map(fs -> Map.entry(fs.name(), parse(
                                 fs.requireText("a fixed-length field is a character range, left:right"),
                                 fs.dataType())))
@@ -65,6 +70,40 @@ public class FixedLengthInputAdapterFactory implements InputAdapterFactory {
                                                 checkLeft(left, e.getValue())
                                         ))))
                         .collect(toMap(Map.Entry::getKey, Map.Entry::getValue)));
+    }
+
+    /**
+     * The one record selector a fixed-length input has.
+     * <p>
+     * Every line of such a file has the same layout, so there is nothing for a
+     * second record selector to select and no way to tell one kind of line from
+     * another - that is what a {@code discriminator} would be for, and this
+     * adapter has none yet. A second one used to be merged into the first: the
+     * fields of both went into one map keyed by name, so two selectors sharing a
+     * field name kept whichever the stream happened to yield last, and the rule
+     * that an omitted left bound continues from the previous field ran <em>across
+     * the two</em> in that same order. A layout written as a list of end positions
+     * therefore came out anchored to a field of the other record selector. None of
+     * that announced itself; the load reported rows and the columns were shifted.
+     *
+     * @throws IllegalArgumentException naming both, so that a spec written for
+     *                                  another format is told which of the two it
+     *                                  has to lose
+     */
+    private static RecordSelectorSpec only(InputSpec spec) {
+        var selectors = spec.recordSelectors();
+        if (selectors.size() == 1) {
+            return selectors.iterator().next();
+        }
+        if (selectors.isEmpty()) {
+            throw new IllegalArgumentException(
+                    "a fixed-length input needs a record selector to say where its fields sit");
+        }
+        throw new IllegalArgumentException("a fixed-length input has one record selector and this"
+                + " one declares " + selectors.size() + ": "
+                + selectors.stream().map(RecordSelectorSpec::name).toList()
+                + ". Every line of the file has the same layout, so there is nothing to tell them"
+                + " apart by; a file that mixes record types needs an adapter that can discriminate");
     }
 
     /**
