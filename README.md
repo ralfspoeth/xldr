@@ -377,7 +377,8 @@ An input specification contains the following pieces of information:
       optional, and neither is written where the whole file holds one kind of record, as in a CSV with a header or a
       fixed-length file. No record selector carries both: no input is read both ways;
     * has related field selectors, which in turn
-        * are identified by a name,
+        * are identified by a name, distinct within that record selector - a mapping refers to a field by this
+          name, so two of them cannot share it and a spec that repeats one is refused,
         * say where the value sits - a `selector` or an [`nth`](#where-a-value-sits), exactly one of the two,
         * and, optionally, a [data type](#field-types);
 * optionally [variables](#variables), values computed once per load;
@@ -543,6 +544,54 @@ tables untouched and the file can be corrected and retried.
 Which database is fed, and how it is pooled, is configured on the application rather than in the mapping - see
 [Configuration](#configuration). No connection information lives in the spec, so the same mapping can be promoted from
 test to production unchanged.
+
+### Loading twice
+
+**XLDR inserts. It does not merge, and this is deliberate.** A mapping has no notion of a natural key, so a file
+loaded twice is loaded twice. What the loader guarantees is narrower and more useful than it first appears, and
+what it leaves alone is left alone on purpose.
+
+**What it guarantees.** A load is one transaction over the whole file. A failed load leaves the tables exactly as
+they were, so *retrying a file that failed* is always safe - which is the idempotency that matters operationally,
+because that is the case that actually happens at three in the morning. What is not safe is loading a file that
+already succeeded.
+
+**Why it stops there.** The target is a **landing zone**, and what happens next is the application's business:
+either it knows how to ingest what has landed, or a stored procedure merges or replaces it. That boundary is where
+it belongs, because merging needs things a mapping spec does not and should not know - which columns form the
+natural key, whether a row is versioned or overwritten, what a soft delete looks like, whether a late correction
+supersedes an earlier record or sits beside it. Expressing that in a spec means the format growing a key language,
+then a conditional, then an ordering; and a configuration format that grows those has become a programming language
+with none of the tools. The database already has one, and it is better at this.
+
+So the division is: XLDR is responsible for the contents of the file arriving faithfully, completely and in one
+transaction. Everything about what those rows *mean* against what is already there belongs downstream.
+
+**What a landing table wants.** Three columns make the downstream job possible, and this is where the sources on a
+field mapping stop being decorative:
+
+    {"expr": "${xldr.filename}", "column": "loaded_from"},
+    {"var": "loadedAt",          "column": "loaded_at"},
+    {"var": "batch",             "column": "batch_id"}
+
+The filename identifies the delivery, the timestamp orders two deliveries of the same name, and a batch number -
+a [variable](#variables), so it is drawn once per load rather than once per row - groups the rows a merge should
+consider together. Without at least the first, a landing table cannot answer "where did this row come from", and
+neither can anyone reconciling it.
+
+**Refusing a redelivery, if you want that.** Since a load is one transaction and a record mapping may cap itself
+with `limit`, the same record selector can feed a control table exactly once per file:
+
+    {"recordSelector": "customers", "table": "load_control", "limit": 1, "fieldMapping": [
+        {"expr": "${xldr.filename}", "column": "filename"},
+        {"var": "loadedAt",          "column": "loaded_at"}
+    ]}
+
+Put a unique constraint on `load_control.filename` and a second delivery of the same name fails on that insert,
+which rolls the whole load back and sends the file to `hospital/` with the constraint violation beside it. A
+duplicate load becomes a refusal rather than duplicated rows - the same trade this toolkit makes everywhere else,
+and available without any support from the spec format. Whether a repeated filename really means a repeated
+delivery is a question about your producer, which is why this is a pattern here rather than a feature.
 
 ### The Record Mapping Specification
 
@@ -940,11 +989,19 @@ A record selector with no discriminator takes every line, which is the single-re
 header almost always wants. A discriminating component that names nothing in the file is refused rather than left to
 match nothing for the length of a load.
 
-**Separated files only, for now.** A fixed-length file is flat too and has the same need - a record type in columns 1
-to 2 is the classic layout - but the fixed-length adapter has no discriminator yet, so it takes exactly one record
-selector and reads every line as one kind of record. A second one is refused rather than merged, which is what it
-used to be: the fields of both went into one layout, and the rule that an omitted left bound continues from the
-previous field ran across the two, so the second record type came out anchored to the first one's fields.
+**A fixed-length file discriminates on a character range**, that being what it has instead of components. The
+record type in columns 1 to 2 is the classic layout, and it is written the way everything else about a fixed-length
+field is written:
+
+    { "name": "orders", "discriminator": { "selector": "0:2", "equals": "OR" },
+      "fieldSelectors": [ {"name": "id", "selector": "2:6"}, ... ] }
+
+`nth` is refused there, as it is on a field selector and for the same reason. So is a range that omits its left
+bound: a field may continue where the previous one ended, and a discriminator has no previous field.
+
+Each record selector carries its own layout, and that is load-bearing rather than tidy. A field may omit its left
+bound and continue from the field before, which makes a layout a running total; when the record selectors shared
+one, the total ran *across* them and the second record type came out anchored to the first one's last field.
 
 **XML** (`text/xml`, `application/xml`):
 

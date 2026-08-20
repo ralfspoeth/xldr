@@ -1,23 +1,24 @@
 package io.github.ralfspoeth.xldr.flt;
 
 import io.github.ralfspoeth.xldr.flt.FixedLengthInputAdapter.Bounds;
+import io.github.ralfspoeth.xldr.flt.FixedLengthInputAdapter.Layout;
 import io.github.ralfspoeth.xldr.ia.Formats;
 import io.github.ralfspoeth.xldr.ia.InputAdapter;
 import io.github.ralfspoeth.xldr.ia.InputAdapterFactory;
 import io.github.ralfspoeth.xldr.spec.DataType;
+import io.github.ralfspoeth.xldr.spec.Discriminator;
 import io.github.ralfspoeth.xldr.spec.InputSpec;
 import io.github.ralfspoeth.xldr.spec.RecordSelectorSpec;
+import io.github.ralfspoeth.xldr.spec.Selector;
 import org.jspecify.annotations.Nullable;
 
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
+import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Pattern;
-import java.util.stream.Gatherer;
 
 import static java.util.Optional.ofNullable;
-import static java.util.stream.Collectors.toMap;
 
 /**
  * Creates fixed-length adapters.
@@ -45,10 +46,6 @@ public class FixedLengthInputAdapterFactory implements InputAdapterFactory {
     @Override
     public InputAdapter createInputAdapter(InputSpec spec) {
         var props = spec.properties();
-        var record = only(spec);
-        // nothing to point at in a fixed-length file, so a selector here is a
-        // spec written for a format that has records to locate
-        record.refuseSelector("a fixed-length file has no place to point at");
         return new FixedLengthInputAdapter(
                 Integer.parseInt(props.getOrDefault("linesPerRecord", "1")),
                 // UTF-8 rather than Charset.defaultCharset(), as in the CSV
@@ -56,58 +53,92 @@ public class FixedLengthInputAdapterFactory implements InputAdapterFactory {
                 // -Dfile.encoding the JVM was started with
                 ofNullable(props.get("charset")).map(Charset::forName).orElse(StandardCharsets.UTF_8),
                 Formats.of(props),
-                record.name(),
-                record.fieldSelectors()
-                        .stream()
-                        .map(fs -> Map.entry(fs.name(), parse(
-                                fs.requireText("a fixed-length field is a character range, left:right"),
-                                fs.dataType())))
-                        .gather(Gatherer.<Map.Entry<String, Bounds>, AtomicInteger, Map.Entry<String, Bounds>>ofSequential(
-                                AtomicInteger::new,
-                                (left, e, ds) ->
-                                        ds.push(Map.entry(
-                                                e.getKey(),
-                                                checkLeft(left, e.getValue())
-                                        ))))
-                        .collect(toMap(Map.Entry::getKey, Map.Entry::getValue)));
+                layouts(spec)
+        );
     }
 
     /**
-     * The one record selector a fixed-length input has.
+     * One layout per record selector, each with its own bounds.
      * <p>
-     * Every line of such a file has the same layout, so there is nothing for a
-     * second record selector to select and no way to tell one kind of line from
-     * another - that is what a {@code discriminator} would be for, and this
-     * adapter has none yet. A second one used to be merged into the first: the
-     * fields of both went into one map keyed by name, so two selectors sharing a
-     * field name kept whichever the stream happened to yield last, and the rule
-     * that an omitted left bound continues from the previous field ran <em>across
-     * the two</em> in that same order. A layout written as a list of end positions
-     * therefore came out anchored to a field of the other record selector. None of
-     * that announced itself; the load reported rows and the columns were shifted.
+     * Own bounds, and not one map shared: a field may omit its left bound and
+     * continue where the previous one ended, so a layout is a running total.
+     * Sharing one used to mean the second record selector's first field
+     * continuing from the first selector's last, which shifted every column after
+     * it - silently, with the load reporting rows the whole time.
      *
-     * @throws IllegalArgumentException naming both, so that a spec written for
-     *                                  another format is told which of the two it
-     *                                  has to lose
+     * @throws IllegalArgumentException where the spec declares nothing to read,
+     *                                  or names a record selector twice
      */
-    private static RecordSelectorSpec only(InputSpec spec) {
-        var selectors = spec.recordSelectors();
-        if (selectors.size() == 1) {
-            return selectors.iterator().next();
-        }
-        if (selectors.isEmpty()) {
+    private static Map<String, Layout> layouts(InputSpec spec) {
+        if (spec.recordSelectors().isEmpty()) {
             throw new IllegalArgumentException(
                     "a fixed-length input needs a record selector to say where its fields sit");
         }
-        throw new IllegalArgumentException("a fixed-length input has one record selector and this"
-                + " one declares " + selectors.size() + ": "
-                + selectors.stream().map(RecordSelectorSpec::name).toList()
-                + ". Every line of the file has the same layout, so there is nothing to tell them"
-                + " apart by; a file that mixes record types needs an adapter that can discriminate");
+        Map<String, Layout> layouts = new LinkedHashMap<>();
+        for (var rs : spec.recordSelectors()) {
+            // nothing to point at in a fixed-length file, so a selector here is a
+            // spec written for a format that has records to locate
+            rs.refuseSelector("a fixed-length file has no place to point at");
+            if (layouts.put(rs.name(), layout(rs)) != null) {
+                throw new IllegalArgumentException("two record selectors are named '" + rs.name()
+                        + "'; a mapping names one of them and could not say which");
+            }
+        }
+        return layouts;
+    }
+
+    private static Layout layout(RecordSelectorSpec rs) {
+        Map<String, Bounds> bounds = new LinkedHashMap<>();
+        // the end of the field before, which is where one that omits its left
+        // bound begins. Per record selector, so it cannot run across two
+        int previousRight = 0;
+        for (var fs : rs.fieldSelectors()) {
+            var parsed = parse(fs.requireText("a fixed-length field is a character range, left:right"),
+                    fs.dataType());
+            var field = parsed.left() < 0 ? new Bounds(previousRight, parsed.right(), parsed.type()) : parsed;
+            // no duplicate to worry about: RecordSelectorSpec refuses two field
+            // selectors of one name, which matters more here than anywhere else -
+            // a repeat would not merely shadow the earlier one, it would move
+            // every field after it, the layout being a running total
+            bounds.put(fs.name(), field);
+            previousRight = field.right();
+        }
+        var discriminator = rs.discriminator();
+        return new Layout(bounds, discriminator,
+                discriminator == null ? null : at(discriminator, rs.name()));
     }
 
     /**
-     * The type is optional in a spec; an absent one reads the field as text.
+     * Where a discriminator looks, as a character range.
+     * <p>
+     * A {@link Selector.Nth} is refused for the same reason a field selector's is:
+     * a fixed-length record is a stretch of characters with declared bounds rather
+     * than components to count, so there is no n-th anything to test. And the left
+     * bound may not be omitted here - a discriminator has no previous field to
+     * continue from, so {@code ":2"} would be asking to start where nothing ended.
+     */
+    private static Bounds at(Discriminator discriminator, String recordSelector) {
+        return switch (discriminator.at()) {
+            case Selector.Text(var range) -> {
+                var bounds = parse(range, DataType.TEXT);
+                if (bounds.left() < 0) {
+                    throw new IllegalArgumentException("record selector '" + recordSelector
+                            + "' discriminates on '" + range + "', but a discriminator has no previous"
+                            + " field to continue from. Say both bounds: \"0:2\"");
+                }
+                yield bounds;
+            }
+            case Selector.Nth nth -> throw new IllegalArgumentException("record selector '"
+                    + recordSelector + "' discriminates on " + nth + ", but a fixed-length record has"
+                    + " offsets and no components to count. Say the character range the type code sits"
+                    + " in instead: { \"selector\": \"0:2\", \"equals\": ... }");
+        };
+    }
+
+    /**
+     * The type is optional in a spec; an absent one reads the field as text. A
+     * left bound of {@code -1} means it was omitted, which the caller resolves
+     * against whatever came before.
      */
     private static Bounds parse(String s, @Nullable DataType dt) {
         var m = BOUNDS.matcher(s);
@@ -116,14 +147,6 @@ public class FixedLengthInputAdapterFactory implements InputAdapterFactory {
                     Integer.parseInt(m.group(2)),
                     dt == null ? DataType.TEXT : dt);
         } else throw new IllegalArgumentException(s + " doesn't match the pattern " + BOUNDS.pattern());
-    }
-
-    private static Bounds checkLeft(AtomicInteger oldLeft, Bounds parsedBounds) {
-        int old = oldLeft.getAndSet(parsedBounds.right());
-        return parsedBounds.left() < 0 ?
-                new Bounds(old, parsedBounds.right(), parsedBounds.type()) :
-                parsedBounds;
-
     }
 
     private static final Pattern BOUNDS = Pattern.compile("(\\d*):(\\d+)");

@@ -4,6 +4,7 @@ import io.github.ralfspoeth.xldr.ia.Field;
 import io.github.ralfspoeth.xldr.ia.InputAdapter;
 import io.github.ralfspoeth.xldr.ia.InputAdapterFactory;
 import io.github.ralfspoeth.xldr.spec.DataType;
+import io.github.ralfspoeth.xldr.spec.Discriminator;
 import io.github.ralfspoeth.xldr.spec.FieldSelectorSpec;
 import io.github.ralfspoeth.xldr.spec.InputSpec;
 import io.github.ralfspoeth.xldr.spec.RecordSelectorSpec;
@@ -292,28 +293,135 @@ public class FixedLengthAdapterTest {
     }
 
     /**
-     * Two record selectors are refused rather than merged.
+     * Two record selectors, each keeping its own lines, as the CSV adapter does.
      * <p>
-     * They used to be flattened into one map of bounds keyed by field name, which
-     * did two silent things: a name declared in both kept whichever came last,
-     * and - worse - the rule that an omitted left bound continues from the
-     * previous field ran <em>across</em> the two. Here {@code b}'s {@code ":6"}
-     * would have continued from {@code a}'s {@code 0:3} rather than starting at
-     * zero, so the second layout came out anchored to the first one's fields. The
-     * load reported rows and the columns were shifted.
+     * The classic fixed-length layout: a type code in the first columns, and a
+     * different arrangement of characters after it per type. Before this the
+     * adapter took one record selector and read every line as one kind, so a file
+     * like this could not be loaded at all.
      */
     @Test
-    public void rejectsAsecondRecordSelector() {
+    public void twoRecordSelectorsPartitionTheFile() throws IOException {
         var spec = new InputSpec(MIME, List.of(
-                new RecordSelectorSpec("a", null, List.of(new FieldSelectorSpec("f", "0:3", DataType.TEXT))),
-                new RecordSelectorSpec("b", null, List.of(new FieldSelectorSpec("g", ":6", DataType.TEXT)))
+                new RecordSelectorSpec("orders", null,
+                        new Discriminator.Equals(new Selector.Text("0:2"), "OR"),
+                        List.of(new FieldSelectorSpec("id", "2:6", DataType.TEXT),
+                                new FieldSelectorSpec("cust", "6:11", DataType.TEXT))),
+                new RecordSelectorSpec("lines", null,
+                        new Discriminator.Equals(new Selector.Text("0:2"), "LI"),
+                        List.of(new FieldSelectorSpec("order", "2:6", DataType.TEXT),
+                                new FieldSelectorSpec("sku", "6:14", DataType.TEXT),
+                                new FieldSelectorSpec("qty", "14:17", DataType.INTEGRAL)))
         ), List.of(), Map.of());
+
+        // \s at the end keeps the padding: a text block strips trailing whitespace
+        // before it interprets escapes, so \s is still two characters at that point
+        // and shields what is left of it. A real fixed-length file is padded, and a
+        // fixture that is not would not exercise the stripping.
+        var file = """
+                OR1001Alice     \s
+                LI1001widget  005
+                LI1001sprocket002
+                OR1002Bob       \s
+                LI1002flange  001
+                """;
+
+        var orders = adapter(spec, Map.of()).parse(in(file), "orders", Set.of("id", "cust"))
+                .rows().toList();
+        var lines = adapter(spec, Map.of()).parse(in(file), "lines", Set.of("order", "sku", "qty"))
+                .rows().toList();
+
+        assertAll(
+                () -> assertEquals(2, orders.size(), "two OR lines"),
+                () -> assertEquals("1001", orders.getFirst().get("id")),
+                () -> assertEquals("Alice", orders.getFirst().get("cust")),
+                () -> assertEquals("Bob", orders.get(1).get("cust"), "padding is stripped from the value"),
+                () -> assertEquals(3, lines.size(), "three LI lines"),
+                () -> assertEquals("widget", lines.getFirst().get("sku")),
+                () -> assertEquals(5L, lines.getFirst().get("qty")),
+                () -> assertEquals("flange", lines.get(2).get("sku")));
+    }
+
+    /**
+     * The regression test for what refusing a second record selector used to hide.
+     * <p>
+     * A field may omit its left bound and continue where the previous one ended,
+     * which makes a layout a running total. When the two record selectors shared
+     * one map that total ran <em>across</em> them, so here {@code b}'s {@code ":4"}
+     * would continue from {@code a}'s {@code 0:4} and read characters 4 to 4 -
+     * nothing - instead of 0 to 4. Both layouts start from zero now, and this test
+     * is the only thing that says so.
+     */
+    @Test
+    public void theRunningLeftBoundDoesNotCrossRecordSelectors() throws IOException {
+        var spec = new InputSpec(MIME, List.of(
+                new RecordSelectorSpec("first", null,
+                        new Discriminator.Equals(new Selector.Text("0:1"), "A"),
+                        List.of(new FieldSelectorSpec("f", "0:4", DataType.TEXT))),
+                new RecordSelectorSpec("second", null,
+                        new Discriminator.Equals(new Selector.Text("0:1"), "B"),
+                        // omits its left bound, and must begin at 0 rather than at 4
+                        List.of(new FieldSelectorSpec("g", ":4", DataType.TEXT)))
+        ), List.of(), Map.of());
+
+        var row = adapter(spec, Map.of()).parse(in("Axxx\nByyy\n"), "second", Set.of("g"))
+                .rows().toList().getFirst();
+        assertEquals("Byyy", row.get("g"), "the second layout starts at 0, not where the first ended");
+    }
+
+    /**
+     * A record selector with no discriminator still takes every record, which is
+     * the single-record-type file every earlier test in this class uses.
+     */
+    @Test
+    public void noDiscriminatorTakesEveryRecord() throws IOException {
+        var rows = adapter(spec(new FieldSelectorSpec("id", "0:3", DataType.TEXT)), Map.of())
+                .parse(in("001\n002\n003\n"), "rec", Set.of("id"))
+                .rows().toList();
+        assertEquals(List.of("001", "002", "003"), rows.stream().map(r -> r.get("id")).toList());
+    }
+
+    /**
+     * A discriminator counts nothing here, for the reason a field selector does
+     * not: a fixed-length record has offsets and no components.
+     */
+    @Test
+    public void rejectsAcountingDiscriminator() {
+        var spec = new InputSpec(MIME, List.of(new RecordSelectorSpec("rec", null,
+                new Discriminator.Equals(new Selector.Nth(1), "A"),
+                List.of(new FieldSelectorSpec("id", "0:3", DataType.TEXT)))), List.of(), Map.of());
         var thrown = assertThrows(IllegalArgumentException.class, () -> adapter(spec, Map.of()));
         assertAll(
-                () -> assertTrue(thrown.getMessage().contains("one record selector"), thrown.getMessage()),
-                // naming both, so the author knows which one to lose
-                () -> assertTrue(thrown.getMessage().contains("a"), thrown.getMessage()),
-                () -> assertTrue(thrown.getMessage().contains("b"), thrown.getMessage()));
+                () -> assertTrue(thrown.getMessage().contains("no components to count"), thrown.getMessage()),
+                // and says what to write instead
+                () -> assertTrue(thrown.getMessage().contains("0:2"), thrown.getMessage()));
+    }
+
+    /**
+     * And its range says both bounds. A field may omit the left one and continue
+     * from the field before; a discriminator has no field before it.
+     */
+    @Test
+    public void rejectsAdiscriminatorRangeWithoutAleftBound() {
+        var spec = new InputSpec(MIME, List.of(new RecordSelectorSpec("rec", null,
+                new Discriminator.Equals(new Selector.Text(":2"), "A"),
+                List.of(new FieldSelectorSpec("id", "0:3", DataType.TEXT)))), List.of(), Map.of());
+        var thrown = assertThrows(IllegalArgumentException.class, () -> adapter(spec, Map.of()));
+        assertTrue(thrown.getMessage().contains("no previous field"), thrown.getMessage());
+    }
+
+    /**
+     * Two record selectors of the same name, which a mapping could not choose
+     * between.
+     */
+    @Test
+    public void rejectsTwoRecordSelectorsOfOneName() {
+        var spec = new InputSpec(MIME, List.of(
+                new RecordSelectorSpec("rec", null, List.of(new FieldSelectorSpec("a", "0:3", DataType.TEXT))),
+                new RecordSelectorSpec("rec", null, List.of(new FieldSelectorSpec("b", "3:6", DataType.TEXT)))
+        ), List.of(), Map.of());
+        var thrown = assertThrows(IllegalArgumentException.class, () -> adapter(spec, Map.of()));
+        assertTrue(thrown.getMessage().contains("could not say which"), thrown.getMessage());
     }
 
     /**

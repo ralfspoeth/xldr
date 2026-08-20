@@ -210,9 +210,11 @@ class CsvFileHandler implements InputAdapter {
             Collection<FieldSelectorSpec> fieldSelectors, Set<String> wanted, Index index) {
         Map<String, Integer> positions = new HashMap<>();
         for (var fs : fieldSelectors) {
-            // computeIfAbsent, so that a name declared twice resolves its first
-            // selector only - the second is never read from, so it is not judged
-            positions.computeIfAbsent(fs.name(), _ -> index.require(fs.selector()));
+            // no tie-break needed: RecordSelectorSpec refuses two field selectors
+            // of one name. This used to keep the first and say the second was
+            // never read from, which is the same excuse we refuse elsewhere for a
+            // selector that matches nothing
+            positions.put(fs.name(), index.require(fs.selector()));
         }
         if (fieldsFromHeader) {
             for (var name : wanted) {

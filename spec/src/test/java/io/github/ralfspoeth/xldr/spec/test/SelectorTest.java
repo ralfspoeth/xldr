@@ -271,6 +271,44 @@ class SelectorTest {
                         """)));
     }
 
+    // ---- a record selector's field names are its own --------------------------
+
+    /**
+     * Two field selectors of one name are refused, in both formats and therefore
+     * for every adapter.
+     * <p>
+     * The rule sits on {@link io.github.ralfspoeth.xldr.spec.RecordSelectorSpec}
+     * rather than in the adapters because all five of them build a map keyed by
+     * that name, and each was quietly picking a winner - CSV the first
+     * declaration, the others whichever the loop reached last. A duplicate is not
+     * written on purpose; it is a name that was meant to be different, so the
+     * field the author intended is missing and a mapping naming it fails
+     * elsewhere, about something else.
+     */
+    @Test
+    void twoFieldSelectorsOfOneNameAreRefused() {
+        assertAll(
+                () -> assertRefused("more than once", () -> json("""
+                        { "name": "who", "fieldSelectors": [
+                            { "name": "id", "selector": "a" },
+                            { "name": "id", "selector": "b" } ] }
+                        """)),
+                () -> assertRefused("more than once", () -> xml("""
+                        <recordSelector name="who">
+                            <fieldSelector name="id" selector="a"/>
+                            <fieldSelector name="id" selector="b"/>
+                        </recordSelector>
+                        """)),
+                // and the message names the one that repeats, there being no
+                // other way to find it in a layout of forty
+                () -> assertRefused("id", () -> json("""
+                        { "name": "who", "fieldSelectors": [
+                            { "name": "a", "selector": "a" },
+                            { "name": "id", "selector": "b" },
+                            { "name": "id", "selector": "c" } ] }
+                        """)));
+    }
+
     // ---- what a discriminator does with a value ------------------------------
 
     /**

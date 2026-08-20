@@ -63,7 +63,15 @@ record 40,000 leaves the table as it was.
 Typical contents: a value that will not convert to its declared type, a row the database rejected for a constraint
 or a length, a quoted field never closed.
 
-The cure is to fix the file, or the spec, and move the file back into `in/`. Nothing is lost while it sits there.
+The cure is to fix the file, or the spec, and move the file back into `in/`. Nothing is lost while it sits there,
+and retrying is safe: the load that failed committed nothing, so the tables are as they were.
+
+**Retrying a file that failed is safe. Loading one that succeeded is not.** XLDR inserts and does not merge - it
+has no notion of a natural key, so the same file loaded twice gives you the rows twice. That is deliberate: the
+target is a landing zone, and what happens to the rows afterwards is the application's business, because only it
+knows which columns identify a row and whether a later delivery supersedes an earlier one. The README explains the
+division under [Loading twice](../../README.md#loading-twice), along with a way to make a repeated delivery fail
+loudly rather than duplicate.
 
 ## Two things worth setting up early
 

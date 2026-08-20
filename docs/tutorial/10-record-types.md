@@ -117,9 +117,14 @@ almost always wants.
 at* - an XPath, a pointer, a range - while in a flat file every line is a candidate and the question is which to
 keep. No input is read both ways, and a spec saying both is refused.
 
-**Discriminators are for separated files.** A fixed-length file is flat too and has the same need - a record type
-in columns 1 to 2 is the classic layout - but the fixed-length adapter has no discriminator yet. It takes one
-record selector and reads every line as one kind.
+**A fixed-length file discriminates on a character range.** It is flat too and the need is the same - a record
+type in columns 1 to 2 is the classic layout - but it has offsets rather than components, so it says where to look
+the way everything else in that format does:
+
+    "discriminator": { "selector": "0:2", "equals": "OR" }
+
+`nth` is refused there, as it is on a fixed-length field selector. So is a range that leaves out its left bound,
+since a discriminator has no previous field to continue from.
 
 ---
 

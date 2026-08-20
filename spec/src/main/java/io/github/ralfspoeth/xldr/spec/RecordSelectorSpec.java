@@ -4,7 +4,10 @@ import org.jspecify.annotations.Nullable;
 
 import java.io.Serializable;
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.List;
+
+import static java.util.function.Predicate.not;
 
 /**
  * Selects the records of one kind from an input and lists the fields to read
@@ -47,7 +50,38 @@ public record RecordSelectorSpec(
                     + " records are, " + discriminator + " says which lines are of this kind, and no"
                     + " input is read both ways");
         }
+        refuseDuplicateNames(name, fieldSelectors);
         fieldSelectors = List.copyOf(fieldSelectors);
+    }
+
+    /**
+     * A field selector's name is what a mapping refers to, so two of them cannot
+     * share one: the mapping would be naming both and reading one.
+     * <p>
+     * Here rather than in the adapters, because every adapter builds a map keyed
+     * by this name and each was therefore picking a winner of its own - the CSV
+     * adapter the first declaration, the others whichever the loop reached last,
+     * and none of them saying so. One rule refused in one place is the difference
+     * between a format that has an answer and five that each have one.
+     * <p>
+     * Refused rather than resolved, because a duplicate is not something anyone
+     * writes on purpose. It is a name that was meant to be different, which means
+     * the field the author intended is missing - and a mapping naming <em>that</em>
+     * one fails somewhere else entirely, with a message about the wrong thing.
+     */
+    private static void refuseDuplicateNames(String name, Collection<FieldSelectorSpec> fieldSelectors) {
+        var seen = new HashSet<String>();
+        var repeated = fieldSelectors.stream()
+                .map(FieldSelectorSpec::name)
+                .filter(not(seen::add))
+                .distinct()
+                .toList();
+        if (!repeated.isEmpty()) {
+            throw new IllegalArgumentException("record selector '" + name + "' declares "
+                    + repeated + " more than once. A field selector's name is what a mapping refers"
+                    + " to, so two of them cannot share it; the usual cause is a name that was meant"
+                    + " to be different");
+        }
     }
 
     /**

@@ -8,7 +8,59 @@ The versions are the git tags `xldr-<version>`; the published artifacts carry th
 
 ## Unreleased
 
+### Breaking
+
+- **A record selector's field selectors have distinct names.** A spec that repeats one is refused when it is read,
+  in either format and therefore for every adapter.
+
+  This replaces five undocumented tie-breaks. Each adapter builds a map keyed by that name and each was quietly
+  picking a winner - the CSV adapter the first declaration, the other four whichever the loop reached last - and
+  none of them said so anywhere. The rule now sits on `RecordSelectorSpec`, which is the only place it is one rule
+  rather than five.
+
+  Refused rather than resolved, because nobody writes a duplicate on purpose. It is a name that was meant to be
+  different, so the field the author intended is missing, and the mapping naming *that* one fails somewhere else
+  entirely with a message about something else. The CSV adapter used to excuse it as "the second is never read
+  from, so it is not judged", which is the same excuse this toolkit refuses for a selector matching no column.
+
+  It matters most in a fixed-length layout, where a field may continue from the one before: a repeat there does not
+  merely shadow the earlier declaration, it moves every field after it.
+
+  Not expressed in the schemas. XSD 1.0 could say it with `xs:unique` and JSON Schema cannot, and adding it to one
+  would make the two disagree about a rule the reader already enforces.
+
 ### Added
+
+- **The fixed-length adapter discriminates.** It was the last flat format that could not, and the gap was written
+  into three documents rather than closed. A record type in columns 1 to 2 is the classic fixed-length layout, and
+  until now such a file could not be loaded at all: the adapter took one record selector and read every line as one
+  kind.
+
+  It says where to look the way everything else in that format does, with a character range - `{ "selector": "0:2",
+  "equals": "OR" }`. `nth` is refused there for the reason it is refused on a field selector: a fixed-length record
+  has offsets and no components to count. A range that omits its left bound is refused too, since that spelling
+  means *continue from the previous field* and a discriminator has none.
+
+  Several record selectors are allowed again as a consequence, each with **its own layout**. That is the part worth
+  knowing: a field may omit its left bound and continue where the previous one ended, so a layout is a running
+  total, and when the selectors shared one map the total ran across them - the second record type came out anchored
+  to the first one's last field, silently. 0.34 refused a second selector to close that hole; this keeps the hole
+  closed by construction and there is a test that says so, which there could not be while two were refused.
+
+- **A written answer to what happens when a file is loaded twice**, under "Loading twice" in the README, because
+  the toolkit had a position on this and had never said it. XLDR inserts and does not merge. Retrying a *failed*
+  load is safe - it committed nothing - and loading a file that already succeeded is not.
+
+  The reason it stops there is that the target is a landing zone: merging needs the natural key, the versioning
+  rule, what a soft delete means and whether a late correction supersedes, and none of those belong to a mapping.
+  A spec format that grew them would be a programming language with none of the tools, next to a database that
+  already has one. So the division is that XLDR owns the file arriving faithfully and in one transaction, and what
+  the rows mean against what is already there is downstream.
+
+  The section also says what a landing table wants - the filename, the load timestamp, a batch number - and notes
+  that a redelivery can be made to *fail* rather than duplicate, with a `limit: 1` mapping into a control table
+  carrying a unique constraint on the filename. That needs no support from the format: a record selector may feed
+  two tables, and `limit` applies per mapping.
 
 - A twelfth tutorial page, on drafting a spec with a language model. A mapping spec is a structured document with a
   published schema derived from a file and a table you can both show, which is close to the ideal shape for one to
