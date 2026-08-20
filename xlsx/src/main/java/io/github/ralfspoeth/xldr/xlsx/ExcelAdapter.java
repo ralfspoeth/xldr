@@ -6,6 +6,7 @@ import io.github.ralfspoeth.xldr.ia.Result;
 import io.github.ralfspoeth.xldr.ia.Row;
 import io.github.ralfspoeth.xldr.spec.DataType;
 import io.github.ralfspoeth.xldr.spec.InputSpec;
+import io.github.ralfspoeth.xldr.spec.Locator;
 import io.github.ralfspoeth.xldr.spec.Selector;
 import org.apache.poi.ss.usermodel.*;
 import org.jspecify.annotations.Nullable;
@@ -49,12 +50,17 @@ class ExcelAdapter implements InputAdapter {
 
     ExcelAdapter(InputSpec spec) {
         for (var rss : spec.recordSelectors()) {
-            // before requiring the range, so that a spec carrying a discriminator
-            // is told about the thing it wrote rather than about the thing it
-            // left out
-            rss.refuseDiscriminator("a sheet has records to point at");
-            // a sheet range has to point somewhere, so this input cannot omit it
-            var range = Range.parse(rss.requireSelector());
+            // a sheet range has to point somewhere, so this input cannot do
+            // without one - and the two it cannot honour each say what the
+            // author wrote rather than what they left out. Spelled out rather
+            // than caught by a total pattern, so that a fourth kind of locator
+            // would stop the build rather than being quietly refused here
+            var because = "a sheet has records to point at";
+            var range = switch (rss.locator()) {
+                case Locator.At(var selector) -> Range.parse(selector);
+                case Locator.Where where -> throw where.wrongBecause(rss.name(), because);
+                case Locator.Every every -> throw every.wrongBecause(rss.name(), because);
+            };
             var columns = new LinkedHashMap<String, Mapped>();
             for (var fss : rss.fieldSelectors()) {
                 var type = fss.dataType() == null ? DataType.TEXT : fss.dataType();

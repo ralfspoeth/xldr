@@ -2,6 +2,7 @@ package io.github.ralfspoeth.xldr.spec.test;
 
 import io.github.ralfspoeth.xldr.spec.Discriminator;
 import io.github.ralfspoeth.xldr.spec.FieldSelectorSpec;
+import io.github.ralfspoeth.xldr.spec.Locator;
 import io.github.ralfspoeth.xldr.spec.Selector;
 import io.github.ralfspoeth.xldr.spec.io.XmlMappingSpecReader;
 import org.junit.jupiter.api.Test;
@@ -157,9 +158,11 @@ public class XsdTest {
         var selectors = new XmlMappingSpecReader().read(stream(xml))
                 .inputSpec().recordSelectors().stream().toList();
         assertAll(
-                () -> assertEquals(new Discriminator.Equals(new Selector.Nth(1), "O"),
-                        selectors.getFirst().discriminator()),
-                () -> assertInstanceOf(Discriminator.Matches.class, selectors.get(1).discriminator()));
+                () -> assertEquals(
+                        new Locator.Where(new Discriminator.Equals(new Selector.Nth(1), "O")),
+                        selectors.getFirst().locator()),
+                () -> assertInstanceOf(Discriminator.Matches.class,
+                        assertInstanceOf(Locator.Where.class, selectors.get(1).locator()).test()));
     }
 
     /**
@@ -195,8 +198,7 @@ public class XsdTest {
 
         var spec = new XmlMappingSpecReader().read(stream(xml));
         var recordSelector = List.copyOf(spec.inputSpec().recordSelectors()).getFirst();
-        assertNull(recordSelector.selector());
-        assertThrows(IllegalArgumentException.class, recordSelector::requireSelector);
+        assertEquals(Locator.every(), recordSelector.locator());
     }
 
     /**

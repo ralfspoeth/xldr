@@ -8,6 +8,7 @@ import io.github.ralfspoeth.xldr.ia.InputAdapterFactory;
 import io.github.ralfspoeth.xldr.spec.DataType;
 import io.github.ralfspoeth.xldr.spec.Discriminator;
 import io.github.ralfspoeth.xldr.spec.InputSpec;
+import io.github.ralfspoeth.xldr.spec.Locator;
 import io.github.ralfspoeth.xldr.spec.RecordSelectorSpec;
 import io.github.ralfspoeth.xldr.spec.Selector;
 import org.jspecify.annotations.Nullable;
@@ -67,7 +68,9 @@ public class FixedLengthInputAdapterFactory implements InputAdapterFactory {
      * it - silently, with the load reporting rows the whole time.
      *
      * @throws IllegalArgumentException where the spec declares nothing to read,
-     *                                  or names a record selector twice
+     *                                  names a record selector twice, or points
+     *                                  at records in a format that has nowhere
+     *                                  to point
      */
     private static Map<String, Layout> layouts(InputSpec spec) {
         if (spec.recordSelectors().isEmpty()) {
@@ -76,9 +79,6 @@ public class FixedLengthInputAdapterFactory implements InputAdapterFactory {
         }
         Map<String, Layout> layouts = new LinkedHashMap<>();
         for (var rs : spec.recordSelectors()) {
-            // nothing to point at in a fixed-length file, so a selector here is a
-            // spec written for a format that has records to locate
-            rs.refuseSelector("a fixed-length file has no place to point at");
             if (layouts.put(rs.name(), layout(rs)) != null) {
                 throw new IllegalArgumentException("two record selectors are named '" + rs.name()
                         + "'; a mapping names one of them and could not say which");
@@ -103,9 +103,16 @@ public class FixedLengthInputAdapterFactory implements InputAdapterFactory {
             bounds.put(fs.name(), field);
             previousRight = field.right();
         }
-        var discriminator = rs.discriminator();
-        return new Layout(bounds, discriminator,
-                discriminator == null ? null : at(discriminator, rs.name()));
+        // Every means every record of the file is of this kind; a discriminator
+        // says which are. A selector is neither - nothing in a fixed-length file
+        // can be pointed at, so a spec carrying one was written for a format
+        // that has records to locate
+        return switch (rs.locator()) {
+            case Locator.Every _ -> new Layout(bounds, null, null);
+            case Locator.Where(var test) -> new Layout(bounds, test, at(test, rs.name()));
+            case Locator.At at -> throw at.wrongBecause(
+                    rs.name(), "a fixed-length file has no place to point at");
+        };
     }
 
     /**

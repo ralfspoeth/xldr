@@ -7,6 +7,7 @@ import io.github.ralfspoeth.xldr.ia.*;
 import io.github.ralfspoeth.xldr.spec.DataType;
 import io.github.ralfspoeth.xldr.spec.FieldSelectorSpec;
 import io.github.ralfspoeth.xldr.spec.InputSpec;
+import io.github.ralfspoeth.xldr.spec.Locator;
 import io.github.ralfspoeth.xldr.spec.RecordSelectorSpec;
 import io.github.ralfspoeth.xldr.spec.Selector;
 import org.jspecify.annotations.Nullable;
@@ -79,16 +80,21 @@ class JsonInputAdapter implements InputAdapter {
         for (var fs : rs.fieldSelectors()) {
             fields.putIfAbsent(fs.name(), new FieldDef(pointerOf(fs), typeOf(fs)));
         }
-        // This adapter is the reason refuseDiscriminator exists. The other two
-        // that point at their records require a selector, so a discriminator
-        // could not reach them unnoticed; here an absent selector is an answer
-        // rather than an omission, so one was being dropped in silence and the
-        // load ran over the whole document as though nothing had been asked for.
-        rs.refuseDiscriminator("a JSON document has records to point at");
-        // selector(), not requireSelector(): for this adapter an absent one is
-        // an answer rather than an omission - the document itself is the record
-        // source, which is what a file that is one top-level array looks like
-        return new RecordDef(pointer(rs.selector()), fields);
+        // This adapter is why the three cases are worth being three cases. The
+        // other two that point at their records reject anything without a
+        // selector outright, so a discriminator could not reach them unnoticed;
+        // here saying nothing is an answer rather than an omission - the
+        // document itself is the record source, which is what a file that is one
+        // top-level array looks like. Two of the three states therefore had to
+        // be told apart, and while they were one nullable field a discriminator
+        // read as neither and was dropped in silence, the load running over the
+        // whole document as though nothing had been asked for.
+        return new RecordDef(switch (rs.locator()) {
+            case Locator.At(var selector) -> pointer(selector);
+            case Locator.Every _ -> Pointer.self();
+            case Locator.Where _ -> throw rs.locator().wrongBecause(
+                    rs.name(), "a JSON document has records to point at");
+        }, fields);
     }
 
     private static DataType typeOf(FieldSelectorSpec fs) {
@@ -123,8 +129,11 @@ class JsonInputAdapter implements InputAdapter {
      * dropped, since {@code parse} would otherwise read it as a step to a member
      * named {@code ""}.
      */
-    private static Pointer pointer(@Nullable String path) {
-        if (path == null || path.isBlank()) {
+    private static Pointer pointer(String path) {
+        // no null branch: the only caller that could pass one was the record
+        // selector's absent selector, which is now Locator.Every and answers
+        // Pointer.self() where it is read
+        if (path.isBlank()) {
             return Pointer.self();
         }
         var stripped = path.strip();

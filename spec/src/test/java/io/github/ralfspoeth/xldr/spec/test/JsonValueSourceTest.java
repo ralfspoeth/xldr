@@ -1,6 +1,8 @@
 package io.github.ralfspoeth.xldr.spec.test;
 
 import io.github.ralfspoeth.xldr.spec.FieldMappingSpec;
+import io.github.ralfspoeth.xldr.spec.Locator;
+import io.github.ralfspoeth.xldr.spec.RecordSelectorSpec;
 import io.github.ralfspoeth.xldr.spec.ValueSource;
 import io.github.ralfspoeth.xldr.spec.VarSpec;
 import io.github.ralfspoeth.xldr.spec.io.JsonMappingSpecReader;
@@ -262,9 +264,9 @@ public class JsonValueSourceTest {
 
     /**
      * A record selector may omit its selector: a CSV with a header holds one
-     * kind of record, so there is nothing to locate, and the CSV adapter reads
-     * an absent selector as "every line". An adapter that cannot do without one
-     * says so when it is asked for it.
+     * kind of record, so there is nothing to locate. That reads as
+     * {@link Locator.Every}, which the flat adapters honour and the ones that
+     * have to be pointed at refuse by name.
      */
     @Test
     public void readsARecordSelectorWithoutASelector() throws IOException {
@@ -282,7 +284,42 @@ public class JsonValueSourceTest {
         var input = new JsonMappingSpecReader().read(stream(source)).inputSpec();
         var recordSelector = List.copyOf(input.recordSelectors()).getFirst();
 
-        assertNull(recordSelector.selector());
-        assertThrows(IllegalArgumentException.class, recordSelector::requireSelector);
+        assertEquals(Locator.every(), recordSelector.locator());
     }
+
+    /**
+     * A selector and a discriminator together describe no input, and this is now
+     * the only place that can say so.
+     * <p>
+     * It used to be refused by {@link RecordSelectorSpec}'s constructor, which
+     * had two nullable fields and four states to police. A {@link Locator} has
+     * three cases and both-at-once is not one of them, so the combination can no
+     * longer be built in Java at all - it survives only as something a spec file
+     * might say, and a reader is the only thing that reads spec files.
+     */
+    @Test
+    public void refusesASelectorAndADiscriminatorTogether() {
+        var source = """
+                {
+                    "input": {
+                        "mimeType": "text/csv",
+                        "recordSelectors": [
+                            {
+                                "name": "orders",
+                                "selector": "//order",
+                                "discriminator": { "nth": 1, "equals": "O" },
+                                "fieldSelectors": [ {"name": "id", "nth": 2} ]
+                            }
+                        ]
+                    },
+                    "mapping": []
+                }
+                """;
+        var thrown = assertThrows(IllegalArgumentException.class,
+                () -> new JsonMappingSpecReader().read(stream(source)));
+        assertAll(
+                () -> assertTrue(thrown.getMessage().contains("orders"), thrown.getMessage()),
+                () -> assertTrue(thrown.getMessage().contains("no input is read both ways"),
+                        thrown.getMessage()));
     }
+}

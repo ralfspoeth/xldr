@@ -8,6 +8,7 @@ import io.github.ralfspoeth.xldr.spec.DataType;
 import io.github.ralfspoeth.xldr.spec.Discriminator;
 import io.github.ralfspoeth.xldr.spec.FieldSelectorSpec;
 import io.github.ralfspoeth.xldr.spec.InputSpec;
+import io.github.ralfspoeth.xldr.spec.Locator;
 import io.github.ralfspoeth.xldr.spec.RecordSelectorSpec;
 import io.github.ralfspoeth.xldr.spec.Selector;
 import org.junit.jupiter.api.Test;
@@ -41,7 +42,7 @@ public class CsvFileHandlerTest {
     // input spec mentions only id and name; the file also carries short-name/long-name.
     // no discriminator (selector null): a single-record-type file takes every line.
     private static final InputSpec SPEC = spec(COMMAS,
-            new RecordSelectorSpec("people", null, List.of(
+            new RecordSelectorSpec("people", Locator.every(), List.of(
                     new FieldSelectorSpec("id", "id", DataType.TEXT),
                     new FieldSelectorSpec("name", "name", DataType.TEXT)
             ))
@@ -50,7 +51,7 @@ public class CsvFileHandlerTest {
     // the same, plus a free-text column - the one that carries separators,
     // line breaks and quotes in a real feed
     private static final InputSpec SPEC_WITH_NOTE = spec(COMMAS,
-            new RecordSelectorSpec("people", null, List.of(
+            new RecordSelectorSpec("people", Locator.every(), List.of(
                     new FieldSelectorSpec("id", "id", DataType.TEXT),
                     new FieldSelectorSpec("name", "name", DataType.TEXT),
                     new FieldSelectorSpec("note", "note", DataType.TEXT)
@@ -70,19 +71,19 @@ public class CsvFileHandlerTest {
     // no header: fields are addressed by column, and named after it here only
     // because a name has to be something
     private static final InputSpec POSITIONAL_SPEC = spec(HEADERLESS,
-            new RecordSelectorSpec("people", null, List.of(at(1), at(2), at(3)))
+            new RecordSelectorSpec("people", Locator.every(), List.of(at(1), at(2), at(3)))
     );
 
     // one headerless file, two interleaved record types keyed by the first
     // column. Positions stay absolute, so column 1 is the discriminator itself
     // and the fields start at 2.
     private static final InputSpec DISCRIMINATED_SPEC = spec(HEADERLESS,
-            new RecordSelectorSpec("orders", null, firstColumnIs("O"), List.of(
+            new RecordSelectorSpec("orders", new Locator.Where(firstColumnIs("O")), List.of(
                     at(2),   // order id
                     at(3),   // date
                     at(4)    // customer
             )),
-            new RecordSelectorSpec("lines", null, firstColumnIs("L"), List.of(
+            new RecordSelectorSpec("lines", new Locator.Where(firstColumnIs("L")), List.of(
                     at(2),   // order id
                     at(3),   // product
                     at(4),   // qty
@@ -206,7 +207,7 @@ public class CsvFileHandlerTest {
     @Test
     public void convertsAccordingToTheDeclaredType() throws IOException {
         var spec = spec(COMMAS,
-                new RecordSelectorSpec("people", null, List.of(
+                new RecordSelectorSpec("people", Locator.every(), List.of(
                         new FieldSelectorSpec("id", "id", DataType.INTEGRAL),
                         new FieldSelectorSpec("name", "name", DataType.TEXT),
                         new FieldSelectorSpec("rate", "rate", DataType.DECIMAL)
@@ -311,7 +312,7 @@ public class CsvFileHandlerTest {
     @Test
     public void quotingCanBeSwitchedOff() throws IOException {
         var spec = spec(Map.of("fieldSeparator", ",", "quote", ""),
-                new RecordSelectorSpec("people", null, List.of(
+                new RecordSelectorSpec("people", Locator.every(), List.of(
                         new FieldSelectorSpec("id", "id", DataType.TEXT),
                         new FieldSelectorSpec("name", "name", DataType.TEXT)
                 )));
@@ -347,11 +348,11 @@ public class CsvFileHandlerTest {
     @Test
     public void headerMaybeSaidToBePresentOrAbsent() throws IOException {
         var withHeader = spec(Map.of("fieldSeparator", ",", "header", "present"),
-                new RecordSelectorSpec("people", null, List.of(
+                new RecordSelectorSpec("people", Locator.every(), List.of(
                         new FieldSelectorSpec("id", "id", DataType.TEXT),
                         new FieldSelectorSpec("name", "name", DataType.TEXT))));
         var withoutHeader = spec(Map.of("fieldSeparator", ",", "header", "absent"),
-                new RecordSelectorSpec("people", null, List.of(at(1), at(2))));
+                new RecordSelectorSpec("people", Locator.every(), List.of(at(1), at(2))));
 
         var named = rowsOf(withHeader, "id,name\n1,Alice\n", "id", "name");
         assertEquals("Alice", named.getFirst().get("name"));
@@ -360,7 +361,7 @@ public class CsvFileHandlerTest {
         assertEquals("Alice", positional.getFirst().get("2"));
 
         var nonsense = spec(Map.of("fieldSeparator", ",", "header", "yes"),
-                new RecordSelectorSpec("people", null, List.of()));
+                new RecordSelectorSpec("people", Locator.every(), List.of()));
         assertThrows(IllegalArgumentException.class, () -> adapterFor(nonsense));
     }
 
@@ -380,7 +381,7 @@ public class CsvFileHandlerTest {
         assertEquals(2, rowsOf(SPEC_WITH_NOTE, csv, "id", "name", "note").size());
 
         var stopping = spec(Map.of("fieldSeparator", ",", "emptyLine", "stop"),
-                new RecordSelectorSpec("people", null, List.of(
+                new RecordSelectorSpec("people", Locator.every(), List.of(
                         new FieldSelectorSpec("id", "id", DataType.TEXT),
                         new FieldSelectorSpec("name", "name", DataType.TEXT),
                         new FieldSelectorSpec("note", "note", DataType.TEXT))));
@@ -398,7 +399,7 @@ public class CsvFileHandlerTest {
     @Test
     public void readsComments() throws IOException {
         var commented = spec(Map.of("fieldSeparator", ",", "comment", "#"),
-                new RecordSelectorSpec("people", null, List.of(
+                new RecordSelectorSpec("people", Locator.every(), List.of(
                         new FieldSelectorSpec("id", "id", DataType.TEXT),
                         new FieldSelectorSpec("name", "name", DataType.TEXT),
                         new FieldSelectorSpec("note", "note", DataType.TEXT))));
@@ -440,7 +441,7 @@ public class CsvFileHandlerTest {
     @Test
     public void aFieldsSelectorNamesTheColumn() throws IOException {
         var spec = spec(Map.of("fieldSeparator", ";"),
-                new RecordSelectorSpec("people", null, List.of(
+                new RecordSelectorSpec("people", Locator.every(), List.of(
                         new FieldSelectorSpec("n1", "Name", DataType.TEXT),
                         new FieldSelectorSpec("n2", "Text", DataType.TEXT),
                         new FieldSelectorSpec("n3", "Id", DataType.INTEGRAL)
@@ -469,7 +470,7 @@ public class CsvFileHandlerTest {
     @Test
     public void aFieldCountsItsComponentWithoutAheader() throws IOException {
         var spec = spec(Map.of("fieldSeparator", ";", "header", "absent"),
-                new RecordSelectorSpec("people", null, List.of(
+                new RecordSelectorSpec("people", Locator.every(), List.of(
                         new FieldSelectorSpec("name", new Selector.Nth(3), DataType.TEXT),
                         new FieldSelectorSpec("id", new Selector.Nth(1), DataType.INTEGRAL)
                 )));
@@ -490,7 +491,7 @@ public class CsvFileHandlerTest {
     @Test
     public void takesUndeclaredFieldsFromTheHeader() throws IOException {
         var spec = spec(Map.of("fieldSeparator", ";", "fieldsFromHeader", "true"),
-                new RecordSelectorSpec("people", null, List.of(
+                new RecordSelectorSpec("people", Locator.every(), List.of(
                         new FieldSelectorSpec("who", "Name", DataType.TEXT)
                 )));
         var rows = rowsOf(spec, """
@@ -516,7 +517,7 @@ public class CsvFileHandlerTest {
     @Test
     public void anUndeclaredFieldIsNothingWithoutTheProperty() throws IOException {
         var spec = spec(Map.of("fieldSeparator", ";"),
-                new RecordSelectorSpec("people", null, List.of(
+                new RecordSelectorSpec("people", Locator.every(), List.of(
                         new FieldSelectorSpec("who", "Name", DataType.TEXT)
                 )));
         var rows = rowsOf(spec, "Id;leer;Name;Text\n1;;Hello;asdf\n", "who", "Id");
@@ -534,7 +535,7 @@ public class CsvFileHandlerTest {
     @Test
     public void fieldsFromHeaderNeedsAheader() {
         var spec = spec(Map.of("fieldSeparator", ";", "header", "absent", "fieldsFromHeader", "true"),
-                new RecordSelectorSpec("people", null, List.of()));
+                new RecordSelectorSpec("people", Locator.every(), List.of()));
         assertThrows(IllegalArgumentException.class, () -> adapterFor(spec));
     }
 
@@ -547,7 +548,7 @@ public class CsvFileHandlerTest {
     @Test
     public void theDefaultsAreTheOnesRfc4180Registers() throws IOException {
         var spec = spec(Map.of(),
-                new RecordSelectorSpec("people", null, List.of(
+                new RecordSelectorSpec("people", Locator.every(), List.of(
                         new FieldSelectorSpec("id", "id", DataType.TEXT),
                         new FieldSelectorSpec("name", "name", DataType.TEXT))));
         var rows = rowsOf(spec, """
@@ -573,7 +574,7 @@ public class CsvFileHandlerTest {
     public void theDefaultCharsetIsUtf8() throws IOException {
         var csv = "id,name\n1,Müller\n";
         var spec = spec(Map.of(),
-                new RecordSelectorSpec("people", null, List.of(
+                new RecordSelectorSpec("people", Locator.every(), List.of(
                         new FieldSelectorSpec("id", "id", DataType.TEXT),
                         new FieldSelectorSpec("name", "name", DataType.TEXT))));
 
@@ -582,7 +583,7 @@ public class CsvFileHandlerTest {
                 "latin-1 bytes are not what this reads");
 
         var latin1 = spec(Map.of("charset", "ISO-8859-1"),
-                new RecordSelectorSpec("people", null, List.of(
+                new RecordSelectorSpec("people", Locator.every(), List.of(
                         new FieldSelectorSpec("id", "id", DataType.TEXT),
                         new FieldSelectorSpec("name", "name", DataType.TEXT))));
         assertEquals("Müller", first(latin1, csv.getBytes(StandardCharsets.ISO_8859_1)).get("name"),
@@ -598,7 +599,7 @@ public class CsvFileHandlerTest {
     @Test
     public void aSelectorNamingNoColumnIsRefused() {
         var spec = spec(Map.of(),
-                new RecordSelectorSpec("people", null, List.of(
+                new RecordSelectorSpec("people", Locator.every(), List.of(
                         new FieldSelectorSpec("id", "id", DataType.TEXT),
                         new FieldSelectorSpec("name", "name", DataType.TEXT))));
         var thrown = assertThrows(IllegalArgumentException.class,
@@ -621,7 +622,7 @@ public class CsvFileHandlerTest {
     @Test
     public void tabSeparatedValuesNeedsNoPropertiesAtAll() throws IOException {
         var spec = new InputSpec("text/tab-separated-values",
-                List.of(new RecordSelectorSpec("people", null, List.of(
+                List.of(new RecordSelectorSpec("people", Locator.every(), List.of(
                         new FieldSelectorSpec("id", "id", DataType.TEXT),
                         new FieldSelectorSpec("name", "name", DataType.TEXT)))),
                 List.of(), Map.of());
@@ -665,7 +666,7 @@ public class CsvFileHandlerTest {
      */
     private static String tsvSeparatorOf(Map<String, String> properties) throws IOException {
         var spec = new InputSpec("text/tab-separated-values",
-                List.of(new RecordSelectorSpec("people", null, List.of(
+                List.of(new RecordSelectorSpec("people", Locator.every(), List.of(
                         new FieldSelectorSpec("a", "a", DataType.TEXT),
                         new FieldSelectorSpec("b", "b", DataType.TEXT)))),
                 List.of(), properties);
@@ -684,10 +685,10 @@ public class CsvFileHandlerTest {
     @Test
     public void countingWorksEvenWhereTheColumnsHaveNames() {
         var counted = spec(Map.of(),
-                new RecordSelectorSpec("people", null, List.of(
+                new RecordSelectorSpec("people", Locator.every(), List.of(
                         new FieldSelectorSpec("second", new Selector.Nth(2), DataType.TEXT))));
         var named = spec(Map.of(),
-                new RecordSelectorSpec("people", null, List.of(
+                new RecordSelectorSpec("people", Locator.every(), List.of(
                         new FieldSelectorSpec("second", "3", DataType.TEXT))));
         var csv = """
                 1,2,3
@@ -708,7 +709,7 @@ public class CsvFileHandlerTest {
     @Test
     public void aNameNeedsAHeaderToNameSomethingIn() {
         var spec = spec(Map.of("header", "absent"),
-                new RecordSelectorSpec("people", null, List.of(
+                new RecordSelectorSpec("people", Locator.every(), List.of(
                         new FieldSelectorSpec("who", "name", DataType.TEXT))));
         var thrown = assertThrows(IllegalArgumentException.class,
                 () -> rowsOf(spec, "1,Alice\n", "who"));
@@ -725,7 +726,7 @@ public class CsvFileHandlerTest {
     @Test
     public void countingPastTheHeaderIsRefused() {
         var spec = spec(Map.of(),
-                new RecordSelectorSpec("people", null, List.of(
+                new RecordSelectorSpec("people", Locator.every(), List.of(
                         new FieldSelectorSpec("far", new Selector.Nth(9), DataType.TEXT))));
         var thrown = assertThrows(IllegalArgumentException.class,
                 () -> rowsOf(spec, "id,name\n1,Alice\n", "far"));
@@ -740,9 +741,7 @@ public class CsvFileHandlerTest {
     @Test
     public void aDiscriminatorMayNameItsColumnInAHeadedFile() throws IOException {
         var spec = spec(Map.of(),
-                new RecordSelectorSpec("ones",
-                        null,
-                        new Discriminator.Equals(new Selector.Text("A"), "1"),
+                new RecordSelectorSpec("ones", new Locator.Where(new Discriminator.Equals(new Selector.Text("A"), "1")),
                         List.of(new FieldSelectorSpec("b", "B", DataType.TEXT))));
         var rows = rowsOf(spec, """
                 A,B,C
@@ -766,8 +765,7 @@ public class CsvFileHandlerTest {
     public void aDiscriminatorMayMatchAPattern() throws IOException {
         var spec = spec(Map.of("header", "absent"),
                 new RecordSelectorSpec("orders",
-                        null,
-                        Discriminator.matching(new Selector.Nth(1), "O[0-9]+"),
+                        new Locator.Where(Discriminator.matching(new Selector.Nth(1), "O[0-9]+")),
                         List.of(at(2))));
         var rows = rowsOf(spec, """
                 O1,first
@@ -791,7 +789,7 @@ public class CsvFileHandlerTest {
     @Test
     public void aFlatRecordSelectorWithASelectorIsRefused() {
         var spec = spec(Map.of("header", "absent"),
-                new RecordSelectorSpec("orders", "O", List.of(at(2))));
+                new RecordSelectorSpec("orders", new Locator.At("O"), List.of(at(2))));
         var thrown = assertThrows(IllegalArgumentException.class,
                 () -> rowsOf(spec, "O,first\n", "orders", Set.of("2")));
         assertAll(
@@ -811,7 +809,7 @@ public class CsvFileHandlerTest {
      */
     @Test
     public void anUndeclaredRecordSelectorIsRefused() {
-        var spec = spec(Map.of(), new RecordSelectorSpec("people", null,
+        var spec = spec(Map.of(), new RecordSelectorSpec("people", Locator.every(),
                 List.of(new FieldSelectorSpec("id", "id", DataType.TEXT))));
         var thrown = assertThrows(IllegalArgumentException.class,
                 () -> rowsOf(spec, "id\n1\n", "peple", Set.of("id")));

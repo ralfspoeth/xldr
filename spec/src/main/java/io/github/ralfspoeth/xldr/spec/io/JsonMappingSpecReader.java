@@ -154,17 +154,18 @@ public class JsonMappingSpecReader implements MappingSpecReader {
     }
 
     /**
-     * Both ways of selecting records are optional, and no record selector has
-     * both. A {@code selector} points at records in a tree or a sheet; a
+     * A {@code selector} points at records in a tree or a sheet; a
      * {@code discriminator} picks lines out of a flat file; and neither says that
      * the whole input holds one kind of record, which a CSV with a header or a
-     * fixed-length file usually does.
+     * fixed-length file usually does. The three are the cases of
+     * {@link io.github.ralfspoeth.xldr.spec.Locator}, and which of them this is
+     * gets decided once, in {@link SpecNode#locator}.
      */
     private static RecordSelectorSpec recordSelectorSpec(JsonValue rs) {
+        var name = PTR.member("name").stringOrThrow(rs);
         return new RecordSelectorSpec(
-                PTR.member("name").stringOrThrow(rs),
-                PTR.member("selector").stringValue(rs).orElse(null),
-                discriminator(rs),
+                name,
+                node(rs).locator("record selector '" + name + "'", discriminator(rs)),
                 PTR.member("fieldSelectors")
                         .select(all())
                         .apply(rs)

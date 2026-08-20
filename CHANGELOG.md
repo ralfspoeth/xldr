@@ -11,21 +11,75 @@ The versions are the git tags `xldr-<version>`; the published artifacts carry th
 ### Fixed
 
 - **A JSON record selector carrying only a discriminator was silently ignored.** The filter the author wrote was
-  dropped and the load ran over the whole document, reporting success. `RecordSelectorSpec` gains
-  `refuseDiscriminator`, the mirror of `refuseSelector`, and the three adapters that locate their records now call
-  it.
+  dropped and the load ran over the whole document, reporting success.
 
-  Only JSON was actually losing one. The canonical constructor already refuses a selector and a discriminator
-  together, so a discriminator can reach an adapter only where the selector is absent - and for XML and Excel an
-  absent selector is itself refused. What those two gain is an accurate message: a spec carrying a discriminator
-  used to fail with "needs a selector for this input", which tells the author about the thing they left out rather
-  than the thing they wrote. For JSON an absent selector legitimately means the whole document, which is why
-  nothing caught it there.
+  Only JSON was actually losing one, and the reason is worth recording because it is what `Locator` below was
+  written for. A record selector used to carry two nullable fields, a `String selector` and a `Discriminator`. Both
+  together was refused, so a discriminator could reach an adapter only where the selector was absent - and for XML
+  and Excel an absent selector was itself refused, which caught it by accident. For JSON an absent selector
+  legitimately means the whole document, so there was nothing left to notice.
 
-  The gap surfaced while migrating `swift-mt`, an out-of-tree adapter, to 0.34: it had the same hole and had to
-  write the check by hand for want of this method.
+  The two that caught it also complained about the wrong thing: a spec carrying a discriminator failed for want of
+  a selector, which tells the author what they left out rather than what they wrote. All three now name what they
+  found.
+
+  The gap surfaced while migrating `swift-mt`, an out-of-tree adapter, to 0.34: it had the same hole, having been
+  written against the same two fields.
+
+- **A load that committed and then failed to file the input away was counted as a failure.** The load and the
+  archive were caught in one clause, so a file whose rows were already in the database went to `hospital/` - which
+  is where an operator looks for work to redeliver, and "Loading twice" in the README says what redelivering it
+  does.
+
+  The two are now caught separately, because only one of them means nothing happened. A load is one transaction: if
+  it throws, nothing committed; if it returns, the rows are in and no later mishap takes them out. Such a file stays
+  in `work/` with a `<name>.loaded` marker beside it, and `recoverWork` reads that marker on the next start - the
+  existing note saying the outcome is unknown is right for a process that died mid-load and wrong for this file,
+  where it is known.
+
+  What made it reachable was `unique`, extracted as `FreeName` and tested for the first time. It checked whether the
+  plain name was free, appended a timestamp and returned that without checking, so where both were taken it handed
+  back a path that already existed - and every move this server makes is deliberately without `REPLACE_EXISTING`.
+  It now looks until it finds a free name, bounded, and says plainly in its javadoc that it is best effort: the move
+  mode is what actually refuses to overwrite, and this only makes the exception rare.
 
 ### Breaking
+
+- **A record selector says which records are its own with a `Locator`.** Three cases and no others: `At`, a
+  selector in the adapter's own syntax; `Where`, a discriminator; and `Every`, the input's records without further
+  qualification. `RecordSelectorSpec` carries one of them instead of a nullable `selector` and a nullable
+  `discriminator`.
+
+  **The spec format does not change.** `"selector": "//order"` is an `At`, a `discriminator` object is a `Where`,
+  saying neither is `Every`, and both schemas are untouched. This is the shape of the parsed result, not of the
+  file, and no existing spec reads differently - with one exception, below.
+
+  Two nullable fields are four states, of which one described no input at all. The constructor refused that fourth
+  state and each of the five adapters then sorted out the remaining three by hand, through `requireSelector`,
+  `refuseSelector` and `refuseDiscriminator` - methods that had to be called, in the right order, to have any
+  effect, and were not, which is the JSON defect above. Three cases in a sealed type say the same thing without
+  anyone having to remember: both-at-once cannot be constructed, `Every` is a case to handle rather than an absence
+  to overlook, and an adapter that forgets one does not compile.
+
+  The split across the five adapters turns out to be clean, which is the argument for the type more than any of
+  this: XML, JSON and Excel accept `At`, CSV and fixed-length accept `Where`, all five accept `Every`, and each
+  refuses exactly what is left. What a record selector is asking - *which records are mine?* - has two answers a
+  format can offer, and every format offers one of them.
+
+  Since both-at-once can no longer be built in Java, the rule that refuses it moved to the readers, which are now
+  the only things that can encounter it. It is a rule about spec files, and it lives where spec files are read.
+
+  Gone from `RecordSelectorSpec`: `selector()`, `discriminator()`, `requireSelector()`, `refuseSelector`,
+  `refuseDiscriminator`, and the three-argument convenience constructor. In their place, `locator()` and a switch.
+
+- **A blank record-selector `selector` is refused.** It used to mean two things: XML and Excel refused it, while
+  JSON resolved it to the whole document. `Locator.At` refuses a blank selector for everyone, which leaves one way
+  to say "every record" - saying nothing at all. A spec writing `"selector": ""` against a JSON input should drop
+  the member.
+
+  Neither schema says this yet: both type `selector` as a plain string, so an editor still calls `""` valid where
+  the reader now refuses it. That is the drift `XsdTest` exists to catch, and closing it means a new schema pair
+  rather than an edit to the published `0.32` files, which described `0.32` accurately.
 
 - **A record selector's field selectors have distinct names.** A spec that repeats one is refused when it is read,
   in either format and therefore for every adapter.

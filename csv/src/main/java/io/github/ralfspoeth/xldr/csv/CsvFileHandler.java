@@ -145,18 +145,18 @@ class CsvFileHandler implements InputAdapter {
             index = positionalIndex();
         }
 
-        // nothing to point at in a flat file, so a selector here is a spec
-        // written before the discriminator existed
-        record.refuseSelector("a flat file has no place to point at");
-
         var types = typesOf(record.fieldSelectors());
         var positions = positions(record.fieldSelectors(), fieldSelectors, index);
-        // which lines are of this kind. Absent means every line is, which is what
-        // a file holding one record type looks like
-        var discriminator = record.discriminator();
-        var rows = discriminator == null
-                ? lines.lines().gather(records(linesRead))
-                : filtered(lines, linesRead, discriminator, index.require(discriminator.at()));
+        // which lines are of this kind. Every means all of them, which is what a
+        // file holding one record type looks like; a selector is a spec written
+        // for a format that has somewhere to point, and there is nowhere here
+        var rows = switch (record.locator()) {
+            case Locator.Every _ -> lines.lines().gather(records(linesRead));
+            case Locator.Where(var test) ->
+                    filtered(lines, linesRead, test, index.require(test.at()));
+            case Locator.At at -> throw at.wrongBecause(
+                    record.name(), "a flat file has no place to point at");
+        };
         return new Result(fields, rows.map(values -> new Line(values, positions, types, formats)));
     }
 

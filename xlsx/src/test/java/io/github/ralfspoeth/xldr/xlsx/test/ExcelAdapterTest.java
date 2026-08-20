@@ -7,6 +7,7 @@ import io.github.ralfspoeth.xldr.spec.DataType;
 import io.github.ralfspoeth.xldr.spec.Discriminator;
 import io.github.ralfspoeth.xldr.spec.FieldSelectorSpec;
 import io.github.ralfspoeth.xldr.spec.InputSpec;
+import io.github.ralfspoeth.xldr.spec.Locator;
 import io.github.ralfspoeth.xldr.spec.RecordSelectorSpec;
 import io.github.ralfspoeth.xldr.spec.Selector;
 import org.apache.poi.ss.usermodel.Sheet;
@@ -52,7 +53,7 @@ public class ExcelAdapterTest {
         });
 
         var spec = new InputSpec(XLSX, List.of(
-                new RecordSelectorSpec("rows", "data!A2:C3", List.of(
+                new RecordSelectorSpec("rows", new Locator.At("data!A2:C3"), List.of(
                         new FieldSelectorSpec("id", "A", DataType.INTEGRAL),
                         new FieldSelectorSpec("name", "B", DataType.TEXT),
                         new FieldSelectorSpec("amount", "C", DataType.DECIMAL),
@@ -96,7 +97,7 @@ public class ExcelAdapterTest {
         });
 
         var spec = new InputSpec(XLSX, List.of(
-                new RecordSelectorSpec("all", "data!A:B", List.of(
+                new RecordSelectorSpec("all", new Locator.At("data!A:B"), List.of(
                         new FieldSelectorSpec("v", "1", DataType.INTEGRAL),
                         new FieldSelectorSpec("label", "2", DataType.TEXT)
                 ))
@@ -119,15 +120,16 @@ public class ExcelAdapterTest {
     /**
      * A discriminator is refused by name.
      * <p>
-     * It was refused before too, but as a missing selector: this adapter requires
-     * a range, so a record selector carrying only a discriminator failed with
-     * "needs a selector for this input" - telling the author about the thing they
-     * left out rather than the thing they wrote.
+     * It was refused before too, but as a missing selector: this adapter needs a
+     * range, so a record selector carrying only a discriminator failed for want
+     * of one - telling the author about the thing they left out rather than the
+     * thing they wrote. {@link Locator.Where} is now a case of its own, and the
+     * complaint belongs to it.
      */
     @Test
     public void rejectsAdiscriminator() {
-        var spec = new InputSpec(XLSX, List.of(new RecordSelectorSpec("rows", null,
-                new Discriminator.Equals(new Selector.Nth(1), "O"),
+        var spec = new InputSpec(XLSX, List.of(new RecordSelectorSpec("rows",
+                new Locator.Where(new Discriminator.Equals(new Selector.Nth(1), "O")),
                 List.of(new FieldSelectorSpec("id", "A", DataType.TEXT)))), List.of(), Map.of());
         var thrown = assertThrows(IllegalArgumentException.class, () -> adapter(spec));
         assertAll(
@@ -138,7 +140,7 @@ public class ExcelAdapterTest {
     @Test
     public void rejectsAmalformedRange() {
         var spec = new InputSpec(XLSX, List.of(
-                new RecordSelectorSpec("bad", "A2:C", List.of())
+                new RecordSelectorSpec("bad", new Locator.At("A2:C"), List.of())
         ), List.of(), Map.of());
         assertThrows(IllegalArgumentException.class, () -> adapter(spec));
     }
@@ -163,7 +165,7 @@ public class ExcelAdapterTest {
         });
 
         var spec = new InputSpec(XLSX, List.of(
-                new RecordSelectorSpec("rows", "A2:B2", List.of(
+                new RecordSelectorSpec("rows", new Locator.At("A2:B2"), List.of(
                         new FieldSelectorSpec("id", "A", DataType.INTEGRAL),
                         new FieldSelectorSpec("name", "B", DataType.TEXT)
                 ))
@@ -204,7 +206,7 @@ public class ExcelAdapterTest {
         });
 
         var spec = new InputSpec(XLSX, List.of(
-                new RecordSelectorSpec("rows", "data!C2:D3", List.of(
+                new RecordSelectorSpec("rows", new Locator.At("data!C2:D3"), List.of(
                         new FieldSelectorSpec("counted", new Selector.Nth(1), DataType.TEXT),
                         new FieldSelectorSpec("alsoCounted", new Selector.Nth(2), DataType.TEXT),
                         new FieldSelectorSpec("absoluteDigit", "1", DataType.TEXT),

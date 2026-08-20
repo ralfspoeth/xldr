@@ -40,14 +40,14 @@ public class XmlMappingSpecReaderTest {
 
         var expected = new MappingSpec(
                 new InputSpec("text/xml", List.of(
-                        new RecordSelectorSpec("fund", "/root/fund", List.of(
+                        new RecordSelectorSpec("fund", new Locator.At("/root/fund"), List.of(
                                 new FieldSelectorSpec("id", "@id", DataType.TEXT),
                                 // lower case in the document, the enum is matched case-insensitively
                                 new FieldSelectorSpec("nav", "nav", DataType.DECIMAL),
                                 // no type attribute at all
                                 new FieldSelectorSpec("desc", "normalize-space(./text())", null)
                         )),
-                        new RecordSelectorSpec("position", "//position", List.of(
+                        new RecordSelectorSpec("position", new Locator.At("//position"), List.of(
                                 new FieldSelectorSpec("fund", "../../../fund/@id", null)
                         ))
                 ), List.of(), Map.of()),

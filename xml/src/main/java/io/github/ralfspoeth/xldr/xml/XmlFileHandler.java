@@ -3,6 +3,7 @@ package io.github.ralfspoeth.xldr.xml;
 import io.github.ralfspoeth.xldr.ia.*;
 import io.github.ralfspoeth.xldr.spec.FieldSelectorSpec;
 import io.github.ralfspoeth.xldr.spec.InputSpec;
+import io.github.ralfspoeth.xldr.spec.Locator;
 import io.github.ralfspoeth.xldr.spec.Selector;
 import org.jspecify.annotations.Nullable;
 import org.w3c.dom.Node;
@@ -48,12 +49,18 @@ class XmlFileHandler implements InputAdapter {
 
         var xpath = newXPath(namespaces);
         for (var recordSpec : spec.recordSelectors()) {
-            // before requiring the selector, so that a spec carrying a
-            // discriminator is told about the thing it wrote rather than about
-            // the thing it left out
-            recordSpec.refuseDiscriminator("an XML document has records to point at");
-            // an XPath has to point somewhere, so this input cannot omit it
-            var path = recordSpec.requireSelector();
+            // an XPath has to point somewhere, so this input cannot do without
+            // one - and the two it cannot honour each say what the author wrote
+            // rather than what they left out. Spelled out rather than caught by
+            // a total pattern, so that a fourth kind of locator would not be
+            // quietly refused here but would stop the build until someone said
+            // what XML makes of it
+            var because = "an XML document has records to point at";
+            var path = switch (recordSpec.locator()) {
+                case Locator.At(var selector) -> selector;
+                case Locator.Where where -> throw where.wrongBecause(recordSpec.name(), because);
+                case Locator.Every every -> throw every.wrongBecause(recordSpec.name(), because);
+            };
             var record = new XmlRecordSelector(
                     recordSpec.name(), path, compile(xpath, path));
             if (recordSelectors.putIfAbsent(recordSpec.name(), record) != null) {

@@ -7,6 +7,7 @@ import io.github.ralfspoeth.xldr.spec.DataType;
 import io.github.ralfspoeth.xldr.spec.Discriminator;
 import io.github.ralfspoeth.xldr.spec.FieldSelectorSpec;
 import io.github.ralfspoeth.xldr.spec.InputSpec;
+import io.github.ralfspoeth.xldr.spec.Locator;
 import io.github.ralfspoeth.xldr.spec.RecordSelectorSpec;
 import io.github.ralfspoeth.xldr.spec.Selector;
 import org.junit.jupiter.api.Test;
@@ -30,8 +31,12 @@ public class JsonAdapterTest {
     private static final String MIME = "application/json";
 
     private static InputSpec spec(String recordSelector, FieldSelectorSpec... fields) {
+        return spec(new Locator.At(recordSelector), fields);
+    }
+
+    private static InputSpec spec(Locator locator, FieldSelectorSpec... fields) {
         return new InputSpec(MIME,
-                List.of(new RecordSelectorSpec("rec", recordSelector, List.of(fields))),
+                List.of(new RecordSelectorSpec("rec", locator, List.of(fields))),
                 List.of(),
                 Map.of());
     }
@@ -188,24 +193,37 @@ public class JsonAdapterTest {
     /**
      * The document itself may be the array of records.
      * <p>
-     * Both spellings of "no selector" mean it - blank and absent alike resolve
-     * to the document. This adapter is one of those that can do without one, so
-     * it reads {@code selector()} rather than {@code requireSelector()}: for
-     * JSON an absent selector is an answer, not an omission.
+     * {@link Locator.Every} is a case this adapter honours rather than one it
+     * refuses: for JSON, saying nothing about where the records are is an answer
+     * and not an omission, which is what a file that is one top-level array
+     * looks like.
      */
     @Test
     public void readsAtopLevelArray() throws IOException {
-        for (var selector : new String[]{"", null}) {
-            var spec = spec(selector, new FieldSelectorSpec("id", "id", DataType.TEXT));
+        var spec = spec(Locator.every(), new FieldSelectorSpec("id", "id", DataType.TEXT));
 
-            var result = adapter(spec, Map.of())
-                    .parse(in("""
-                            [ { "id": "A-1" }, { "id": "A-2" } ]
-                            """), "rec", Set.of("id"));
+        var result = adapter(spec, Map.of())
+                .parse(in("""
+                        [ { "id": "A-1" }, { "id": "A-2" } ]
+                        """), "rec", Set.of("id"));
 
-            assertEquals(List.of("A-1", "A-2"), result.rows().map(r -> r.get("id")).toList(),
-                    "selector " + (selector == null ? "absent" : "blank"));
-        }
+        assertEquals(List.of("A-1", "A-2"), result.rows().map(r -> r.get("id")).toList());
+    }
+
+    /**
+     * A blank selector is not the same thing, and no longer reads as though it
+     * were.
+     * <p>
+     * It used to: this adapter resolved {@code ""} to the document while XML and
+     * Excel refused it, so one spelling meant two things depending on which
+     * adapter read it. {@link Locator.At} refuses a blank selector for everyone,
+     * which leaves exactly one way to say "every record" - saying nothing.
+     */
+    @Test
+    public void refusesAblankSelector() {
+        var thrown = assertThrows(IllegalArgumentException.class,
+                () -> spec("", new FieldSelectorSpec("id", "id", DataType.TEXT)));
+        assertTrue(thrown.getMessage().contains("blank"), thrown.getMessage());
     }
 
     /**
@@ -312,8 +330,8 @@ public class JsonAdapterTest {
      */
     @Test
     public void rejectsAdiscriminator() {
-        var spec = new InputSpec(MIME, List.of(new RecordSelectorSpec("rec", null,
-                new Discriminator.Equals(new Selector.Nth(1), "O"),
+        var spec = new InputSpec(MIME, List.of(new RecordSelectorSpec("rec",
+                new Locator.Where(new Discriminator.Equals(new Selector.Nth(1), "O")),
                 List.of(new FieldSelectorSpec("id", "id", DataType.TEXT)))), List.of(), Map.of());
         var thrown = assertThrows(IllegalArgumentException.class, () -> adapter(spec, Map.of()));
         assertAll(

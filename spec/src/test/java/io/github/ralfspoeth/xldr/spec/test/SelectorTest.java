@@ -1,6 +1,7 @@
 package io.github.ralfspoeth.xldr.spec.test;
 
 import io.github.ralfspoeth.xldr.spec.Discriminator;
+import io.github.ralfspoeth.xldr.spec.Locator;
 import io.github.ralfspoeth.xldr.spec.MappingSpec;
 import io.github.ralfspoeth.xldr.spec.Selector;
 import io.github.ralfspoeth.xldr.spec.io.JsonMappingSpecReader;
@@ -10,7 +11,6 @@ import org.junit.jupiter.api.function.Executable;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
-import java.util.Objects;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.junit.jupiter.api.Assertions.assertAll;
@@ -58,8 +58,11 @@ class SelectorTest {
     }
 
     private static Discriminator onlyDiscriminator(MappingSpec spec) {
-        var d = spec.inputSpec().recordSelectors().iterator().next().discriminator();
-        return Objects.requireNonNull(d, "the record selector carried no discriminator");
+        var locator = spec.inputSpec().recordSelectors().iterator().next().locator();
+        if (locator instanceof Locator.Where(var test)) {
+            return test;
+        }
+        throw new AssertionError("the record selector is " + locator + ", not a discriminator");
     }
 
     // ---- a field selector names a component or counts one ---------------------

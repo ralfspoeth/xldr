@@ -1,8 +1,10 @@
 package io.github.ralfspoeth.xldr.spec.io;
 
 import io.github.ralfspoeth.xldr.spec.Discriminator;
+import io.github.ralfspoeth.xldr.spec.Locator;
 import io.github.ralfspoeth.xldr.spec.Selector;
 import io.github.ralfspoeth.xldr.spec.ValueSource;
+import org.jspecify.annotations.Nullable;
 
 import java.util.Optional;
 
@@ -92,6 +94,42 @@ interface SpecNode {
             return new Selector.Nth(nth.get());
         }
         throw new IllegalArgumentException(what + " needs a selector or an nth: " + shown());
+    }
+
+    /**
+     * Which records of the input are of one kind: a {@code selector} pointing at
+     * them, a {@code discriminator} testing them, or neither, which is every
+     * record there is.
+     * <p>
+     * Saying both is refused, and this is the only place left that can refuse it:
+     * a {@link Locator} has three cases and both-at-once is not one of them, so
+     * the combination can no longer be constructed in Java and survives only as
+     * something a spec file might say. The check moved here from the record's
+     * constructor for that reason, rather than being weakened - what used to be
+     * a rule enforced at construction is now a shape that cannot be built.
+     * <p>
+     * The discriminator is passed in rather than looked up, the two formats
+     * keeping it in different places - a JSON member, an XML child element - and
+     * traversal being the part each reader owns.
+     *
+     * @param what          names the element in the complaint
+     * @param discriminator the discriminator this element carries, or
+     *                      {@code null} where it carries none
+     */
+    default Locator locator(String what, @Nullable Discriminator discriminator) {
+        var selector = string("selector");
+        if (selector.isPresent() && discriminator != null) {
+            throw new IllegalArgumentException(what + " has both a selector and a discriminator: '"
+                    + selector.get() + "' says where the records are, " + discriminator + " says"
+                    + " which records are of this kind, and no input is read both ways: " + shown());
+        }
+        if (selector.isPresent()) {
+            return new Locator.At(selector.get());
+        }
+        if (discriminator != null) {
+            return new Locator.Where(discriminator);
+        }
+        return Locator.every();
     }
 
     /**

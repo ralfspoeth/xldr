@@ -7,6 +7,7 @@ import io.github.ralfspoeth.xldr.spec.DataType;
 import io.github.ralfspoeth.xldr.spec.Discriminator;
 import io.github.ralfspoeth.xldr.spec.FieldSelectorSpec;
 import io.github.ralfspoeth.xldr.spec.InputSpec;
+import io.github.ralfspoeth.xldr.spec.Locator;
 import io.github.ralfspoeth.xldr.spec.RecordSelectorSpec;
 import io.github.ralfspoeth.xldr.spec.Selector;
 import org.junit.jupiter.api.Test;
@@ -36,7 +37,8 @@ public class FixedLengthAdapterTest {
      * nothing noticed.
      */
     private static InputSpec spec(FieldSelectorSpec... fields) {
-        return new InputSpec(MIME, List.of(new RecordSelectorSpec("rec", null, List.of(fields))), List.of(), Map.of());
+        return new InputSpec(MIME, List.of(new RecordSelectorSpec("rec",
+                Locator.every(), List.of(fields))), List.of(), Map.of());
     }
 
     /**
@@ -284,7 +286,7 @@ public class FixedLengthAdapterTest {
      */
     @Test
     public void rejectsAselectorOnTheRecordSelector() {
-        var spec = new InputSpec(MIME, List.of(new RecordSelectorSpec("rec", "//record",
+        var spec = new InputSpec(MIME, List.of(new RecordSelectorSpec("rec", new Locator.At("//record"),
                 List.of(new FieldSelectorSpec("id", "0:3", DataType.TEXT)))), List.of(), Map.of());
         var thrown = assertThrows(IllegalArgumentException.class, () -> adapter(spec, Map.of()));
         assertAll(
@@ -303,12 +305,12 @@ public class FixedLengthAdapterTest {
     @Test
     public void twoRecordSelectorsPartitionTheFile() throws IOException {
         var spec = new InputSpec(MIME, List.of(
-                new RecordSelectorSpec("orders", null,
-                        new Discriminator.Equals(new Selector.Text("0:2"), "OR"),
+                new RecordSelectorSpec("orders",
+                        new Locator.Where(new Discriminator.Equals(new Selector.Text("0:2"), "OR")),
                         List.of(new FieldSelectorSpec("id", "2:6", DataType.TEXT),
                                 new FieldSelectorSpec("cust", "6:11", DataType.TEXT))),
-                new RecordSelectorSpec("lines", null,
-                        new Discriminator.Equals(new Selector.Text("0:2"), "LI"),
+                new RecordSelectorSpec("lines",
+                        new Locator.Where(new Discriminator.Equals(new Selector.Text("0:2"), "LI")),
                         List.of(new FieldSelectorSpec("order", "2:6", DataType.TEXT),
                                 new FieldSelectorSpec("sku", "6:14", DataType.TEXT),
                                 new FieldSelectorSpec("qty", "14:17", DataType.INTEGRAL)))
@@ -355,11 +357,11 @@ public class FixedLengthAdapterTest {
     @Test
     public void theRunningLeftBoundDoesNotCrossRecordSelectors() throws IOException {
         var spec = new InputSpec(MIME, List.of(
-                new RecordSelectorSpec("first", null,
-                        new Discriminator.Equals(new Selector.Text("0:1"), "A"),
+                new RecordSelectorSpec("first",
+                        new Locator.Where(new Discriminator.Equals(new Selector.Text("0:1"), "A")),
                         List.of(new FieldSelectorSpec("f", "0:4", DataType.TEXT))),
-                new RecordSelectorSpec("second", null,
-                        new Discriminator.Equals(new Selector.Text("0:1"), "B"),
+                new RecordSelectorSpec("second",
+                        new Locator.Where(new Discriminator.Equals(new Selector.Text("0:1"), "B")),
                         // omits its left bound, and must begin at 0 rather than at 4
                         List.of(new FieldSelectorSpec("g", ":4", DataType.TEXT)))
         ), List.of(), Map.of());
@@ -387,8 +389,8 @@ public class FixedLengthAdapterTest {
      */
     @Test
     public void rejectsAcountingDiscriminator() {
-        var spec = new InputSpec(MIME, List.of(new RecordSelectorSpec("rec", null,
-                new Discriminator.Equals(new Selector.Nth(1), "A"),
+        var spec = new InputSpec(MIME, List.of(new RecordSelectorSpec("rec",
+                new Locator.Where(new Discriminator.Equals(new Selector.Nth(1), "A")),
                 List.of(new FieldSelectorSpec("id", "0:3", DataType.TEXT)))), List.of(), Map.of());
         var thrown = assertThrows(IllegalArgumentException.class, () -> adapter(spec, Map.of()));
         assertAll(
@@ -403,8 +405,8 @@ public class FixedLengthAdapterTest {
      */
     @Test
     public void rejectsAdiscriminatorRangeWithoutAleftBound() {
-        var spec = new InputSpec(MIME, List.of(new RecordSelectorSpec("rec", null,
-                new Discriminator.Equals(new Selector.Text(":2"), "A"),
+        var spec = new InputSpec(MIME, List.of(new RecordSelectorSpec("rec",
+                new Locator.Where(new Discriminator.Equals(new Selector.Text(":2"), "A")),
                 List.of(new FieldSelectorSpec("id", "0:3", DataType.TEXT)))), List.of(), Map.of());
         var thrown = assertThrows(IllegalArgumentException.class, () -> adapter(spec, Map.of()));
         assertTrue(thrown.getMessage().contains("no previous field"), thrown.getMessage());
@@ -417,8 +419,10 @@ public class FixedLengthAdapterTest {
     @Test
     public void rejectsTwoRecordSelectorsOfOneName() {
         var spec = new InputSpec(MIME, List.of(
-                new RecordSelectorSpec("rec", null, List.of(new FieldSelectorSpec("a", "0:3", DataType.TEXT))),
-                new RecordSelectorSpec("rec", null, List.of(new FieldSelectorSpec("b", "3:6", DataType.TEXT)))
+                new RecordSelectorSpec("rec",
+                        Locator.every(), List.of(new FieldSelectorSpec("a", "0:3", DataType.TEXT))),
+                new RecordSelectorSpec("rec",
+                        Locator.every(), List.of(new FieldSelectorSpec("b", "3:6", DataType.TEXT)))
         ), List.of(), Map.of());
         var thrown = assertThrows(IllegalArgumentException.class, () -> adapter(spec, Map.of()));
         assertTrue(thrown.getMessage().contains("could not say which"), thrown.getMessage());

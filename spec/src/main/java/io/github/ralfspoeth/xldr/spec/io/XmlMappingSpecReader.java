@@ -112,11 +112,12 @@ public class XmlMappingSpecReader implements MappingSpecReader {
     }
 
     /**
-     * Both ways of selecting records are optional, and no record selector has
-     * both. A {@code selector} attribute points at records in a tree or a sheet;
-     * a {@code <discriminator>} child picks lines out of a flat file; and neither
+     * A {@code selector} attribute points at records in a tree or a sheet; a
+     * {@code <discriminator>} child picks lines out of a flat file; and neither
      * says that the whole input holds one kind of record, which a CSV with a
-     * header or a fixed-length file usually does.
+     * header or a fixed-length file usually does. The three are the cases of
+     * {@link io.github.ralfspoeth.xldr.spec.Locator}, and which of them this is
+     * gets decided once, in {@link SpecNode#locator}.
      *
      * <pre>
      * &lt;recordSelector name="orders"&gt;
@@ -125,10 +126,11 @@ public class XmlMappingSpecReader implements MappingSpecReader {
      * </pre>
      */
     private static RecordSelectorSpec recordSelectorSpec(Element recordSelector) {
+        var name = required(recordSelector, "name");
         return new RecordSelectorSpec(
-                required(recordSelector, "name"),
-                attributeValue("selector").apply(recordSelector).orElse(null),
-                discriminator(recordSelector),
+                name,
+                node(recordSelector).locator("record selector '" + name + "'",
+                        discriminator(recordSelector)),
                 elements("fieldSelector")
                         .apply(recordSelector)
                         .map(XmlMappingSpecReader::fieldSelectorSpec)
