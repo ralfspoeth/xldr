@@ -137,7 +137,7 @@ class FileProcessor {
      */
     private static boolean configured(Feed.Active feed, Path file) {
         boolean conf = Files.exists(feed.specFile());
-        if(!conf) {
+        if (!conf) {
             LOG.log(DEBUG, () -> "not loading " + file.getFileName()
                     + " [" + feed.name() + "]: the spec is gone");
         }
@@ -156,17 +156,30 @@ class FileProcessor {
     /**
      * Loads an already-claimed file, under the concurrency permit, and files it
      * away afterwards.
+     * <p>
+     * The load and the filing away are caught separately, because only one of
+     * them means nothing happened. A load is one transaction: if it throws,
+     * nothing is committed and the file is a failure to be corrected and
+     * redelivered. Once it returns, the rows are in the database and no later
+     * mishap can take them out again.
+     * <p>
+     * One clause used to cover both, so a file that had loaded and then failed to
+     * archive was counted as a failure and sent to the hospital with its rows
+     * already committed - and an operator doing what the hospital is for would
+     * load them a second time. A name collision could cause it, which
+     * {@link FreeName} now makes very unlikely; a full disk still can, and no
+     * amount of care over names helps there.
      */
     private void runLoad(Feed.Active feed, Path claimed, String originalName) {
-        if (acquirePermit(feed, claimed)) {
-            // from here the permit is held, and the finally below is what returns it
-            statistics.loadStarted();
+        if (!acquirePermit(feed, claimed)) {
+            return;
+        }
+        // from here the permit is held, and the finally below is what returns it
+        statistics.loadStarted();
+        try {
+            int rows;
             try {
-                var rows = new LoadJob(feed.mappingSpec(), feed.directory(), connectionSource).load(claimed);
-                var target = archive(feed, claimed);
-                statistics.loaded(feed.name(), rows);
-                LOG.log(INFO, () -> "loaded " + rows + " row(s) from " + originalName
-                        + " [" + feed.name() + "] -> " + target);
+                rows = new LoadJob(feed.mappingSpec(), feed.directory(), connectionSource).load(claimed);
             } catch (Exception e) {
                 statistics.failed(feed.name());
                 LOG.log(ERROR, () -> "load failed for " + originalName + " [" + feed.name() + "]: " + e);
@@ -175,12 +188,66 @@ class FileProcessor {
                 } catch (IOException io) {
                     LOG.log(ERROR, () -> "could not move " + claimed + " to the hospital: " + io);
                 }
-            } finally {
-                statistics.loadFinished();
-                loadPermits.release();
+                return;
             }
+            // committed. Counted here rather than after the archive, because that
+            // is what happened and no filing accident makes it untrue
+            statistics.loaded(feed.name(), rows);
+            try {
+                var target = archive(feed, claimed);
+                LOG.log(INFO, () -> "loaded " + rows + " row(s) from " + originalName
+                        + " [" + feed.name() + "] -> " + target);
+            } catch (Exception e) {
+                strandLoaded(feed, claimed, originalName, rows, e);
+            }
+        } finally {
+            statistics.loadFinished();
+            loadPermits.release();
         }
     }
+
+    /**
+     * A file whose rows are committed and which could not be archived.
+     * <p>
+     * It stays in {@code work/}, which is the one directory that is neither an
+     * inbox nor an outcome, and a marker goes beside it saying what happened. Not
+     * the hospital: that is where an operator looks for work to redeliver, and
+     * redelivering this one duplicates rows. Not left silent either - the marker
+     * is what {@link #recoverWork} reads later to say something better than "it is
+     * unknown whether the transaction committed", because here it is known.
+     */
+    private void strandLoaded(Feed.Active feed, Path claimed, String originalName, int rows, Exception failure) {
+        LOG.log(ERROR, () -> "loaded " + rows + " row(s) from " + originalName + " [" + feed.name()
+                + "] but could not archive the file: " + failure + ". The rows are committed."
+                + " The file is left in " + claimed + " and must not be redelivered.");
+        try {
+            Files.writeString(loadedMarker(claimed), """
+                    This file's load COMMITTED. Its rows are in the database.
+                    
+                    Archiving it afterwards failed, which is why it is still here rather than
+                    under archive/. Do not move it back into in/ - that would load the rows a
+                    second time. Once the reason for the archive failure is dealt with, move
+                    the file into archive/ by hand and delete this marker.
+                    
+                    feed:   %s
+                    input:  %s
+                    rows:   %d
+                    failed: %s
+                    cause:  %s
+                    """.formatted(feed.name(), originalName, rows, LocalDateTime.now(), failure));
+        } catch (IOException io) {
+            LOG.log(ERROR, () -> "could not even mark " + claimed + " as loaded: " + io);
+        }
+    }
+
+    /**
+     * where {@link #strandLoaded} records that a file's rows are already in
+     */
+    private static Path loadedMarker(Path claimed) {
+        return claimed.resolveSibling(claimed.getFileName() + LOADED);
+    }
+
+    private static final String LOADED = ".loaded";
 
     /**
      * Waits for a concurrency permit, putting the file back if the wait is
@@ -300,33 +367,62 @@ class FileProcessor {
      * Anything left in {@code work/} was claimed by a process that then died. It
      * is unknown whether the load committed, so it is not retried automatically -
      * that could duplicate rows - but handed to an operator.
+     * <p>
+     * Unknown in general, but not always: a file that {@link #strandLoaded} left
+     * here carries a marker saying its rows are in, and then the note written
+     * beside it says so rather than telling an operator to go and check. Both end
+     * in {@code hospital/}, since {@code work/} means "a load is running" and
+     * nothing here is; what differs is what the note tells them to do, which is
+     * the whole of the difference between correcting a failure and duplicating a
+     * success.
      */
     public void recoverWork(Feed feed) {
         try (var stale = Files.list(feed.work())) {
-            stale.filter(Files::isRegularFile).forEach(file -> {
-                try {
-                    var target = unique(feed.hospital(), file.getFileName().toString());
-                    Files.createDirectories(feed.hospital());
-                    // the log first and the move last, as in hospitalise: a file
-                    // in hospital/ is never there without its explanation
-                    Files.writeString(
-                            feed.hospital().resolve(target.getFileName() + ".recovered.log"),
-                            """
-                                    Found in work/ at startup. A previous run claimed this file and did not finish.
-                                    Whether its transaction committed is unknown - check the target tables
-                                    before moving it back into in/.
-                                    """);
-                    Files.move(file, target);
-                    LOG.log(WARNING, () -> "recovered stale claim " + file.getFileName()
-                            + " [" + feed.name() + "] -> hospital");
-                } catch (IOException e) {
-                    LOG.log(ERROR, () -> "could not recover " + file + ": " + e);
-                }
-            });
+            stale.filter(Files::isRegularFile)
+                    // a marker is not an input; it is what the input beside it means
+                    .filter(file -> !file.getFileName().toString().endsWith(LOADED))
+                    .forEach(file -> recover(feed, file));
         } catch (IOException e) {
             LOG.log(WARNING, () -> "cannot list " + feed.work() + ": " + e);
         }
     }
+
+    /**
+     * One file out of {@code work/}, with the note that says which of the two
+     * cases it is.
+     */
+    private static void recover(Feed feed, Path file) {
+        var marker = loadedMarker(file);
+        var loaded = Files.exists(marker);
+        try {
+            var target = unique(feed.hospital(), file.getFileName().toString());
+            Files.createDirectories(feed.hospital());
+            // the log first and the move last, as in hospitalise: a file in
+            // hospital/ is never there without its explanation
+            Files.writeString(feed.hospital().resolve(target.getFileName() + ".recovered.log"),
+                    loaded ? LOADED_NOT_ARCHIVED : OUTCOME_UNKNOWN);
+            Files.move(file, target);
+            Files.deleteIfExists(marker);
+            LOG.log(loaded ? ERROR : WARNING,
+                    () -> (loaded ? "recovered loaded but unarchived " : "recovered stale claim ")
+                            + file.getFileName() + " [" + feed.name() + "] -> hospital");
+        } catch (IOException e) {
+            LOG.log(ERROR, () -> "could not recover " + file + ": " + e);
+        }
+    }
+
+    private static final String OUTCOME_UNKNOWN = """
+            Found in work/ at startup. A previous run claimed this file and did not finish.
+            Whether its transaction committed is unknown - check the target tables
+            before moving it back into in/.
+            """;
+
+    private static final String LOADED_NOT_ARCHIVED = """
+            Found in work/ at startup, marked as loaded. Its transaction COMMITTED and its
+            rows are in the database; only archiving it failed. Do not move it back into
+            in/ - that would load the rows a second time. It is here rather than under
+            archive/ because the archive could not be written.
+            """;
 
     /**
      * Processes everything already sitting in {@code in/} - files that arrived
@@ -371,15 +467,12 @@ class FileProcessor {
         return name.startsWith(".") || name.endsWith(".tmp") || name.endsWith(".part");
     }
 
+    /**
+     * What makes a colliding name different here is the moment, which is the
+     * server's decision rather than {@link FreeName}'s - that type only knows
+     * that the name it hands back is not taken.
+     */
     private static Path unique(Path dir, String name) {
-        var candidate = dir.resolve(name);
-        if (!Files.exists(candidate)) {
-            return candidate;
-        }
-        var stamp = LocalDateTime.now().format(STAMP);
-        var dot = name.lastIndexOf('.');
-        return dir.resolve(dot > 0
-                ? name.substring(0, dot) + "." + stamp + name.substring(dot)
-                : name + "." + stamp);
+        return FreeName.in(dir, name, LocalDateTime.now().format(STAMP));
     }
 }
