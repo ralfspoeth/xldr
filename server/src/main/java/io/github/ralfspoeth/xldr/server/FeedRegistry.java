@@ -31,8 +31,16 @@ import static java.lang.System.Logger.Level.*;
  * A failure is contained in the feed that caused it: an unreadable directory or
  * an unparseable spec deactivates that one feed and is logged, it never
  * propagates to a sibling or to the watcher.
+ * <p>
+ * <strong>Public for the same reason {@link FreeName} is:</strong> so that it
+ * can be tested. Nothing outside this module is expected to construct one - the
+ * {@link Watcher} owns the registry of a running server - and the widening buys
+ * a test for the transitions a feed goes through, which are the ones that
+ * decide whether a deployment comes up at all. {@link Feed} deliberately stays
+ * package-private, so a caller in another package can ask how many feeds are
+ * active and which inbox belongs to one, and cannot take a feed apart.
  */
-class FeedRegistry {
+public class FeedRegistry {
 
     private static final System.Logger LOG = System.getLogger(FeedRegistry.class.getName());
 

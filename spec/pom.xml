@@ -17,6 +17,13 @@
             <artifactId>junit-jupiter-api</artifactId>
             <scope>test</scope>
         </dependency>
+        <!-- so that JsonSchemaTest can hold the published JSON schema to what
+             the reader accepts, as XsdTest does for the XSD -->
+        <dependency>
+            <groupId>com.networknt</groupId>
+            <artifactId>json-schema-validator</artifactId>
+            <scope>test</scope>
+        </dependency>
         <dependency>
             <groupId>io.github.ralfspoeth</groupId>
             <artifactId>json</artifactId>

@@ -72,7 +72,12 @@
         <th>XML</th>
     </tr>
     <tr>
-        <td>0.32 - 0.34 (current)</td>
+        <td>0.35 (current)</td>
+        <td><a href="schema/mapping-spec-0.35.json">mapping-spec-0.35.json</a></td>
+        <td><a href="schema/mapping-spec-0.35.xsd">mapping-spec-0.35.xsd</a></td>
+    </tr>
+    <tr>
+        <td>0.32 - 0.34</td>
         <td><a href="schema/mapping-spec-0.32.json">mapping-spec-0.32.json</a></td>
         <td><a href="schema/mapping-spec-0.32.xsd">mapping-spec-0.32.xsd</a></td>
     </tr>
@@ -123,7 +128,15 @@
     adapters that existed when the schema was published and lags behind ones added since. That is how
     <code>text/tab-separated-values</code> spent four releases missing from the list while validating perfectly well:
     added to the adapter in 0.28, it reached the schema only in 0.32, the first release since to change the format at
-    all.
+    all. The list has not moved since; no adapter has been added since 0.32.
+</p>
+
+<p>
+    In 0.35 a <code>selector</code> may no longer be blank, wherever one appears. It used to mean two things: the
+    XML and Excel adapters refused it while the JSON one resolved it to the whole document, so the same spelling
+    read two ways depending on who read it. There is now one way to say "every record", which is to leave the
+    attribute or member out. Nothing else about the format changed, and a spec that does not write a blank selector
+    - which is every spec anyone has written on purpose - validates against 0.32 and 0.35 alike.
 </p>
 
 <p>
@@ -170,7 +183,7 @@
 <p>In a JSON spec, as a member the reader does not recognise and therefore ignores:</p>
 
 <pre><code>{
-  "$schema": "https://ralfspoeth.github.io/xldr/schema/mapping-spec-0.32.json",
+  "$schema": "https://ralfspoeth.github.io/xldr/schema/mapping-spec-0.35.json",
   "input": {
     "mimeType": "text/csv",
     "properties": { "fieldSeparator": "," },
@@ -182,7 +195,7 @@
 <p>In an XML spec, as the schema location of a document that has no namespace of its own:</p>
 
 <pre><code>&lt;mappingSpec xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-             xsi:noNamespaceSchemaLocation="https://ralfspoeth.github.io/xldr/schema/mapping-spec-0.32.xsd"&gt;
+             xsi:noNamespaceSchemaLocation="https://ralfspoeth.github.io/xldr/schema/mapping-spec-0.35.xsd"&gt;
     &lt;input mimeType="text/xml"&gt;
         ...
     &lt;/input&gt;

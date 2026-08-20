@@ -22,17 +22,24 @@ import static java.lang.System.Logger.Level.WARNING;
  * <p>
  * Registration is best effort: a JMX server that will not take the bean is a
  * reason to log and carry on, never a reason for the server not to load files.
+ * <p>
+ * <strong>Public for the same reason {@link FeedRegistry} is:</strong> so that
+ * it can be tested. What a monitor reports is worth a test of its own - a gauge
+ * that quietly counts the wrong thing is believed for as long as nobody checks
+ * it against the directory - and every type in its signature was public
+ * already, {@link FeedStatus} and {@link FeedState} being what the MXBean
+ * hands out.
  */
-final class ServerStatus implements ServerMXBean {
+public final class ServerStatus implements ServerMXBean {
 
-    static final String OBJECT_NAME = "io.github.ralfspoeth.xldr:type=Server";
+    public static final String OBJECT_NAME = "io.github.ralfspoeth.xldr:type=Server";
 
     private static final System.Logger LOG = System.getLogger(ServerStatus.class.getName());
 
     private final FeedRegistry registry;
     private final Statistics statistics;
 
-    ServerStatus(FeedRegistry registry, Statistics statistics) {
+    public ServerStatus(FeedRegistry registry, Statistics statistics) {
         this.registry = registry;
         this.statistics = statistics;
     }
@@ -41,7 +48,7 @@ final class ServerStatus implements ServerMXBean {
      * Registers the bean, returning what unregisters it again - or nothing at
      * all if it could not be registered.
      */
-    static AutoCloseable register(FeedRegistry registry, Statistics statistics) {
+    public static AutoCloseable register(FeedRegistry registry, Statistics statistics) {
         try {
             var name = new ObjectName(OBJECT_NAME);
             var server = ManagementFactory.getPlatformMBeanServer();

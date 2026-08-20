@@ -25,17 +25,17 @@ guesses the rest.
 **The schema, and its version.** This is the one that decides whether the answer is any good:
 
     Write an XLDR mapping spec (spec.json) valid against
-    https://ralfspoeth.github.io/xldr/schema/mapping-spec-0.32.json
+    https://ralfspoeth.github.io/xldr/schema/mapping-spec-0.35.json
 
-Say the version. The format changed at 0.32, and a model that learned from anything written before that - or that
-is generalising from other ETL tools, which is what it is really doing - will reach for the older vocabulary with
+Say the version. The vocabulary changed at 0.32, and a model that learned from anything written before that - or
+that is generalising from other ETL tools, which is what it is really doing - will reach for the older words with
 complete confidence. If the assistant cannot fetch a URL, paste the schema itself; it is one file and it is the
 most useful thing in the prompt.
 
 A prompt worth copying:
 
     Write an XLDR mapping spec as spec.json, valid against the JSON schema at
-    https://ralfspoeth.github.io/xldr/schema/mapping-spec-0.32.json
+    https://ralfspoeth.github.io/xldr/schema/mapping-spec-0.35.json
 
     The file arriving looks like this (text/csv):
 

@@ -6,7 +6,12 @@ ways that break existing code and existing specs; those changes are listed here 
 The versions are the git tags `xldr-<version>`; the published artifacts carry the same version under the group
 `io.github.ralfspoeth.xldr`.
 
-## Unreleased
+## 0.35
+
+Which records of an input belong to one record selector is a type with three cases rather than two nullable fields,
+which is a change to the code and not to the spec: `mapping-spec-0.35` is published, and the one thing it says that
+`mapping-spec-0.32` did not is that a selector may not be blank. Everything else that reads under 0.34 reads under
+0.35.
 
 ### Fixed
 
@@ -77,9 +82,10 @@ The versions are the git tags `xldr-<version>`; the published artifacts carry th
   to say "every record" - saying nothing at all. A spec writing `"selector": ""` against a JSON input should drop
   the member.
 
-  Neither schema says this yet: both type `selector` as a plain string, so an editor still calls `""` valid where
-  the reader now refuses it. That is the drift `XsdTest` exists to catch, and closing it means a new schema pair
-  rather than an edit to the published `0.32` files, which described `0.32` accurately.
+  `mapping-spec-0.35` is published for it, in both formats, and `mapping-spec-0.32` is frozen and goes on
+  describing 0.32 to 0.34. It is the only difference between the two: a spec that does not write a blank selector -
+  which is every spec anyone has written on purpose - validates against either.
+
 
 - **A record selector's field selectors have distinct names.** A spec that repeats one is refused when it is read,
   in either format and therefore for every adapter.
@@ -102,6 +108,34 @@ The versions are the git tags `xldr-<version>`; the published artifacts carry th
 
 ### Added
 
+- **The JSON schema has a test.** It was the stricter of the two published files and the one nothing checked, which
+  is the wrong way round. XSD 1.0 cannot say "exactly one of these", so three rules live only in the JSON schema:
+  that a field mapping carries one value source, that a var's source is not a field selector, and that a record
+  selector is not both pointed at and filtered. Any of them could have been wrong for as long as nobody looked.
+
+  `JsonSchemaTest` does for it what `XsdTest` does for the XSD - validates fixtures against the file served from
+  GitHub Pages, read out of the repository so that the file an author downloads is the file tested. Where a rule is
+  one the reader enforces too, the test asserts both, since the point is that they agree.
+
+  This adds `com.networknt:json-schema-validator` to the `spec` module in test scope, which brings Jackson, slf4j
+  and `ethlo:itu` with it. That is a large tree next to a module whose own JSON dependency is deliberately small,
+  and it is the price of the schema being checked by something that implements the specification rather than by
+  assertions about the schema's own text. Nothing ships with it.
+
+- **Tests for `Config`, `FeedRegistry` and `ServerStatus`**, the three largest untested classes in the server.
+
+  `Config` is pure parsing and needed no change to be testable. The other two are package-private and are now
+  public, for the reason `FreeName` was in 0.35: so that a test in another package can reach them. `Feed` stays
+  package-private, so what those tests can ask is how many feeds are active and which inbox belongs to one - which
+  is the surface a caller has anyway, and a better thing to assert against than the internals.
+
+  What this covers is the transitions that decide whether a deployment comes up: a directory that is not a feed, a
+  delivery without a spec, a spec that will not parse, two spec files, a spec appearing beside a pending feed, a
+  delivery removed. And the gauges a monitor believes - in particular that a hospitalised file and the `.log`
+  explaining it count as one patient and not two, which would have put every alert threshold out by a factor of two.
+
+  Still untested: `FileProcessor`, whose failure paths need a filesystem that fails after a successful commit, and
+  `LoadJob`. Both are larger pieces than these.
 - **The fixed-length adapter discriminates.** It was the last flat format that could not, and the gap was written
   into three documents rather than closed. A record type in columns 1 to 2 is the classic fixed-length layout, and
   until now such a file could not be loaded at all: the adapter took one record selector and read every line as one
