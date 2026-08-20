@@ -73,9 +73,10 @@ A file moved into `/var/lib/xldr/people/in/` is now loaded into `person` and fil
 file must be *moved* rather than written in place.
 
 **Writing the spec is the actual work**, and this README is the reference rather than the path through it. For that,
-see the [tutorial](docs/tutorial/README.md). It is eleven short pages, each adding one thing to the spec built by
+see the [tutorial](docs/tutorial/README.md). It is twelve short pages, each adding one thing to the spec built by
 the page before: constants, variables, lookups, expressions, types and notation, counting a headerless file's
-components, and separating several kinds of record into several tables. Each page shows whole files rather than
+components, separating several kinds of record into several tables, and - last, because it needs everything before
+it - having a language model draft one and knowing what to check. Each page shows whole files rather than
 fragments, so what you copy is something you can put straight into a feed.
 
 ### Using the toolkit as a library

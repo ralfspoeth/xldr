@@ -1,6 +1,6 @@
 # 11. When it goes wrong
 
-[← several kinds of record](10-record-types.md) · [index](README.md)
+[← several kinds of record](10-record-types.md) · [index](README.md) · [next: drafting one with an assistant →](12-with-an-assistant.md)
 
 Every page so far has worked. This one is about the three ways a spec fails, and they fail at three different
 moments - which is the useful thing to know, because the moment tells you where to look.
@@ -80,14 +80,17 @@ way to tell "nothing arrived" from "something arrived and was refused", which fr
 
 ---
 
-## That is the tutorial
+## That is the format
 
 You can now write a spec that reads a file of any of the supported formats, converts values from a producer's
 notation, fills columns from four different kinds of source, and separates several kinds of record into several
-tables.
+tables - and, as importantly, read one and say whether it is right.
 
-What is left is reference, and it is in the [README](../../README.md): the properties of each adapter, XML and JSON
-and Excel and fixed-length inputs, the server's configuration, how files are delivered, and how to embed the loader
-in an application rather than running the server at all.
+Which is what the [last page](12-with-an-assistant.md) needs: having a language model draft a spec is a reasonable
+way to start, and worth nothing at all unless you can review what comes back.
 
-[← several kinds of record](10-record-types.md) · [index](README.md)
+The rest is reference, in the [README](../../README.md): the properties of each adapter, XML and JSON and Excel and
+fixed-length inputs, the server's configuration, how files are delivered, and how to embed the loader in an
+application rather than running the server at all.
+
+[← several kinds of record](10-record-types.md) · [index](README.md) · [next: drafting one with an assistant →](12-with-an-assistant.md)

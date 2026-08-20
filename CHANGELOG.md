@@ -6,6 +6,18 @@ ways that break existing code and existing specs; those changes are listed here 
 The versions are the git tags `xldr-<version>`; the published artifacts carry the same version under the group
 `io.github.ralfspoeth.xldr`.
 
+## Unreleased
+
+### Added
+
+- A twelfth tutorial page, on drafting a spec with a language model. A mapping spec is a structured document with a
+  published schema derived from a file and a table you can both show, which is close to the ideal shape for one to
+  write - and the page is last rather than first on purpose, since a generated spec is worth having only if you can
+  read it. It says what to put in the prompt (a few lines of the file, the DDL, and the schema URL *with its
+  version*), lists the six things that go wrong because every other tool in this space uses slightly different
+  words, and ends where page 11 does: let the editor check the mechanical part, then load twenty rows and look,
+  because a spec can be valid and still put the wrong column in the wrong place.
+
 ## 0.34
 
 ### Fixed
