@@ -1,0 +1,67 @@
+name: release
+
+# The tag is the trigger, and `mvn release:prepare` pushes it - so publishing a
+# download stays part of releasing rather than a step to remember afterwards.
+# The tag also fixes the version: release:prepare sets <revision> to the release
+# version in the commit it tags, and only then bumps to the next snapshot.
+on:
+  push:
+    tags: [ 'xldr-*' ]
+
+permissions:
+  # to create the release and attach the archives to it. Nothing else, and in
+  # particular not write access to the repository's contents beyond that
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+          cache: maven
+
+      # -DskipTests, because release:prepare ran clean verify against this exact
+      # source before it cut the tag. Rebuilding is for producing the archives,
+      # not for finding out whether they work.
+      #
+      # -pl app -am builds the application and what it needs, which leaves the
+      # front ends and the integration tests out of it.
+      - name: Build the distribution
+        run: mvn -B -ntp -DskipTests package -pl app -am
+
+      # The assembly names its output after the module that produced it while
+      # the archive unpacks to xldr-<version>/, so a download called app-… would
+      # be the one name a reader has met nowhere else.
+      - name: Name the archives after the product
+        run: |
+          set -euo pipefail
+          version="${GITHUB_REF_NAME#xldr-}"
+          mkdir dist
+          for kind in tar.gz zip; do
+            built="app/target/app-$version-dist.$kind"
+            test -f "$built" || { echo "::error::no $built - has the assembly changed?"; exit 1; }
+            cp "$built" "dist/xldr-$version-dist.$kind"
+          done
+          ls -l dist
+
+      # gh is on the runner already, so this needs no third-party action and no
+      # token beyond the one the job is given
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          version="${GITHUB_REF_NAME#xldr-}"
+          gh release create "$GITHUB_REF_NAME" dist/* \
+            --title "XLDR $version" \
+            --notes "Unpack either archive and run \`bin/xldr\` - Java 25 or later, no build required.
+          See [the changelog](https://github.com/ralfspoeth/xldr/blob/$GITHUB_REF_NAME/CHANGELOG.md) for what
+          changed in $version, and [the tutorial](https://github.com/ralfspoeth/xldr/blob/$GITHUB_REF_NAME/docs/tutorial/README.md)
+          for writing the mapping spec that does the work.
+
+          The library modules are on Maven Central under \`io.github.ralfspoeth.xldr\`; this archive is the server."

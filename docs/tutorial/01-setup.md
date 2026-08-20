@@ -7,16 +7,18 @@ None of this is the interesting part - it is twenty minutes once, and every page
 
 ## The distribution
 
-XLDR is not published as a runnable artifact, so build it from a checkout. Java 25 or later is required.
+Take the archive from the [latest release](https://github.com/ralfspoeth/xldr/releases/latest) and unpack it. Java
+25 or later is the only thing you need installed:
+
+    tar xzf xldr-<version>-dist.tar.gz        # or: unzip xldr-<version>-dist.zip
+    cd xldr-<version>
+
+If you would rather build it, the same archive comes out of a checkout under `app/target`, named after the module
+that assembled it rather than after the product:
 
     git clone https://github.com/ralfspoeth/xldr
-    cd xldr
-    mvn install
-
-That leaves the distribution in `app/target`, as both a tarball and a zip. Unpack whichever suits:
-
-    tar xzf app/target/xldr-<version>-dist.tar.gz     # or: unzip app/target/xldr-<version>-dist.zip
-    cd xldr-<version>
+    cd xldr && mvn install
+    tar xzf app/target/app-<version>-dist.tar.gz
 
 Inside:
 
@@ -24,7 +26,7 @@ Inside:
     lib/          the application and the toolkit - remove anything here and nothing starts
     modules/      the input adapters, one jar per format
     xl/           Apache POI, needed only if you read spreadsheets
-    drivers/      empty, and yours to fill
+    drivers/      JDBC drivers - H2, PostgreSQL and Oracle are already there
 
 The three directories after `lib/` are the choices a deployment makes. Delete `xl/` if no feed of yours reads
 Excel and the Excel adapter simply stops being offered; nothing else notices. That is JPMS service binding rather
@@ -32,20 +34,18 @@ than configuration - what is on the module path is what the server can read.
 
 ## A database
 
-Any database with a JDBC driver. For working through this tutorial, H2 in file mode is the least trouble: one jar,
-no server, and the data survives a restart so you can look at what a load actually did.
+Any database with a JDBC driver, and the distribution already carries three: H2, PostgreSQL and Oracle. For working
+through this tutorial H2 in file mode is the least trouble - nothing to install and nothing to start, since in file
+mode it runs inside the server's own JVM and writes to a file you name in the URL. The data survives a restart, so
+you can look at what a load actually did.
 
-Download `h2-*.jar` from [h2database.com](https://h2database.com) and drop it in `drivers/`:
+If you would rather use something else, copy that driver's jar into `drivers/` and adjust the URL below; nothing
+else in this tutorial changes. Removing the drivers you do not target is the same operation in reverse, and the
+server neither notices nor cares - what is in that directory is what it can connect to.
 
-    cp ~/Downloads/h2-2.4.240.jar drivers/
+Create the table the next page loads into, using the H2 jar that is already there:
 
-There is nothing to start - in file mode H2 runs inside the server's own JVM and writes to a file you name in the
-URL. If you would rather use PostgreSQL, MariaDB or Oracle, put that driver in `drivers/` instead and adjust the
-URL below; nothing else in this tutorial changes.
-
-Create the table the next page loads into. With H2's shell:
-
-    java -cp drivers/h2-2.4.240.jar org.h2.tools.Shell \
+    java -cp drivers/h2-*.jar org.h2.tools.Shell \
         -url jdbc:h2:/tmp/xldr-tutorial -user sa
 
 and then:

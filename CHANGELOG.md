@@ -21,6 +21,16 @@ The versions are the git tags `xldr-<version>`; the published artifacts carry th
   into a feed, and each page changes only what it is about rather than reprinting the input for the fifth time.
   Nothing about the code changed.
 
+- The distribution is published as a **GitHub release**, so running the server no longer means building it. A
+  workflow triggered by the `xldr-*` tag builds `app` from that tag and attaches the tarball and the zip, which
+  makes publishing a download part of releasing rather than a step to remember afterwards - `release:prepare`
+  pushes the tag that fires it. The archives are renamed `xldr-<version>-dist` on the way, the assembly naming its
+  output after the module that produced it while the archive unpacks to `xldr-<version>/`.
+
+  The README and the tutorial said `drivers/` was empty and told the reader to go and fetch a driver. It has never
+  been empty: the assembly ships H2, PostgreSQL and Oracle deliberately, which is what makes the tutorial's first
+  page a download and two commands rather than a scavenger hunt. Both are corrected.
+
 ## 0.32
 
 The first change to the mapping-spec format since 0.23, so `mapping-spec-0.32` is published and `mapping-spec-0.23`
