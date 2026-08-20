@@ -6,7 +6,24 @@ ways that break existing code and existing specs; those changes are listed here 
 The versions are the git tags `xldr-<version>`; the published artifacts carry the same version under the group
 `io.github.ralfspoeth.xldr`.
 
-## Unreleased
+## 0.34
+
+### Fixed
+
+- **The published archive no longer carries the Oracle driver.** It is a convenience in a build you made yourself
+  and a redistribution when we put it on a release page, and 0.33's download had it. The assembly is unchanged, so
+  `mvn package` still gives you all three; the release workflow unpacks, removes `ojdbc*.jar`, and repacks both
+  archives from that one tree. A `drivers/README.txt` goes in beside the remaining two saying where the third one
+  lives, since an absence with no explanation is worse than either choice.
+
+  This is the one respect in which the download differs from a local build of the same version, which is a thing
+  worth disliking and the reason it is written down in three places rather than none.
+
+- The 0.33 section of this file was headed `## Unreleased` when it was tagged, and the README's BOM snippet still
+  said `0.32`. Neither is touched by `release:prepare`; both are now part of the release checklist rather than of
+  whoever remembers.
+
+## 0.33
 
 ### Added
 

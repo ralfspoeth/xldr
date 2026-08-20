@@ -21,12 +21,17 @@ Java 25 or later is required.
 
 Download the distribution from the [latest release](https://github.com/ralfspoeth/xldr/releases/latest) and unpack
 it. Java 25 or later is the only requirement - the archive carries the toolkit, the adapters, and JDBC drivers for
-H2, PostgreSQL and Oracle:
+H2 and PostgreSQL:
 
     tar xzf xldr-<version>-dist.tar.gz        # or unzip xldr-<version>-dist.zip
     cd xldr-<version>
 
-Or build it from a checkout, which produces the same archive named after the module that assembled it:
+For Oracle, drop `ojdbc17` into `drivers/`; it is left out of the download rather than the build, so that
+publishing the archive does not make this project a redistributor of it. That is the one respect in which the
+download differs from a local build, and there is a note in `drivers/` saying so.
+
+Or build it from a checkout, which produces the same archive - Oracle driver included - named after the module that
+assembled it:
 
     mvn install
     tar xzf app/target/app-<version>-dist.tar.gz
@@ -83,7 +88,7 @@ fix their versions in one place:
             <dependency>
                 <groupId>io.github.ralfspoeth.xldr</groupId>
                 <artifactId>bom</artifactId>
-                <version>0.32</version>
+                <version>0.34</version>
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>
@@ -180,15 +185,15 @@ carry the concrete version rather than a literal `${revision}`.
 ### Distribution
 
 `mvn package` on `app` builds a runnable distribution (`app/target/app-<version>-dist.{tar.gz,zip}`) via the
-`maven-assembly-plugin`; the release workflow attaches the same two archives to the GitHub release under the name
-the archive unpacks to, `xldr-<version>-dist`. Unpacked, it is
+`maven-assembly-plugin`; the release workflow repacks the same tree as `xldr-<version>-dist`, the name the archive
+unpacks to, and takes the Oracle driver out on the way. Unpacked, it is
 
     xldr-<version>/
         bin/xldr, bin/xldr.cmd   launchers
         lib/                     the application and the toolkit
         modules/                 the input adapters
         xl/                      the Excel adapter and Apache POI
-        drivers/                 the JDBC drivers - H2, PostgreSQL and Oracle, and yours goes here too
+        drivers/                 the JDBC drivers - H2 and PostgreSQL, Oracle too in a local build
         conf/                    sample xldr.properties and logging.properties
         README.md
 

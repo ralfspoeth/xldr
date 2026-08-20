@@ -34,19 +34,50 @@ jobs:
       - name: Build the distribution
         run: mvn -B -ntp -DskipTests package -pl app -am
 
-      # The assembly names its output after the module that produced it while
-      # the archive unpacks to xldr-<version>/, so a download called app-… would
-      # be the one name a reader has met nowhere else.
-      - name: Name the archives after the product
+      # Two things at once, from one unpacked tree so that the tarball and the
+      # zip cannot come out holding different things.
+      #
+      # The rename: the assembly names its output after the module that produced
+      # it while the archive unpacks to xldr-<version>/, so a download called
+      # app-… would be the one name a reader has met nowhere else.
+      #
+      # The removal: the build ships an Oracle driver, which is a convenience
+      # when you built it yourself and makes us a redistributor when we publish
+      # it. The published archive carries H2 and PostgreSQL, and a note saying
+      # where the third one lives - so that a reader who was expecting it finds
+      # a sentence rather than an absence. This is the one respect in which the
+      # download differs from a local build, and the note is there to say so.
+      - name: Repack without the Oracle driver
         run: |
           set -euo pipefail
           version="${GITHUB_REF_NAME#xldr-}"
+          built="app/target/app-$version-dist.tar.gz"
+          test -f "$built" || { echo "::error::no $built - has the assembly changed?"; exit 1; }
+
+          tar xzf "$built"
+          root="xldr-$version"
+          test -d "$root/drivers" || { echo "::error::no $root/drivers in the archive"; exit 1; }
+          rm -f "$root"/drivers/ojdbc*.jar
+          cat > "$root/drivers/README.txt" <<'NOTE'
+          The JDBC drivers. What is in this directory is what the server can connect
+          to - installing one is copying its jar in here, and removing one is deleting
+          it. Nothing names them in code; java.sql finds a Driver by service binding.
+
+          H2 and PostgreSQL are here. Oracle is not, in this download only: a build
+          from source includes ojdbc, but publishing it would make the project a
+          redistributor of it rather than a convenience for people who already have
+          it. Take it from Maven Central -
+
+              com.oracle.database.jdbc:ojdbc17
+
+          or from oracle.com, and drop the jar in here. That is the whole install.
+          NOTE
+
           mkdir dist
-          for kind in tar.gz zip; do
-            built="app/target/app-$version-dist.$kind"
-            test -f "$built" || { echo "::error::no $built - has the assembly changed?"; exit 1; }
-            cp "$built" "dist/xldr-$version-dist.$kind"
-          done
+          tar czf "dist/xldr-$version-dist.tar.gz" "$root"
+          zip -qr "dist/xldr-$version-dist.zip" "$root"
+          echo "published archive holds:"
+          ls -l "$root/drivers"
           ls -l dist
 
       # gh is on the runner already, so this needs no third-party action and no
@@ -60,6 +91,8 @@ jobs:
           gh release create "$GITHUB_REF_NAME" dist/* \
             --title "XLDR $version" \
             --notes "Unpack either archive and run \`bin/xldr\` - Java 25 or later, no build required.
+          Carries JDBC drivers for H2 and PostgreSQL; for Oracle, drop \`ojdbc17\` into \`drivers/\` (see the
+          README in that directory).
           See [the changelog](https://github.com/ralfspoeth/xldr/blob/$GITHUB_REF_NAME/CHANGELOG.md) for what
           changed in $version, and [the tutorial](https://github.com/ralfspoeth/xldr/blob/$GITHUB_REF_NAME/docs/tutorial/README.md)
           for writing the mapping spec that does the work.

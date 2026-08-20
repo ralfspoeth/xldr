@@ -26,7 +26,7 @@ Inside:
     lib/          the application and the toolkit - remove anything here and nothing starts
     modules/      the input adapters, one jar per format
     xl/           Apache POI, needed only if you read spreadsheets
-    drivers/      JDBC drivers - H2, PostgreSQL and Oracle are already there
+    drivers/      JDBC drivers - H2 and PostgreSQL are already there
 
 The three directories after `lib/` are the choices a deployment makes. Delete `xl/` if no feed of yours reads
 Excel and the Excel adapter simply stops being offered; nothing else notices. That is JPMS service binding rather
@@ -34,7 +34,7 @@ than configuration - what is on the module path is what the server can read.
 
 ## A database
 
-Any database with a JDBC driver, and the distribution already carries three: H2, PostgreSQL and Oracle. For working
+Any database with a JDBC driver, and the distribution already carries two: H2 and PostgreSQL. For working
 through this tutorial H2 in file mode is the least trouble - nothing to install and nothing to start, since in file
 mode it runs inside the server's own JVM and writes to a file you name in the URL. The data survives a restart, so
 you can look at what a load actually did.
