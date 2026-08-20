@@ -8,6 +8,23 @@ The versions are the git tags `xldr-<version>`; the published artifacts carry th
 
 ## Unreleased
 
+### Fixed
+
+- **A JSON record selector carrying only a discriminator was silently ignored.** The filter the author wrote was
+  dropped and the load ran over the whole document, reporting success. `RecordSelectorSpec` gains
+  `refuseDiscriminator`, the mirror of `refuseSelector`, and the three adapters that locate their records now call
+  it.
+
+  Only JSON was actually losing one. The canonical constructor already refuses a selector and a discriminator
+  together, so a discriminator can reach an adapter only where the selector is absent - and for XML and Excel an
+  absent selector is itself refused. What those two gain is an accurate message: a spec carrying a discriminator
+  used to fail with "needs a selector for this input", which tells the author about the thing they left out rather
+  than the thing they wrote. For JSON an absent selector legitimately means the whole document, which is why
+  nothing caught it there.
+
+  The gap surfaced while migrating `swift-mt`, an out-of-tree adapter, to 0.34: it had the same hole and had to
+  write the check by hand for want of this method.
+
 ### Breaking
 
 - **A record selector's field selectors have distinct names.** A spec that repeats one is refused when it is read,

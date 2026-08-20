@@ -49,6 +49,10 @@ class ExcelAdapter implements InputAdapter {
 
     ExcelAdapter(InputSpec spec) {
         for (var rss : spec.recordSelectors()) {
+            // before requiring the range, so that a spec carrying a discriminator
+            // is told about the thing it wrote rather than about the thing it
+            // left out
+            rss.refuseDiscriminator("a sheet has records to point at");
             // a sheet range has to point somewhere, so this input cannot omit it
             var range = Range.parse(rss.requireSelector());
             var columns = new LinkedHashMap<String, Mapped>();

@@ -79,6 +79,12 @@ class JsonInputAdapter implements InputAdapter {
         for (var fs : rs.fieldSelectors()) {
             fields.putIfAbsent(fs.name(), new FieldDef(pointerOf(fs), typeOf(fs)));
         }
+        // This adapter is the reason refuseDiscriminator exists. The other two
+        // that point at their records require a selector, so a discriminator
+        // could not reach them unnoticed; here an absent selector is an answer
+        // rather than an omission, so one was being dropped in silence and the
+        // load ran over the whole document as though nothing had been asked for.
+        rs.refuseDiscriminator("a JSON document has records to point at");
         // selector(), not requireSelector(): for this adapter an absent one is
         // an answer rather than an omission - the document itself is the record
         // source, which is what a file that is one top-level array looks like

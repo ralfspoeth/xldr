@@ -4,6 +4,7 @@ import io.github.ralfspoeth.xldr.ia.Field;
 import io.github.ralfspoeth.xldr.ia.InputAdapter;
 import io.github.ralfspoeth.xldr.ia.InputAdapterFactory;
 import io.github.ralfspoeth.xldr.spec.DataType;
+import io.github.ralfspoeth.xldr.spec.Discriminator;
 import io.github.ralfspoeth.xldr.spec.FieldSelectorSpec;
 import io.github.ralfspoeth.xldr.spec.InputSpec;
 import io.github.ralfspoeth.xldr.spec.RecordSelectorSpec;
@@ -31,7 +32,21 @@ public class XmlAdapterTest {
     /**
      * The adapter's settings are part of the input spec, so they are added to a
      * copy of it rather than set on the factory.
+     * A discriminator is refused by name, where before it was refused as a
+     * missing selector - the author told about what they left out rather than
+     * what they wrote.
      */
+    @Test
+    public void rejectsAdiscriminator() {
+        var spec = new InputSpec("text/xml", List.of(new RecordSelectorSpec("rec", null,
+                new Discriminator.Equals(new Selector.Nth(1), "O"),
+                List.of(new FieldSelectorSpec("id", "@id", DataType.TEXT)))), List.of(), Map.of());
+        var thrown = assertThrows(IllegalArgumentException.class, () -> adapter(spec));
+        assertAll(
+                () -> assertTrue(thrown.getMessage().contains("rec"), thrown.getMessage()),
+                () -> assertTrue(thrown.getMessage().contains("records to point at"), thrown.getMessage()));
+    }
+
     private static InputAdapter adapter(InputSpec spec, String... properties) {
         Map<String, String> props = new LinkedHashMap<>();
         for (int i = 0; i < properties.length; i += 2) {

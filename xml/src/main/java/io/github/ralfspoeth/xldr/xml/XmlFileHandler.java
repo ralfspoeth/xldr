@@ -48,6 +48,10 @@ class XmlFileHandler implements InputAdapter {
 
         var xpath = newXPath(namespaces);
         for (var recordSpec : spec.recordSelectors()) {
+            // before requiring the selector, so that a spec carrying a
+            // discriminator is told about the thing it wrote rather than about
+            // the thing it left out
+            recordSpec.refuseDiscriminator("an XML document has records to point at");
             // an XPath has to point somewhere, so this input cannot omit it
             var path = recordSpec.requireSelector();
             var record = new XmlRecordSelector(

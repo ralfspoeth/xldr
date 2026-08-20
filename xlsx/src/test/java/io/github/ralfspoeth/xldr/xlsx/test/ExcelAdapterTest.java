@@ -4,6 +4,7 @@ import io.github.ralfspoeth.xldr.ia.Field;
 import io.github.ralfspoeth.xldr.ia.InputAdapter;
 import io.github.ralfspoeth.xldr.ia.InputAdapterFactory;
 import io.github.ralfspoeth.xldr.spec.DataType;
+import io.github.ralfspoeth.xldr.spec.Discriminator;
 import io.github.ralfspoeth.xldr.spec.FieldSelectorSpec;
 import io.github.ralfspoeth.xldr.spec.InputSpec;
 import io.github.ralfspoeth.xldr.spec.RecordSelectorSpec;
@@ -113,6 +114,25 @@ public class ExcelAdapterTest {
                 // an absent cell in a string column is the empty string
                 () -> assertEquals("", rows.get(2).get("label"))
         );
+    }
+
+    /**
+     * A discriminator is refused by name.
+     * <p>
+     * It was refused before too, but as a missing selector: this adapter requires
+     * a range, so a record selector carrying only a discriminator failed with
+     * "needs a selector for this input" - telling the author about the thing they
+     * left out rather than the thing they wrote.
+     */
+    @Test
+    public void rejectsAdiscriminator() {
+        var spec = new InputSpec(XLSX, List.of(new RecordSelectorSpec("rows", null,
+                new Discriminator.Equals(new Selector.Nth(1), "O"),
+                List.of(new FieldSelectorSpec("id", "A", DataType.TEXT)))), List.of(), Map.of());
+        var thrown = assertThrows(IllegalArgumentException.class, () -> adapter(spec));
+        assertAll(
+                () -> assertTrue(thrown.getMessage().contains("rows"), thrown.getMessage()),
+                () -> assertTrue(thrown.getMessage().contains("records to point at"), thrown.getMessage()));
     }
 
     @Test

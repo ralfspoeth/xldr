@@ -130,4 +130,29 @@ public record RecordSelectorSpec(
                     + " discriminator: { \"nth\": 1, \"equals\": \"" + selector + "\" }");
         }
     }
+
+    /**
+     * Refuses a discriminator on an input whose records have to be located.
+     * <p>
+     * The mirror of {@link #refuseSelector}, and worth having for the same
+     * reason. A discriminator picks records out of a file where every line is a
+     * candidate; a tree, a document or a sheet has to be pointed at instead, so
+     * there is nothing for one to filter.
+     * <p>
+     * The canonical constructor already refuses a selector and a discriminator
+     * together, so this only ever fires where the selector is absent - which is
+     * exactly where an adapter would otherwise proceed on a default. For JSON an
+     * absent selector legitimately means the whole document, so a discriminator
+     * there was being dropped in silence; for the adapters that require a
+     * selector it was refused, but with a message telling the author they had
+     * forgotten one when in fact they had written the other thing.
+     */
+    public void refuseDiscriminator(String what) {
+        if (discriminator != null) {
+            throw new IllegalArgumentException("record selector '" + name + "' has a discriminator, "
+                    + discriminator + ", but " + what + ". Where the records are is a 'selector',"
+                    + " in this adapter's own syntax; a discriminator is for a flat file, where"
+                    + " every record is a candidate and the question is which to keep");
+        }
+    }
 }

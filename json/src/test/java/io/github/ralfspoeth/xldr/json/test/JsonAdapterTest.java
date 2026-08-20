@@ -4,6 +4,7 @@ import io.github.ralfspoeth.xldr.ia.Field;
 import io.github.ralfspoeth.xldr.ia.InputAdapter;
 import io.github.ralfspoeth.xldr.ia.InputAdapterFactory;
 import io.github.ralfspoeth.xldr.spec.DataType;
+import io.github.ralfspoeth.xldr.spec.Discriminator;
 import io.github.ralfspoeth.xldr.spec.FieldSelectorSpec;
 import io.github.ralfspoeth.xldr.spec.InputSpec;
 import io.github.ralfspoeth.xldr.spec.RecordSelectorSpec;
@@ -297,6 +298,27 @@ public class JsonAdapterTest {
         assertAll(
                 () -> assertNull(row.get("counted"), "an object has no first element"),
                 () -> assertEquals("1", row.get("named"), "and naming still works"));
+    }
+
+    /**
+     * A discriminator is refused, and this adapter is the reason the refusal
+     * exists.
+     * <p>
+     * The other two that point at their records require a selector, so one could
+     * not slip past them unnoticed. Here an absent selector legitimately means
+     * the whole document, so a record selector carrying only a discriminator used
+     * to be read as "the document, unfiltered" - the load ran over everything and
+     * reported success, with the filter the author wrote silently dropped.
+     */
+    @Test
+    public void rejectsAdiscriminator() {
+        var spec = new InputSpec(MIME, List.of(new RecordSelectorSpec("rec", null,
+                new Discriminator.Equals(new Selector.Nth(1), "O"),
+                List.of(new FieldSelectorSpec("id", "id", DataType.TEXT)))), List.of(), Map.of());
+        var thrown = assertThrows(IllegalArgumentException.class, () -> adapter(spec, Map.of()));
+        assertAll(
+                () -> assertTrue(thrown.getMessage().contains("rec"), thrown.getMessage()),
+                () -> assertTrue(thrown.getMessage().contains("records to point at"), thrown.getMessage()));
     }
 
     @Test

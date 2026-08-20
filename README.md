@@ -375,7 +375,8 @@ An input specification contains the following pieces of information:
     * says which records are its own - a `selector` for an input that has to be *pointed at*, or a
       [`discriminator`](#which-records-are-of-a-kind) for a flat one where every line is a candidate. Both are
       optional, and neither is written where the whole file holds one kind of record, as in a CSV with a header or a
-      fixed-length file. No record selector carries both: no input is read both ways;
+      fixed-length file. No record selector carries both: no input is read both ways, and an adapter that locates
+      its records refuses a discriminator by name rather than proceeding without it;
     * has related field selectors, which in turn
         * are identified by a name, distinct within that record selector - a mapping refers to a field by this
           name, so two of them cannot share it and a spec that repeats one is refused,
