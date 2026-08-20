@@ -17,7 +17,8 @@ The versions are the git tags `xldr-<version>`; the published artifacts carry th
   lives, since an absence with no explanation is worse than either choice.
 
   This is the one respect in which the download differs from a local build of the same version, which is a thing
-  worth disliking and the reason it is written down in three places rather than none.
+  worth disliking and the reason it is said in four places rather than none - the workflow, the note inside
+  the archive, the release notes and the README.
 
 - The 0.33 section of this file was headed `## Unreleased` when it was tagged, and the README's BOM snippet still
   said `0.32`. Neither is touched by `release:prepare`; both are now part of the release checklist rather than of
