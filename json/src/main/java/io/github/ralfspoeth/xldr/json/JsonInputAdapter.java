@@ -205,10 +205,22 @@ class JsonInputAdapter implements InputAdapter {
         return bool.map(aBoolean -> type == DataType.TEXT ? aBoolean.toString() : formats.parse(type, aBoolean.toString())).orElse(null);
     }
 
+    /**
+     * A JSON number literal, as the declared type.
+     * <p>
+     * No pattern is involved: the document has already said this is a number, so
+     * there is nothing to parse and {@code numberFormat} does not apply. The
+     * {@code INTEGRAL} rule is still the shared one - a fraction or a magnitude
+     * beyond 64 bits is refused rather than dropped, which {@code longValue()}
+     * did silently here for as long as this adapter has existed, and without even
+     * a {@code numberFormat} needing to be configured for it to happen.
+     */
     private @Nullable Object number(BigDecimal value, DataType type) {
         return switch (type) {
             case DECIMAL -> value;
-            case INTEGRAL -> value.longValue();
+            case INTEGRAL -> Formats.integral(value, value.toPlainString());
+            // FP is the type that says it may be approximate, so this one is the
+            // contract rather than a loss
             case FP -> value.doubleValue();
             // a number where the spec wants text or a date: let the shared rules decide
             case TEXT, DATE -> formats.parse(type, value.toPlainString());

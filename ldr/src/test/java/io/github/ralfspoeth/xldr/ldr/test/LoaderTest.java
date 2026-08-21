@@ -12,7 +12,9 @@ import org.junit.jupiter.api.Test;
 import java.io.InputStream;
 import java.sql.DriverManager;
 import java.sql.SQLException;
+import java.time.Instant;
 import java.time.LocalDate;
+import java.time.OffsetDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Stream;
@@ -634,6 +636,66 @@ public class LoaderTest {
         }
         assertEquals(List.of("1:Alice", "2:Bob"),
                 selectPersons().stream().map(r -> r.get(0) + ":" + r.get(1)).toList());
+    }
+
+    /**
+     * {@code ${now()}} into a {@code timestamp with time zone}, which is what
+     * tutorial pages 5 and 7 tell a reader to write and what nothing checked
+     * while they said it.
+     * <p>
+     * The claim has two halves and both can fail quietly. {@code now()} yields an
+     * {@link java.time.Instant}, which JDBC 4.2 deliberately does not list among
+     * the {@code java.time} types a driver must map - so the loader converts it
+     * to an {@code OffsetDateTime} at the JVM's zone on the way to the statement.
+     * If that conversion were dropped the value would still reach some drivers
+     * and be refused by others, which is the kind of thing that works in a test
+     * and fails in production against Oracle.
+     * <p>
+     * The other half is the column type. Into a zoned column the instant keeps
+     * its offset and comes back as the same moment; a plain {@code timestamp}
+     * would silently take the zone from wherever it was read, which is why the
+     * tutorial says to declare the column with one.
+     */
+    @Test
+    public void nowReachesAzonedColumnAsTheSameInstant() throws Exception {
+        try (var conn = DriverManager.getConnection(jdbcUrl);
+             var stmt = conn.createStatement()) {
+            stmt.execute("drop table if exists arrival");
+            stmt.execute("create table arrival(id varchar(10), loaded_at timestamp with time zone)");
+        }
+
+        var mapping = new RecordMappingSpec("rows", "arrival", List.of(
+                new FieldMappingSpec("id", new ValueSource.Field("id")),
+                new FieldMappingSpec("loaded_at", new ValueSource.Expr("${now()}"))
+        ), null);
+        var spec = new MappingSpec(
+                new InputSpec("text/csv", List.of(), List.of(), Map.of()),
+                List.of(mapping));
+
+        var before = Instant.now();
+        try (var loader = new Loader(spec, DriverManager.getConnection(jdbcUrl))) {
+            loader.loadInput(adapterFor(Map.of("rows", List.of(Map.of("id", "1")))),
+                    InputStream.nullInputStream(), mapping);
+        }
+        var after = Instant.now();
+
+        try (var conn = DriverManager.getConnection(jdbcUrl);
+             var stmt = conn.createStatement();
+             var rs = stmt.executeQuery("select loaded_at from arrival")) {
+            assertTrue(rs.next(), "one row");
+            var loadedAt = rs.getObject(1, OffsetDateTime.class);
+            assertAll(
+                    () -> assertNotNull(loadedAt, "the column is not null"),
+                    () -> assertNotNull(loadedAt.getOffset(), "and carries an offset"),
+                    // the instant, not the local reading of it: compare on the
+                    // timeline so that a wrong offset shows up rather than
+                    // cancelling out against the JVM's own zone
+                    () -> assertFalse(loadedAt.toInstant().isBefore(before.minusSeconds(1)),
+                            "loaded before the load started: " + loadedAt),
+                    () -> assertFalse(loadedAt.toInstant().isAfter(after.plusSeconds(1)),
+                            "loaded after the load finished: " + loadedAt));
+            assertFalse(rs.next(), "exactly one row");
+        }
     }
 
     /**

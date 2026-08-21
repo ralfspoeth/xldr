@@ -76,14 +76,17 @@ sql> select id, name, since, balance from customer order by id;
 | type | what it is |
 |---|---|
 | `TEXT` | text, and the default when no type is given |
-| `INTEGRAL` | a whole number, of arbitrary size |
+| `INTEGRAL` | a whole number, up to 64 bits |
 | `DECIMAL` | an exact decimal |
 | `FP` | a floating-point number, allowed to be approximate |
 | `DATE` | a date, or a date and time |
 
 The names are deliberately none of Java's or SQL's, so that nobody reads `FP` as a `float` and infers a width from
-it, or reads `INTEGRAL` as a 32-bit int. `INTEGRAL` has no upper bound and `DECIMAL` is exact - money belongs in
-it, never in `FP`.
+it, or reads `INTEGRAL` as a 32-bit int. `DECIMAL` is exact - money belongs in it, never in `FP`.
+
+`INTEGRAL` is a 64-bit whole number, so ±9223372036854775807. A value with a fraction or beyond that range is
+refused rather than rounded or wrapped, and the message says so - an identifier too long for it belongs in a text
+column, which is usually the right home for one anyway, since nothing arithmetic is ever done to it.
 
 The question the type answers is what the *value* is, not what the column is. The driver takes it from there, and
 a `DECIMAL` into a `numeric(12,2)` needs nothing said twice.

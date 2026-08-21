@@ -170,6 +170,53 @@ public class JsonAdapterTest {
     }
 
     /**
+     * A JSON number declared {@code INTEGRAL} has to be one.
+     * <p>
+     * This adapter does not go through a pattern for a number literal - the
+     * document has already said it is a number - so it reached
+     * {@code BigDecimal.longValue()} directly, which drops a fraction and wraps
+     * an overflow. No {@code numberFormat} had to be configured for it to
+     * happen, which made this the quieter of the two places the same mistake
+     * lived.
+     */
+    @Test
+    public void refusesAnumberThatIsNotAwholeIntegral() throws IOException {
+        var spec = spec("rows", new FieldSelectorSpec("qty", "qty", DataType.INTEGRAL));
+
+        var fraction = assertThrows(RuntimeException.class,
+                () -> adapter(spec, Map.of())
+                        .parse(in("""
+                                { "rows": [ { "qty": 1.5 } ] }
+                                """), "rec", Set.of("qty"))
+                        .rows().toList());
+        var tooBig = assertThrows(RuntimeException.class,
+                () -> adapter(spec, Map.of())
+                        .parse(in("""
+                                { "rows": [ { "qty": 9999999999999999999999999 } ] }
+                                """), "rec", Set.of("qty"))
+                        .rows().toList());
+
+        assertAll(
+                () -> assertTrue(fraction.getMessage().contains("1.5"), fraction.getMessage()),
+                () -> assertTrue(tooBig.getMessage().contains("INTEGRAL"), tooBig.getMessage()));
+    }
+
+    /**
+     * And a number that is whole still loads however it was written - a JSON
+     * literal may carry a decimal point and still be an integer.
+     */
+    @Test
+    public void awholeNumberLoadsHoweverItIsWritten() throws IOException {
+        var spec = spec("rows", new FieldSelectorSpec("qty", "qty", DataType.INTEGRAL));
+
+        var rows = adapter(spec, Map.of()).parse(in("""
+                { "rows": [ { "qty": 3 }, { "qty": 3.0 }, { "qty": 3.00 }, { "qty": 3e2 } ] }
+                """), "rec", Set.of("qty")).rows().toList();
+
+        assertEquals(List.of(3L, 3L, 3L, 300L), rows.stream().map(r -> r.get("qty")).toList());
+    }
+
+    /**
      * Values carried as strings still honor the feed's patterns.
      */
     @Test

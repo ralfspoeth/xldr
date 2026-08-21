@@ -113,7 +113,9 @@ public final class Formats {
                 .filter(not(String::isEmpty))
                 .map(s -> switch (type) {
                     case DATE -> date == null ? DataType.DATE.parse(s) : dateTime(s);
-                    case INTEGRAL -> number == null ? DataType.INTEGRAL.parse(s) : number(s).longValue();
+                    case INTEGRAL -> number == null
+                            ? DataType.INTEGRAL.parse(s)
+                            : integral(bigDecimal(s), s);
                     case FP -> number == null ? DataType.FP.parse(s) : number(s).doubleValue();
                     case DECIMAL -> number == null ? DataType.DECIMAL.parse(s) : bigDecimal(s);
                     case TEXT -> s;
@@ -146,6 +148,50 @@ public final class Formats {
 
     private BigDecimal bigDecimal(String s) {
         // parseBigDecimal is on, so this is exact
-        return number(s) instanceof BigDecimal bd ? bd : new BigDecimal(number(s).toString());
+        var parsed = number(s);
+        return parsed instanceof BigDecimal bd ? bd : new BigDecimal(parsed.toString());
+    }
+
+    /**
+     * A whole number, refusing what it cannot carry rather than dropping it.
+     * <p>
+     * {@link DataType#INTEGRAL} is a {@code Long}, so there are two ways for a
+     * number to be a number and still not be one of these: a non-zero fraction,
+     * and a magnitude beyond 64 bits. Both used to end in
+     * {@code Number.longValue()}, which drops the first and wraps the second -
+     * so {@code 1,5} loaded as {@code 1} and a twenty-five digit account number
+     * loaded as whatever its low bits said, in both cases with the load
+     * reporting success.
+     * <p>
+     * The canonical path never did this, {@code Long.parseLong} refusing both.
+     * What made the disagreement hard to see is that the path is chosen by a
+     * property rather than by the field: configuring {@code numberFormat} for a
+     * money column changed how the id column beside it handled bad input, and
+     * nothing in the spec says so.
+     * <p>
+     * Only a non-zero fraction is refused. One {@code numberFormat} covers a
+     * whole file, so a pattern with decimal places is the ordinary case even
+     * where some columns are whole, and {@code 1.00} under {@code #,##0.00} is
+     * exactly one.
+     * <p>
+     * Public and static because the JSON adapter needs the same rule on a path
+     * that never reaches an instance of this class: a JSON number is already a
+     * {@link BigDecimal} when the adapter sees it, so no pattern is involved and
+     * there would otherwise be a second copy of this to keep in step.
+     *
+     * @param value the number, already parsed
+     * @param shown how the input looked, for the complaint - the text as the
+     *              file wrote it, which is what an operator will be looking at
+     * @throws IllegalArgumentException if it is not a whole 64-bit number
+     */
+    public static long integral(BigDecimal value, String shown) {
+        try {
+            return value.longValueExact();
+        } catch (ArithmeticException e) {
+            throw new IllegalArgumentException("'" + shown + "' is " + value.toPlainString()
+                    + ", which is not a whole number a 64-bit INTEGRAL can hold. Use DECIMAL for a"
+                    + " value with a fraction, and for one beyond 9223372036854775807 a text"
+                    + " column - nothing arithmetic is done to an identifier that long anyway", e);
+        }
     }
 }
