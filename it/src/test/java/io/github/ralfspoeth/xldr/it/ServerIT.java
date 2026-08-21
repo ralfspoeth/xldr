@@ -17,6 +17,7 @@ import java.nio.file.Path;
 import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.time.Duration;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
@@ -24,6 +25,7 @@ import java.util.function.BooleanSupplier;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.nio.file.StandardCopyOption.ATOMIC_MOVE;
+import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -44,6 +46,11 @@ public class ServerIT {
     private Path root;
     private Path staging;
     private Watcher watcher;
+    /**
+     * kept, because {@code recoverWork} runs once when a watcher starts: a test
+     * of it has to lay the feed down first and start a watcher of its own
+     */
+    private Config config;
 
     @BeforeEach
     void setUp() throws Exception {
@@ -64,7 +71,7 @@ public class ServerIT {
         props.setProperty("xldr.maxConcurrentLoads", "2");
         props.setProperty("jdbc.url", JDBC_URL);
 
-        var config = Config.of(props);
+        config = Config.of(props);
         watcher = Watcher.watch(config, () -> DriverManager.getConnection(JDBC_URL));
     }
 
@@ -450,9 +457,165 @@ public class ServerIT {
         assertTrue(Files.notExists(typo.resolve("in")), "an unknown setting must not become a feed");
     }
 
+    // ---- what happens after the transaction commits ---------------------------
+
     /**
-     * Producers hand a file over by an atomic move, never by writing into in/.
+     * A load that committed and could not be archived stays in {@code work/}
+     * with a marker, and is not a failure.
+     * <p>
+     * The case the whole split in {@code runLoad} exists for. Before it, the
+     * archive throwing was caught with the load, so the file went to
+     * {@code hospital/} with its rows already in the database - and an operator
+     * doing what the hospital is for would load them a second time. Nothing
+     * exercised it, because provoking it looked like it needed a filesystem that
+     * fails on demand.
+     * <p>
+     * It needs one line. {@code archive()} puts a file under
+     * {@code archive/yyyy/MM/dd}, so a regular file where the year directory
+     * should go makes {@code createDirectories} throw. The feed's own
+     * {@code archive/} is still a directory, which matters: the registry
+     * recreates the four working directories on every reconcile, and breaking
+     * one of those would deactivate the feed instead of the load.
      */
+    @Test
+    @Timeout(60)
+    void strandsAloadThatCommittedButCouldNotBeArchived() throws Exception {
+        var feed = Files.createDirectory(root.resolve("unarchivable"));
+        Files.writeString(feed.resolve(Delivery.FILE), "accepts = glob:*.csv\n");
+        Files.writeString(feed.resolve("spec.json"), SPEC);
+        await("in/ to be created", () -> Files.isDirectory(feed.resolve("in")));
+
+        // where archive() wants to make a directory, leave it a file
+        var year = String.valueOf(LocalDate.now().getYear());
+        Files.writeString(feed.resolve("archive").resolve(year), "not a directory");
+
+        deliver(feed, "committed.csv", """
+                id,name
+                1,Alice
+                2,Bob
+                """);
+
+        await("rows to arrive", () -> selectPersons().size() == 2);
+        await("the marker to be written", () -> !markers(feed).isEmpty());
+
+        var work = names(feed.resolve("work"));
+        assertAll(
+                () -> assertEquals(List.of("1:Alice", "2:Bob"), selectPersons(),
+                        "the transaction committed, whatever happened afterwards"),
+                () -> assertTrue(work.contains("committed.csv"),
+                        "the input stays in work/, not hospital/: " + work),
+                () -> assertTrue(work.contains("committed.csv.loaded"),
+                        "with a marker beside it: " + work),
+                () -> assertTrue(hospital(feed).isEmpty(),
+                        "the hospital is where an operator looks for work to redeliver, and this "
+                                + "one must not be: " + hospital(feed)),
+                () -> assertTrue(
+                        Files.readString(feed.resolve("work").resolve("committed.csv.loaded"))
+                                .contains("COMMITTED"),
+                        "and the marker says so in as many words"));
+    }
+
+    // ---- what happens to a file a dead process left behind --------------------
+
+    /**
+     * A file left in {@code work/} by a process that died is handed to an
+     * operator rather than retried.
+     * <p>
+     * Retrying would be the tempting thing and the wrong one: whether the
+     * transaction committed is unknown, so a retry either loses nothing or
+     * duplicates everything, and nothing here can tell which.
+     * <p>
+     * This starts a watcher of its own, because {@code recoverWork} runs once at
+     * startup over the feeds registered by then - it is the answer to what a
+     * crash left behind, not to anything that happens while the server is up.
+     */
+    @Test
+    @Timeout(60)
+    void recoversAstaleClaimAtStartup() throws Exception {
+        var feed = staleClaim("crashed", "interrupted.csv", null);
+
+        await("the stale claim to be recovered", () -> hospital(feed).contains("interrupted.csv"));
+        assertAll(
+                () -> assertTrue(names(feed.resolve("work")).isEmpty(),
+                        "work/ means a load is running, and none is"),
+                () -> assertTrue(recoveredLog(feed).contains("unknown"),
+                        "the note has to say the outcome is unknown: " + recoveredLog(feed)),
+                () -> assertTrue(recoveredLog(feed).contains("check the target tables"),
+                        recoveredLog(feed)));
+    }
+
+    /**
+     * And one that carries a {@code .loaded} marker gets the stronger note.
+     * <p>
+     * Same directory, same recovery, opposite instruction. The generic note tells
+     * an operator to check the target tables and decide; here there is nothing to
+     * decide, because the previous run already recorded that the rows are in. A
+     * file whose marker was ignored would be redelivered on the strength of a
+     * note saying "unknown", which is the duplicate this marker exists to
+     * prevent.
+     */
+    @Test
+    @Timeout(60)
+    void recoversAloadedButUnarchivedFileWithTheStrongerNote() throws Exception {
+        var feed = staleClaim("half-filed", "committed.csv", """
+                This file's load COMMITTED. Its rows are in the database.
+                """);
+
+        await("the stale claim to be recovered", () -> hospital(feed).contains("committed.csv"));
+        assertAll(
+                () -> assertTrue(recoveredLog(feed).contains("COMMITTED"),
+                        "the note has to say the rows are in: " + recoveredLog(feed)),
+                () -> assertTrue(recoveredLog(feed).contains("Do not move it back"),
+                        recoveredLog(feed)),
+                () -> assertTrue(names(feed.resolve("work")).isEmpty(),
+                        "the marker goes with the file it described: " + names(feed.resolve("work"))));
+    }
+
+    /**
+     * A feed laid out as a dead process would have left it, with a watcher
+     * started afterwards so that {@code recoverWork} sees it.
+     *
+     * @param marker the content of the {@code .loaded} file, or null for a claim
+     *               whose outcome nothing recorded
+     */
+    private Path staleClaim(String name, String input, String marker) throws Exception {
+        watcher.close();
+        var feed = Files.createDirectory(root.resolve(name));
+        Files.writeString(feed.resolve(Delivery.FILE), "accepts = glob:*.csv\n");
+        Files.writeString(feed.resolve("spec.json"), SPEC);
+        Files.createDirectories(feed.resolve("work"));
+        Files.writeString(feed.resolve("work").resolve(input), "id,name\n1,Alice\n");
+        if (marker != null) {
+            Files.writeString(feed.resolve("work").resolve(input + ".loaded"), marker);
+        }
+        watcher = Watcher.watch(config, () -> DriverManager.getConnection(JDBC_URL));
+        return feed;
+    }
+
+    /** the {@code .recovered.log} of the one file this feed recovered */
+    private static String recoveredLog(Path feed) {
+        try (var files = Files.list(feed.resolve("hospital"))) {
+            var log = files.filter(p -> p.getFileName().toString().endsWith(".recovered.log"))
+                    .findFirst()
+                    .orElseThrow(() -> new AssertionError("no .recovered.log in " + hospital(feed)));
+            return Files.readString(log);
+        } catch (IOException e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
+    private static List<String> markers(Path feed) {
+        return names(feed.resolve("work")).stream().filter(n -> n.endsWith(".loaded")).toList();
+    }
+
+    private static List<String> names(Path dir) {
+        try (var files = Files.list(dir)) {
+            return files.map(p -> p.getFileName().toString()).sorted().toList();
+        } catch (IOException e) {
+            return List.of();
+        }
+    }
+
     private void deliver(Path feed, String name, String content) throws IOException {
         deliver(feed, name, content.getBytes(UTF_8));
     }
@@ -515,6 +678,39 @@ public class ServerIT {
         await("the second row", () -> selectPersons().size() == 2);
         assertEquals(List.of("1:from-test", "2:from-prod"), selectPersons(),
                 "env.properties is read per load, so the edit must reach the second file");
+    }
+
+    /**
+     * {@code env.properties} is read as UTF-8, not as the ISO-8859-1 that
+     * {@code Properties.load(InputStream)} assumes.
+     * <p>
+     * A deliberate departure from the {@code .properties} convention, and worth
+     * pinning because nothing about it is visible: these values are written by
+     * hand in an editor that saves UTF-8, and they reach a database column
+     * verbatim. Read the other way, {@code Grüße} arrives as {@code GrÃ¼ÃŸe} -
+     * no error anywhere, just a column that is quietly wrong in every row of
+     * every load until somebody looks at it.
+     */
+    @Test
+    @Timeout(60)
+    void readsEnvPropertiesAsUtfEight() throws Exception {
+        var feed = Files.createDirectory(root.resolve("accented"));
+        Files.writeString(feed.resolve(Delivery.FILE), "accepts = glob:*.csv\n");
+        // Files.writeString is UTF-8, which is what an editor would have written
+        Files.writeString(feed.resolve("env.properties"), "label = Grüße\n");
+        Files.writeString(feed.resolve("spec.json"), SPEC.replace(
+                "{\"fieldSelector\": \"name\", \"column\": \"name\"}",
+                "{\"expr\": \"${env.label}\", \"column\": \"name\"}"));
+        await("in/ to be created", () -> Files.isDirectory(feed.resolve("in")));
+
+        deliver(feed, "accented.csv", """
+                id,name
+                1,ignored
+                """);
+
+        await("the row", () -> selectPersons().size() == 1);
+        assertEquals(List.of("1:Grüße"), selectPersons(),
+                "read as ISO-8859-1 this would be GrÃ¼ÃŸe, and nothing would have complained");
     }
 
     /**

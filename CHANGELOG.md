@@ -36,6 +36,29 @@ The versions are the git tags `xldr-<version>`; the published artifacts carry th
   document and can see none of the three. `CheckIT` runs the command against a file-based H2 and provokes each
   finding, so what the command claims is checked rather than asserted.
 
+- **Tests for the three things the server does after a load returns**, which were the last untested paths in
+  `FileProcessor` and `LoadJob` and the ones whose mistakes are least visible.
+
+  A load that committed and could not be archived is left in `work/` with a marker and is not counted a failure -
+  the split in `runLoad` that 0.35 made, and until now unexercised, because provoking it looked as though it needed
+  a filesystem that fails on demand. It needs one line: `archive()` writes under `archive/yyyy/MM/dd`, so a regular
+  file where the year directory belongs makes `createDirectories` throw. The feed's own `archive/` stays a
+  directory, which matters - the registry remakes the four working directories on every reconcile, and breaking one
+  of those would deactivate the feed rather than the load.
+
+  A file left in `work/` by a process that died is recovered to `hospital/` with a note, and the note differs: the
+  generic one says the outcome is unknown and to check the target tables, and one with a `.loaded` marker beside it
+  says the rows are in and not to redeliver. Both are asserted, since the whole point of the marker is that the two
+  say opposite things.
+
+  And `env.properties` is read as UTF-8 rather than the ISO-8859-1 `Properties.load(InputStream)` assumes. A
+  deliberate departure from the convention, previously written down and not checked, and invisible when wrong:
+  `Grüße` would arrive as `GrÃ¼ÃŸe` in every row of every load with nothing raising a word.
+
+  In `ServerIT` rather than as unit tests. All three are filesystem plus database plus a running server, so there is
+  no unit in them to isolate, and testing them through the server needed no change to what the module exposes -
+  `FileProcessor`, `LoadJob` and `Feed` all stay package-private.
+
 ### Fixed
 
 - **An `INTEGRAL` that is not a whole 64-bit number is refused rather than quietly changed.** Two paths ended in
