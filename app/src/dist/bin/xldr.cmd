@@ -41,5 +41,6 @@ if exist "%HERE%\modules" set "MODULEPATH=%MODULEPATH%;%HERE%\modules"
 if exist "%HERE%\xl" set "MODULEPATH=%MODULEPATH%;%HERE%\xl"
 if exist "%HERE%\drivers" set "MODULEPATH=%MODULEPATH%;%HERE%\drivers"
 
-"%JAVA%" %JAVA_OPTS% -Dxldr.home="%HERE%" -p "%MODULES%" ^
+"%JAVA%" %JAVA_OPTS% -Dxldr.home="%HERE%" ^
+    -p "%MODULEPATH%" ^
     -m io.github.ralfspoeth.xldr.app/io.github.ralfspoeth.xldr.app.App %*
