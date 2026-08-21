@@ -14,6 +14,10 @@ module io.github.ralfspoeth.xldr.app {
     opens io.github.ralfspoeth.xldr.app to info.picocli;
 
     requires io.github.ralfspoeth.xldr.server;
+    // the check subcommand builds an adapter and reads a sample through it,
+    // which the server does for itself and never on this module's behalf.
+    // ia requires spec transitively, so the spec types come with it
+    requires io.github.ralfspoeth.xldr.ia;
     requires java.sql;
     requires java.logging;
     requires com.zaxxer.hikari;

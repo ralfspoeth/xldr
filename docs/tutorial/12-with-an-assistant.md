@@ -83,15 +83,34 @@ Everything above is mechanical, so do not do it by eye. Save the spec with its `
 IntelliJ or VS Code, and read the squiggles - as [page 11](11-when-it-goes-wrong.md) describes. The schema catches
 every one of the six except the first, and catches a good deal else besides.
 
-Then load a copy of the file with a `limit` on the mapping and look at the rows:
+Then run `check`, which is the step the schema cannot do. The schema reads the document; this reads the document
+against your file and your database:
 
-    {"recordSelector": "customers", "table": "customer", "limit": 20, "fieldMapping": [ ... ]}
+    xldr check spec.json --sample sample.csv --url jdbc:h2:./tutorial
 
-Which brings us to what neither the schema nor the assistant can do for you. A spec can be entirely valid, load
-without complaint, and be wrong - `home_city` filled from the wrong field, a date that parsed under the default
-because nobody said `dd.MM.yyyy` and `01.03.2026` happened not to throw. Nothing in the toolchain knows what your
-columns mean. Twenty rows and a look is the whole of the remedy, and it is worth the two minutes on a spec you
-wrote yourself, let alone on one you did not.
+    checking spec.json
+      input          text/csv, 1 record selector(s)
+      mappings       1, over 1 declared record selector(s)
+      columns        checked against jdbc:h2:./tutorial
+      sample         sample.csv (96 bytes)
+      'customers'  -> customer: 2 record(s) matched
+          id=1 (Long)  name=Alice (String)  since=2026-03-01T00:00 (LocalDateTime)
+
+    no findings.
+
+The three things it finds are the three an assistant gets wrong after the schema has had its say: a mapping naming
+a record selector the input never declared, a `column` your table has not got, and a record selector that matches
+nothing in a real file. Each of those is a spec that validates perfectly and fails on the first delivery - or, in
+the last case, does not fail at all and loads nothing. Nothing is written, so the `--url` may be any database that
+has the table.
+
+Which brings us to what neither the schema nor `check` nor the assistant can decide for you. A spec can be entirely
+valid, pass every check, load without complaint, and be wrong - `home_city` filled from the wrong field, or a date
+that parsed under the default because nobody said `dd.MM.yyyy` and `01.03.2026` happened not to throw. That is why
+`check` prints the parsed values with their types rather than only counting them: the file said `01.03.2026` and
+the line above says the first of March, which is either what your producer meant or is not. Nothing in the
+toolchain knows which. One look is the whole of the remedy, and it is worth the two minutes on a spec you wrote
+yourself, let alone on one you did not.
 
 ## Where an assistant is genuinely better than a person
 

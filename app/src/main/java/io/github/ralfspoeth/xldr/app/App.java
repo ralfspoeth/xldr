@@ -24,23 +24,33 @@ import static java.lang.System.Logger.Level.INFO;
  * Entry point: starts the server and watches the configured roots until the
  * process is asked to stop.
  * <p>
- * Running the server is what the command does, and all it does: {@code xldr}
- * reads {@code xldr.properties} from the working directory, or from the one named
- * by {@code --dir}.
+ * Running the server is what {@code xldr} with no subcommand does: it reads
+ * {@code xldr.properties} from the working directory, or from the one named by
+ * {@code --dir}. There is one subcommand, {@link Check}, and adding it changed
+ * nothing about that.
  * <p>
- * There was a {@code validate} subcommand, removed in 0.30. What it checked has
- * since moved to the places that know: an adapter refuses a selector naming no
- * column of the file, {@code SpecRegistry} refuses a spec the deployment cannot
- * load, and a feed that cannot activate says so. Those are earlier, or more
- * authoritative, than a command somebody has to remember to run. What was left
- * was one heuristic - a record selector's discriminator beside a header - and it
- * was wrong often enough to argue about, a headed file being perfectly entitled
- * to carry a type column.
+ * There was also a {@code validate} subcommand, removed in 0.30, and
+ * {@code check} is not its return. What {@code validate} did has since moved to
+ * the places that know: an adapter refuses a selector naming no column of the
+ * file, {@code SpecRegistry} refuses a spec the deployment cannot load, and a
+ * feed that cannot activate says so. Those are earlier, or better informed, than
+ * a command somebody has to remember to run, and what was left of the old one
+ * was a single heuristic that was wrong often enough to argue about.
+ * <p>
+ * {@code check} answers a question none of them can. It holds the spec, a sample
+ * file and the target table at once, which no component of a running server ever
+ * does - the adapter has the first two and knows nothing of the table, the loader
+ * has the first and the third but only with a transaction already open. So it
+ * catches what is left: a mapping naming a record selector the input never
+ * declared, a column the table has not got, a record selector that matches
+ * nothing in a real file. Each of those is refused today by something, on the
+ * first delivery, with the feed already deployed.
  */
 @Command(
         name = "xldr",
         mixinStandardHelpOptions = true,
         versionProvider = App.ManifestVersion.class,
+        subcommands = Check.class,
         description = "Watches the configured roots and loads files that appear into the target database."
 )
 public class App implements Callable<Integer> {

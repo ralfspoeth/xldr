@@ -41,6 +41,12 @@
             <artifactId>server</artifactId>
             <version>${project.version}</version>
         </dependency>
+        <!-- CheckIT drives the shipped command line, so the module that has it -->
+        <dependency>
+            <groupId>io.github.ralfspoeth.xldr</groupId>
+            <artifactId>app</artifactId>
+            <version>${project.version}</version>
+        </dependency>
         <dependency>
             <groupId>io.github.ralfspoeth.xldr</groupId>
             <artifactId>xml</artifactId>

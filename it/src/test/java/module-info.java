@@ -1,6 +1,10 @@
 open module io.github.ralfspoeth.xldr.it.test {
     // require the core parts
     requires transitive io.github.ralfspoeth.xldr.it;
+    // CheckIT drives the shipped command line rather than the class behind it,
+    // so that what is tested is what an author actually types
+    requires io.github.ralfspoeth.xldr.app;
+    requires info.picocli;
     // require the adapters
     requires io.github.ralfspoeth.xldr.xml;
     requires io.github.ralfspoeth.xldr.csv;

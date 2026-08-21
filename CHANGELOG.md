@@ -6,6 +6,59 @@ ways that break existing code and existing specs; those changes are listed here 
 The versions are the git tags `xldr-<version>`; the published artifacts carry the same version under the group
 `io.github.ralfspoeth.xldr`.
 
+## Unreleased
+
+### Added
+
+- **`xldr check` - a spec, a sample file and the target table, compared before a feed exists.**
+
+      xldr check spec.json --sample orders.csv --url jdbc:... --user dbuser --password
+
+  Not the `validate` removed in 0.30 returning. That one repeated what the adapters do, and removing it was right.
+  This asks what none of them can, because it holds three artifacts at once that no part of a running server ever
+  does: the adapter has the spec and the file and knows nothing of the table, the loader has the spec and the table
+  but only with a transaction already open. What falls between them is a mapping naming a record selector the input
+  never declared, a `column` the table has not got, and a record selector that is well formed and matches nothing
+  in a real file. The first is refused on the first delivery, the second is a SQL error on the first insert, and
+  the third is not refused at all - the load succeeds and inserts no rows.
+
+  `--rows N` prints the first N parsed records with their Java types, which is the half no check can do. A date
+  read under the wrong pattern is still a date and a German decimal read as a plain one is still a number, so
+  nothing refuses either; but the file said `01.03.2026` and the output says `2026-03-01`, and that is either what
+  the producer meant or is not.
+
+  It reads only - a connection for `DatabaseMetaData`, the sample parsed in memory - so it is safe against the only
+  database that has the table. Every argument but the spec is optional, so it degrades to whatever is available.
+
+  Bare `xldr` still starts the server exactly as before; `check` is a subcommand beside it.
+
+  Written because the loop an author or an assistant works in was not closed: the published schema validates the
+  document and can see none of the three. `CheckIT` runs the command against a file-based H2 and provokes each
+  finding, so what the command claims is checked rather than asserted.
+
+### Fixed
+
+- **An `INTEGRAL` that is not a whole 64-bit number is refused rather than quietly changed.** Two paths ended in
+  `Number.longValue()`, which drops a fraction and wraps an overflow: `1,5` loaded as `1`, and a twenty-five digit
+  account number loaded as whatever its low bits said. The load reported success both times.
+
+  In `Formats` it happened only where a `numberFormat` was configured. The canonical path never did it -
+  `Long.parseLong` refuses both - so the two disagreed, and which one a field got depended on a pattern that had
+  very likely been set for the money column beside it. Nothing in the spec says that setting reaches the id column
+  at all.
+
+  The JSON adapter had the same mistake on a path with no pattern in it: a JSON *number* literal is already a
+  `BigDecimal` when the adapter sees it, so `{"qty": 1.5}` declared `INTEGRAL` became `1` with nothing configured
+  and nothing said. That was the quieter of the two. Both now go through one shared rule, `Formats.integral`,
+  rather than a second copy to keep in step.
+
+  Only a non-zero fraction is refused: one `numberFormat` covers a whole file, so a pattern with decimal places is
+  the ordinary case even where some columns are whole, and `1.00` under `#,##0.00` is exactly one and still loads.
+  `FP` is untouched - it is the type that says it may be approximate.
+
+  Found while writing a test for a claim on tutorial page 8, which is also corrected: it said `INTEGRAL` has no
+  upper bound, where `DataType` has always documented it as a `Long`. The README had it right.
+
 ## 0.35
 
 Which records of an input belong to one record selector is a type with three cases rather than two nullable fields,

@@ -345,6 +345,38 @@ perfectly well carry a type column whose values are what the discriminator selec
 grey area at all: a discriminator may name the component it tests, so a headed file with a type column is what the
 feature is *for*.
 
+### Checking a draft against the database and a sample
+
+    xldr check spec.json --sample orders.csv --url jdbc:postgresql://host/db --user dbuser --password
+
+This is not the old `validate` returning. That one repeated what the adapters do; this asks the question none of
+them can, because it holds three things at once that no part of a running server ever does - the spec, a real file,
+and the target table. The adapter has the first two and knows nothing about the table. The loader has the first and
+the third, but only once a file is being loaded and a transaction is open. So what is left over is exactly this:
+
+- a mapping naming a record selector the input never declared, which the adapter refuses on the first delivery;
+- a `column` the table has not got, which is a SQL error on the first insert;
+- a record selector that is well formed and matches nothing in a file you call representative, which nothing
+  refuses at all - the load succeeds and inserts no rows.
+
+Each argument is optional except the spec: without `--url` the database is not consulted, without `--sample` the
+file is not read, and a check with neither still cross-checks the spec against itself.
+
+It reads only. The connection is opened to ask `DatabaseMetaData` what the table holds, and the sample is parsed in
+memory, so it is safe to point at production if that is the only place the table exists.
+
+`--rows N` prints the first N parsed records of each record selector with their Java types, and this is the half no
+check can do for you:
+
+    'customers'  -> customer: 2 record(s) matched
+        id=1 (Long)  name=Alice (String)  since=2026-03-01T00:00 (LocalDateTime)  balance=1234.56 (BigDecimal)
+
+Nothing here is an error, and nothing could be: a date read under the wrong pattern is still a date, and a German
+decimal read as a plain one is still a number. But the file said `01.03.2026` and `1.234,56`, and one look at the
+line above says whether `dateFormat` and `locale` were understood the way the producer meant them. That is the
+failure this toolkit is otherwise worst at catching, and it costs a row that is silently wrong rather than a load
+that stops.
+
 Reading different file types is supported by providing a specific adapter per MIME type. There may be more than one
 adapter per MIME type on the module path; it's then however unspecified which one will be selected. A future enhancement
 will allow require features to be implemented by the adapter. The adapters shipped with the toolkit are
