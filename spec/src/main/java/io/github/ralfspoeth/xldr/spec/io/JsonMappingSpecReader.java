@@ -28,8 +28,11 @@ import java.util.Optional;
  * <p>
  * Members beyond those are ignored at every level, so an author may annotate a
  * spec - for instance with a {@code "comments"} member - without breaking it.
- * The name {@code load} is reserved (it carried the commit policy once and may
- * return) and must not be repurposed.
+ * No member name is reserved. {@code load} was, held since 0.2 against the
+ * return of the commit policy it once carried; what a deployment needs to say
+ * about where a load goes is now {@code target.properties} beside the spec, and
+ * a name kept open for something that is not coming back is only a trap for
+ * whoever picks it.
  */
 public class JsonMappingSpecReader implements MappingSpecReader {
 

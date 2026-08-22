@@ -161,12 +161,16 @@ public class JsonValueSourceTest {
     }
 
     /**
-     * Members the reader does not consume - arbitrary annotations and the
-     * reserved {@code load} - are ignored at every level, so an annotated spec
-     * parses to the same result as a bare one.
+     * Members the reader does not consume are ignored at every level, so an
+     * annotated spec parses to the same result as a bare one.
+     * <p>
+     * The fixture still carries a {@code load} block, which used to be the one
+     * reserved name and is now an unrecognised member like any other - kept here
+     * because a spec written against an older release may well contain one, and
+     * it has to go on being ignored rather than becoming an error.
      */
     @Test
-    public void ignoresUnknownAndReservedMembers() throws IOException {
+    public void ignoresUnknownMembers() throws IOException {
         var bare = """
                 {
                     "input": { "mimeType": "text/csv",

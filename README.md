@@ -289,9 +289,8 @@ following formats:
 
 A spec may carry more than the members the reader consumes. Anything a reader does not recognise - a JSON member, an
 XML element or attribute, at any level - is ignored, so an annotation never breaks a spec; the schemas, being
-stricter, name `comment` for exactly that purpose. The one exception is `load`: that name is **reserved**.
-It carried the commit policy in an earlier version and may return, so it must not be repurposed for the author's own
-data; a spec that still contains an old `load` block is simply ignored today.
+stricter, name `comment` for exactly that purpose. There are no reserved names: `load` was one until 0.36, held in
+case the commit policy it once carried came back, and it is now an ordinary unrecognised member like any other.
 
 ### Validating a spec while writing it
 
@@ -760,6 +759,7 @@ be created; a feed is a directory exactly one level below a root that contains a
     <root>/<feed>/
         delivery.properties how files arrive; its presence makes the directory a feed
         spec.json           one of spec.json | spec.xml; what to do with what arrives
+        target.properties   optional; the schema and catalog the rows go to
         env.properties      optional; what this deployment supplies to the spec
         in/                 producers move input files in here
         work/               claimed, currently being loaded
@@ -776,6 +776,44 @@ Removing the spec deactivates the feed, replacing it reloads it - and the same g
 changing which files a feed claims is no more structural than changing a selector. No restart in either case. Exactly
 one spec file must be present: two of them is refused rather than resolved by precedence, because loading through the
 wrong spec is worse than not loading at all.
+
+#### `target.properties`: where the rows go
+
+The dual of `delivery.properties`. One says how a feed's files arrive, the other where their rows land, and both are
+properties of the deployment rather than of the mapping - which is why neither is in the spec. A spec is meant to
+travel from test to production unchanged, and the schema it writes into is exactly the sort of thing that differs
+between the two.
+
+    schema  = staging
+    catalog = warehouse
+
+Both settings are optional, and so is the file. Without it, table names go to the database as the spec wrote them
+and resolve through whatever search path the connection already has - which is how most deployments work and how
+every one worked before this existed. Naming a schema matters where the search path is not enough: a service
+account that can see several, or a staging schema fed by the same specs that feed production.
+
+The schema qualifies the `insert` and every `lookup` select alike, since a reference table a spec names without
+qualification lives wherever the feed's tables live. Each part is folded like any other identifier, so `staging`
+and `STAGING` are one schema and a quoted `"My Schema"` keeps its case.
+
+**Not every database takes both.** Before the first record is read, the driver is asked whether a catalog and a
+schema may appear in data manipulation at all, and one it will not take is refused there and then:
+
+    this deployment names a catalog, warehouse, but PostgreSQL does not take a database in an
+    insert. Remove it from target.properties
+
+PostgreSQL is the case that matters - it cannot qualify across databases, so `catalog` is never usable against it,
+and Oracle has no catalog worth the name either. Asking first turns a driver syntax error on the first record of
+the first file into a sentence before the file is claimed. The separator is always `.`: JDBC has no notion of a
+schema separator, that being fixed by the SQL grammar rather than by a dialect, and `getCatalogSeparator` only
+means anything alongside `isCatalogAtStart` - which every driver shipped here answers the same way.
+
+A setting this file does not know is refused rather than ignored, and the reason is sharper than for
+`delivery.properties`: a misspelled `schmea` would leave the load unqualified, and an unqualified load against a
+search path that happens to find a table of the same name *succeeds* - into the wrong schema, with nothing said.
+
+The three files are read per load, not cached on the feed, so editing one reaches the next file without the feed
+being reloaded.
 
 Deactivating takes effect for files as well as for the feed: a file already sitting in `in/` when the spec goes is
 left there untouched, and so is a marker beside it. A load in flight when the spec is removed does run to the end -
