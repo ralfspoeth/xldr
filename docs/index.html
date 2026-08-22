@@ -76,7 +76,7 @@
         <th>XML</th>
     </tr>
     <tr>
-        <td>0.35 - 0.36 (current)</td>
+        <td>0.35 - 0.37 (current)</td>
         <td><a href="schema/mapping-spec-0.35.json">mapping-spec-0.35.json</a></td>
         <td><a href="schema/mapping-spec-0.35.xsd">mapping-spec-0.35.xsd</a></td>
     </tr>
@@ -120,9 +120,9 @@
 <p>
     A schema is published whenever the format changes, and named after the release that changed it: the format is
     still settling before 1.0, and a spec should be validated against the schema its release reads. A release that
-    changes nothing about the format - 0.11, 0.12, 0.14 to 0.20, 0.22, 0.24 to 0.31, 0.33, 0.34 - keeps the previous schema rather than
-    publishing
-    a copy of it. An older one stays where it is, so a spec pinned to it keeps validating.
+    changes nothing about the format - 0.11, 0.12, 0.14 to 0.20, 0.22, 0.24 to 0.31, 0.33, 0.34, 0.36, 0.37 - keeps
+    the previous schema rather than publishing a copy of it. An older one stays where it is, so a spec pinned to it
+    keeps validating.
 </p>
 
 <p>
@@ -133,6 +133,15 @@
     <code>text/tab-separated-values</code> spent four releases missing from the list while validating perfectly well:
     added to the adapter in 0.28, it reached the schema only in 0.32, the first release since to change the format at
     all. The list has not moved since; no adapter has been added since 0.32.
+</p>
+
+<p>
+    In 0.37 a JSON <code>selector</code> may no longer begin with a slash, and this is one the schema cannot catch:
+    the same field carries an XPath for the XML adapter, where a leading slash is ordinary. A leading slash is
+    RFC 6901's - the syntax of JSON Schema <code>$ref</code>, JSON Patch and OpenAPI - and the two differ where it
+    costs most, an array step there being a bare number and a bare number here a member name. It used to be
+    stripped, so <code>/orders/0/id</code> resolved to nothing and loaded a column of NULLs without a word. It is
+    now refused when the adapter is built. A bare number <em>without</em> a slash still means a member of that name.
 </p>
 
 <p>
