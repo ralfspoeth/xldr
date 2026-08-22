@@ -1,6 +1,6 @@
-# 5. Variables
+# 7. Variables
 
-[← constants](04-constants.md) · [index](README.md) · [next: lookups →](06-lookups.md)
+[← constants](06-constants.md) · [index](README.md) · [next: lookups →](08-lookups.md)
 
 A constant is worked out before the load starts. A **variable** is worked out **once when the load starts** - so
 every row of one file gets the same value, and the next file gets a fresh one.
@@ -61,7 +61,7 @@ and declare the variable:
 }
 ```
 
-`${now()}` is an expression, and expressions have [a page of their own](07-expressions.md). This is the only one
+`${now()}` is an expression, and expressions have [a page of their own](09-expressions.md). This is the only one
 needed here: it yields the current instant, which is why the column is `with time zone` - an instant is a moment
 rather than a reading off a wall clock, and a column without a zone would silently pick one.
 
@@ -79,7 +79,7 @@ Two rows, one timestamp between them. Evaluated per row you would get two, or tw
 file - and the rows of one batch would no longer be identifiable as one batch, which is usually the entire reason
 for having the column.
 
-The saving matters more when the value comes from the database, as the [next page](06-lookups.md) shows. A variable
+The saving matters more when the value comes from the database, as the [next page](08-lookups.md) shows. A variable
 reading a batch number out of a table runs that query once; the same thing written per row runs it for every
 record. And correctness follows cost here: nothing guarantees a query asked twice answers the same, so a per-row
 read could split one file across two batches.
@@ -90,9 +90,9 @@ The same four sources a column has, minus the one that would make no sense:
 
 | source | meaning |
 |---|---|
-| `constant` | a fixed value from the spec - [page 4](04-constants.md) |
-| `lookup` | read from a reference table - [page 6](06-lookups.md) |
-| `expr` | a `${...}` template - [page 7](07-expressions.md) |
+| `constant` | a fixed value from the spec - [page 6](06-constants.md) |
+| `lookup` | read from a reference table - [page 8](08-lookups.md) |
+| `expr` | a `${...}` template - [page 9](09-expressions.md) |
 | `var` | another variable |
 
 A `fieldSelector` is refused. A variable is evaluated once, before any record has been read, so there is no record
@@ -103,4 +103,4 @@ Variables may refer to one another, and the order they are declared in is the or
 
 ---
 
-[← constants](04-constants.md) · [index](README.md) · [next: lookups →](06-lookups.md)
+[← constants](06-constants.md) · [index](README.md) · [next: lookups →](08-lookups.md)

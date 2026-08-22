@@ -1,6 +1,6 @@
 # 11. When it goes wrong
 
-[← several kinds of record](10-record-types.md) · [index](README.md) · [next: drafting one with an assistant →](12-with-an-assistant.md)
+[← types and notation](10-types.md) · [index](README.md) · [next: drafting one with an assistant →](12-with-an-assistant.md)
 
 Every page so far has worked. This one is about two ways to find a mistake before it costs anything, and the three
 moments at which one shows up if you did not - and the moment is the useful thing, because it tells you where to
@@ -38,7 +38,7 @@ The schema reads your document. `check` reads it against your file and your data
 
     xldr check spec.json --sample customers.csv --url jdbc:h2:./tutorial
 
-Point it at the spec from [page 8](08-types.md) and the file that page shows, and it says:
+Point it at the spec from [page 10](10-types.md) and the file that page shows, and it says:
 
     checking spec.json
       input          text/csv, 1 record selector(s)
@@ -119,7 +119,7 @@ The reason is in the server's log, and it names the feed. The commonest are wort
 * **a selector that names no column of the file.** A field saying `"selector": "id"` against a file whose header
   has no `id`. The message lists the columns the header did carry and the separator they were split on, because
   the usual cause is the separator: read a tab-separated file with commas and the whole header becomes one column.
-* **a selector where the format has nowhere to point**, or an `nth` where it has nothing to count. Page 9 lists
+* **a selector where the format has nowhere to point**, or an `nth` where it has nothing to count. Page 4 lists
   which formats have which.
 * **a pattern that does not compile**, from a `matches` discriminator.
 * **a record selector with both a `selector` and a `discriminator`.**
@@ -179,4 +179,4 @@ The rest is reference, in the [README](../../README.md): the properties of each 
 fixed-length inputs, the server's configuration, how files are delivered, and how to embed the loader in an
 application rather than running the server at all.
 
-[← several kinds of record](10-record-types.md) · [index](README.md) · [next: drafting one with an assistant →](12-with-an-assistant.md)
+[← types and notation](10-types.md) · [index](README.md) · [next: drafting one with an assistant →](12-with-an-assistant.md)

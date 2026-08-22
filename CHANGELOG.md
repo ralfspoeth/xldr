@@ -6,6 +6,59 @@ ways that break existing code and existing specs; those changes are listed here 
 The versions are the git tags `xldr-<version>`; the published artifacts carry the same version under the group
 `io.github.ralfspoeth.xldr`.
 
+## 0.37
+
+The mapping-spec format is unchanged, so `mapping-spec-0.35` remains its schema. The one breaking entry below is a
+new refusal by the JSON adapter, and it is not expressible in a schema: the string it now rejects is a perfectly
+good selector for the XML adapter, which shares the field.
+
+### Breaking
+
+- **A JSON selector may no longer begin with a slash.** It used to be stripped, and that was quiet in both
+  directions. `/orders` and `orders` do address the same member, so the tolerance was harmless for every path with
+  no array step in it - and wrong for every path with one. A leading slash is RFC 6901's, the syntax of JSON Schema
+  `$ref`, JSON Patch and OpenAPI, and the two differ exactly where it costs most: an array step there is a bare
+  number, and a bare number here is a member name. So `/orders/0/id` against `{"orders":[{"id":7}]}` parsed, read
+  `0` as the name of a member and looked for it on an array, found nothing, and bound SQL NULL for every row - a
+  spec that validates against the published schema, loads without a word, and fills a column with nothing.
+
+  Accepting the slash was the worst part of it, because it confirmed the belief that produced it: the author's
+  evidence that the string was being read as a JSON Pointer was that the pointer had been accepted. The refusal
+  happens when the adapter is built, so it lands before a file is opened, and it names the syntax the author
+  probably meant rather than only the one they missed.
+
+  The refusal deliberately stops at the slash. A bare numeric step without one - `orders/0/id` - is still read as a
+  member name, because `{"0": ...}` is a legal object and forbidding it to catch a suspected mistake would refuse a
+  document with every right to exist. `xldr check --sample` covers that residue: it prints the value read for each
+  field, and an unexpectedly empty one shows up there.
+
+  Nothing in this repository, its tests or its tutorial relied on the tolerance, so the migration is to delete the
+  character. That restores exactly what such a spec did before - and where it does not, because the path also
+  carried a bare index, the spec was already loading nothing into that column and has only now been told.
+
+### Documentation
+
+- **The headerless file is the front page now.** The project description opened on "files of different formats and
+  layout", which is the sentence every loader writes and tells a reader nothing about which one to pick, and
+  Getting Started then demonstrated a CSV with a header row - the case that needs no toolkit at all. Both now lead
+  with the file this was written for: no header, several kinds of record interleaved, and a column near the front
+  saying which kind each line is. The Getting Started spec is the one from tutorial page 5, so what the front page
+  shows is a spec the build validates, parses and cross-checks against its own tables.
+
+  The usual answer to such a file is a hand-written step that splits it by record type before anything
+  general-purpose is allowed near it, and that step is where the format knowledge goes to hide. Saying so is the
+  point of the section; no other tool is named, because the shape of the problem is recognisable without one.
+
+- **The tutorial's headerless pair moved to pages 4 and 5**, from 9 and 10. A reader holding such a file should
+  find out whether it can be read before working through six pages on constants, variables, lookups and
+  expressions. Pages 1, 2, 3, 11 and 12 keep their numbers; constants through types shift up by two.
+
+  The no-header page had been written as a diff against the types page - the same file minus its header row, with
+  that page's `balance` column and its de-DE formats - so moving it ahead would have referred to a table not yet
+  created, which `TutorialTest`'s accumulating-tables rule would have caught. It is now a diff against page 2
+  instead, which is the better page for it: it was teaching "no header" and locale formatting at once, and only
+  the first is its subject.
+
 ## 0.36
 
 A release about knowing sooner. `xldr check` compares a draft spec against a real file and a real table before a

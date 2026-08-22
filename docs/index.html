@@ -39,7 +39,8 @@
 <p class="sub">
     Schemas and adapter settings for the mapping specification of
     <a href="https://github.com/ralfspoeth/xldr">XLDR</a>, a modular toolkit that loads CSV, XML, JSON,
-    fixed-length and Excel files into database tables.
+    fixed-length and Excel files into database tables - and, the case it was written for, flat files with no
+    header row and several kinds of record interleaved in one file, told apart by a column rather than by a name.
 </p>
 
 <p>
@@ -51,9 +52,12 @@
 <p>
     New to writing one? The
     <a href="https://github.com/ralfspoeth/xldr/blob/HEAD/docs/tutorial/README.md">tutorial</a> is a path through the
-    format rather than a reference: twelve short pages, each adding one thing to the spec built by the page before,
-    from a first CSV to a file interleaving two record types - and a last one on having a language model draft a
-    spec, and what to check in what it hands back.
+    format rather than a reference: twelve short pages, each adding one thing to the spec built by the page before.
+    A first CSV, the same spec in XML, then
+    <a href="https://github.com/ralfspoeth/xldr/blob/HEAD/docs/tutorial/04-no-header.md">pages 4 and 5</a> on the
+    headerless file and the one interleaving two record types, which come early because that is the case this was
+    written for; then constants, variables, lookups, expressions and types - and a last page on having a language
+    model draft a spec, and what to check in what it hands back.
 </p>
 
 <p>

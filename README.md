@@ -2,11 +2,32 @@
 
 ## Project Description
 
-The idea of the XLDR toolkit is to provide a flexible yet simple engine to load files of different formats and layout or
-structure into database tables.
+XLDR loads files into database tables from a mapping specification - a document that says what the file looks like
+and which value goes in which column, with no code between the two.
 
-The toolkit provides adapters for different file types that can be loaded as modules and utilize the service framework
-of JPMS.
+It handles CSV, XML, JSON and Excel. It was written for the files that come before those: **a flat file with no
+header row, several kinds of record interleaved in it, and a column near the front whose value says which kind each
+line is.**
+
+    O,1001,2026-03-01,1
+    L,1001,widget,5
+    L,1001,sprocket,2
+    O,1002,2026-03-02,2
+
+Two record types, two destination tables, one file, and nothing in it that names anything. There are no column
+headings for a mapping to refer to, so fields are addressed by position; and the file cannot be read as one shape,
+so a spec declares two record selectors and gives each a **discriminator** - which component to look at and what
+its value has to be. Both tables are filled in one transaction, so there is no state in which the orders are loaded
+and their lines are not.
+
+Files like this arrive daily from mainframes and from partners who settled on a layout decades ago, and the usual
+answer is a hand-written pre-processing step that splits the file by record type before anything general-purpose is
+allowed near it. That step is where the format knowledge goes to hide. Here it is four lines of the spec - see
+[Which records are of a kind](#which-records-are-of-a-kind), or the tutorial's
+[pages 4 and 5](docs/tutorial/04-no-header.md), which are early on purpose.
+
+The adapters are JPMS modules bound by the service framework, so the set of formats a deployment understands is the
+set of modules on its module path.
 
 > **Pre-1.0.** The API and the mapping-spec format are still settling and may change in any release before `1.0`,
 > including in ways that break existing code and existing specs. Such changes are listed in the
@@ -36,30 +57,51 @@ assembled it:
     mvn install
     tar xzf app/target/app-<version>-dist.tar.gz
 
+Create the two tables the file above goes into:
+
+    create table orders(id varchar(10), ordered_on date, customer_id varchar(10));
+    create table order_line(order_id varchar(10), sku varchar(30), qty integer);
+
 Then set up a feed - a directory below a root, holding two files: how its files arrive, and what to do with them.
 
-    mkdir -p /var/lib/xldr/people
-    echo 'accepts = glob:*.csv' > /var/lib/xldr/people/delivery.properties
-    cat > /var/lib/xldr/people/spec.json <<'EOF'
+    mkdir -p /var/lib/xldr/orders
+    echo 'accepts = glob:*.dat' > /var/lib/xldr/orders/delivery.properties
+    cat > /var/lib/xldr/orders/spec.json <<'EOF'
     {
       "input": {
         "mimeType": "text/csv",
-        "properties": { "fieldSeparator": "," },
+        "properties": { "header": "absent" },
         "recordSelectors": [
-          { "name": "people", "fieldSelectors": [
-              {"name": "id",   "selector": "id",   "type": "INTEGRAL"},
-              {"name": "name", "selector": "name", "type": "TEXT"}
+          { "name": "orders", "discriminator": {"nth": 1, "equals": "O"}, "fieldSelectors": [
+              {"name": "id",       "nth": 2},
+              {"name": "ordered",  "nth": 3, "type": "DATE"},
+              {"name": "customer", "nth": 4}
+          ] },
+          { "name": "lines", "discriminator": {"nth": 1, "equals": "L"}, "fieldSelectors": [
+              {"name": "order", "nth": 2},
+              {"name": "sku",   "nth": 3},
+              {"name": "qty",   "nth": 4, "type": "INTEGRAL"}
           ] }
         ]
       },
       "mapping": [
-        { "recordSelector": "people", "table": "person", "fieldMapping": [
-            {"fieldSelector": "id",   "column": "id"},
-            {"fieldSelector": "name", "column": "name"}
+        { "recordSelector": "orders", "table": "orders", "fieldMapping": [
+            {"fieldSelector": "id",       "column": "id"},
+            {"fieldSelector": "ordered",  "column": "ordered_on"},
+            {"fieldSelector": "customer", "column": "customer_id"}
+        ] },
+        { "recordSelector": "lines", "table": "order_line", "fieldMapping": [
+            {"fieldSelector": "order", "column": "order_id"},
+            {"fieldSelector": "sku",   "column": "sku"},
+            {"fieldSelector": "qty",   "column": "qty"}
         ] }
       ]
     }
     EOF
+
+`header: "absent"` is what says there is no row of names, and it is why the fields count with `nth` rather than
+naming a column with `selector`. A headed file is the shorter case, not the starting one: drop the property and
+write `"selector": "sku"`.
 
 Point the server at the root and start it; it creates the working directories and picks the feed up. The server
 reads `xldr.properties` from the directory it is started in, or from the one `--dir` names:
@@ -68,16 +110,18 @@ reads `xldr.properties` from the directory it is started in, or from the one `--
     bin/xldr                        # this directory
     bin/xldr --dir /etc/xldr        # or that one
 
-A file moved into `/var/lib/xldr/people/in/` is now loaded into `person` and filed away under `archive/`. See
-[Configuration](#configuration) for the full set of settings, and [Delivering files](#delivering-files) for why the
-file must be *moved* rather than written in place.
+A `.dat` file moved into `/var/lib/xldr/orders/in/` is now split by its first column into `orders` and
+`order_line`, in one transaction, and filed away under `archive/`. See [Configuration](#configuration) for the full
+set of settings, and [Delivering files](#delivering-files) for why the file must be *moved* rather than written in
+place.
 
 **Writing the spec is the actual work**, and this README is the reference rather than the path through it. For that,
 see the [tutorial](docs/tutorial/README.md). It is twelve short pages, each adding one thing to the spec built by
-the page before: constants, variables, lookups, expressions, types and notation, counting a headerless file's
-components, separating several kinds of record into several tables, and - last, because it needs everything before
-it - having a language model draft one and knowing what to check. Each page shows whole files rather than
-fragments, so what you copy is something you can put straight into a feed.
+the page before: a first spec and the same one in XML, then the headerless pair - counting a file's components
+instead of naming them, and separating several kinds of record into several tables - then constants, variables,
+lookups, expressions, types and notation, and last, because it needs everything before it, having a language model
+draft a spec and knowing what to check. Each page shows whole files rather than fragments, so what you copy is
+something you can put straight into a feed.
 
 Those pages are checked rather than trusted. Every build reads them: each spec printed in the tutorial is validated
 against the published schema, parsed by the reader that will parse it in anger, and cross-checked against the
@@ -137,7 +181,7 @@ Both the spec readers and the
 adapters are found through `ServiceLoader`, so each need only be on the module path - naming the spec file is enough
 to read it, since its name says which format it is in:
 
-    var spec = readSpec(Path.of("/var/lib/xldr/people/spec.json"));
+    var spec = readSpec(Path.of("/var/lib/xldr/orders/spec.json"));
     int rows = Loader.load(spec, () -> Files.newInputStream(file), Map.of(), connection);
     // one transaction: committed, or rolled back if any mapping failed
 
@@ -1177,6 +1221,13 @@ applied to the record, so `id` reads one of its members, `customer/address/city`
             {"name": "net",  "selector": "amounts/net",          "type": "DECIMAL"}
         ] }
     ]
+
+There is no leading slash, and one is refused rather than ignored. A leading slash is RFC 6901's - the syntax of
+JSON Schema `$ref`, JSON Patch and OpenAPI, and so the one a reader writes out of habit - and the two differ exactly
+where it costs most: an array step there is a bare number, and a bare number here is a member name. `/orders/0/id`
+against `{"orders":[{"id":7}]}` would resolve to nothing and load a column of NULLs without a word, so the adapter
+refuses it when it is built and names the syntax it is actually reading. A bare number *without* a slash still means
+a member of that name, `{"0": ...}` being a legal object.
 
 A field may also say `nth` instead, which is the n-th element of a record that is an array - the same thing
 `[n-1]` says as a pointer, written the way every other adapter writes it. A record that turns out to be an *object*

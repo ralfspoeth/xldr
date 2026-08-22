@@ -1,35 +1,38 @@
-# 9. A file with no header
+# 4. A file with no header
 
-[← types and notation](08-types.md) · [index](README.md) · [next: several kinds of record →](10-record-types.md)
+[← the same spec in XML](03-in-xml.md) · [index](README.md) · [next: several kinds of record →](05-record-types.md)
 
-Plenty of feeds arrive with no header row. There are then no column names for a `selector` to name, so a field
-**counts** instead. The same file as the last page, with its header row taken away:
+Plenty of feeds arrive with no header row - most of the ones that come off a mainframe, and most of the ones a
+partner has been sending unchanged since before anyone thought to ask. There are then no column names for a
+`selector` to name, so a field **counts** instead.
+
+Here is page 2's file with its header row taken away:
 
 ```csv
-1,Alice,01.03.2026,"1.234,56"
-2,Bob,15.03.2026,"98,00"
+1,Alice,Berlin
+2,Bob,Hamburg
 ```
 
-The table is unchanged; only the input side of the spec differs:
+The table is unchanged:
+
+```sql
+create table customer(id varchar(10), name varchar(50), city varchar(50))
+```
+
+And only the input side of the spec differs from page 2's:
 
 ```json
 {
   "input": {
     "mimeType": "text/csv",
-    "properties": {
-      "header": "absent",
-      "dateFormat": "dd.MM.yyyy",
-      "numberFormat": "#,##0.00",
-      "locale": "de-DE"
-    },
+    "properties": { "header": "absent" },
     "recordSelectors": [
       {
         "name": "customers",
         "fieldSelectors": [
-          {"name": "id",      "nth": 1, "type": "INTEGRAL"},
-          {"name": "name",    "nth": 2},
-          {"name": "since",   "nth": 3, "type": "DATE"},
-          {"name": "balance", "nth": 4, "type": "DECIMAL"}
+          {"name": "id",   "nth": 1},
+          {"name": "name", "nth": 2},
+          {"name": "city", "nth": 3}
         ]
       }
     ]
@@ -39,27 +42,30 @@ The table is unchanged; only the input side of the spec differs:
       "recordSelector": "customers",
       "table": "customer",
       "fieldMapping": [
-        {"fieldSelector": "id",      "column": "id"},
-        {"fieldSelector": "name",    "column": "name"},
-        {"fieldSelector": "since",   "column": "since"},
-        {"fieldSelector": "balance", "column": "balance"}
+        {"fieldSelector": "id",   "column": "id"},
+        {"fieldSelector": "name", "column": "name"},
+        {"fieldSelector": "city", "column": "city"}
       ]
     }
   ]
 }
 ```
 
-which loads exactly what the last page loaded:
+which loads exactly what page 2 loaded:
 
 ```
-sql> select id, name, since, balance from customer order by id;
+sql> select id, name, city from customer order by id;
 
-1 | Alice | 2026-03-01 | 1234.56
-2 | Bob   | 2026-03-15 | 98.00
+1 | Alice | Berlin
+2 | Bob   | Hamburg
 ```
 
-Two changes. `header: "absent"` tells the CSV adapter there is no header row to skip - the default is `present`,
-which is why the earlier pages did not mention it. And each field says `nth` rather than `selector`.
+Two changes, and the mapping is not one of them. `header: "absent"` tells the CSV adapter there is no header row to
+skip - the default is `present`, which is why page 2 did not mention it. And each field says `nth` rather than
+`selector`.
+
+That the *mapping* half is untouched is the point of the two-part shape. What the file looks like and what the rows
+mean are different questions, and only the first one changed here.
 
 ## Exactly one of the two
 
@@ -99,4 +105,4 @@ of the same value. `nth` is what CSS calls the same idea in `:nth-child`.
 
 ---
 
-[← types and notation](08-types.md) · [index](README.md) · [next: several kinds of record →](10-record-types.md)
+[← the same spec in XML](03-in-xml.md) · [index](README.md) · [next: several kinds of record →](05-record-types.md)

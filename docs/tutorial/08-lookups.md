@@ -1,6 +1,6 @@
-# 6. Lookups
+# 8. Lookups
 
-[← variables](05-vars.md) · [index](README.md) · [next: expressions →](07-expressions.md)
+[← variables](07-vars.md) · [index](README.md) · [next: expressions →](09-expressions.md)
 
 The third source. A **lookup** reads the value out of another table: *this* column of *that* table, where *that*
 key column matches a key you supply. It is how a code in the file becomes a foreign key in the row.
@@ -81,7 +81,7 @@ The key is a source in its own right, and any of the three you have already met:
 of the record, a `constant` for a fixed key, or a `var`. What it may not be is another lookup - a chain of them is a
 join, and a join belongs in a view rather than in a mapping spec.
 
-Both forms appear above, and the difference is the one from [page 5](05-vars.md). `region_id` is looked up **per
+Both forms appear above, and the difference is the one from [page 7](07-vars.md). `region_id` is looked up **per
 row**, because the key is a field and every record has its own. `batch_id` is a variable, so its lookup runs
 **once** - its key is a constant, and the answer cannot differ between rows.
 
@@ -106,4 +106,4 @@ are normalized and quoted as identifiers. A spec cannot inject SQL, whatever is 
 
 ---
 
-[← variables](05-vars.md) · [index](README.md) · [next: expressions →](07-expressions.md)
+[← variables](07-vars.md) · [index](README.md) · [next: expressions →](09-expressions.md)

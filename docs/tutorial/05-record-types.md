@@ -1,6 +1,6 @@
-# 10. Several kinds of record
+# 5. Several kinds of record
 
-[← a file with no header](09-no-header.md) · [index](README.md) · [next: when it goes wrong →](11-when-it-goes-wrong.md)
+[← a file with no header](04-no-header.md) · [index](README.md) · [next: constants →](06-constants.md)
 
 A headerless feed often interleaves several kinds of record in one file, the first field naming the kind and the
 ones after it differing in number and meaning per kind. Here an order is followed by its lines:
@@ -110,7 +110,7 @@ partway through a file at four in the morning.
 **Counting stays absolute within the line.** Component 1 is the discriminator itself, so a kind's payload usually
 starts at 2 - as it does above.
 
-**No discriminator means every line.** That is what pages 2 to 9 were doing, and it is what a feed with a header
+**No discriminator means every line.** That is what pages 2 to 4 were doing, and it is what a feed with a header
 almost always wants.
 
 **A record selector never carries both a `selector` and a `discriminator`.** A tree or a sheet has to be *pointed
@@ -128,4 +128,4 @@ since a discriminator has no previous field to continue from.
 
 ---
 
-[← a file with no header](09-no-header.md) · [index](README.md) · [next: when it goes wrong →](11-when-it-goes-wrong.md)
+[← a file with no header](04-no-header.md) · [index](README.md) · [next: constants →](06-constants.md)

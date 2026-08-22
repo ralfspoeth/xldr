@@ -34,7 +34,9 @@ import static java.nio.charset.StandardCharsets.UTF_8;
  * {@link Pointer}s in Greyson's {@link Pointer#parse(String) parse} syntax:
  * slash separated steps, where a step is a member name, {@code [n]} for the
  * n-th element of an array ({@code [-1]} counting from the end), or
- * {@code #regex} to match a member by pattern.
+ * {@code #regex} to match a member by pattern. There is no leading slash, and
+ * one is refused rather than ignored, a leading slash being RFC 6901's and that
+ * syntax differing from this one exactly where it costs most.
  * <p>
  * The record selector addresses the records: {@code orders}, or
  * {@code data/orders} for a nested document. An empty selector is the document
@@ -125,9 +127,32 @@ class JsonInputAdapter implements InputAdapter {
 
     /**
      * A selector in Greyson's {@link Pointer#parse(String)} syntax. An empty
-     * selector addresses the value itself; a leading slash is tolerated and
-     * dropped, since {@code parse} would otherwise read it as a step to a member
-     * named {@code ""}.
+     * selector addresses the value itself.
+     * <p>
+     * A leading slash is refused, being the one unambiguous sign that the author
+     * meant <a href="https://datatracker.ietf.org/doc/html/rfc6901">RFC 6901</a>
+     * - the syntax of JSON Schema {@code $ref}, JSON Patch and OpenAPI, and the
+     * one a reader coming from any of those writes by reflex. The two differ
+     * exactly where it costs most: an array step there is a bare number, and a
+     * bare number here is a member name.
+     * <p>
+     * It used to be dropped instead, and that was quiet in both directions.
+     * {@code /orders} and {@code orders} do mean the same thing, so the tolerance
+     * was harmless for every path without an array step - and wrong for every
+     * path with one. {@code /orders/0/id} against
+     * {@code {"orders":[{"id":7}]}} parsed, read {@code 0} as a member name,
+     * matched nothing, and bound SQL NULL for every row: a spec that validates
+     * against the published schema, loads without a word, and fills a column with
+     * nothing. Worse, accepting the slash confirmed the belief that produced it,
+     * since the author's evidence for "this is being read as a JSON Pointer" was
+     * that the pointer had been accepted.
+     * <p>
+     * The refusal deliberately stops at the slash. A bare numeric step without
+     * one - {@code orders/0/id} - is still read as a member name, because
+     * {@code {"0": ...}} is a legal object and forbidding it to catch a suspected
+     * mistake would refuse a document that has every right to exist. What covers
+     * that residue is {@code xldr check --sample}, which prints the value read
+     * for each field.
      */
     private static Pointer pointer(String path) {
         // no null branch: the only caller that could pass one was the record
@@ -136,11 +161,15 @@ class JsonInputAdapter implements InputAdapter {
         if (path.isBlank()) {
             return Pointer.self();
         }
-        var stripped = path.strip();
-        while (stripped.startsWith("/")) {
-            stripped = stripped.substring(1);
+        var trimmed = path.strip();
+        if (trimmed.startsWith("/")) {
+            throw new IllegalArgumentException("selector '" + path + "' begins with a slash, which is RFC 6901's"
+                    + " syntax and not this one. A step here is a member name, [n] for the n-th element of an array"
+                    + " (negative counting from the end), or #regex for a member matched by pattern - so an index"
+                    + " needs its brackets, and a bare number is read as a member name. Drop the leading slash and"
+                    + " bracket the indices.");
         }
-        return stripped.isEmpty() ? Pointer.self() : Pointer.parse(stripped);
+        return Pointer.parse(trimmed);
     }
 
     @Override

@@ -1,6 +1,6 @@
-# 4. Constants
+# 6. Constants
 
-[← the same spec in XML](03-in-xml.md) · [index](README.md) · [next: variables →](05-vars.md)
+[← several kinds of record](05-record-types.md) · [index](README.md) · [next: variables →](07-vars.md)
 
 Not every column is filled from the file. The next four pages are about the ones that are not - four sources,
 differing mainly in *when* the value is worked out.
@@ -93,4 +93,4 @@ typed constants.
 
 ---
 
-[← the same spec in XML](03-in-xml.md) · [index](README.md) · [next: variables →](05-vars.md)
+[← several kinds of record](05-record-types.md) · [index](README.md) · [next: variables →](07-vars.md)

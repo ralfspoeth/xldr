@@ -1,9 +1,9 @@
-# 8. Types and notation
+# 10. Types and notation
 
-[← expressions](07-expressions.md) · [index](README.md) · [next: a file with no header →](09-no-header.md)
+[← expressions](09-expressions.md) · [index](README.md) · [next: when it goes wrong →](11-when-it-goes-wrong.md)
 
-The mapping side of a spec is now familiar - four sources, and a column for each. These last pages change the file
-instead, and keep the mapping short so that the input side is what you are reading.
+The mapping side of a spec is now familiar - four sources, and a column for each. This page changes the file
+instead, as pages 4 and 5 did, and keeps the mapping short so that the input side is what you are reading.
 
 Everything so far has been loaded as text, which is what a spec means when it says nothing. Two separate questions
 arise the moment it should not be: **what is this value**, and **how did the producer write it down**.
@@ -119,4 +119,4 @@ and the CSV adapter's defaults are the RFC's: comma, double quote, UTF-8.
 
 ---
 
-[← expressions](07-expressions.md) · [index](README.md) · [next: a file with no header →](09-no-header.md)
+[← expressions](09-expressions.md) · [index](README.md) · [next: when it goes wrong →](11-when-it-goes-wrong.md)

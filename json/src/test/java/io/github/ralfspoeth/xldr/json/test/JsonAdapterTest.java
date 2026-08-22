@@ -386,6 +386,46 @@ public class JsonAdapterTest {
                 () -> assertTrue(thrown.getMessage().contains("records to point at"), thrown.getMessage()));
     }
 
+    /**
+     * A leading slash is refused, in either kind of selector.
+     * <p>
+     * It used to be stripped, which was right for the path it was tested on and
+     * wrong for the one that matters: {@code /orders} and {@code orders} do mean
+     * the same thing, but {@code /orders/0/id} - RFC 6901, and what anyone
+     * arriving from JSON Schema or JSON Patch writes - read {@code 0} as a member
+     * name, matched nothing and bound NULL for every row, on a spec the published
+     * schema accepts. The refusal is at construction, so it lands before a file
+     * is opened rather than as an empty column afterwards.
+     */
+    @Test
+    public void refusesAnRfc6901Selector() {
+        var record = assertThrows(IllegalArgumentException.class,
+                () -> adapter(spec("/orders", new FieldSelectorSpec("id", "id", DataType.TEXT)), Map.of()));
+        var field = assertThrows(IllegalArgumentException.class,
+                () -> adapter(spec("orders", new FieldSelectorSpec("id", "/id", DataType.TEXT)), Map.of()));
+        assertAll(
+                () -> assertTrue(record.getMessage().contains("/orders"), record.getMessage()),
+                () -> assertTrue(record.getMessage().contains("6901"), record.getMessage()),
+                () -> assertTrue(field.getMessage().contains("/id"), field.getMessage()),
+                () -> assertTrue(field.getMessage().contains("6901"), field.getMessage()));
+    }
+
+    /**
+     * The refusal stops at the slash. {@code {"0": ...}} is a legal object, so a
+     * bare numeric step keeps meaning what it says - a member of that name - and
+     * is not second-guessed into an index.
+     */
+    @Test
+    public void abareNumberIsStillAmemberName() throws IOException {
+        var spec = spec("rows/0", new FieldSelectorSpec("id", "id", DataType.TEXT));
+
+        var result = adapter(spec, Map.of()).parse(in("""
+                { "rows": { "0": { "id": "A-1" } } }
+                """), "rec", Set.of("id"));
+
+        assertEquals(List.of("A-1"), result.rows().map(r -> r.get("id")).toList());
+    }
+
     @Test
     public void rejectsAnUnknownRecordSelector() {
         var spec = spec("rows", new FieldSelectorSpec("id", "id", DataType.TEXT));

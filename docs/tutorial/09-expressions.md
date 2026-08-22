@@ -1,12 +1,12 @@
-# 7. Expressions
+# 9. Expressions
 
-[← lookups](06-lookups.md) · [index](README.md) · [next: types and notation →](08-types.md)
+[← lookups](08-lookups.md) · [index](README.md) · [next: types and notation →](10-types.md)
 
 The fourth and last source. An **expression** is a `${...}` template evaluated in the JVM, and it is the one that
 can combine things: literal text with a field, two fields together, a value the server supplies about the load
 itself.
 
-You have already used one. `${now()}` on [page 5](05-vars.md) was an expression with a single built-in call in it.
+You have already used one. `${now()}` on [page 7](07-vars.md) was an expression with a single built-in call in it.
 
 Three more columns - a number within the file, a label built from two fields, and where the row came from:
 
@@ -124,4 +124,4 @@ that has a language for it.
 
 ---
 
-[← lookups](06-lookups.md) · [index](README.md) · [next: types and notation →](08-types.md)
+[← lookups](08-lookups.md) · [index](README.md) · [next: types and notation →](10-types.md)
