@@ -5,6 +5,7 @@ import io.github.ralfspoeth.xldr.ia.InputAdapterFactory;
 import io.github.ralfspoeth.xldr.ia.Row;
 import io.github.ralfspoeth.xldr.spec.MappingSpec;
 import io.github.ralfspoeth.xldr.spec.RecordMappingSpec;
+import io.github.ralfspoeth.xldr.spec.SqlIdentifier;
 import io.github.ralfspoeth.xldr.spec.ValueSource;
 import org.jspecify.annotations.Nullable;
 
@@ -16,7 +17,6 @@ import java.time.format.DateTimeFormatter;
 import java.time.temporal.TemporalAccessor;
 import java.util.*;
 import java.util.function.Function;
-import java.util.regex.Pattern;
 
 import static java.util.Objects.requireNonNull;
 import static java.util.Optional.ofNullable;
@@ -43,7 +43,6 @@ import static java.util.Optional.ofNullable;
  * input nor the batch grows with the size of the file.
  */
 public class Loader implements AutoCloseable {
-    private static final Pattern QS_PATTERN = Pattern.compile("\".*\"");
 
     /**
      * How many inserts are sent in one round trip. The point of batching is the
@@ -91,18 +90,16 @@ public class Loader implements AutoCloseable {
     }
 
     /**
-     * Unquoted SQL identifiers are case-insensitive in every target database;
-     * they only disagree on the case they fold to - Oracle and H2 fold up,
-     * PostgreSQL folds down. Folding to upper case here is portable because we
-     * never add quotes: each database then folds what we send onto the name it
-     * stored. A quoted name is case-sensitive by definition and is passed through
-     * verbatim, which also keeps {@code "t1"} and {@code t1} distinct.
+     * How a table or column name reaches the database.
      * <p>
-     * {@code Locale.ROOT} is required: under a Turkish default locale
-     * {@code "id".toUpperCase()} yields {@code "İD"}.
+     * The rule and its reasoning moved to {@link SqlIdentifier}, in the spec
+     * module, when a second place needed the same answer: a record mapping
+     * refuses two field mappings onto one column, and cannot tell whether two
+     * names are one column without folding them exactly as this does. Kept as a
+     * name here because it reads better in the eight places that build SQL.
      */
     private static String normalizeIdentifier(String name) {
-        return QS_PATTERN.matcher(name).matches() ? name : name.toUpperCase(Locale.ROOT);
+        return SqlIdentifier.folded(name);
     }
 
     /**

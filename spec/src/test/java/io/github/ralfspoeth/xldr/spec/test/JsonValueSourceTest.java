@@ -288,6 +288,102 @@ public class JsonValueSourceTest {
     }
 
     /**
+     * A mapping writes each column once.
+     * <p>
+     * The loader builds its insert from the field mappings in order, so two onto
+     * one column produce {@code insert into t(name, name) values(?, ?)}, which
+     * every database rejects - on the first record of the first file, with the
+     * feed deployed. The mirror of the rule on field selector names, refused for
+     * the same reason: a spec that cannot load should not be readable.
+     */
+    @Test
+    public void refusesTwoFieldMappingsOntoOneColumn() {
+        var source = """
+                {
+                    "input": { "mimeType": "text/csv" },
+                    "mapping": [
+                        { "recordSelector": "r", "table": "person", "fieldMapping": [
+                            { "fieldSelector": "id",   "column": "id" },
+                            { "fieldSelector": "name", "column": "name" },
+                            { "constant": "X",         "column": "name" }
+                        ] }
+                    ]
+                }
+                """;
+        var thrown = assertThrows(IllegalArgumentException.class,
+                () -> new JsonMappingSpecReader().read(stream(source)));
+        assertAll(
+                () -> assertTrue(thrown.getMessage().contains("name"), thrown.getMessage()),
+                () -> assertTrue(thrown.getMessage().contains("person"), thrown.getMessage()),
+                () -> assertTrue(thrown.getMessage().contains("more than once"), thrown.getMessage()));
+    }
+
+    /**
+     * Compared as SQL sees them, not as strings. An unquoted identifier folds, so
+     * {@code name} and {@code NAME} are one column and would build exactly the
+     * insert above.
+     */
+    @Test
+    public void refusesTwoSpellingsOfOneUnquotedColumn() {
+        var source = """
+                {
+                    "input": { "mimeType": "text/csv" },
+                    "mapping": [
+                        { "recordSelector": "r", "table": "person", "fieldMapping": [
+                            { "fieldSelector": "a", "column": "name" },
+                            { "fieldSelector": "b", "column": "NAME" }
+                        ] }
+                    ]
+                }
+                """;
+        assertThrows(IllegalArgumentException.class,
+                () -> new JsonMappingSpecReader().read(stream(source)));
+    }
+
+    /**
+     * And a quoted name is left alone, because a quoted identifier is
+     * case-sensitive by definition: a database holding both {@code name} and
+     * {@code "Name"} has two columns, and a spec is entitled to write both.
+     */
+    @Test
+    public void allowsAquotedColumnBesideItsUnquotedNamesake() throws IOException {
+        var source = """
+                {
+                    "input": { "mimeType": "text/csv" },
+                    "mapping": [
+                        { "recordSelector": "r", "table": "person", "fieldMapping": [
+                            { "fieldSelector": "a", "column": "name" },
+                            { "fieldSelector": "b", "column": "\\"name\\"" }
+                        ] }
+                    ]
+                }
+                """;
+        var spec = new JsonMappingSpecReader().read(stream(source));
+        assertEquals(2, List.copyOf(spec.recordMappingSpecs()).getFirst().fieldMappings().size());
+    }
+
+    /**
+     * Two mappings into one table are not a repeat. Each is its own insert with
+     * its own columns, which is how a spec fills different columns of one table
+     * from different kinds of record.
+     */
+    @Test
+    public void allowsOneColumnInTwoDifferentMappings() throws IOException {
+        var source = """
+                {
+                    "input": { "mimeType": "text/csv" },
+                    "mapping": [
+                        { "recordSelector": "a", "table": "person", "fieldMapping": [
+                            { "fieldSelector": "id", "column": "id" } ] },
+                        { "recordSelector": "b", "table": "person", "fieldMapping": [
+                            { "fieldSelector": "id", "column": "id" } ] }
+                    ]
+                }
+                """;
+        assertEquals(2, new JsonMappingSpecReader().read(stream(source)).recordMappingSpecs().size());
+    }
+
+    /**
      * A selector and a discriminator together describe no input, and this is now
      * the only place that can say so.
      * <p>
