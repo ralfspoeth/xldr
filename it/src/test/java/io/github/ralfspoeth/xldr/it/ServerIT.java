@@ -12,8 +12,11 @@ import javax.management.ObjectName;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.lang.management.ManagementFactory;
+import java.lang.reflect.Proxy;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.sql.Connection;
+import java.sql.DatabaseMetaData;
 import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.time.Duration;
@@ -678,6 +681,161 @@ public class ServerIT {
         await("the second row", () -> selectPersons().size() == 2);
         assertEquals(List.of("1:from-test", "2:from-prod"), selectPersons(),
                 "env.properties is read per load, so the edit must reach the second file");
+    }
+
+    /**
+     * A feed's {@code target.properties} decides which schema its rows land in.
+     * <p>
+     * The dual of {@code delivery.properties}: one says how the files arrive, the
+     * other where their rows go, and neither is in the spec because a spec is
+     * meant to travel from test to production unchanged while both of those
+     * differ between the two.
+     * <p>
+     * Two schemas hold a table of the same name, and the assertion is not only
+     * that the rows arrived but that the other schema is still empty. Without
+     * that half the test would pass against an unqualified insert whose search
+     * path happened to find the right table first, which is precisely the
+     * accident this file exists to remove.
+     */
+    @Test
+    @Timeout(60)
+    void loadsIntoTheSchemaTargetPropertiesNames() throws Exception {
+        try (var conn = DriverManager.getConnection(JDBC_URL);
+             var stmt = conn.createStatement()) {
+            for (var schema : List.of("staging", "elsewhere")) {
+                stmt.execute("drop schema if exists " + schema + " cascade");
+                stmt.execute("create schema " + schema);
+                stmt.execute("create table " + schema + ".person(id varchar(10), name varchar(50))");
+            }
+        }
+        var feed = Files.createDirectory(root.resolve("targeted"));
+        Files.writeString(feed.resolve(Delivery.FILE), "accepts = glob:*.csv\n");
+        Files.writeString(feed.resolve("target.properties"), "schema = staging\n");
+        Files.writeString(feed.resolve("spec.json"), SPEC);
+        await("in/ to be created", () -> Files.isDirectory(feed.resolve("in")));
+
+        deliver(feed, "people-1.csv", """
+                id,name
+                1,Alice
+                """);
+
+        await("the row to arrive in staging", () -> personsIn("staging").size() == 1);
+        assertAll(
+                () -> assertEquals(List.of("1:Alice"), personsIn("staging")),
+                () -> assertEquals(List.of(), personsIn("elsewhere"),
+                        "the other schema has a person table too, and must stay empty"),
+                () -> assertTrue(selectPersons().isEmpty(),
+                        "and so must the unqualified one"));
+    }
+
+    private static List<String> personsIn(String schema) {
+        var rows = new ArrayList<String>();
+        try (var conn = DriverManager.getConnection(JDBC_URL);
+             var stmt = conn.createStatement();
+             var rs = stmt.executeQuery("select id, name from " + schema + ".person order by id")) {
+            while (rs.next()) {
+                rows.add(rs.getString(1) + ":" + rs.getString(2));
+            }
+        } catch (SQLException e) {
+            return List.of();
+        }
+        return rows;
+    }
+
+    /**
+     * A database that will not take a catalog in an insert says so, and the file
+     * is hospitalised rather than failing halfway through.
+     * <p>
+     * PostgreSQL is the real case - it cannot qualify across databases, so
+     * {@code supportsCatalogsInDataManipulation} is false and
+     * {@code catalog = warehouse} is a spec it can never load. No PostgreSQL in
+     * this build, so the connection is wrapped to answer as one would. That is
+     * not a fake of the database: what is under test is how we react to what a
+     * driver reports, and the driver reporting it is the input.
+     * <p>
+     * The seam is {@code ConnectionSource}, which the server already takes from
+     * its caller - a lambda in every other test here.
+     */
+    @Test
+    @Timeout(60)
+    void refusesAcatalogTheDatabaseCannotTake() throws Exception {
+        watcher.close();
+        var feed = Files.createDirectory(root.resolve("catalogued"));
+        Files.writeString(feed.resolve(Delivery.FILE), "accepts = glob:*.csv\n");
+        Files.writeString(feed.resolve("target.properties"), "catalog = warehouse\n");
+        Files.writeString(feed.resolve("spec.json"), SPEC);
+        watcher = Watcher.watch(config, () -> withoutCatalogSupport(DriverManager.getConnection(JDBC_URL)));
+        await("in/ to be created", () -> Files.isDirectory(feed.resolve("in")));
+
+        deliver(feed, "people-1.csv", """
+                id,name
+                1,Alice
+                """);
+
+        await("the input to be hospitalised", () -> hospital(feed).contains("people-1.csv"));
+        var log = hospitalLog(feed);
+        assertAll(
+                () -> assertTrue(log.contains("warehouse"),
+                        "the message names the catalog that cannot be used: " + log),
+                () -> assertTrue(selectPersons().isEmpty(), "and nothing was loaded"));
+    }
+
+    /**
+     * The same connection, reporting no catalog support. Everything else is the
+     * real H2 - only the one answer differs, so the load fails where a
+     * PostgreSQL deployment's would and nowhere else.
+     */
+    private static Connection withoutCatalogSupport(Connection real) {
+        return (Connection) Proxy.newProxyInstance(
+                ServerIT.class.getClassLoader(), new Class<?>[]{Connection.class},
+                (proxy, method, args) -> "getMetaData".equals(method.getName())
+                        ? denyingCatalogs(real.getMetaData())
+                        : method.invoke(real, args));
+    }
+
+    private static DatabaseMetaData denyingCatalogs(DatabaseMetaData real) {
+        return (DatabaseMetaData) Proxy.newProxyInstance(
+                ServerIT.class.getClassLoader(), new Class<?>[]{DatabaseMetaData.class},
+                (proxy, method, args) -> "supportsCatalogsInDataManipulation".equals(method.getName())
+                        ? Boolean.FALSE
+                        : method.invoke(real, args));
+    }
+
+    /** the text of the one {@code .log} this feed's hospital holds */
+    private static String hospitalLog(Path feed) {
+        try (var files = Files.list(feed.resolve("hospital"))) {
+            var log = files.filter(p -> p.getFileName().toString().endsWith(".log"))
+                    .findFirst()
+                    .orElseThrow(() -> new AssertionError("no log in " + hospital(feed)));
+            return Files.readString(log);
+        } catch (IOException e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
+    /**
+     * A misspelled setting is refused rather than ignored, which matters more
+     * here than in {@code delivery.properties}: an ignored {@code schmea} leaves
+     * the load unqualified, and an unqualified load against a search path that
+     * finds a table of the same name succeeds - into the wrong schema, with
+     * nothing said.
+     */
+    @Test
+    @Timeout(60)
+    void hospitalisesAloadWhoseTargetSettingIsMisspelled() throws Exception {
+        var feed = Files.createDirectory(root.resolve("mistyped-target"));
+        Files.writeString(feed.resolve(Delivery.FILE), "accepts = glob:*.csv\n");
+        Files.writeString(feed.resolve("target.properties"), "schmea = staging\n");
+        Files.writeString(feed.resolve("spec.json"), SPEC);
+        await("in/ to be created", () -> Files.isDirectory(feed.resolve("in")));
+
+        deliver(feed, "people-1.csv", """
+                id,name
+                1,Alice
+                """);
+
+        await("the input to be hospitalised", () -> hospital(feed).contains("people-1.csv"));
+        assertTrue(selectPersons().isEmpty(), "and nothing was loaded");
     }
 
     /**

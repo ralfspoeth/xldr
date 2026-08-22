@@ -12,8 +12,9 @@ import java.util.List;
  *
  * <pre>
  * &lt;root&gt;/&lt;feed&gt;/
- *     delivery.properties makes the directory a feed
+ *     delivery.properties makes the directory a feed, and says how files arrive
  *     spec.json           what to do with what arrives
+ *     target.properties   optional; the schema and catalog its rows go to
  *     env.properties      optional; what this deployment supplies to the spec
  *     in/                 producers move input files in here
  *     work/               claimed, currently being loaded

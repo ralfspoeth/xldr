@@ -107,6 +107,16 @@ public class Check implements Callable<Integer> {
             description = "how many parsed records to show per record selector; 0 for none")
     private int rows;
 
+    @Option(names = "--schema", paramLabel = "NAME",
+            description = "the schema the tables are in, as the feed's target.properties would say; "
+                    + "without one the database is asked about any table of that name it can see")
+    @Nullable
+    private String schema;
+
+    @Option(names = "--catalog", paramLabel = "NAME", description = "the catalog, likewise")
+    @Nullable
+    private String catalog;
+
     @Option(names = "--same-as", paramLabel = "SPEC",
             description = "another spec, in either format, that this one should be equivalent to; "
                     + "for checking a transliteration between spec.json and spec.xml")
@@ -427,9 +437,24 @@ public class Check implements Callable<Integer> {
                 : DriverManager.getConnection(url, user, password);
     }
 
-    private static Set<String> columnsOf(Connection conn, String table) throws SQLException {
+    /**
+     * The columns of one table, asked of the database rather than of a DDL file.
+     * <p>
+     * Narrowed by {@code --catalog} and {@code --schema} where they are given,
+     * and by neither where they are not - a null there means "any", so an
+     * unqualified check finds a table of that name wherever the connection can
+     * see one. That is the right default and the wrong answer for a deployment
+     * whose {@code target.properties} names a schema: the server would qualify
+     * the insert and land somewhere this check never looked, so the two have to
+     * be told the same thing.
+     */
+    private Set<String> columnsOf(Connection conn, String table) throws SQLException {
         var columns = new LinkedHashSet<String>();
-        try (var rs = conn.getMetaData().getColumns(null, null, table, null)) {
+        var lower = conn.getMetaData().storesLowerCaseIdentifiers();
+        try (var rs = conn.getMetaData().getColumns(
+                catalog == null ? null : normalize(catalog, lower),
+                schema == null ? null : normalize(schema, lower),
+                table, null)) {
             while (rs.next()) {
                 columns.add(rs.getString("COLUMN_NAME"));
             }

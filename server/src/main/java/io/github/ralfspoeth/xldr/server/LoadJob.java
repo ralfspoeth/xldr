@@ -16,9 +16,15 @@ import static java.nio.charset.StandardCharsets.UTF_8;
  * Loads one file of one feed.
  * <p>
  * The loading itself is {@link Loader#load}, which both front ends share. What is
- * left here is what makes it a <em>feed's</em> file: the two ambient values a load
- * from a directory can supply, being the file's own name and whatever the
- * deployment put in {@value #ENV_FILE} beside the spec.
+ * left here is what makes it a <em>feed's</em> file: the file's own name and
+ * whatever the deployment put beside the spec - the ambient values of
+ * {@value #ENV_FILE}, and the schema and catalog of
+ * {@value TargetFile#FILE}.
+ * <p>
+ * All three are read per load rather than held on the feed. They are small files
+ * read once per loaded file, and caching them would mean staleness checks beside
+ * the spec's for no gain - so an edit reaches the next load with no reload of the
+ * feed in between.
  */
 class LoadJob {
 
@@ -44,10 +50,14 @@ class LoadJob {
         var ambient = new HashMap<String, Object>();
         ambient.put("xldr.filename", file.getFileName().toString());
         ambient.putAll(environment());
+        // read per load, as env.properties is and for the same reason: it is a
+        // small file, and caching it would mean a second staleness check beside
+        // the spec's for no gain
+        var target = TargetFile.read(feedDirectory);
         // reopened per record mapping, which is the whole reason this takes a
         // source rather than a stream
         return Loader.load(mappingSpec, () -> Files.newInputStream(file),
-                ambient, connectionSource.getConnection());
+                ambient, target, connectionSource.getConnection());
     }
 
     /**

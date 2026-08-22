@@ -10,6 +10,38 @@ The versions are the git tags `xldr-<version>`; the published artifacts carry th
 
 ### Added
 
+- **`target.properties` - the dual of `delivery.properties`, saying where a feed's rows go.**
+
+      schema  = staging
+      catalog = warehouse
+
+  One file says how a feed's files arrive, the other where their rows land, and both are properties of the
+  deployment rather than of the mapping. That is why neither is in the spec: a spec is meant to travel from test to
+  production unchanged, and the schema it writes into is exactly what differs between them.
+
+  Both settings are optional and so is the file. Without it, table names reach the database as the spec wrote them
+  and resolve through the connection's own search path - how most deployments work, and how every one worked before
+  this existed. A schema qualifies the insert and every lookup select alike, since a reference table a spec names
+  without qualification lives wherever that feed's tables live. Each part folds like any other identifier, so
+  `staging` and `STAGING` are one schema while a quoted `"My Schema"` keeps its case - which is why the name is
+  assembled from folded parts rather than folded after assembly.
+
+  `Target` carries what the deployment said; the `Loader` renders it, because that is the only thing that builds SQL
+  and the only thing holding a connection. It resolves the qualifier once per load and asks the driver first whether
+  this database takes a catalog or a schema in data manipulation at all - PostgreSQL answers no to catalogs, being
+  unable to qualify across databases, so `catalog = warehouse` against it is now a sentence before any record is
+  read rather than a syntax error on the first one. The separator stays `.`: JDBC has no schema separator, a schema
+  separator being fixed by the SQL grammar, and `getCatalogSeparator` only means anything beside `isCatalogAtStart`,
+  which every driver here answers the same way. The day one does not, there is one place to change.
+
+  An unknown setting is refused rather than ignored, for a sharper reason than in `delivery.properties`: a
+  misspelled `schmea` leaves the load unqualified, and an unqualified load against a search path that finds a table
+  of that name *succeeds*, into the wrong schema, silently.
+
+  `Loader` gains a `Target` and overloads that take one; the existing signatures default to `Target.none()`, so
+  `xlet` and every existing caller are unchanged. `xldr check` gains `--schema` and `--catalog`, because a check
+  that asks the database about any table of that name would pass a spec the server then loads somewhere else.
+
 - **`xldr check` - a spec, a sample file and the target table, compared before a feed exists.**
 
       xldr check spec.json --sample orders.csv --url jdbc:... --user dbuser --password
@@ -164,6 +196,12 @@ which is a change to the code and not to the spec: `mapping-spec-0.35` is publis
   mode is what actually refuses to overwrite, and this only makes the exception rare.
 
 ### Breaking
+
+- **No spec member is reserved any more.** `load` was, held since 0.2 against the return of the commit policy it
+  once carried. What a deployment needs to say about where a load goes is now `target.properties` beside the spec,
+  so the name is not coming back, and one kept open for something that is not coming is only a trap for whoever
+  picks it. It becomes an ordinary unrecognised member: ignored, like any annotation, so a spec written against an
+  older release and still carrying a `load` block goes on loading exactly as it does today.
 
 - **A mapping writes each column once.** Two field mappings onto one column build
   `insert into t(name, name) values(?, ?)`, which every database rejects - on the first record of the first file,

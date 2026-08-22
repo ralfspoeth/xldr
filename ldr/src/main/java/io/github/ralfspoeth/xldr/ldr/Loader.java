@@ -73,11 +73,18 @@ public class Loader implements AutoCloseable {
      * position of a column is its bind-parameter position. A {@code Set} would
      * let {@code (a, b)} and {@code (b, a)} collide on one cache entry and bind
      * values into the wrong columns.
+     *
+     * @param qualifiedTable the table as it goes into SQL, already carrying
+     *                       whatever {@link Target} the load has and already
+     *                       folded. Folded before it gets here rather than in
+     *                       this constructor, because folding an assembled
+     *                       {@code "My Schema".customer} would upper-case the
+     *                       quoted part that was quoted precisely so that it
+     *                       would not be
      */
-    record TabCol(String table, List<String> columns, List<String> valueExprs) {
+    record TabCol(String qualifiedTable, List<String> columns, List<String> valueExprs) {
         TabCol {
-            requireNonNull(table);
-            table = normalizeIdentifier(table);
+            requireNonNull(qualifiedTable);
             columns = columns.stream().map(Loader::normalizeIdentifier).toList();
             valueExprs = List.copyOf(valueExprs);
         }
@@ -85,7 +92,7 @@ public class Loader implements AutoCloseable {
         String insertStatement() {
             var columnList = String.join(", ", columns);
             var values = String.join(", ", valueExprs);
-            return String.format("insert into %s(%s) values(%s)", table, columnList, values);
+            return String.format("insert into %s(%s) values(%s)", qualifiedTable, columnList, values);
         }
     }
 
@@ -100,6 +107,71 @@ public class Loader implements AutoCloseable {
      */
     private static String normalizeIdentifier(String name) {
         return SqlIdentifier.folded(name);
+    }
+
+    /**
+     * What this load's {@link Target} adds in front of a table name: each part
+     * folded, each followed by its dot, or empty where the target is.
+     * <p>
+     * Resolved once in the constructor rather than per statement, so the
+     * metadata is asked once per load and every name a load builds is qualified
+     * the same way by construction.
+     */
+    private final String qualifier;
+
+    /**
+     * {@code table} as it goes into SQL from this load.
+     * <p>
+     * A name is the qualifier and the folded table, with no case analysis: the
+     * four combinations of catalog and schema are already in the one string.
+     */
+    private String qualify(String table) {
+        return qualifier + normalizeIdentifier(table);
+    }
+
+    /**
+     * The qualifier for a target, refusing what this database will not take.
+     * <p>
+     * The separator is {@code .} and not
+     * {@link DatabaseMetaData#getCatalogSeparator()}. There is no schema
+     * equivalent in JDBC at all - a schema separator is fixed by the SQL grammar
+     * rather than chosen by a dialect - and the catalog one only means anything
+     * alongside {@link DatabaseMetaData#isCatalogAtStart()}, since a driver
+     * reporting an unusual separator generally puts the catalog at the end as
+     * well. Every driver this project ships answers {@code .} at the start, so
+     * honouring the pair would add a branch nothing exercises. The day one does
+     * not, this is where it goes.
+     * <p>
+     * What the metadata is asked is the question that has different answers
+     * today: whether a catalog or a schema may appear in data manipulation at
+     * all. PostgreSQL says no to catalogs - it cannot qualify across databases -
+     * so {@code catalog = warehouse} against it is a spec that cannot load, and
+     * without this it would be a driver syntax error on the first record of the
+     * first file rather than a sentence before any record is read.
+     */
+    private static String qualifierFor(Target target, Connection connection) throws SQLException {
+        if (target.isEmpty()) {
+            return "";
+        }
+        var meta = connection.getMetaData();
+        var parts = new StringBuilder();
+        if (target.catalog() != null) {
+            if (!meta.supportsCatalogsInDataManipulation()) {
+                throw new SQLException("this deployment names a catalog, " + target.catalog()
+                        + ", but " + meta.getDatabaseProductName() + " does not take a "
+                        + meta.getCatalogTerm() + " in an insert. Remove it from target.properties");
+            }
+            parts.append(SqlIdentifier.folded(target.catalog())).append('.');
+        }
+        if (target.schema() != null) {
+            if (!meta.supportsSchemasInDataManipulation()) {
+                throw new SQLException("this deployment names a schema, " + target.schema()
+                        + ", but " + meta.getDatabaseProductName() + " does not take a "
+                        + meta.getSchemaTerm() + " in an insert. Remove it from target.properties");
+            }
+            parts.append(SqlIdentifier.folded(target.schema())).append('.');
+        }
+        return parts.toString();
     }
 
     /**
@@ -137,11 +209,23 @@ public class Loader implements AutoCloseable {
     public static int load(MappingSpec spec, InputSource source,
                            Map<String, Object> ambient, Connection connection)
             throws IOException, SQLException {
+        return load(spec, source, ambient, Target.none(), connection);
+    }
+
+    /**
+     * The same, for a deployment that says where its tables live.
+     *
+     * @param target the catalog and schema to qualify table names with; see
+     *               {@link Target} for why this is not in the spec
+     */
+    public static int load(MappingSpec spec, InputSource source, Map<String, Object> ambient,
+                           Target target, Connection connection)
+            throws IOException, SQLException {
         var factory = InputAdapterFactory.of(spec.inputSpec())
                 .orElseThrow(() -> new IllegalStateException(
                         "no input adapter for mime type " + spec.inputSpec().mimeType()));
         var adapter = factory.createInputAdapter(spec.inputSpec());
-        try (var loader = new Loader(spec, connection, ambient)) {
+        try (var loader = new Loader(spec, connection, ambient, target)) {
             int total = 0;
             for (var mapping : spec.recordMappingSpecs()) {
                 try (var in = source.open()) {
@@ -166,10 +250,27 @@ public class Loader implements AutoCloseable {
      *                   an expression cannot be mistaken for a var or a field.
      */
     public Loader(MappingSpec ms, Connection connection, Map<String, Object> ambient) throws SQLException {
+        this(ms, connection, ambient, Target.none());
+    }
+
+    /**
+     * The same, for a deployment whose tables are not where the connection's own
+     * search path would find them.
+     *
+     * @param target the catalog and schema to qualify table names with, or
+     *               {@link Target#none()} to send them as the spec wrote them
+     */
+    public Loader(MappingSpec ms, Connection connection, Map<String, Object> ambient, Target target)
+            throws SQLException {
         this.mappingSpec = requireNonNull(ms);
         this.connection = requireNonNull(connection);
         this.ambient = Map.copyOf(ambient);
+        // before auto-commit is touched: a target this database cannot honour is
+        // a load that will not happen, and there is no reason to have taken the
+        // connection over by then
+        this.qualifier = qualifierFor(requireNonNull(target), connection);
         connection.setAutoCommit(false);
+        // after the qualifier: a var may hold a lookup, and a lookup reads a table
         this.varValues = evaluateVars();
     }
 
@@ -402,7 +503,7 @@ public class Loader implements AutoCloseable {
             return null;
         }
         var sql = "select " + normalizeIdentifier(lk.column())
-                + " from " + normalizeIdentifier(lk.table())
+                + " from " + qualify(lk.table())
                 + " where " + normalizeIdentifier(lk.keyColumn()) + " = ?";
         try (var ps = connection.prepareStatement(sql)) {
             ps.setObject(1, jdbcValue(key));
@@ -452,7 +553,7 @@ public class Loader implements AutoCloseable {
             var result = adapter.parse(source, mapping.recordSelector(), Set.copyOf(fieldNames));
             // the statement is not closed here - the cache owns it, and close()
             // closes them all once the load is over
-            var ps = prepareInsert(new TabCol(mapping.table(), columns, valueExprs));
+            var ps = prepareInsert(new TabCol(qualify(mapping.table()), columns, valueExprs));
 
             var rowStream = result.rows();
             if (mapping.limit() != null) {
@@ -644,7 +745,7 @@ public class Loader implements AutoCloseable {
             case ValueSource.Lookup lk -> {
                 var keyExpr = plan(lk.key(), binders, fieldNames);
                 yield "(select " + normalizeIdentifier(lk.column())
-                        + " from " + normalizeIdentifier(lk.table())
+                        + " from " + qualify(lk.table())
                         + " where " + normalizeIdentifier(lk.keyColumn()) + " = " + keyExpr + ")";
             }
         };

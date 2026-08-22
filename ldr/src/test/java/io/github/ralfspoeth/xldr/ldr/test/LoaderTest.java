@@ -5,6 +5,7 @@ import io.github.ralfspoeth.xldr.ia.InputAdapter;
 import io.github.ralfspoeth.xldr.ia.Result;
 import io.github.ralfspoeth.xldr.ia.Row;
 import io.github.ralfspoeth.xldr.ldr.Loader;
+import io.github.ralfspoeth.xldr.ldr.Target;
 import io.github.ralfspoeth.xldr.spec.*;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -696,6 +697,131 @@ public class LoaderTest {
                             "loaded after the load finished: " + loadedAt));
             assertFalse(rs.next(), "exactly one row");
         }
+    }
+
+    /**
+     * A target's schema reaches the insert, and the lookup that feeds it.
+     * <p>
+     * The point of the whole arrangement: the same spec, unchanged, loads into
+     * whichever schema the deployment names. So this creates two schemas with the
+     * same table in each, loads with the target pointed at one of them, and
+     * checks the rows landed there and not in the other - which an unqualified
+     * insert against a connection whose search path finds either would get wrong
+     * silently.
+     * <p>
+     * The lookup is here because it is the easier half to forget: its select is
+     * built separately from the insert, so a target applied to one and not the
+     * other would pass every test that only inserts.
+     */
+    @Test
+    public void loadsIntoTheSchemaTheTargetNames() throws Exception {
+        try (var conn = DriverManager.getConnection(jdbcUrl);
+             var stmt = conn.createStatement()) {
+            for (var schema : List.of("staging", "elsewhere")) {
+                stmt.execute("drop schema if exists " + schema + " cascade");
+                stmt.execute("create schema " + schema);
+                stmt.execute("create table " + schema + ".person(id varchar(10), name varchar(50))");
+                stmt.execute("create table " + schema + ".naming(code varchar(2), label varchar(20))");
+            }
+            stmt.execute("insert into staging.naming values ('DE', 'from-staging')");
+            stmt.execute("insert into elsewhere.naming values ('DE', 'from-elsewhere')");
+        }
+
+        var mapping = new RecordMappingSpec("people", "person", List.of(
+                new FieldMappingSpec("id", new ValueSource.Field("id")),
+                new FieldMappingSpec("name",
+                        new ValueSource.Lookup("naming", "label", "code",
+                                new ValueSource.Constant("DE")))
+        ), null);
+        var spec = new MappingSpec(
+                new InputSpec("text/csv", List.of(), List.of(), Map.of()), List.of(mapping));
+
+        try (var loader = new Loader(spec, DriverManager.getConnection(jdbcUrl),
+                Map.of(), new Target(null, "staging"))) {
+            loader.loadInput(adapterFor(Map.of("people", List.of(Map.of("id", "1")))),
+                    InputStream.nullInputStream(), mapping);
+        }
+
+        assertAll(
+                () -> assertEquals(List.of("1:from-staging"), personsIn("staging"),
+                        "the rows, and the lookup, went to the schema the target named"),
+                () -> assertEquals(List.of(), personsIn("elsewhere"),
+                        "and nothing went anywhere else"));
+    }
+
+    /**
+     * The shapes a qualified name comes in, checked by loading through each and
+     * seeing where the row landed.
+     * <p>
+     * Here rather than as a unit test of a {@code qualify} method, because the
+     * question a qualifier answers - will this database take a schema in an
+     * insert, and how is one written - is a question about a database. A pure
+     * test of the string-building would have agreed with itself.
+     * <p>
+     * <strong>Only H2 answers here.</strong> Every driver this project ships
+     * puts the catalog first and separates with a dot, so that is all the build
+     * exercises; a driver that answered otherwise would have no test, which is
+     * the price of putting the rendering behind a {@link java.sql.Connection}.
+     */
+    @Test
+    public void qualifiesWithWhicheverPartsTheTargetHas() throws Exception {
+        try (var conn = DriverManager.getConnection(jdbcUrl);
+             var stmt = conn.createStatement()) {
+            stmt.execute("drop schema if exists mixed cascade");
+            stmt.execute("create schema mixed");
+            stmt.execute("create table mixed.person(id varchar(10), name varchar(50))");
+        }
+        var mapping = new RecordMappingSpec("people", "person", List.of(
+                new FieldMappingSpec("id", new ValueSource.Field("id"))), null);
+        var spec = new MappingSpec(
+                new InputSpec("text/csv", List.of(), List.of(), Map.of()), List.of(mapping));
+
+        // the two spellings of one unquoted schema are one schema
+        for (var schema : List.of("mixed", "MIXED")) {
+            try (var loader = new Loader(spec, DriverManager.getConnection(jdbcUrl),
+                    Map.of(), new Target(null, schema))) {
+                loader.loadInput(adapterFor(Map.of("people", List.of(Map.of("id", schema)))),
+                        InputStream.nullInputStream(), mapping);
+            }
+        }
+        assertEquals(2, personsIn("mixed").size(), "both spellings reached the same table");
+    }
+
+    /**
+     * A target this database will not honour stops the load before it starts.
+     * <p>
+     * H2 takes both, so the refusal is provoked through a schema that is not
+     * there rather than through a database that refuses the concept - the
+     * PostgreSQL case, where {@code supportsCatalogsInDataManipulation} is
+     * false, has no driver in this build to exercise it.
+     */
+    @Test
+    public void aschemaThatIsNotThereFailsTheLoadRatherThanTheRow() throws Exception {
+        var mapping = new RecordMappingSpec("people", "person", List.of(
+                new FieldMappingSpec("id", new ValueSource.Field("id"))), null);
+        var spec = new MappingSpec(
+                new InputSpec("text/csv", List.of(), List.of(), Map.of()), List.of(mapping));
+
+        assertThrows(SQLException.class, () -> {
+            try (var loader = new Loader(spec, DriverManager.getConnection(jdbcUrl),
+                    Map.of(), new Target(null, "no_such_schema"))) {
+                loader.loadInput(adapterFor(Map.of("people", List.of(Map.of("id", "1")))),
+                        InputStream.nullInputStream(), mapping);
+            }
+        });
+        assertEquals(List.of(), selectPersons(), "and the unqualified table is untouched");
+    }
+
+    private List<String> personsIn(String schema) throws SQLException {
+        var rows = new ArrayList<String>();
+        try (var conn = DriverManager.getConnection(jdbcUrl);
+             var stmt = conn.createStatement();
+             var rs = stmt.executeQuery("select id, name from " + schema + ".person order by id")) {
+            while (rs.next()) {
+                rows.add(rs.getString(1) + ":" + rs.getString(2));
+            }
+        }
+        return rows;
     }
 
     /**
