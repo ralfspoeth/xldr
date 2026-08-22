@@ -380,10 +380,30 @@ check can do for you:
 
 These are the *field selectors* - what the file gives - and not what would be inserted. A constant, a `var`, an
 `expr` or a lookup's result does not appear, because evaluating those is the load rather than a reading of the
-file: an expression needs the ambient values a feed supplies, and a lookup needs to query. So `--rows` says
-everything about the input side of a spec and nothing about the mapping side, which is worth knowing before you
-read a clean run as a verdict on the whole thing. A lookup's *key* does appear, that being a field selector like
-any other.
+file: an expression needs the ambient values a feed supplies, and a lookup needs to query. A lookup's *key* does
+appear, that being a field selector like any other.
+
+For the other half, `check` prints the mapping plan - where each target column's value comes from:
+
+      customer <- 'customers'
+          id           field     id
+          name         field     name
+          source_cd    var       src
+          loaded_from  expr      ${xldr.filename}
+          region_id    lookup    region.id where city = field name
+
+Nothing is evaluated here either, and deliberately: working out what an expression comes to would be a second
+implementation of the loader's engine, one that could disagree with it. What it gives you is the wiring in one
+place. A spec spreads forty columns over a hundred lines with each source nested inside its own object, so *where
+does this column come from* is a question the document does not answer anywhere - and a column wired to the wrong
+source validates, loads, and is wrong in every row.
+
+Two specs can also be compared, which is what a transliteration between the formats needs:
+
+    xldr check spec.json --same-as spec.xml
+
+Both are read into the same in-memory form, so the comparison is equality; where they part company it says which
+record selector, var or mapping differs and shows both.
 
 Within that, nothing shown is an error and nothing could be: a date read under the wrong pattern is still a date,
 and a German decimal read as a plain one is still a number. But the file said `01.03.2026` and `1.234,56`, and one

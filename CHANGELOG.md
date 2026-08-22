@@ -46,6 +46,30 @@ The versions are the git tags `xldr-<version>`; the published artifacts carry th
   document and can see none of this. `CheckIT` runs the command against a file-based H2 and provokes every finding,
   so what the command claims is checked rather than asserted.
 
+  It also prints the **mapping plan** - where each target column's value comes from, one line each, for every kind
+  of source. Nothing is evaluated: working out what an expression comes to would be a second implementation of the
+  loader's engine, one that could disagree with it, which is worse than not having one. What it gives is the wiring
+  in one place, which the document itself never does - a spec spreads forty columns over a hundred lines with each
+  source nested inside its own object, and a column wired to the wrong source validates, loads and is wrong in
+  every row.
+
+  And `--same-as` compares two specs:
+
+      xldr check spec.json --same-as spec.xml
+
+  The formats are transliterations of each other and the tutorial has a page on converting between them, so
+  "did I convert it faithfully?" was a question with no answer. Both are read into a `MappingSpec`, which is records
+  all the way down, so the comparison is equality - whitespace, member order and the order of record selectors do
+  not matter. Where they differ it names the record selector, var or mapping and shows both, since "they differ" is
+  no help against a hundred lines. A comparison spec that will not parse is itself a finding: the first version
+  printed to stderr and returned, so `--same-as` pointed at a broken file exited zero, which is the one answer it
+  must never give.
+
+  This depends on `Discriminator.Matches` having gained `equals` and `hashCode` over the pattern text. It held a
+  `java.util.regex.Pattern`, which compares by identity, so two separately-read specs with the same `matches`
+  discriminator were never equal - a record that silently was not a value type, and one nothing had noticed because
+  nothing compared specs before.
+
   Tutorial page 11 gains a section on it, between letting the editor read the document and watching what happens
   when a feed goes quiet, which is where it belongs in the order someone actually works. The transcript there is a
   real one - the page 8 spec against the page 8 file - rather than an invented example, and the page says outright
@@ -140,6 +164,21 @@ which is a change to the code and not to the spec: `mapping-spec-0.35` is publis
   mode is what actually refuses to overwrite, and this only makes the exception rare.
 
 ### Breaking
+
+- **A mapping writes each column once.** Two field mappings onto one column build
+  `insert into t(name, name) values(?, ?)`, which every database rejects - on the first record of the first file,
+  with the feed deployed and a producer waiting. It is now refused when the spec is read, which is the mirror of
+  the rule `RecordSelectorSpec` applies to field selector names and is refused for the same reason: a spec that
+  cannot load should not be readable.
+
+  Compared as SQL sees the names rather than as strings, so `name` and `NAME` are one column and are refused
+  together, while a quoted `"name"` beside an unquoted `name` is two columns and is allowed. That rule and its
+  reasoning moved out of `Loader`, where it had been private, into `SqlIdentifier` in the spec module - a record
+  mapping cannot tell whether two names are one column without folding them exactly as the loader does, and a
+  second copy that could drift is what this project keeps removing.
+
+  Nothing that loads today breaks: a spec with a repeated column has never been able to load. Turned up while
+  writing a `CheckIT` fixture that happened to contain one.
 
 - **A record selector says which records are its own with a `Locator`.** Three cases and no others: `At`, a
   selector in the adapter's own syntax; `Where`, a discriminator; and `Every`, the input's records without further

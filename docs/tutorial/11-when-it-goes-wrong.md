@@ -78,8 +78,36 @@ producer meant. Seeing the parsed value is the whole remedy.
 
 One limit worth knowing. Those are the *field selectors* - what the file gives. A constant, a `var`, an `expr` or
 what a lookup *resolves to* does not appear, because working those out is the load rather than a reading of the
-file. So a clean run says a great deal about the input half of your spec and nothing about the mapping half. A
-lookup's key shows up, being a field selector like any other.
+file. A lookup's key shows up, being a field selector like any other.
+
+For the mapping half, `check` prints the plan - where each column's value comes from, in one place:
+
+      customer <- 'customers'
+          id           field     id
+          name         field     name
+          source_cd    var       src
+          loaded_from  expr      ${xldr.filename}
+          region_id    lookup    region.id where city = field name
+
+Nothing here is evaluated either. What it is for is the question your spec does not answer anywhere: a spec with
+forty columns spreads them over a hundred lines, each source nested inside its own object, and a column wired to
+the wrong one validates, loads, and is wrong in every row. Reading the plan against the table you meant to fill is
+about ten seconds and catches that.
+
+## Checking a spec against its other self
+
+[Page 3](03-in-xml.md) wrote the same spec twice, once in each format. If you keep both - or convert one to the
+other - `check` will tell you whether they still say the same thing:
+
+    xldr check spec.json --same-as spec.xml
+
+Both are read into the same in-memory form, so the comparison is exact rather than textual: whitespace, member
+order and the order of record selectors do not matter, and a genuine difference is named -
+
+    1 finding(s):
+      - spec.xml: mapping 'customers' differs:
+          RecordMappingSpec[recordSelector=customers, table=customer, ...]
+          RecordMappingSpec[recordSelector=customers, table=customers, ...]
 
 ## When the spec is read: the feed goes quiet
 

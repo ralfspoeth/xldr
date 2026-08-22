@@ -56,7 +56,9 @@ public class CheckIT {
             stmt.execute("drop table if exists customer");
             stmt.execute("""
                     create table customer(
-                        id integer, name varchar(50), since date, balance decimal(12,2))
+                        id integer, name varchar(50), since date, balance decimal(12,2),
+                        -- for the mapping plan, which wants a column per kind of source
+                        source_cd varchar(10), region_id integer, loaded_from varchar(60))
                     """);
             stmt.execute("drop table if exists region");
             stmt.execute("create table region(city varchar(50), id integer)");
@@ -118,7 +120,7 @@ public class CheckIT {
 
         var out = new StringWriter();
         var err = new StringWriter();
-        var args = new ArrayList<String>(List.of(
+        var args = new ArrayList<>(List.of(
                 "check", specFile.toString(),
                 "--sample", sampleFile.toString(),
                 "--url", JDBC_URL));
@@ -260,6 +262,126 @@ public class CheckIT {
                          "lookup": {"table": "%s", "column": "%s",
                                     "keyColumn": "%s", "fieldSelector": "name"}},"""
                         .formatted(table, column, keyColumn));
+    }
+
+    // ---- one spec against another ----------------------------------------------
+
+    /**
+     * A spec transliterated into the other format is the same spec, and
+     * {@code --same-as} says so.
+     * <p>
+     * Tutorial page 3 is entirely about converting between the two formats, and
+     * until now nothing could tell you whether a conversion was faithful. Both
+     * are read into a {@code MappingSpec}, which is records all the way down, so
+     * the comparison is equality.
+     */
+    @Test
+    void saysWhenTheOtherFormatSaysTheSameThing(@TempDir Path dir) throws IOException {
+        var run = check(dir, SPEC.formatted("customers", "balance"), SAMPLE,
+                "--same-as", xml(dir, "same.xml", EQUIVALENT_XML));
+        assertAll(
+                () -> assertEquals(0, run.exitCode(), run.out() + run.err()),
+                () -> assertTrue(run.reports("matches same.xml"), run.out()));
+    }
+
+    /**
+     * And names what parted company, rather than only that something did.
+     * <p>
+     * "They differ" is no help against a hundred lines, so the comparison is
+     * piecewise and by name - a record selector written in a different order is
+     * the same spec, and reporting that would bury the difference that matters.
+     */
+    @Test
+    void namesWhatDiffersBetweenTheTwoFormats(@TempDir Path dir) throws IOException {
+        // a different target table, which is a difference and not a broken spec:
+        // changing a column instead would have put two field mappings onto one
+        // column, and that is now refused when the spec is read
+        var wrong = EQUIVALENT_XML.replace("table=\"customer\"", "table=\"customers\"");
+        var run = check(dir, SPEC.formatted("customers", "balance"), SAMPLE,
+                "--same-as", xml(dir, "wrong.xml", wrong));
+        assertAll(
+                () -> assertFalse(run.exitCode() == 0, "should have found something"),
+                () -> assertTrue(run.reports("differs"), run.out()),
+                () -> assertTrue(run.reports("mapping 'customers'"), run.out()));
+    }
+
+    /**
+     * And a comparison spec that will not parse is a finding, not a shrug.
+     * <p>
+     * It printed to stderr and returned, leaving the exit code at zero - so
+     * {@code --same-as} pointed at a broken file reported success, which is the
+     * one answer it must never give: the question is whether the two agree, and
+     * one of them could not be read.
+     */
+    @Test
+    void anUnreadableComparisonSpecIsAfinding(@TempDir Path dir) throws IOException {
+        var run = check(dir, SPEC.formatted("customers", "balance"), SAMPLE,
+                "--same-as", xml(dir, "broken.xml", "<mappingSpec><input"));
+        assertAll(
+                () -> assertFalse(run.exitCode() == 0, "should have found something"),
+                () -> assertTrue(run.reports("broken.xml"), run.out() + run.err()),
+                () -> assertTrue(run.reports("nothing was compared"), run.out()));
+    }
+
+    /** the page-8 spec written as XML, which is what page 3 teaches */
+    private static final String EQUIVALENT_XML = """
+            <mappingSpec>
+                <input mimeType="text/csv">
+                    <properties dateFormat="dd.MM.yyyy" numberFormat="#,##0.00" locale="de-DE"/>
+                    <recordSelector name="customers">
+                        <fieldSelector name="id" selector="id" type="INTEGRAL"/>
+                        <fieldSelector name="name" selector="name"/>
+                        <fieldSelector name="since" selector="since" type="DATE"/>
+                        <fieldSelector name="balance" selector="balance" type="DECIMAL"/>
+                    </recordSelector>
+                </input>
+                <mapping recordSelector="customers" table="customer">
+                    <fieldMapping fieldSelector="id" column="id"/>
+                    <fieldMapping fieldSelector="name" column="name"/>
+                    <fieldMapping fieldSelector="since" column="since"/>
+                    <fieldMapping fieldSelector="balance" column="balance"/>
+                </mapping>
+            </mappingSpec>
+            """;
+
+    private static String xml(Path dir, String name, String content) throws IOException {
+        return Files.writeString(dir.resolve(name), content).toString();
+    }
+
+    // ---- the mapping side ------------------------------------------------------
+
+    /**
+     * Where every target column's value comes from, which nothing else in this
+     * command says anything about.
+     * <p>
+     * A spec spreads its columns over a hundred lines with each source nested
+     * inside its own object, so the question "where does this column come from?"
+     * is answered nowhere in one place - and a column wired to the wrong source
+     * validates, loads, and is wrong in every row.
+     */
+    @Test
+    void showsWhereEachColumnComesFrom(@TempDir Path dir) throws IOException {
+        var withEverything = SPEC.formatted("customers", "balance")
+                .replace("\"recordSelectors\":", """
+                        "vars": [ { "name": "src", "constant": "PD" } ],
+                        "recordSelectors":""")
+                .replace("{\"fieldSelector\": \"balance\", \"column\": \"balance\"}", """
+                        {"fieldSelector": "balance", "column": "balance"},
+                        {"var": "src", "column": "source_cd"},
+                        {"expr": "${xldr.filename}", "column": "loaded_from"},
+                        {"column": "region_id",
+                         "lookup": {"table": "region", "column": "id",
+                                    "keyColumn": "city", "fieldSelector": "name"}}""");
+        var run = check(dir, withEverything, SAMPLE);
+        assertAll(
+                () -> assertTrue(run.reports("customer <- 'customers'"), run.out()),
+                () -> assertTrue(run.reports("field     id"), run.out()),
+                () -> assertTrue(run.reports("var       src"), run.out()),
+                () -> assertTrue(run.reports("expr      ${xldr.filename}"), run.out()),
+                () -> assertTrue(run.reports("lookup    region.id where city = field name"),
+                        run.out()),
+                () -> assertTrue(run.reports("vars, evaluated once per load"), run.out()),
+                () -> assertTrue(run.reports("constant  'PD'"), run.out()));
     }
 
     /**

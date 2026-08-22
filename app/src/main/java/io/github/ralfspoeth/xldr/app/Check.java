@@ -7,6 +7,7 @@ import io.github.ralfspoeth.xldr.spec.MappingSpec;
 import io.github.ralfspoeth.xldr.spec.RecordMappingSpec;
 import io.github.ralfspoeth.xldr.spec.RecordSelectorSpec;
 import io.github.ralfspoeth.xldr.spec.ValueSource;
+import io.github.ralfspoeth.xldr.spec.VarSpec;
 import io.github.ralfspoeth.xldr.spec.io.MappingSpecReader;
 import org.jspecify.annotations.Nullable;
 import picocli.CommandLine.Command;
@@ -23,12 +24,17 @@ import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.concurrent.Callable;
+import java.util.function.Function;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
@@ -101,6 +107,12 @@ public class Check implements Callable<Integer> {
             description = "how many parsed records to show per record selector; 0 for none")
     private int rows;
 
+    @Option(names = "--same-as", paramLabel = "SPEC",
+            description = "another spec, in either format, that this one should be equivalent to; "
+                    + "for checking a transliteration between spec.json and spec.xml")
+    @Nullable
+    private Path sameAs;
+
     /**
      * Everything wrong with the spec, in one run.
      * <p>
@@ -139,11 +151,16 @@ public class Check implements Callable<Integer> {
         } else {
             out.println("  columns        not checked, no --url given");
         }
+        if (sameAs != null) {
+            compareWith(spec, out, err);
+        }
         if (sample != null) {
             checkAgainstTheSample(spec, out, err);
         } else {
             out.println("  sample         not checked, no --sample given");
         }
+
+        printPlan(spec, out);
 
         out.println();
         if (findings.isEmpty()) {
@@ -186,6 +203,148 @@ public class Check implements Callable<Integer> {
         }
         out.printf("  mappings       %d, over %d declared record selector(s)%n",
                 spec.recordMappingSpecs().size(), declared.size());
+    }
+
+    // ---- the mapping side, which nothing else here says anything about ---------
+
+    /**
+     * Where each target column's value comes from, one line each.
+     * <p>
+     * Nothing is evaluated. A constant, a {@code var}, an {@code expr} or what a
+     * lookup resolves to is the load rather than a reading of the spec, and
+     * working them out here would mean a second implementation of the loader's
+     * expression engine - one that could disagree with it, which is worse than
+     * not having one. So this shows the wiring and not the values.
+     * <p>
+     * That is still the only view of the mapping half there is. A spec spreads
+     * forty columns over a hundred lines of JSON, each with its source nested
+     * inside it, and the question a reader actually has - <em>where does
+     * {@code home_city} come from?</em> - is answered nowhere in one place.
+     * Wiring a column to the wrong source produces a spec that validates, loads
+     * and is wrong in every row, and this is what makes it visible.
+     */
+    private static void printPlan(MappingSpec spec, PrintWriter out) {
+        for (var mapping : spec.recordMappingSpecs()) {
+            out.println();
+            out.printf("  %s <- '%s'%s%n", mapping.table(), mapping.recordSelector(),
+                    mapping.limit() == null ? "" : "  (limit " + mapping.limit() + ")");
+            var width = mapping.fieldMappings().stream()
+                    .mapToInt(fm -> fm.column().length())
+                    .max().orElse(0);
+            for (var fm : mapping.fieldMappings()) {
+                out.printf("      %-" + Math.max(width, 8) + "s  %s%n", fm.column(), describe(fm.source()));
+            }
+        }
+        if (!spec.inputSpec().vars().isEmpty()) {
+            out.println();
+            out.println("  vars, evaluated once per load:");
+            var width = spec.inputSpec().vars().stream()
+                    .mapToInt(v -> v.name().length())
+                    .max().orElse(0);
+            for (var var : spec.inputSpec().vars()) {
+                out.printf("      %-" + Math.max(width, 8) + "s  %s%n", var.name(), describe(var.source()));
+            }
+        }
+    }
+
+    /** one value source, as a phrase rather than as a record's toString */
+    private static String describe(ValueSource source) {
+        return switch (source) {
+            case ValueSource.Field(var name) -> "field     " + name;
+            case ValueSource.Constant(var value) -> "constant  "
+                    + (value == null ? "null (a SQL NULL)" : "'" + value + "'");
+            case ValueSource.Var(var name) -> "var       " + name;
+            case ValueSource.Expr(var template) -> "expr      " + template;
+            case ValueSource.Lookup(var table, var column, var keyColumn, var key) ->
+                    "lookup    " + table + "." + column + " where " + keyColumn
+                            + " = " + describe(key).replaceAll("\\s{2,}", " ").strip();
+        };
+    }
+
+    // ---- one spec against another ----------------------------------------------
+
+    /**
+     * Whether two specs say the same thing, which is what
+     * {@code spec.json} and {@code spec.xml} of the same feed are supposed to.
+     * <p>
+     * The formats are transliterations of each other, and the tutorial has a page
+     * on converting between them - so "did I convert it faithfully?" is a
+     * question people have and nothing could answer. Both are read into a
+     * {@link MappingSpec}, which is records all the way down, so the comparison
+     * is equality; what takes the work is saying <em>where</em> two specs part
+     * company, since "they differ" is no help against a hundred lines.
+     */
+    private void compareWith(MappingSpec spec, PrintWriter out, PrintWriter err) {
+        assert sameAs != null;
+        MappingSpec other;
+        try {
+            other = MappingSpecReader.readSpec(sameAs);
+        } catch (IOException | RuntimeException e) {
+            // a finding, not a note on stderr. Printing and returning left the
+            // exit code at zero, so --same-as pointed at a spec that does not
+            // parse reported success - the one answer it must never give, since
+            // the whole question is whether the two agree and one of them could
+            // not be read at all
+            err.println("  same-as        cannot read " + sameAs.getFileName() + ": " + e.getMessage());
+            findings.add("cannot read " + sameAs.getFileName() + ", so nothing was compared against it: "
+                    + e.getMessage());
+            return;
+        }
+        var differences = differences(spec, other);
+        if (differences.isEmpty()) {
+            out.printf("  same-as        matches %s%n", sameAs.getFileName());
+        } else {
+            out.printf("  same-as        differs from %s%n", sameAs.getFileName());
+            differences.forEach(d -> findings.add(sameAs.getFileName() + ": " + d));
+        }
+    }
+
+    /**
+     * Where two specs part company, piece by piece.
+     * <p>
+     * Compared by name rather than in order: a record selector or a mapping
+     * written in a different order is the same spec, and reporting that as a
+     * difference would bury the one that matters.
+     */
+    private static List<String> differences(MappingSpec a, MappingSpec b) {
+        var out = new ArrayList<String>();
+        if (!a.inputSpec().mimeType().equals(b.inputSpec().mimeType())) {
+            out.add("mimeType " + a.inputSpec().mimeType() + " vs " + b.inputSpec().mimeType());
+        }
+        if (!a.inputSpec().properties().equals(b.inputSpec().properties())) {
+            out.add("properties " + new TreeMap<>(a.inputSpec().properties())
+                    + " vs " + new TreeMap<>(b.inputSpec().properties()));
+        }
+        compare(out, "var", byName(a.inputSpec().vars(), VarSpec::name),
+                byName(b.inputSpec().vars(), VarSpec::name));
+        compare(out, "record selector",
+                byName(a.inputSpec().recordSelectors(), RecordSelectorSpec::name),
+                byName(b.inputSpec().recordSelectors(), RecordSelectorSpec::name));
+        compare(out, "mapping",
+                byName(a.recordMappingSpecs(), RecordMappingSpec::recordSelector),
+                byName(b.recordMappingSpecs(), RecordMappingSpec::recordSelector));
+        return out;
+    }
+
+    private static <T> Map<String, T> byName(Collection<T> items, Function<T, String> name) {
+        var map = new LinkedHashMap<String, T>();
+        items.forEach(item -> map.put(name.apply(item), item));
+        return map;
+    }
+
+    private static <T> void compare(List<String> out, String what,
+                                    Map<String, T> a, Map<String, T> b) {
+        for (var name : a.keySet()) {
+            if (!b.containsKey(name)) {
+                out.add(what + " '" + name + "' is only in the first");
+            } else if (!a.get(name).equals(b.get(name))) {
+                out.add("%s '%s' differs:%n      %s%n      %s"
+                        .formatted(what, name, a.get(name), b.get(name)));
+            }
+        }
+        b.keySet().stream()
+                .filter(name -> !a.containsKey(name))
+                .forEach(name -> out.add(what + " '" + name + "' is only in the second"));
     }
 
     // ---- the spec against the database ----------------------------------------
@@ -241,18 +400,17 @@ public class Check implements Callable<Integer> {
      * broken one fails the load before a single row is read.
      */
     private void checkLookups(Connection conn, ValueSource source, boolean lower) throws SQLException {
-        if (!(source instanceof ValueSource.Lookup lookup)) {
-            return;
+        if (source instanceof ValueSource.Lookup(String table, String column, String keyColumn, ValueSource key)) {
+            var actual = columnsOf(conn, normalize(table, lower));
+            if (actual.isEmpty()) {
+                findings.add("a lookup reads table '" + table
+                        + "', which is not in the target database");
+            } else {
+                requireColumn(actual, table, column, lower);
+                requireColumn(actual, table, keyColumn, lower);
+            }
+            checkLookups(conn, key, lower);
         }
-        var actual = columnsOf(conn, normalize(lookup.table(), lower));
-        if (actual.isEmpty()) {
-            findings.add("a lookup reads table '" + lookup.table()
-                    + "', which is not in the target database");
-        } else {
-            requireColumn(actual, lookup.table(), lookup.column(), lower);
-            requireColumn(actual, lookup.table(), lookup.keyColumn(), lower);
-        }
-        checkLookups(conn, lookup.key(), lower);
     }
 
     private void requireColumn(Set<String> actual, String table, String column, boolean lower) {

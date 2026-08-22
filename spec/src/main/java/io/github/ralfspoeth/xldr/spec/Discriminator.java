@@ -3,6 +3,7 @@ package io.github.ralfspoeth.xldr.spec;
 import org.jspecify.annotations.Nullable;
 
 import java.io.Serializable;
+import java.util.Objects;
 import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
 
@@ -69,6 +70,19 @@ public sealed interface Discriminator extends Serializable {
         @Override
         public boolean accepts(@Nullable String value) {
             return value != null && pattern.matcher(value.strip()).matches();
+        }
+
+        @Override
+        public boolean equals(Object obj) {
+            return obj instanceof Matches(var mat, var mpat)
+                    && this.at.equals(mat)
+                    && this.pattern.pattern().equals(mpat.pattern())
+                    && this.pattern.flags()==mpat.flags();
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(at, pattern.pattern(), pattern.flags());
         }
 
         @Override
