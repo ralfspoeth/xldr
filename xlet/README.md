@@ -22,6 +22,97 @@ in common: read this input through that spec, in one transaction, into the datab
 So `xlet` is not a port of `server`. It is the other half of it - and most of what
 `server` does has no counterpart here at all.
 
+## Deploying it
+
+One jar and one `web.xml`. The jar is on Maven Central with the rest; import the
+[bom](../bom) to have its version follow the others:
+
+    <dependency>
+        <groupId>io.github.ralfspoeth.xldr</groupId>
+        <artifactId>xlet</artifactId>
+    </dependency>
+
+    <!-- and the adapters this deployment reads, one per format -->
+    <dependency>
+        <groupId>io.github.ralfspoeth.xldr</groupId>
+        <artifactId>csv</artifactId>
+    </dependency>
+
+`jakarta.servlet-api` is `provided`, the container having its own. Which adapters you
+add is what decides which `mimeType` a spec may name: they are found through
+`ServiceLoader`, so an adapter that is on the path can be used and one that is not
+cannot, with nothing to configure either way.
+
+There is no ready-made `.war`, deliberately. A war has to choose a URL and would ship
+without the thing that belongs in front of it, and this endpoint writes to your
+database. The mapping and the constraint are one decision, so both are yours:
+
+    <web-app xmlns="https://jakarta.ee/xml/ns/jakartaee" version="6.1">
+
+        <servlet>
+            <servlet-name>xldr</servlet-name>
+            <servlet-class>io.github.ralfspoeth.xldr.xlet.XldrServlet</servlet-class>
+            <!-- where the DataSource is, matching the resource-ref below -->
+            <init-param>
+                <param-name>dataSource</param-name>
+                <param-value>java:comp/env/jdbc/xldr</param-value>
+            </init-param>
+            <!-- optional: where the rows go, if the connection does not say -->
+            <init-param>
+                <param-name>schema</param-name>
+                <param-value>staging</param-value>
+            </init-param>
+            <!-- optional: no larger than the DataSource's maximum -->
+            <init-param>
+                <param-name>maxConcurrentLoads</param-name>
+                <param-value>4</param-value>
+            </init-param>
+            <!-- read the specs and settle everything at startup, not on the
+                 first request, so a misconfiguration is a deployment failure -->
+            <load-on-startup>1</load-on-startup>
+        </servlet>
+
+        <servlet-mapping>
+            <servlet-name>xldr</servlet-name>
+            <url-pattern>/load</url-pattern>
+        </servlet-mapping>
+
+        <resource-ref>
+            <res-ref-name>jdbc/xldr</res-ref-name>
+            <res-type>javax.sql.DataSource</res-type>
+            <res-auth>Container</res-auth>
+        </resource-ref>
+
+        <!-- present rather than assumed. Anyone who can POST here can write to
+             the target tables; whether that is a role, mutual TLS or a network
+             boundary is your deployment's business, but it is not nothing -->
+        <security-constraint>
+            <web-resource-collection>
+                <web-resource-name>xldr load</web-resource-name>
+                <url-pattern>/load</url-pattern>
+            </web-resource-collection>
+            <auth-constraint>
+                <role-name>xldr-loader</role-name>
+            </auth-constraint>
+            <user-data-constraint>
+                <transport-guarantee>CONFIDENTIAL</transport-guarantee>
+            </user-data-constraint>
+        </security-constraint>
+
+        <security-role>
+            <role-name>xldr-loader</role-name>
+        </security-role>
+
+    </web-app>
+
+The specs go in `/WEB-INF/specs/`, one file per mapping, the base name being the name
+a request asks for: `/WEB-INF/specs/statements.json` is `?spec=statements`.
+
+An `/load/*` mapping works too and is refused a trailing path with a `400`, so nobody
+comes to believe the path means something. An exact `/load` leaves such a request to
+the container's default servlet instead, which is why the refusal exists only under
+the wildcard.
+
 ## How it corresponds
 
 | file server | xlet |

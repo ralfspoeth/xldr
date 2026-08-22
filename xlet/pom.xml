@@ -9,7 +9,16 @@
     </parent>
 
     <artifactId>xlet</artifactId>
-    <name>xlet</name>
+    <name>xldr xlet</name>
+
+    <!--
+        Published since 0.36. It was not before, and that was a decision rather
+        than an oversight: the README argued a servlet is a thing to read and
+        adapt rather than to depend on, which held while this was one class and a
+        doPost. It carries a spec registry, a concurrency limit, an MXBean and
+        the target resolution now, and a deployment that copies all of that has
+        forked it - and a fork receives no fix made here.
+    -->
 
     <properties>
         <!--
@@ -22,18 +31,15 @@
 
     <build>
         <plugins>
-            <plugin>
-                <groupId>org.sonatype.central</groupId>
-                <artifactId>central-publishing-maven-plugin</artifactId>
-                <configuration>
-                    <skipPublishing>true</skipPublishing>
-                </configuration>
-            </plugin>
             <!--
-                The parent only manages failsafe; a module runs its integration
-                tests by saying so, as `it` does. Without this the *IT classes
-                match no surefire pattern and no failsafe execution, and are
-                quietly not run at all.
+                Bare on purpose, and not removable. The integration-test and
+                verify goals are bound in plumbum's pluginManagement, two poms
+                up, and pluginManagement binds nothing by itself - it supplies
+                version, configuration and executions to a module that declares
+                the plugin. This declaration is that, and inherits the lot.
+                Deleting it leaves the *IT classes matching no surefire pattern
+                and no failsafe execution, so they are not run and nothing says
+                so. `it` carries the same three lines for the same reason.
             -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>

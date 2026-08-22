@@ -119,11 +119,21 @@ level, so every type is non-null unless it carries `@Nullable`. The annotations 
 and `provided` scope - so nothing is added to your runtime; a null checker will read them, and a build without one is
 unaffected.
 
-The `bom` manages exactly the published artifacts - `spec`, `ia`, `ldr`, `server` and the adapters `csv`, `xml`,
-`xlsx`, `flt` and `json` - and deliberately no third-party versions, so importing it does not bind you to the POI, HikariCP or JDBC
-driver versions this build happens to use. `app`, `xlet` and `it` are not published at all: `app` is the
-distribution rather than a library, `xlet` is a front end to read and adapt rather than to depend on, and what an
-application would embed is `server`. Both the spec readers and the
+The `bom` manages exactly the published artifacts - `spec`, `ia`, `ldr`, both front ends `server` and `xlet`, and
+the adapters `csv`, `xml`, `xlsx`, `flt` and `json` - and deliberately no third-party versions, so importing it does
+not bind you to the POI, HikariCP or JDBC driver versions this build happens to use.
+
+`xlet` was not published until 0.36, on the argument that a servlet is a thing to read and adapt rather than to
+depend on. That was defensible when it was one class and a `doPost`. It is no longer: it carries a spec registry, a
+concurrency limit with its own refusal, statistics behind an MXBean, and the target resolution it shares with the
+file server. A deployment that copies all that forks it, and a fork receives no fix anybody makes here - which is
+the argument the other way, and now the stronger one. Adapt it if you want to; the source is right there. But
+depending on it should be possible, and it is.
+
+`app` and `it` are still unpublished: `app` is the distribution rather than a library, and goes out as a
+[GitHub release](https://github.com/ralfspoeth/xldr/releases); `it` is nothing but integration tests.
+
+Both the spec readers and the
 adapters are found through `ServiceLoader`, so each need only be on the module path - naming the spec file is enough
 to read it, since its name says which format it is in:
 

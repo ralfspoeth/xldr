@@ -65,6 +65,17 @@
                 <artifactId>server</artifactId>
                 <version>${project.version}</version>
             </dependency>
+            <!--
+                The two front ends, and the reason both are here rather than
+                only the first: a deployment embeds one or the other, the file
+                server or the servlet, and which it is has nothing to do with
+                which adapters it wants.
+            -->
+            <dependency>
+                <groupId>io.github.ralfspoeth.xldr</groupId>
+                <artifactId>xlet</artifactId>
+                <version>${project.version}</version>
+            </dependency>
         </dependencies>
     </dependencyManagement>
 

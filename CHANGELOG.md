@@ -20,6 +20,23 @@ have loaded.
 
 ### Added
 
+- **`xlet` is published, and its README says how to deploy it.** It was the one library module not on Maven
+  Central, which was a decision rather than an oversight - the argument being that a servlet is a thing to read and
+  adapt rather than to depend on. That held while it was one class and a `doPost`. It now carries a spec registry, a
+  concurrency limit with its own refusal, statistics behind an MXBean and the target resolution it shares with the
+  file server, and a deployment that copies all of that has forked it. A fork receives no fix made here, which is
+  the argument the other way and now the stronger one.
+
+  Publishing was the smaller half. Even with the jar there was nothing to copy: no dependency snippet, and no
+  `web.xml` anywhere in the documentation, so a deployer had to derive the whole deployment from prose. The README
+  now carries a complete one - the servlet and its mapping, the `resource-ref` matching the `dataSource`
+  init-param, `schema` and `maxConcurrentLoads`, `load-on-startup` so that the refusals really do happen at
+  deployment, and a `security-constraint` that is present rather than assumed.
+
+  Still no `.war`, deliberately. One would have to choose a URL, and it would ship without the thing that belongs in
+  front of it: anyone who can POST to this endpoint can write to the target tables. The mapping and the constraint
+  are one decision, and it is the deployer's.
+
 - **The tutorial is checked by the build.** `TutorialTest` reads `docs/tutorial/*.md` and holds every spec printed
   there to the standard of a fixture: it validates against the published schema, it is parsed by the reader that
   will parse it in anger, and it is cross-checked against the record selectors and `create table` statements of its
