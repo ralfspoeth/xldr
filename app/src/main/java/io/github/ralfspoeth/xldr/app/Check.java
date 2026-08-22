@@ -191,33 +191,74 @@ public class Check implements Callable<Integer> {
     // ---- the spec against the database ----------------------------------------
 
     /**
-     * Every {@code table} exists and every {@code column} is one of its own.
+     * Every table a spec names exists, and every column it names is one of that
+     * table's own.
      * <p>
      * Read through {@link java.sql.DatabaseMetaData} rather than by parsing DDL:
      * the database is the authority on what its tables hold, and a DDL file is a
      * statement about what they held when it was written.
+     * <p>
+     * Both kinds of table, which was not so at first. A spec names its targets in
+     * a {@code mapping}, and it names <em>reference</em> tables inside every
+     * {@link ValueSource.Lookup} - each with a column to return and a column to
+     * match on. Those are as easy to misspell and worse to get wrong: a lookup
+     * against a table that is not there fails on the first record of the first
+     * file, by which time the load has begun. Sweeping the tutorial found this
+     * gap rather than a mistake, its lookup pages having passed without their
+     * reference tables being examined at all.
      */
     private void checkColumnsExist(MappingSpec spec, PrintWriter out, PrintWriter err) {
         try (var conn = connect()) {
-            var meta = conn.getMetaData();
+            var lower = conn.getMetaData().storesLowerCaseIdentifiers();
             for (var mapping : spec.recordMappingSpecs()) {
-                var table = normalize(mapping.table(), meta.storesLowerCaseIdentifiers());
-                var actual = columnsOf(conn, table);
+                var actual = columnsOf(conn, normalize(mapping.table(), lower));
                 if (actual.isEmpty()) {
                     findings.add("no table '" + mapping.table() + "' in the target database");
-                    continue;
-                }
-                for (var fm : mapping.fieldMappings()) {
-                    var column = normalize(fm.column(), meta.storesLowerCaseIdentifiers());
-                    if (!actual.contains(column)) {
-                        findings.add("table '" + mapping.table() + "' has no column '" + fm.column()
-                                + "'; it has " + new TreeSet<>(actual));
+                } else {
+                    for (var fm : mapping.fieldMappings()) {
+                        requireColumn(actual, mapping.table(), fm.column(), lower);
                     }
                 }
+                for (var fm : mapping.fieldMappings()) {
+                    checkLookups(conn, fm.source(), lower);
+                }
+            }
+            for (var var : spec.inputSpec().vars()) {
+                checkLookups(conn, var.source(), lower);
             }
             out.printf("  columns        checked against %s%n", conn.getMetaData().getURL());
         } catch (SQLException e) {
             err.println("  columns        not checked: " + e.getMessage());
+        }
+    }
+
+    /**
+     * A lookup's own table and its two columns.
+     * <p>
+     * Recursive, because a lookup's key is itself a value source and may be
+     * another lookup. Vars are walked as well as field mappings: a var may hold a
+     * lookup, and it is evaluated once per load rather than per record, so a
+     * broken one fails the load before a single row is read.
+     */
+    private void checkLookups(Connection conn, ValueSource source, boolean lower) throws SQLException {
+        if (!(source instanceof ValueSource.Lookup lookup)) {
+            return;
+        }
+        var actual = columnsOf(conn, normalize(lookup.table(), lower));
+        if (actual.isEmpty()) {
+            findings.add("a lookup reads table '" + lookup.table()
+                    + "', which is not in the target database");
+        } else {
+            requireColumn(actual, lookup.table(), lookup.column(), lower);
+            requireColumn(actual, lookup.table(), lookup.keyColumn(), lower);
+        }
+        checkLookups(conn, lookup.key(), lower);
+    }
+
+    private void requireColumn(Set<String> actual, String table, String column, boolean lower) {
+        if (!actual.contains(normalize(column, lower))) {
+            findings.add("table '" + table + "' has no column '" + column
+                    + "'; it has " + new TreeSet<>(actual));
         }
     }
 

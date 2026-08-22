@@ -14,7 +14,7 @@ before it, so the series reads as a diff rather than as a catalogue.
 8. [Types and notation](08-types.md) - what a value is, and how the producer wrote it
 9. [A file with no header](09-no-header.md) - counting components instead of naming them
 10. [Several kinds of record](10-record-types.md) - one file, two tables
-11. [When it goes wrong](11-when-it-goes-wrong.md) - the hospital, and having your editor check the spec first
+11. [When it goes wrong](11-when-it-goes-wrong.md) - `xldr check` before you deploy, and the hospital after
 12. [Drafting one with an assistant](12-with-an-assistant.md) - what to give a model, and what to check in the answer
 
 The [README](../../README.md) is the reference: every adapter's properties, every field type, the full expression

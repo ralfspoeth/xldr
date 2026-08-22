@@ -2,8 +2,9 @@
 
 [← several kinds of record](10-record-types.md) · [index](README.md) · [next: drafting one with an assistant →](12-with-an-assistant.md)
 
-Every page so far has worked. This one is about the three ways a spec fails, and they fail at three different
-moments - which is the useful thing to know, because the moment tells you where to look.
+Every page so far has worked. This one is about two ways to find a mistake before it costs anything, and the three
+moments at which one shows up if you did not - and the moment is the useful thing, because it tells you where to
+look.
 
 ## Before you save: let the editor check it
 
@@ -29,7 +30,56 @@ release that changes nothing keeps the previous. The full list is on the [schema
 
 What this catches is what a schema can: a misspelled member, a `type` that is not one of the five, a field mapping
 with no source or with two, an `nth` that is not a whole number. What it cannot catch is a `selector` that does not
-match your file - nothing knows that until a file arrives.
+match your file - nothing knows that until a file arrives. Which is the next section.
+
+## Before you deploy: `xldr check`
+
+The schema reads your document. `check` reads it against your file and your database:
+
+    xldr check spec.json --sample customers.csv --url jdbc:h2:./tutorial
+
+Point it at the spec from [page 8](08-types.md) and the file that page shows, and it says:
+
+    checking spec.json
+      input          text/csv, 1 record selector(s)
+      mappings       1, over 1 declared record selector(s)
+      columns        checked against jdbc:h2:./tutorial
+      sample         customers.csv (77 bytes)
+      'customers'    -> customer: 2 record(s) matched
+          id=1 (Long)  name=Alice (String)  since=2026-03-01T00:00 (LocalDateTime)  balance=1234.56 (BigDecimal)
+          id=2 (Long)  name=Bob (String)  since=2026-03-15T00:00 (LocalDateTime)  balance=98.00 (BigDecimal)
+
+    no findings.
+
+Four things are compared, and each of them is a mistake that a schema-valid spec can contain:
+
+- a `mapping` naming a `recordSelector` the `input` never declared - refused, but not until a file arrives;
+- a `column` your table has not got - a SQL error on the first insert;
+- a `lookup` whose reference table, returned column or key column is not there;
+- a record selector that matches nothing in a file you call representative - which nothing refuses at all: the
+  load succeeds and inserts no rows.
+
+A finding names the thing and what would have been right:
+
+    1 finding(s):
+      - table 'customer' has no column 'blance'; it has [BALANCE, ID, NAME, SINCE]
+
+Nothing is written. The connection is opened to ask the database what the table holds, and your file is parsed in
+memory, so it is safe against whatever database has the table - including the only one that does.
+
+Every argument but the spec is optional. Without `--url` the database is not consulted; without `--sample` the file
+is not read; with neither, the spec is still checked against itself.
+
+**Read the values, not just the last line.** The two rows above are the reason to run this rather than a reason to
+skim it. The file said `01.03.2026` and `1.234,56`; the output says the first of March and one thousand two hundred
+and thirty-four. If `dateFormat` were `MM.dd.yyyy` that first date would read as the third of January - a real
+date, a valid load, and every row silently wrong. No check can catch that, because nothing but you knows what your
+producer meant. Seeing the parsed value is the whole remedy.
+
+One limit worth knowing. Those are the *field selectors* - what the file gives. A constant, a `var`, an `expr` or
+what a lookup *resolves to* does not appear, because working those out is the load rather than a reading of the
+file. So a clean run says a great deal about the input half of your spec and nothing about the mapping half. A
+lookup's key shows up, being a field selector like any other.
 
 ## When the spec is read: the feed goes quiet
 

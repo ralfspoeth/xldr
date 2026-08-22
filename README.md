@@ -79,6 +79,11 @@ components, separating several kinds of record into several tables, and - last, 
 it - having a language model draft one and knowing what to check. Each page shows whole files rather than
 fragments, so what you copy is something you can put straight into a feed.
 
+Those pages are checked rather than trusted: [`tools/`](tools/README.md) holds two sweeps that run every spec in
+the tutorial against the published schema, against the tables its own `create table` statements make, and against
+the sample files it shows. Nothing in the build runs them, documentation not being compiled, so they are worth a
+turn whenever a page changes or the format does.
+
 ### Using the toolkit as a library
 
 The library modules are published to Maven Central under the group `io.github.ralfspoeth.xldr`. Import the `bom` to
@@ -356,6 +361,8 @@ the third, but only once a file is being loaded and a transaction is open. So wh
 
 - a mapping naming a record selector the input never declared, which the adapter refuses on the first delivery;
 - a `column` the table has not got, which is a SQL error on the first insert;
+- a `lookup` whose reference table, returned column or key column is not there, which fails on the first record -
+  and, where the lookup is in a `var`, before a single record has been read;
 - a record selector that is well formed and matches nothing in a file you call representative, which nothing
   refuses at all - the load succeeds and inserts no rows.
 
@@ -371,10 +378,17 @@ check can do for you:
     'customers'  -> customer: 2 record(s) matched
         id=1 (Long)  name=Alice (String)  since=2026-03-01T00:00 (LocalDateTime)  balance=1234.56 (BigDecimal)
 
-Nothing here is an error, and nothing could be: a date read under the wrong pattern is still a date, and a German
-decimal read as a plain one is still a number. But the file said `01.03.2026` and `1.234,56`, and one look at the
-line above says whether `dateFormat` and `locale` were understood the way the producer meant them. That is the
-failure this toolkit is otherwise worst at catching, and it costs a row that is silently wrong rather than a load
+These are the *field selectors* - what the file gives - and not what would be inserted. A constant, a `var`, an
+`expr` or a lookup's result does not appear, because evaluating those is the load rather than a reading of the
+file: an expression needs the ambient values a feed supplies, and a lookup needs to query. So `--rows` says
+everything about the input side of a spec and nothing about the mapping side, which is worth knowing before you
+read a clean run as a verdict on the whole thing. A lookup's *key* does appear, that being a field selector like
+any other.
+
+Within that, nothing shown is an error and nothing could be: a date read under the wrong pattern is still a date,
+and a German decimal read as a plain one is still a number. But the file said `01.03.2026` and `1.234,56`, and one
+look at the line above says whether `dateFormat` and `locale` were understood the way the producer meant them. That
+is the failure this toolkit is otherwise worst at catching, and it costs a row that is silently wrong rather than a load
 that stops.
 
 Reading different file types is supported by providing a specific adapter per MIME type. There may be more than one

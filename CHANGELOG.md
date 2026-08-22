@@ -32,9 +32,24 @@ The versions are the git tags `xldr-<version>`; the published artifacts carry th
 
   Bare `xldr` still starts the server exactly as before; `check` is a subcommand beside it.
 
+  A `lookup` is checked too - its reference table, the column it returns and the column it matches on, whether it
+  sits in a field mapping or in a `var`, and recursively where a lookup's key is itself one. That was missing from
+  the first version and the tutorial sweep found it: both lookup pages passed with their reference tables never
+  examined. A broken lookup fails on the first record, or, in a var, before a single record has been read.
+
+  What `--rows` shows is the field selectors - what the file gives - and not what would be inserted. A constant, a
+  var, an expr or a lookup's *result* needs the load rather than a reading of the file, so it says everything about
+  the input side of a spec and nothing about the mapping side. Worth knowing before reading a clean run as a
+  verdict on the whole thing; the README says so now.
+
   Written because the loop an author or an assistant works in was not closed: the published schema validates the
-  document and can see none of the three. `CheckIT` runs the command against a file-based H2 and provokes each
-  finding, so what the command claims is checked rather than asserted.
+  document and can see none of this. `CheckIT` runs the command against a file-based H2 and provokes every finding,
+  so what the command claims is checked rather than asserted.
+
+  Tutorial page 11 gains a section on it, between letting the editor read the document and watching what happens
+  when a feed goes quiet, which is where it belongs in the order someone actually works. The transcript there is a
+  real one - the page 8 spec against the page 8 file - rather than an invented example, and the page says outright
+  that the values are the part worth reading.
 
 - **Tests for the three things the server does after a load returns**, which were the last untested paths in
   `FileProcessor` and `LoadJob` and the ones whose mistakes are least visible.

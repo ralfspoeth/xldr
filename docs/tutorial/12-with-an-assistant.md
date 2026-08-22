@@ -83,26 +83,15 @@ Everything above is mechanical, so do not do it by eye. Save the spec with its `
 IntelliJ or VS Code, and read the squiggles - as [page 11](11-when-it-goes-wrong.md) describes. The schema catches
 every one of the six except the first, and catches a good deal else besides.
 
-Then run `check`, which is the step the schema cannot do. The schema reads the document; this reads the document
-against your file and your database:
+Then run `check`, as [page 11](11-when-it-goes-wrong.md#before-you-deploy-xldr-check) describes:
 
     xldr check spec.json --sample sample.csv --url jdbc:h2:./tutorial
 
-    checking spec.json
-      input          text/csv, 1 record selector(s)
-      mappings       1, over 1 declared record selector(s)
-      columns        checked against jdbc:h2:./tutorial
-      sample         sample.csv (96 bytes)
-      'customers'  -> customer: 2 record(s) matched
-          id=1 (Long)  name=Alice (String)  since=2026-03-01T00:00 (LocalDateTime)
-
-    no findings.
-
-The three things it finds are the three an assistant gets wrong after the schema has had its say: a mapping naming
-a record selector the input never declared, a `column` your table has not got, and a record selector that matches
-nothing in a real file. Each of those is a spec that validates perfectly and fails on the first delivery - or, in
-the last case, does not fail at all and loads nothing. Nothing is written, so the `--url` may be any database that
-has the table.
+What it compares is exactly what an assistant gets wrong once the schema has had its say. A model that invented a
+`column`, or referred to a record selector by a name it did not declare, or wrote a `lookup` against a table it
+imagined, produces a spec that validates perfectly and fails on the first delivery. And a record selector that
+matches nothing in your file does not fail at all - it loads no rows, quietly, which is the one an assistant is
+most likely to hand you with confidence.
 
 Which brings us to what neither the schema nor `check` nor the assistant can decide for you. A spec can be entirely
 valid, pass every check, load without complaint, and be wrong - `home_city` filled from the wrong field, or a date

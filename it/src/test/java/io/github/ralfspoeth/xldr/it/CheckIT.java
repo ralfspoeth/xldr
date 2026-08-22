@@ -45,7 +45,10 @@ public class CheckIT {
     private static final Path DB = Path.of("target", "check-it");
     private static final String JDBC_URL = "jdbc:h2:./" + DB;
 
-    /** the table tutorial page 8 loads into, so the fixtures below are its own */
+    /**
+     * The table tutorial page 8 loads into, so the fixtures below are its own,
+     * plus the reference table its lookup pages use.
+     */
     @BeforeAll
     static void createTheSchema() throws SQLException {
         try (var conn = DriverManager.getConnection(JDBC_URL);
@@ -55,6 +58,8 @@ public class CheckIT {
                     create table customer(
                         id integer, name varchar(50), since date, balance decimal(12,2))
                     """);
+            stmt.execute("drop table if exists region");
+            stmt.execute("create table region(city varchar(50), id integer)");
         }
     }
 
@@ -181,6 +186,80 @@ public class CheckIT {
                 () -> assertFalse(run.exitCode() == 0, "should have found something"),
                 () -> assertTrue(run.reports("matches nothing"), run.out()),
                 () -> assertTrue(run.reports("0 record(s) matched"), run.out()));
+    }
+
+    /**
+     * A lookup names a table and two columns of its own, and those are checked
+     * too.
+     * <p>
+     * They were not at first, which the tutorial sweep found - its two lookup
+     * pages passed with their reference tables never examined. A lookup against
+     * a table that is not there fails on the first record of the first file, by
+     * which point the load has begun and the file is claimed.
+     */
+    @Test
+    void findsAlookupAgainstAtableThatIsNotThere(@TempDir Path dir) throws IOException {
+        var run = check(dir, withLookup("regoin", "id", "city"), SAMPLE);
+        assertAll(
+                () -> assertFalse(run.exitCode() == 0, "should have found something"),
+                () -> assertTrue(run.reports("regoin"), run.out()),
+                () -> assertTrue(run.reports("not in the target database"), run.out()));
+    }
+
+    /** and the column it returns, and the column it matches on */
+    @Test
+    void findsAlookupColumnThatIsNotThere(@TempDir Path dir) throws IOException {
+        var returned = check(dir, withLookup("region", "ident", "city"), SAMPLE);
+        var key = check(dir, withLookup("region", "id", "twon"), SAMPLE);
+        assertAll(
+                () -> assertTrue(returned.reports("ident"), returned.out()),
+                () -> assertTrue(returned.reports("CITY"),
+                        "and lists what region has: " + returned.out()),
+                () -> assertTrue(key.reports("twon"), key.out()));
+    }
+
+    /** a lookup that resolves against a real table and real columns is quiet */
+    @Test
+    void acorrectLookupHasNoFindings(@TempDir Path dir) throws IOException {
+        var run = check(dir, withLookup("region", "id", "city"), SAMPLE);
+        assertEquals(0, run.exitCode(), run.out() + run.err());
+    }
+
+    /**
+     * A spec whose lookup is inside a var rather than a field mapping. A var is
+     * evaluated once per load rather than per record, so a broken one fails
+     * before a single row has been read - and it is reached by a different walk,
+     * which is the reason to test it separately.
+     */
+    @Test
+    void findsAbrokenLookupInsideAvar(@TempDir Path dir) throws IOException {
+        var spec = SPEC.formatted("customers", "balance").replace(
+                "\"recordSelectors\":",
+                """
+                        "vars": [
+                          { "name": "regionId",
+                            "lookup": { "table": "regoin", "column": "id",
+                                        "keyColumn": "city", "constant": "Berlin" } }
+                        ],
+                        "recordSelectors":""");
+        var run = check(dir, spec, SAMPLE);
+        assertAll(
+                () -> assertFalse(run.exitCode() == 0, "should have found something"),
+                () -> assertTrue(run.reports("regoin"), run.out()));
+    }
+
+    /**
+     * The page-8 spec with its {@code name} column filled by a lookup instead,
+     * so that one field mapping carries a {@code ValueSource.Lookup}.
+     */
+    private static String withLookup(String table, String column, String keyColumn) {
+        return SPEC.formatted("customers", "balance").replace(
+                "{\"fieldSelector\": \"name\",    \"column\": \"name\"},",
+                """
+                        {"column": "name",
+                         "lookup": {"table": "%s", "column": "%s",
+                                    "keyColumn": "%s", "fieldSelector": "name"}},"""
+                        .formatted(table, column, keyColumn));
     }
 
     /**
