@@ -14,6 +14,8 @@ import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Proxy;
+import java.sql.Connection;
+import java.sql.DatabaseMetaData;
 import java.sql.DriverManager;
 import java.util.Collections;
 import java.util.HashMap;
@@ -249,17 +251,38 @@ final class Proxies {
     static final class Counting {
         private final AtomicInteger taken = new AtomicInteger();
         private final DataSource dataSource;
+        private final String jdbcUrl;
 
         private Counting(String jdbcUrl) {
+            this(jdbcUrl, Map.of());
+        }
+
+        private Counting(String jdbcUrl, Map<String, Object> metadataAnswers) {
+            this.jdbcUrl = jdbcUrl;
             dataSource = proxy(DataSource.class, Map.of(
                     "getConnection", (Answer) _ -> {
                         taken.incrementAndGet();
                         if (jdbcUrl == null) {
                             throw new IllegalStateException("no database was configured for this test");
                         }
-                        return DriverManager.getConnection(jdbcUrl);
+                        var connection = DriverManager.getConnection(jdbcUrl);
+                        return metadataAnswers.isEmpty() ? connection
+                                : connectionReporting(connection, metadataAnswers);
                     }
             ));
+        }
+
+        /**
+         * The same database, whose metadata answers these calls differently.
+         * <p>
+         * For the questions H2 and a production database disagree about - whether
+         * a catalog may appear in an insert, which PostgreSQL denies - so that
+         * how this module reacts to a driver's answer can be tested without that
+         * driver. Everything not named here is still H2's own answer, so nothing
+         * but the disagreement is invented.
+         */
+        Counting reporting(Map<String, Object> metadataAnswers) {
+            return new Counting(jdbcUrl, metadataAnswers);
         }
 
         DataSource dataSource() {
@@ -269,5 +292,25 @@ final class Proxies {
         int connectionsTaken() {
             return taken.get();
         }
+    }
+
+    /**
+     * A connection whose {@link java.sql.DatabaseMetaData} answers the named
+     * calls as given and delegates the rest.
+     */
+    private static Connection connectionReporting(Connection real, Map<String, Object> answers) {
+        return (Connection) Proxy.newProxyInstance(
+                Proxies.class.getClassLoader(), new Class<?>[]{Connection.class},
+                (_, method, args) -> "getMetaData".equals(method.getName())
+                        ? metadataReporting(real.getMetaData(), answers)
+                        : method.invoke(real, args));
+    }
+
+    private static DatabaseMetaData metadataReporting(DatabaseMetaData real, Map<String, Object> answers) {
+        return (DatabaseMetaData) Proxy.newProxyInstance(
+                Proxies.class.getClassLoader(), new Class<?>[]{DatabaseMetaData.class},
+                (_, method, args) -> answers.containsKey(method.getName())
+                        ? answers.get(method.getName())
+                        : method.invoke(real, args));
     }
 }

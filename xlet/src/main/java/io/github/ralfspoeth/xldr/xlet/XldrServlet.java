@@ -3,6 +3,7 @@ package io.github.ralfspoeth.xldr.xlet;
 import io.github.ralfspoeth.xldr.ia.InputAdapterFactory;
 import io.github.ralfspoeth.xldr.ldr.Loader;
 import io.github.ralfspoeth.xldr.ldr.Statistics;
+import io.github.ralfspoeth.xldr.ldr.Target;
 import io.github.ralfspoeth.xldr.spec.MappingSpec;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServlet;
@@ -17,6 +18,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.sql.SQLException;
 import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
@@ -70,6 +72,8 @@ public class XldrServlet extends HttpServlet {
     private SpecRegistry specs;
     private DataSource dataSource;
     private Map<String, Object> environment;
+    /** the schema and catalog every load through this servlet writes into */
+    private Target target;
     private Semaphore permits;
     private long acquireTimeoutMillis;
     private long maxBytes;
@@ -82,6 +86,8 @@ public class XldrServlet extends HttpServlet {
         specs = SpecRegistry.read(getServletContext());
         dataSource = dataSource();
         environment = environment();
+        target = target();
+        refuseUnusableTarget();
         int concurrent = number("maxConcurrentLoads", 4);
         permits = new Semaphore(concurrent);
         acquireTimeoutMillis = number("acquireTimeoutMillis", 2_000);
@@ -89,7 +95,7 @@ public class XldrServlet extends HttpServlet {
         statistics = new Statistics();
         status = new XletStatus(specs, statistics, concurrent, acquireTimeoutMillis, maxBytes);
         unregister = status.register(getServletContext().getContextPath(), getServletName());
-        LOG.log(INFO, () -> "xldr ready: " + specs.names()
+        LOG.log(INFO, () -> "xldr ready: " + specs.names() + ", loading " + target
                 + ", at most " + concurrent + " concurrent load(s), at most " + maxBytes + " bytes each");
     }
 
@@ -263,7 +269,8 @@ public class XldrServlet extends HttpServlet {
             throws Exception {
         var ambient = new HashMap<>(environment);
         ambient.put("xldr.spec", name);
-        return Loader.load(spec, () -> Files.newInputStream(input), ambient, dataSource.getConnection());
+        return Loader.load(spec, () -> Files.newInputStream(input), ambient, target,
+                dataSource.getConnection());
     }
 
     /**
@@ -342,6 +349,73 @@ public class XldrServlet extends HttpServlet {
         });
         LOG.log(INFO, () -> "environment supplies " + new TreeSet<>(env.keySet()));
         return Map.copyOf(env);
+    }
+
+    /**
+     * Where this deployment's tables live, from the {@code schema} and
+     * {@code catalog} init-params - the servlet's counterpart of a feed's
+     * {@code target.properties}, and named with the same two words on purpose.
+     *
+     * <pre>
+     * &lt;init-param&gt;
+     *     &lt;param-name&gt;schema&lt;/param-name&gt;
+     *     &lt;param-value&gt;staging&lt;/param-value&gt;
+     * &lt;/init-param&gt;
+     * </pre>
+     *
+     * Both are optional and usually absent: a {@code DataSource} configured for
+     * one application generally connects as a user whose search path already
+     * finds its tables, which is why this went unmissed until the file server
+     * grew the same setting.
+     * <p>
+     * Context-params first and a servlet's own init-params over them, as
+     * {@link #environment} does - several xldr servlets in one application share
+     * a database and usually a schema, and the one that does not says so itself.
+     */
+    private Target target() {
+        return new Target(inherited("catalog"), inherited("schema"));
+    }
+
+    /**
+     * Refuses at startup a {@code schema} or {@code catalog} this database will
+     * not take, so that the servlet does not come up half-configured.
+     * <p>
+     * Everything else here is settled at initialisation or not at all, and this
+     * was the one exception: whether a database accepts a catalog in an insert is
+     * something only a connection can answer, and the loader gets one per
+     * request - so PostgreSQL and a {@code catalog} init-param used to be a
+     * {@code 500} on the first load, reported to a caller who had done nothing
+     * wrong.
+     * <p>
+     * <strong>Only when a target is configured.</strong> A deployment that names
+     * neither is the common one and asks the database nothing, which matters
+     * beyond saving a round trip: the servlet has never taken a connection at
+     * startup, so making it do so unconditionally would mean a database that
+     * happens to be down at deploy time keeps the application from coming up at
+     * all. That is a real change in behaviour and not one this setting is
+     * entitled to make on everyone's behalf.
+     */
+    private void refuseUnusableTarget() throws ServletException {
+        if (!target.isEmpty()) {
+            try (var connection = dataSource.getConnection()) {
+                Loader.refuseUnusableTarget(target, connection);
+            } catch (SQLException e) {
+                throw new ServletException(e.getMessage(), e);
+            }
+        }
+    }
+
+    /**
+     * An init-param of this servlet, or of the context if the servlet is silent.
+     * Blank counts as absent, so a half-edited {@code <param-value/>} is no
+     * setting rather than a name made of nothing.
+     */
+    private @Nullable String inherited(String name) {
+        var value = getInitParameter(name);
+        if (value == null || value.isBlank()) {
+            value = getServletContext().getInitParameter(name);
+        }
+        return value == null || value.isBlank() ? null : value.strip();
     }
 
     /**

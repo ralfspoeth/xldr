@@ -130,6 +130,28 @@ public class Loader implements AutoCloseable {
     }
 
     /**
+     * Throws where this database will not take {@code target}, and does nothing
+     * otherwise.
+     * <p>
+     * The same question every load asks, offered separately so that a front end
+     * can ask it once at startup rather than once per load. A misconfiguration
+     * that can never work should be found when the thing is configured, not on
+     * the first delivery - {@code xlet} states that rule about itself, and could
+     * not keep it for this without a way in.
+     * <p>
+     * Named for what it does rather than for what it returns: the answer a
+     * caller wants is the absence of an exception, and the qualifier the check
+     * produces on the way is of no use to anyone who is not about to build a
+     * statement.
+     *
+     * @throws SQLException if the target names a catalog or a schema this
+     *                      database does not take in data manipulation
+     */
+    public static void refuseUnusableTarget(Target target, Connection connection) throws SQLException {
+        qualifierFor(target, connection);
+    }
+
+    /**
      * The qualifier for a target, refusing what this database will not take.
      * <p>
      * The separator is {@code .} and not

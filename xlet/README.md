@@ -128,10 +128,36 @@ under `/WEB-INF/`, where the container's own access control covers them.
 | `/WEB-INF/specs/*.{json,xml}` | one file per feed; the base name is the feed name |
 | `java:comp/env/jdbc/...` | the `DataSource`, named by an init-param |
 | init- and context-params `env.*` | what a spec's `${env.…}` expressions resolve against |
+| init- or context-params `schema`, `catalog` | where the rows go, if the connection does not already say |
 
 The `env.` convention is unchanged from the file server, so a spec moves between the
 two without editing: only where the values come from differs, a properties file there
 and the container's environment here.
+
+`schema` and `catalog` are the same two words a feed's `target.properties` uses, and for
+the same reason: a spec names a table and nothing more, so that it can travel from test
+to production unchanged, and the schema it lands in is exactly what differs between them.
+
+    <init-param>
+        <param-name>schema</param-name>
+        <param-value>staging</param-value>
+    </init-param>
+
+Both are optional and usually absent - a `DataSource` configured for one application
+generally connects as a user whose search path already finds its tables. A context-param
+serves every xldr servlet in the application; a servlet's own init-param overrides it, as
+with `env.`. A blank value is no setting rather than a name made of nothing.
+
+A database that will not take one is refused at startup, keeping this module's rule that
+everything is settled at initialisation or not at all: PostgreSQL cannot qualify across
+databases, so a `catalog` init-param against it stops the servlet coming up instead of
+becoming a `500` on the first load, reported to a caller who did nothing wrong.
+
+That is the only time this servlet touches the database before a request, and only when a
+target is named. A deployment that names neither asks nothing - which matters beyond the
+round trip, since a database that happens to be down at deploy time would otherwise keep
+the whole application from starting, and that is not a change this setting is entitled to
+make for deployments that never asked for it.
 
 ## What it stands on
 

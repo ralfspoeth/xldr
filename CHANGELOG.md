@@ -6,7 +6,17 @@ ways that break existing code and existing specs; those changes are listed here 
 The versions are the git tags `xldr-<version>`; the published artifacts carry the same version under the group
 `io.github.ralfspoeth.xldr`.
 
-## Unreleased
+## 0.36
+
+A release about knowing sooner. `xldr check` compares a draft spec against a real file and a real table before a
+feed exists; `target.properties` lets a deployment say where its rows go, and a database that will not take that
+answer says so at startup; three loader paths that silently produced a wrong number now refuse; and the tutorial is
+read by the build, so a page cannot drift from the release without a test naming it.
+
+The mapping-spec format is unchanged, so `mapping-spec-0.35` remains its schema and a spec that loaded under 0.35
+loads under 0.36. Two of the breaking entries below are new refusals by the reader - a repeated column, and an
+`INTEGRAL` that is not one - and neither is expressible in a schema. Both refuse specs and values that could never
+have loaded.
 
 ### Added
 
@@ -62,8 +72,24 @@ The versions are the git tags `xldr-<version>`; the published artifacts carry th
   of that name *succeeds*, into the wrong schema, silently.
 
   `Loader` gains a `Target` and overloads that take one; the existing signatures default to `Target.none()`, so
-  `xlet` and every existing caller are unchanged. `xldr check` gains `--schema` and `--catalog`, because a check
-  that asks the database about any table of that name would pass a spec the server then loads somewhere else.
+  every other caller is unchanged. `xldr check` gains `--schema` and `--catalog`, because a check that asks the
+  database about any table of that name would pass a spec the server then loads somewhere else.
+
+  `xlet` takes the same two words as init-params, a context-param serving every xldr servlet in an application and
+  a servlet's own overriding it, as `env.` already works. So a spec moves between the two front ends without
+  editing and the deployment says where its rows go in whichever way it configures anything else - a properties
+  file beside the spec, or `web.xml`.
+
+  The servlet's rule is that everything is refused at initialisation or not at all, and it keeps that here: a
+  target this database will not take stops it coming up, rather than becoming a `500` on the first load reported to
+  a caller who did nothing wrong. `Loader.refuseUnusableTarget` is the same question every load asks, offered
+  separately so a front end can ask it once - named for what it does, since the answer wanted is the absence of an
+  exception and the qualifier it produces on the way is of no use to anyone not about to build a statement.
+
+  Only when a target is named, though. That is the one time this servlet touches the database before a request, and
+  a deployment naming neither asks nothing: the servlet has never taken a connection at startup, so checking
+  unconditionally would mean a database that is down at deploy time keeps the whole application from coming up -
+  not a change this setting is entitled to make on behalf of deployments that never asked for it.
 
 - **`xldr check` - a spec, a sample file and the target table, compared before a feed exists.**
 
@@ -153,7 +179,35 @@ The versions are the git tags `xldr-<version>`; the published artifacts carry th
   no unit in them to isolate, and testing them through the server needed no change to what the module exposes -
   `FileProcessor`, `LoadJob` and `Feed` all stay package-private.
 
+### Breaking
+
+- **No spec member is reserved any more.** `load` was, held since 0.2 against the return of the commit policy it
+  once carried. What a deployment needs to say about where a load goes is now `target.properties` beside the spec,
+  so the name is not coming back, and one kept open for something that is not coming is only a trap for whoever
+  picks it. It becomes an ordinary unrecognised member: ignored, like any annotation, so a spec written against an
+  older release and still carrying a `load` block goes on loading exactly as it does today.
+
+- **A mapping writes each column once.** Two field mappings onto one column build
+  `insert into t(name, name) values(?, ?)`, which every database rejects - on the first record of the first file,
+  with the feed deployed and a producer waiting. It is now refused when the spec is read, which is the mirror of
+  the rule `RecordSelectorSpec` applies to field selector names and is refused for the same reason: a spec that
+  cannot load should not be readable.
+
+  Compared as SQL sees the names rather than as strings, so `name` and `NAME` are one column and are refused
+  together, while a quoted `"name"` beside an unquoted `name` is two columns and is allowed. That rule and its
+  reasoning moved out of `Loader`, where it had been private, into `SqlIdentifier` in the spec module - a record
+  mapping cannot tell whether two names are one column without folding them exactly as the loader does, and a
+  second copy that could drift is what this project keeps removing.
+
+  Nothing that loads today breaks: a spec with a repeated column has never been able to load. Turned up while
+  writing a `CheckIT` fixture that happened to contain one.
+
 ### Fixed
+
+- **`bin/xldr.cmd` starts the server.** It passed `-p "%MODULES%"`, a variable nothing ever set, so the Windows
+  launcher handed the JVM an empty module path and could never have worked. The three lines above it that build
+  `MODULEPATH` were right; only the one that used it was wrong. The shell script was unaffected, which is why this
+  survived: the distribution was only ever started from one of the two.
 
 - **An `INTEGRAL` that is not a whole 64-bit number is refused rather than quietly changed.** Two paths ended in
   `Number.longValue()`, which drops a fraction and wraps an overflow: `1,5` loaded as `1`, and a twenty-five digit
@@ -220,27 +274,6 @@ which is a change to the code and not to the spec: `mapping-spec-0.35` is publis
 
 ### Breaking
 
-- **No spec member is reserved any more.** `load` was, held since 0.2 against the return of the commit policy it
-  once carried. What a deployment needs to say about where a load goes is now `target.properties` beside the spec,
-  so the name is not coming back, and one kept open for something that is not coming is only a trap for whoever
-  picks it. It becomes an ordinary unrecognised member: ignored, like any annotation, so a spec written against an
-  older release and still carrying a `load` block goes on loading exactly as it does today.
-
-- **A mapping writes each column once.** Two field mappings onto one column build
-  `insert into t(name, name) values(?, ?)`, which every database rejects - on the first record of the first file,
-  with the feed deployed and a producer waiting. It is now refused when the spec is read, which is the mirror of
-  the rule `RecordSelectorSpec` applies to field selector names and is refused for the same reason: a spec that
-  cannot load should not be readable.
-
-  Compared as SQL sees the names rather than as strings, so `name` and `NAME` are one column and are refused
-  together, while a quoted `"name"` beside an unquoted `name` is two columns and is allowed. That rule and its
-  reasoning moved out of `Loader`, where it had been private, into `SqlIdentifier` in the spec module - a record
-  mapping cannot tell whether two names are one column without folding them exactly as the loader does, and a
-  second copy that could drift is what this project keeps removing.
-
-  Nothing that loads today breaks: a spec with a repeated column has never been able to load. Turned up while
-  writing a `CheckIT` fixture that happened to contain one.
-
 - **A record selector says which records are its own with a `Locator`.** Three cases and no others: `At`, a
   selector in the adapter's own syntax; `Where`, a discriminator; and `Every`, the input's records without further
   qualification. `RecordSelectorSpec` carries one of them instead of a nullable `selector` and a nullable
@@ -296,6 +329,7 @@ which is a change to the code and not to the spec: `mapping-spec-0.35` is publis
 
   Not expressed in the schemas. XSD 1.0 could say it with `xs:unique` and JSON Schema cannot, and adding it to one
   would make the two disagree about a rule the reader already enforces.
+
 
 ### Added
 

@@ -95,7 +95,7 @@ fix their versions in one place:
             <dependency>
                 <groupId>io.github.ralfspoeth.xldr</groupId>
                 <artifactId>bom</artifactId>
-                <version>0.35</version>
+                <version>0.36</version>
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>
@@ -330,7 +330,7 @@ written for `fieldSelectors` costs a record every one of its fields, and no read
 unknown is exactly what it promises.
 
 A schema is published whenever the format changes, and is named after the release that changed it:
-`mapping-spec-0.35` describes the format from 0.35, `mapping-spec-0.32` that of 0.32 to 0.34,
+`mapping-spec-0.35` describes the format from 0.35 onwards, `mapping-spec-0.32` that of 0.32 to 0.34,
 `mapping-spec-0.23` that of 0.23 to 0.31,
 `mapping-spec-0.21` that of 0.21 to 0.22,
 `mapping-spec-0.13` that of 0.13 to 0.20,

@@ -334,6 +334,108 @@ class XldrServletTest {
         assertEquals(2, rows().size(), response.body());
     }
 
+    /**
+     * The {@code schema} init-param decides which schema the rows land in - the
+     * servlet's counterpart of a feed's {@code target.properties}, and the reason
+     * a spec need not name one: the same spec is meant to travel from test to
+     * production unchanged.
+     * <p>
+     * Two schemas hold a table of the same name, and the assertion is not only
+     * that the rows arrived but that the other is still empty. Without that half
+     * this would pass against no qualification at all, the unqualified insert
+     * finding whichever table the session's search path reached first - which is
+     * precisely the accident the setting exists to remove.
+     */
+    @Test
+    void loadsIntoTheSchemaTheInitParamNames() throws Exception {
+        try (var conn = DriverManager.getConnection(JDBC_URL);
+             var stmt = conn.createStatement()) {
+            for (var schema : List.of("staging", "elsewhere")) {
+                stmt.execute("drop schema if exists " + schema + " cascade");
+                stmt.execute("create schema " + schema);
+                stmt.execute("create table " + schema + ".person(id varchar(10), name varchar(50))");
+            }
+        }
+        var response = new Proxies.Recorded();
+        started(Map.of("schema", "staging"), Proxies.dataSource(JDBC_URL))
+                .post(Proxies.post("text/csv; charset=UTF-8", Map.of("spec", "people"), TWO_PEOPLE), response);
+
+        assertAll(
+                () -> assertEquals(200, response.status(), response.body()),
+                () -> assertEquals(2, rowsIn("staging").size(), "the schema the init-param named"),
+                () -> assertEquals(List.of(), rowsIn("elsewhere"), "and nowhere else"),
+                () -> assertEquals(List.of(), rows(), "nor the unqualified table"));
+    }
+
+    /**
+     * A blank init-param is no setting rather than a schema named the empty
+     * string, which would have produced a leading dot in every statement.
+     */
+    @Test
+    void ablankSchemaIsNoSchema() throws Exception {
+        var response = new Proxies.Recorded();
+        started(Map.of("schema", "   "), Proxies.dataSource(JDBC_URL))
+                .post(Proxies.post("text/csv; charset=UTF-8", Map.of("spec", "people"), TWO_PEOPLE), response);
+        assertAll(
+                () -> assertEquals(200, response.status(), response.body()),
+                () -> assertEquals(2, rows().size(), "loaded unqualified, as with no setting at all"));
+    }
+
+    /**
+     * A catalog this database will not take stops the servlet coming up, rather
+     * than surfacing as a 500 on the first load.
+     * <p>
+     * PostgreSQL is the case - it cannot qualify across databases - and there is
+     * none here, so the connection reports what one would. That is not a fake
+     * database: what is under test is when we react to what a driver says, and
+     * the saying is the input.
+     */
+    @Test
+    void acatalogTheDatabaseCannotTakeStopsInitialisation() {
+        var thrown = assertThrows(ServletException.class,
+                () -> started(Map.of("catalog", "warehouse"), denyingCatalogs()));
+        assertAll(
+                () -> assertTrue(thrown.getMessage().contains("warehouse"), thrown.getMessage()),
+                () -> assertTrue(thrown.getMessage().contains("PostgreSQL"), thrown.getMessage()));
+    }
+
+    /**
+     * And a deployment naming no target asks the database nothing at startup.
+     * <p>
+     * Worth pinning rather than assuming. The servlet has never taken a
+     * connection in {@code init()}, so checking unconditionally would mean a
+     * database that is down at deploy time keeps the whole application from
+     * coming up - a change this setting has no business making for deployments
+     * that never asked for it.
+     */
+    @Test
+    void withoutAtargetInitialisationTakesNoConnection() throws Exception {
+        var dataSource = Proxies.dataSource(JDBC_URL);
+        started(Map.of(), dataSource);
+        assertEquals(0, dataSource.connectionsTaken(), "init() should not have needed the database");
+    }
+
+    /** the real H2, reporting as a database that takes no catalog in an insert */
+    private static Proxies.Counting denyingCatalogs() {
+        var real = Proxies.dataSource(JDBC_URL);
+        return real.reporting(Map.of(
+                "supportsCatalogsInDataManipulation", false,
+                "getDatabaseProductName", "PostgreSQL",
+                "getCatalogTerm", "database"));
+    }
+
+    private static List<String> rowsIn(String schema) throws SQLException {
+        var found = new ArrayList<String>();
+        try (var conn = DriverManager.getConnection(JDBC_URL);
+             var stmt = conn.createStatement();
+             var rs = stmt.executeQuery("select id, name from " + schema + ".person order by id")) {
+            while (rs.next()) {
+                found.add(rs.getString(1) + ":" + rs.getString(2));
+            }
+        }
+        return found;
+    }
+
     private static List<String> rows() throws SQLException {
         var found = new ArrayList<String>();
         try (var conn = DriverManager.getConnection(JDBC_URL);
