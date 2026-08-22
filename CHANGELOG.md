@@ -10,6 +10,29 @@ The versions are the git tags `xldr-<version>`; the published artifacts carry th
 
 ### Added
 
+- **The tutorial is checked by the build.** `TutorialTest` reads `docs/tutorial/*.md` and holds every spec printed
+  there to the standard of a fixture: it validates against the published schema, it is parsed by the reader that
+  will parse it in anger, and it is cross-checked against the record selectors and `create table` statements of its
+  own page - tables accumulating across pages and a later definition winning, which is what a reader following in
+  order has.
+
+  It also settles the one claim in the documentation that nothing could check: page 3 says it is page 2's spec
+  written in XML, and both are now read and compared. That is `xldr check --same-as` applied to the place that makes
+  the promise.
+
+  This replaces a Python script, and the reason is not the language. The script validated with a second
+  implementation of JSON Schema, so a clean sweep said something about *its* opinion rather than about what the
+  reader accepts; the test uses the validator the rest of the build already has. More to the point, a sweep nobody
+  runs checks nothing, and `docs/index.html` was four releases stale before anyone noticed. Documentation drifts
+  silently because drifting is all it can do.
+
+  One test in it asserts the extraction found anything at all - twelve pages, eight JSON specs, one XML spec, five
+  tables. Every other assertion here passes vacuously if a fence is written differently or a page is renamed, and a
+  green run that checked nothing is precisely the failure this class exists to prevent.
+
+  What stays a script is `tools/check-tutorial.py`: running `xldr check` over each page needs a packaged
+  distribution and a database per page, which is too much in front of every build.
+
 - **`target.properties` - the dual of `delivery.properties`, saying where a feed's rows go.**
 
       schema  = staging

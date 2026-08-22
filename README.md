@@ -79,10 +79,11 @@ components, separating several kinds of record into several tables, and - last, 
 it - having a language model draft one and knowing what to check. Each page shows whole files rather than
 fragments, so what you copy is something you can put straight into a feed.
 
-Those pages are checked rather than trusted: [`tools/`](tools/README.md) holds two sweeps that run every spec in
-the tutorial against the published schema, against the tables its own `create table` statements make, and against
-the sample files it shows. Nothing in the build runs them, documentation not being compiled, so they are worth a
-turn whenever a page changes or the format does.
+Those pages are checked rather than trusted. Every build reads them: each spec printed in the tutorial is validated
+against the published schema, parsed by the reader that will parse it in anger, and cross-checked against the
+record selectors and `create table` statements of its own page - so a page cannot drift from the release without a
+test saying so. What needs the real adapters and a database, which is whether a record selector matches anything in
+the sample file and what its values parse to, is [`tools/check-tutorial.py`](tools/README.md), run by hand.
 
 ### Using the toolkit as a library
 

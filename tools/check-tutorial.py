@@ -4,7 +4,7 @@
 The half of the sweep that needs the real adapters: whether each record selector
 matches anything in the page's own sample, and what the values parse to. The
 static half - schema, record selector names, columns against the DDL - is
-sweep.py and needs no Java.
+TutorialTest in the spec module, and runs on every build.
 
     python3 tools/check-tutorial.py <path-to-xldr-repo> <path-to-bin/xldr>
 
