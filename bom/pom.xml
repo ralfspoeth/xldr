@@ -66,6 +66,16 @@
                 <version>${project.version}</version>
             </dependency>
             <!--
+                The conformance kit, for anyone writing an adapter of their own.
+                Test scope in the consumer, but managed here like the rest: a
+                version to agree on is the whole point of a bom.
+            -->
+            <dependency>
+                <groupId>io.github.ralfspoeth.xldr</groupId>
+                <artifactId>tck</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <!--
                 The two front ends, and the reason both are here rather than
                 only the first: a deployment embeds one or the other, the file
                 server or the servlet, and which it is has nothing to do with

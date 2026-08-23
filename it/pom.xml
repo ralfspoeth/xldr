@@ -68,6 +68,13 @@
             <artifactId>app</artifactId>
             <version>${project.version}</version>
         </dependency>
+        <!-- the conformance kit, run against each of the five adapters below -->
+        <dependency>
+            <groupId>io.github.ralfspoeth.xldr</groupId>
+            <artifactId>tck</artifactId>
+            <version>${project.version}</version>
+            <scope>test</scope>
+        </dependency>
         <dependency>
             <groupId>io.github.ralfspoeth.xldr</groupId>
             <artifactId>xml</artifactId>

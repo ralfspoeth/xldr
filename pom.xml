@@ -25,6 +25,8 @@
         <module>json</module>
         <module>xml</module>
         <module>xlsx</module>
+        <!-- the SPI's obligations, as tests an adapter can be run against -->
+        <module>tck</module>
         <!-- bill of materials -->
         <module>bom</module>
         <!-- the server, embeddable without the distribution's decisions -->

@@ -209,6 +209,43 @@ one-argument `ServiceLoader.load(Class)` uses the context loader, which a servle
 application framework will have set to something of its own; where that loader cannot see these modules the lookup
 finds no providers and reports nothing at all.
 
+### Writing an adapter
+
+A format xldr does not ship is a module of its own: implement `InputAdapterFactory` and `InputAdapter`, declare
+`provides io.github.ralfspoeth.xldr.ia.InputAdapterFactory with YourFactory` in its `module-info.java`, and put it
+on the module path. Nothing else registers it - the jars carry `provides` and no `META-INF/services`, so a module
+the graph has not resolved is a module no lookup will find.
+
+The full contract is the package documentation of `io.github.ralfspoeth.xldr.ia`: ten obligations, each with the
+reason it exists. Two are worth naming here because they are the ones an implementation gets wrong quietly. A field
+delivers the type the spec declared, `TEXT` where it declared none, converted through `Formats.of(properties)` so
+that `dateFormat`, `numberFormat` and `locale` mean the same thing in every format - an adapter that returns text
+regardless hands the loader a `String` for a numeric column and nothing says so until the insert. And a spec that
+cannot be right is refused when the adapter is *built*, not when a file arrives: that is the last moment before a
+deployment starts, and a selector this format cannot mean is knowable there.
+
+Six of the ten can be checked without knowing the format, and the `tck` module checks them:
+
+    <dependency>
+        <groupId>io.github.ralfspoeth.xldr</groupId>
+        <artifactId>tck</artifactId>
+        <scope>test</scope>
+    </dependency>
+
+```java
+class MyConformanceTest extends InputAdapterContract {
+    protected InputAdapterFactory factory() { return new MyFactory(); }
+    protected String mimeType()             { return "application/x-mine"; }
+    protected InputSpec spec()              { return ...; }   // reads the sample below
+    protected byte[] sample()               { return ...; }
+}
+```
+
+Declare at least one field with a real type in that spec; a spec that is all `TEXT` passes the typing tests without
+having been asked anything. The other four obligations are format-specific and remain yours to test: what your
+format cannot mean, what a bad record looks like, whether *empty* differs from *absent*, and that no state survives
+between calls.
+
 ## Building and Releasing
 
 ### Modules and building
@@ -217,6 +254,12 @@ The whole toolkit is one reactor under the `xldr` parent POM and builds with a s
 modules by their dependencies:
 
 * `spec`, `ia`, `ldr` - the core: the mapping-spec model and readers, the input-adapter SPI, and the JDBC loader;
+* `tck` - the input adapter SPI's obligations, as tests. An adapter author extends `InputAdapterContract`, supplies a
+  factory and something for it to read, and gets one named test per obligation the kit can check without knowing the
+  format. It exists because the obligations were previously only demonstrated - five worked examples in this
+  repository, and an adapter written elsewhere against the published interface that kept nine of them and quietly
+  dropped the tenth. See the package documentation of `ia` for the full contract, and
+  [Writing an adapter](#writing-an-adapter);
 * `bom` - a bill of materials fixing the versions of the published modules in one import;
 * `csv`, `xml`, `xlsx`, `flt`, `json` - the input adapters, each an `InputAdapterFactory` provider discovered through
   `ServiceLoader`;

@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>io.github.ralfspoeth.xldr</groupId>
+        <artifactId>xldr</artifactId>
+        <version>${revision}</version>
+    </parent>
+
+    <artifactId>tck</artifactId>
+    <name>xldr tck</name>
+    <description>Conformance kit for xldr input adapters: the SPI's obligations as tests an implementation can run.</description>
+
+    <dependencies>
+        <dependency>
+            <groupId>io.github.ralfspoeth.xldr</groupId>
+            <artifactId>ia</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <!--
+            Compile scope, and the one thing that makes this module unusual. The
+            kit *is* a test class, so an implementer inherits its @Test methods
+            and runs them with their own runner. A findings-list API would avoid
+            this dependency and cost the thing worth having: one named failure per
+            obligation, in the report, beside the implementer's own tests.
+
+            Nothing depends on tck at compile scope except a test, so the
+            dependency reaches no deployment that does not already have it.
+        -->
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter-api</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.jspecify</groupId>
+            <artifactId>jspecify</artifactId>
+        </dependency>
+    </dependencies>
+</project>

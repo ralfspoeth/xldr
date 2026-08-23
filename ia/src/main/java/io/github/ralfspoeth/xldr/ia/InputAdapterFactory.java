@@ -33,6 +33,21 @@ public interface InputAdapterFactory {
     /**
      * Creates an adapter reading the input {@code spec} describes, configured
      * from that spec's {@linkplain InputSpec#properties() properties}.
+     * <p>
+     * This is where a spec that cannot be right is refused: it is the last moment
+     * before any file exists, and everything the spec alone proves wrong is
+     * knowable here. A {@link io.github.ralfspoeth.xldr.spec.Locator} case this
+     * format cannot mean, an {@code nth} where it has nothing to count, a
+     * malformed selector, a pattern that will not compile - each is a deployment
+     * that does not start rather than a load that dies at four in the morning.
+     * The message should name what the author wrote rather than what they left
+     * out. A property this format does not recognise is not an error; settings
+     * are per format and one spec may be read by more than one.
+     * <p>
+     * See the {@linkplain io.github.ralfspoeth.xldr.ia package documentation} for
+     * the rest of what an adapter owes its caller.
+     *
+     * @throws IllegalArgumentException if the spec says something this format cannot mean
      */
     InputAdapter createInputAdapter(InputSpec spec);
 

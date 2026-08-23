@@ -6,6 +6,41 @@ ways that break existing code and existing specs; those changes are listed here 
 The versions are the git tags `xldr-<version>`; the published artifacts carry the same version under the group
 `io.github.ralfspoeth.xldr`.
 
+## 0.39
+
+### Added
+
+- **The adapter SPI's contract is written down**, in the package documentation of `io.github.ralfspoeth.xldr.ia`:
+  ten obligations, each with the reason it exists, and the surface an adapter actually needs - six types from `ia`
+  and seven from `spec`, the rest of `spec` being the loader's half and none of an adapter's business.
+
+  It was written because an adapter outside this repository got one of them wrong. `swift-mt` implements the SPI,
+  resolves the published bom, and sees only what is exported; it kept nine of the ten and returned text for every
+  field whatever the spec declared - not by oversight but on an argument its README set out, which nothing in the
+  interface contradicted. Five worked examples inside one repository are not a contract, and an implementer reading
+  the interface alone had nothing else to go on.
+
+- **A conformance kit, `tck`**, published beside the rest. An adapter author extends `InputAdapterContract`,
+  supplies a factory, a MIME type, a spec and a sample, and gets one named test per obligation that can be checked
+  without knowing the format: that it claims its own MIME type and not everything, that an unrecognised property is
+  ignored and changes nothing, that an undeclared record selector and an undeclared field selector are refused,
+  that the requested fields and no others come back, that each reports the declared type, that each value is of its
+  field's type, and that reading twice gives the same answer.
+
+  Four of the ten stay untestable generically and the kit says so rather than implying coverage it has not got:
+  refusing at construction depends on what a format cannot mean, naming the bad record depends on what a bad record
+  looks like, empty-versus-absent is a property of the format, and statelessness is sampled rather than proved.
+  A green run says an adapter keeps the obligations that can be stated generically, and no more than that.
+
+  It takes `junit-jupiter-api` at compile scope, which is unusual for a published artifact and is the price of the
+  shape: the kit is a test class, so an implementer inherits its methods and runs them with their own runner. A
+  findings-list API would have avoided the dependency and lost the thing worth having, which is one named failure
+  per obligation sitting in the report beside the implementer's own tests.
+
+  The five in-reactor adapters are run against it from `it`, one conformance test each. They are there rather than
+  in each adapter's own module because those modules' tests are patched in and so have no descriptor in which to
+  require the kit - the same constraint that keeps `xlet`'s test module alive.
+
 ## 0.38
 
 A release about where test code lives. Every module but `xlet` and `it` now has its tests in the package they test

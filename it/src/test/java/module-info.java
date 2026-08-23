@@ -14,6 +14,10 @@ open module io.github.ralfspoeth.xldr.it.test {
     requires org.eclipse.jetty.ee11.servlet;
     requires org.eclipse.jetty.server;
     requires java.net.http;
+    // the conformance kit, and the five adapters run against it. These tests live
+    // here rather than in each adapter's own module because those are patched
+    // into the module they test and so have no descriptor to require the kit in
+    requires io.github.ralfspoeth.xldr.tck;
     // require the adapters
     requires io.github.ralfspoeth.xldr.xml;
     requires io.github.ralfspoeth.xldr.csv;
