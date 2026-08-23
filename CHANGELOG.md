@@ -6,6 +6,31 @@ ways that break existing code and existing specs; those changes are listed here 
 The versions are the git tags `xldr-<version>`; the published artifacts carry the same version under the group
 `io.github.ralfspoeth.xldr`.
 
+## Unreleased
+
+### Changed
+
+- **The five input adapters live under `iaimpl/`**, a pom module that is now their Maven parent, where they used
+  to be five directories at the top of the reactor beside `spec`, `ldr` and the rest. Nothing about the artifacts
+  changes: an adapter is still `io.github.ralfspoeth.xldr:csv`, `:xml`, `:xlsx`, `:flt`, `:json`, at the same
+  coordinates and the same versions, so no consumer has anything to edit.
+
+  They are the one set of modules in this build that a deployment chooses *between* - which of them are on the
+  module path is which formats the server reads, and `modules/` in the distribution holds exactly these five. That
+  was already true of the code and true of the assembly, and the reactor was the only place it did not show.
+
+  Having a parent is what makes the grouping worth more than a directory: `ia`, `jspecify` and `junit-jupiter-api`
+  are declared once in `iaimpl/pom.xml`, so each adapter's own pom now says only what makes it that format - POI
+  for `xlsx`, Greyson for `json`, and nothing at all for `csv`, `flt` and `xml`, which need no library to read what
+  they read. `iaimpl` is published for the same reason the parent pom is: Maven has to be able to resolve it to
+  read theirs.
+
+### Fixed
+
+- **`json` never declared its dependency on `jspecify`.** Its `module-info` says `requires static org.jspecify` and
+  it compiled anyway, because `ia` brought the jar along transitively - which is one upstream change away from not
+  being true. Declaring the three shared dependencies in `iaimpl` is what surfaced it; all five now state it.
+
 ## 0.40
 
 A release about reaching into the target database from a spec. A var may now call a function there - a sequence, a

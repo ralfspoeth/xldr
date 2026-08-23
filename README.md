@@ -260,8 +260,13 @@ modules by their dependencies:
   dropped the tenth. See the package documentation of `ia` for the full contract, and
   [Writing an adapter](#writing-an-adapter);
 * `bom` - a bill of materials fixing the versions of the published modules in one import;
-* `csv`, `xml`, `xlsx`, `flt`, `json` - the input adapters, each an `InputAdapterFactory` provider discovered through
-  `ServiceLoader`;
+* `iaimpl` - the input adapters, `csv`, `xml`, `xlsx`, `flt` and `json`, each an `InputAdapterFactory` provider
+  discovered through `ServiceLoader`. They sit under a parent of their own because they are the one set of modules
+  in this build that a deployment picks from - which of them are on the module path is which formats the server
+  reads, and `modules/` in the distribution holds exactly these. The parent also declares the three dependencies
+  every adapter has, `ia`, `jspecify` and JUnit, so each module states only what makes it that format: POI for
+  `xlsx`, Greyson for `json`, nothing at all for the other three. The artifacts are unchanged -
+  `io.github.ralfspoeth.xldr:csv` and the rest, at the same coordinates as before;
 * `server` - the watching and the loading: the `Watcher`, the feed registry, the file processor and the JMX
   statistics. It does not `requires` any adapter; JPMS service binding pulls them into the graph via the `uses` here
   and the `provides` in each adapter, so a deployment supplies the adapter set it needs on the module path. This is
@@ -353,7 +358,8 @@ leaves both choices where they belong.
 
 Publishing goes through the Central Portal via the `central-publishing-maven-plugin`, inherited from the `plumbum`
 parent. The plugin bundles the whole reactor into a single deployment, so the `xldr` parent POM, the `bom` and the
-nine library modules - `spec`, `ia`, `ldr`, `server`, `csv`, `xml`, `xlsx`, `flt`, `json` - are published together. `app` (an
+nine library modules - `spec`, `ia`, `ldr`, `server`, `csv`, `xml`, `xlsx`, `flt`, `json` - are published together,
+along with `tck` and the `iaimpl` pom that the five adapters inherit from, which Maven has to be able to resolve. `app` (an
 executable, not a library) and `it` (integration tests) each set `skipPublishing` on the plugin, so they are left
 out of the bundle.
 

@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>io.github.ralfspoeth.xldr</groupId>
+        <artifactId>xldr</artifactId>
+        <version>${revision}</version>
+    </parent>
+
+    <artifactId>iaimpl</artifactId>
+    <packaging>pom</packaging>
+    <name>xldr input adapters</name>
+    <description>The input adapters that ship with xldr, one module per format.</description>
+
+    <!--
+      The implementations of the SPI in `ia`, gathered because they are the one
+      set of modules in this build that a deployment chooses between: which of
+      them are on the module path is which formats the server reads, and the
+      distribution puts exactly these into `modules/`. A directory that answers
+      "what may I drop?" with its own contents is worth more than five entries
+      spelled out in the reactor.
+
+      Grouping them is also what lets the three dependencies every adapter has
+      be declared once. Each module keeps only what makes it that format - POI
+      for xlsx, Greyson for json, and nothing at all for csv, flt and xml, which
+      need no library to read what they read.
+
+      The artifact coordinates do not change: an adapter is still
+      io.github.ralfspoeth.xldr:<format>, so nothing a consumer wrote has to move.
+      This pom is published because it is their parent and Maven has to be able
+      to resolve it, not because anyone would depend on it.
+    -->
+    <modules>
+        <module>csv</module>
+        <module>flt</module>
+        <module>json</module>
+        <module>xml</module>
+        <module>xlsx</module>
+    </modules>
+
+    <dependencies>
+        <!--
+            The SPI, which is what makes a module an adapter rather than a
+            library that happens to read a format.
+        -->
+        <dependency>
+            <groupId>io.github.ralfspoeth.xldr</groupId>
+            <artifactId>ia</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <!--
+            Nullness, declared here rather than inherited by accident: every
+            adapter's module-info says `requires static org.jspecify` and json's
+            pom did not say so, compiling only because `ia` brought it along.
+            A compile-only annotation that arrives transitively is one upstream
+            change away from not arriving.
+        -->
+        <dependency>
+            <groupId>org.jspecify</groupId>
+            <artifactId>jspecify</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter-api</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+</project>
