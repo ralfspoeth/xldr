@@ -1,4 +1,4 @@
-package io.github.ralfspoeth.xldr.ldr.test;
+package io.github.ralfspoeth.xldr.ldr;
 
 import java.lang.reflect.Proxy;
 import java.sql.Connection;

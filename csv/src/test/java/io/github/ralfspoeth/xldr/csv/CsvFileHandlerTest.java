@@ -1,9 +1,9 @@
-package io.github.ralfspoeth.xldr.csv.test;
+package io.github.ralfspoeth.xldr.csv;
 
 import io.github.ralfspoeth.xldr.ia.Field;
 import io.github.ralfspoeth.xldr.ia.InputAdapter;
-import io.github.ralfspoeth.xldr.ia.InputAdapterFactory;
 import io.github.ralfspoeth.xldr.ia.Row;
+import io.github.ralfspoeth.xldr.ia.InputAdapterFactory;
 import io.github.ralfspoeth.xldr.spec.*;
 import org.junit.jupiter.api.Test;
 
@@ -13,7 +13,6 @@ import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
-import java.util.ServiceLoader;
 import java.util.Set;
 
 import static java.util.Objects.requireNonNull;
@@ -85,12 +84,21 @@ public class CsvFileHandlerTest {
             ))
     );
 
+    /**
+     * {@link InputAdapterFactory#of} rather than {@link java.util.ServiceLoader}
+     * directly, which matters now that these tests are patched into the module
+     * they test.
+     * <p>
+     * A module may only load a service it declares {@code uses} for, and
+     * {@code csv} does not - nor should it, being a provider rather than a
+     * consumer. {@code of} works anyway because the {@code ServiceLoader} call
+     * lives in {@code ia}, whose descriptor carries the {@code uses} for exactly
+     * this reason. So the test still finds its adapter the way the loader does,
+     * from a module that could not have looked for one itself.
+     */
     private static InputAdapter adapterFor(InputSpec spec) {
-        return ServiceLoader.load(InputAdapterFactory.class)
-                .stream()
-                .map(ServiceLoader.Provider::get)
-                .filter(iaf -> iaf.reads(spec))
-                .findFirst().orElseThrow()
+        return InputAdapterFactory.of(spec)
+                .orElseThrow(() -> new IllegalStateException("no adapter for " + spec.mimeType()))
                 .createInputAdapter(spec);
     }
 

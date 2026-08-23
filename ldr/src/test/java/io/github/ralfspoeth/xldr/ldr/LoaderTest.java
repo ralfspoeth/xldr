@@ -1,11 +1,9 @@
-package io.github.ralfspoeth.xldr.ldr.test;
+package io.github.ralfspoeth.xldr.ldr;
 
 import io.github.ralfspoeth.xldr.ia.Field;
 import io.github.ralfspoeth.xldr.ia.InputAdapter;
 import io.github.ralfspoeth.xldr.ia.Result;
 import io.github.ralfspoeth.xldr.ia.Row;
-import io.github.ralfspoeth.xldr.ldr.Loader;
-import io.github.ralfspoeth.xldr.ldr.Target;
 import io.github.ralfspoeth.xldr.spec.*;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

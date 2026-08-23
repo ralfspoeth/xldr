@@ -1,4 +1,4 @@
-package io.github.ralfspoeth.xldr.xlsx.test;
+package io.github.ralfspoeth.xldr.xlsx;
 
 import io.github.ralfspoeth.xldr.ia.Field;
 import io.github.ralfspoeth.xldr.ia.InputAdapter;
@@ -14,7 +14,6 @@ import java.io.IOException;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
-import java.util.ServiceLoader;
 import java.util.Set;
 
 import static java.util.Objects.requireNonNull;
@@ -24,14 +23,17 @@ public class ExcelAdapterTest {
 
     private static final String XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 
+    /**
+     * {@link InputAdapterFactory#of} rather than {@link java.util.ServiceLoader}
+     * directly. These tests are patched into the module they test, and a module
+     * may only load a service it declares {@code uses} for - which {@code xlsx}
+     * does not, being a provider. {@code of} works anyway: its lookup runs in
+     * {@code ia}, whose descriptor carries the {@code uses}.
+     */
     private static InputAdapter adapter(InputSpec spec) {
-        var factory = ServiceLoader.load(InputAdapterFactory.class)
-                .stream()
-                .map(ServiceLoader.Provider::get)
-                .filter(f -> f.reads(spec))
-                .findFirst()
-                .orElseThrow();
-        return factory.createInputAdapter(spec);
+        return InputAdapterFactory.of(spec)
+                .orElseThrow(() -> new IllegalStateException("no adapter for " + spec.mimeType()))
+                .createInputAdapter(spec);
     }
 
     /**

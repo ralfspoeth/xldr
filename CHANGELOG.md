@@ -20,6 +20,23 @@ The versions are the git tags `xldr-<version>`; the published artifacts carry th
   anything testable was to make it public, and that is how an API surface grows by accident before a 1.0 freezes
   it. A test beside its subject can reach a package-private member and nobody has to decide anything.
 
+  **The five adapters followed**, `csv`, `xml`, `xlsx`, `json` and `flt`, and there the patching forced one change
+  to the tests. Each called `ServiceLoader.load(InputAdapterFactory.class)` in its own code, and a module may only
+  load a service it declares `uses` for - which none of the five does, nor should: they are providers. Patched in,
+  every one of those calls would have been a `ServiceConfigurationError`.
+
+  They now go through `InputAdapterFactory.of`, which is what `Loader` uses and which works from anywhere: the
+  `ServiceLoader` call inside it belongs to `ia`, and `ia`'s descriptor carries the `uses` with a comment saying so.
+  The tests therefore still find their adapter the way the loader finds it, from modules that could not have looked
+  for one themselves - and no production descriptor gained a `uses` to accommodate a test.
+
+  The `csv` and `xml` fixtures moved too. Both tests load them with `getClass().getResourceAsStream("simple.csv")`,
+  which resolves against the class's own package, so the resources had to follow the classes out of `.test`.
+
+  **`ldr` was a plain move**, its four tests and the `AnsweringConnection` proxy going to `io.github.ralfspoeth.xldr.ldr`.
+  Nothing there discovers a service: `Loader` reaches an adapter through `InputAdapterFactory.of`, whose lookup runs
+  inside `ia` and against `ia`'s own `uses`.
+
   **`ia` went the same way**, `FormatsTest` moving beside `Formats`. The argument for keeping a blackbox test
   module there - that it is the one thing proving the SPI is usable from outside - does not survive being checked:
   nine modules' main sources require `ia`, and seven test modules require it too, every one of them seeing only

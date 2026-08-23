@@ -1,4 +1,4 @@
-package io.github.ralfspoeth.xldr.flt.test;
+package io.github.ralfspoeth.xldr.flt;
 
 import io.github.ralfspoeth.xldr.ia.Field;
 import io.github.ralfspoeth.xldr.ia.InputAdapter;
@@ -12,7 +12,6 @@ import java.io.InputStream;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
-import java.util.ServiceLoader;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -38,15 +37,17 @@ public class FixedLengthAdapterTest {
     /**
      * The adapter's settings are part of the input spec, so they are added to a
      * copy of it rather than set on the factory.
+     * <p>
+     * {@link InputAdapterFactory#of} rather than {@link java.util.ServiceLoader}
+     * directly: these tests are patched into the module they test, and a module
+     * may only load a service it declares {@code uses} for - which {@code flt}
+     * does not, being a provider. {@code of} works anyway, its lookup running in
+     * {@code ia}, whose descriptor carries the {@code uses}.
      */
     private static InputAdapter adapter(InputSpec spec, Map<String, String> properties) {
         var configured = new InputSpec(spec.mimeType(),
                 spec.recordSelectors(), spec.vars(), properties);
-        return ServiceLoader.load(InputAdapterFactory.class)
-                .stream()
-                .map(ServiceLoader.Provider::get)
-                .filter(f -> f.reads(configured))
-                .findFirst()
+        return InputAdapterFactory.of(configured)
                 .orElseThrow(() -> new IllegalStateException("no adapter for " + configured.mimeType()))
                 .createInputAdapter(configured);
     }

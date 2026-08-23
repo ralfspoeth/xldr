@@ -1,7 +1,5 @@
-package io.github.ralfspoeth.xldr.ldr.test;
+package io.github.ralfspoeth.xldr.ldr;
 
-import io.github.ralfspoeth.xldr.ldr.Loader;
-import io.github.ralfspoeth.xldr.ldr.Target;
 import io.github.ralfspoeth.xldr.spec.InputSpec;
 import io.github.ralfspoeth.xldr.spec.MappingSpec;
 import org.junit.jupiter.api.Test;
@@ -10,7 +8,7 @@ import java.sql.SQLException;
 import java.util.List;
 import java.util.Map;
 
-import static io.github.ralfspoeth.xldr.ldr.test.AnsweringConnection.*;
+import static io.github.ralfspoeth.xldr.ldr.AnsweringConnection.*;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**

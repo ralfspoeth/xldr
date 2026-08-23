@@ -1,6 +1,5 @@
-package io.github.ralfspoeth.xldr.ldr.test;
+package io.github.ralfspoeth.xldr.ldr;
 
-import io.github.ralfspoeth.xldr.ldr.Target;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.*;

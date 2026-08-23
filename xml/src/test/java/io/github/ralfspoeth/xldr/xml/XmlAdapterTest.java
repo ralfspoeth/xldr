@@ -1,4 +1,4 @@
-package io.github.ralfspoeth.xldr.xml.test;
+package io.github.ralfspoeth.xldr.xml;
 
 import io.github.ralfspoeth.xldr.ia.Field;
 import io.github.ralfspoeth.xldr.ia.InputAdapter;
@@ -15,13 +15,16 @@ import static org.junit.jupiter.api.Assertions.*;
 
 public class XmlAdapterTest {
 
+    /**
+     * {@link InputAdapterFactory#of} rather than {@link java.util.ServiceLoader}
+     * directly. These tests are patched into the module they test, and a module
+     * may only load a service it declares {@code uses} for - which {@code xml}
+     * does not, being a provider. {@code of} works anyway: its lookup runs in
+     * {@code ia}, whose descriptor carries the {@code uses}.
+     */
     private static InputAdapterFactory factory(InputSpec spec) {
-        return ServiceLoader.load(InputAdapterFactory.class)
-                .stream()
-                .map(ServiceLoader.Provider::get)
-                .filter(iaf -> iaf.reads(spec))
-                .findFirst()
-                .orElseThrow();
+        return InputAdapterFactory.of(spec)
+                .orElseThrow(() -> new IllegalStateException("no adapter for " + spec.mimeType()));
     }
 
     /**
