@@ -6,6 +6,32 @@ ways that break existing code and existing specs; those changes are listed here 
 The versions are the git tags `xldr-<version>`; the published artifacts carry the same version under the group
 `io.github.ralfspoeth.xldr`.
 
+## 0.38
+
+### Fixed
+
+- **The README said the fixed-length adapter has no discriminator.** It has had one since 0.32, and the same file
+  says so ninety lines earlier under *Which records are of a kind*, as does tutorial page 5. The adapter section
+  still described the state before that release: one record selector, a second refused, "and this adapter has none
+  yet". So the front page now sends a reader to the headline case through a section denying that the case works.
+
+  The paragraph is rewritten from the code and each claim in it has a test: several record selectors, each with its
+  own bounds so that a field omitting its left bound continues within its own layout rather than across two; a
+  discriminator as a character range needing both bounds, since it has no previous field to continue from; `nth`
+  refused there as on a field; no `selector` on a record selector; and every record taken where there is no
+  discriminator.
+
+  This survived the pass that was meant to reconcile the README's two accounts of a flat file, which is worth
+  recording: that pass fixed the account that was being discussed and left the one further down the page. Two
+  descriptions of one adapter in one file is the defect; fixing them one at a time is how it lasted five releases.
+
+### Added
+
+- **A fixed-length record too short to discriminate belongs to no record selector.** It already did - `Bounds.of`
+  answers null past the end of the line, and both discriminators refuse a null - but nothing said so, and the
+  README now claims it. A truncated line is the commonest thing wrong with a real flat file, and one that silently
+  joined whichever kind was declared first would put a file's rows in the wrong table.
+
 ## 0.37
 
 The mapping-spec format is unchanged, so `mapping-spec-0.35` remains its schema. The one breaking entry below is a

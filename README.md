@@ -1197,12 +1197,22 @@ A line that stops short of a field's bounds is not an error: the value is whatev
 beyond the end of the line is null. Together with the stripping every type does, that makes a producer's trailing
 padding irrelevant.
 
-The adapter takes exactly one record selector, and a second is refused: every line of the file has the same layout,
-so there is nothing to tell one kind from another - that is what a [`discriminator`](#which-records-are-of-a-kind)
-would be for, and this adapter has none yet. That one record selector carries no `selector` either, a fixed-length
-file having nowhere to point at, and one written there is refused rather than ignored. A field says `selector` and
-never `nth`: a fixed-length record is a stretch of characters with declared bounds rather than components to count,
-so counting too is refused when the adapter is built.
+Several record selectors are allowed, and each says which records are its own with a
+[`discriminator`](#which-records-are-of-a-kind) - a character range and what the value there has to be, as in
+`{"selector": "0:2", "equals": "OR"}`. Both bounds are required there, unlike in a field: a discriminator has no
+previous field to continue from, so `":2"` would be asking to start where nothing ended. `nth` is refused for the
+same reason it is on a field. A record too short to hold the discriminating range matches nothing, a record that
+could not be asked not being one that answered. A record selector with no discriminator takes every record, which
+is the single-layout case.
+
+Each record selector carries its own bounds rather than sharing one map, which matters because a field may omit its
+left bound: a layout is a running total, and two layouts sharing one would leave the second anchored to a field of
+the first.
+
+A record selector carries no `selector`, a fixed-length file having nowhere to point at, and one written there is
+refused rather than ignored. A field says `selector` and never `nth`: a fixed-length record is a stretch of
+characters with declared bounds rather than components to count, so counting too is refused when the adapter is
+built.
 
 **JSON** (`application/json`, `text/json`): no settings of its own, and deliberately no charset - JSON exchanged
 between systems is UTF-8 by definition (RFC 8259), so a document is always read as such.

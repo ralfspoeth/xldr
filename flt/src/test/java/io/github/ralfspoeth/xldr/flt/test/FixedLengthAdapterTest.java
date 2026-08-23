@@ -384,6 +384,41 @@ public class FixedLengthAdapterTest {
     }
 
     /**
+     * A record too short to hold the discriminating range belongs to no record
+     * selector, rather than to all of them or to the first.
+     * <p>
+     * {@code Bounds.of} answers null where the record stops short, and both
+     * discriminators refuse a null - a record that could not be asked is not one
+     * that answered. That is the only sensible reading, and it had nothing behind
+     * it: a truncated line is the commonest thing wrong with a real flat file, and
+     * a short line silently joining whichever kind was declared first would put
+     * one file's rows in another file's table.
+     */
+    @Test
+    public void arecordTooShortToDiscriminateBelongsToNoKind() throws IOException {
+        var spec = new InputSpec(MIME, List.of(
+                new RecordSelectorSpec("orders",
+                        new Locator.Where(new Discriminator.Equals(new Selector.Text("0:2"), "OR")),
+                        List.of(new FieldSelectorSpec("id", "2:6", DataType.TEXT))),
+                new RecordSelectorSpec("lines",
+                        new Locator.Where(Discriminator.matching(new Selector.Text("0:2"), "LI")),
+                        List.of(new FieldSelectorSpec("order", "2:6", DataType.TEXT)))
+        ), List.of(), Map.of());
+
+        // the empty second line reaches neither discriminator's range
+        var file = "OR1001\n\nLI1001\n";
+
+        var orders = adapter(spec, Map.of()).parse(in(file), "orders", Set.of("id")).rows().toList();
+        var lines = adapter(spec, Map.of()).parse(in(file), "lines", Set.of("order")).rows().toList();
+
+        assertAll(
+                () -> assertEquals(1, orders.size(), "the short line is not an order"),
+                () -> assertEquals(1, lines.size(), "nor a line, though that one matches by pattern"),
+                () -> assertEquals("1001", orders.getFirst().get("id")),
+                () -> assertEquals("1001", lines.getFirst().get("order")));
+    }
+
+    /**
      * A discriminator counts nothing here, for the reason a field selector does
      * not: a fixed-length record has offsets and no components.
      */
