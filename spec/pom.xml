@@ -17,11 +17,22 @@
             <artifactId>junit-jupiter-api</artifactId>
             <scope>test</scope>
         </dependency>
-        <!-- so that JsonSchemaTest can hold the published JSON schema to what
-             the reader accepts, as XsdTest does for the XSD -->
+        <!--
+            So that JsonSchemaTest can hold the published JSON schema to what the
+            reader accepts, as XsdTest does for the XSD.
+
+            It brings Jackson 3, slf4j and ethlo itu with it, which is a large
+            tree for one assertion - and the alternative was a schema nothing
+            checks, carrying the two exactly-one-of rules that XSD 1.0 cannot
+            express. Nothing ships with it.
+
+            Versioned here rather than in the parent: one module uses it, so
+            there is nothing to coordinate.
+        -->
         <dependency>
             <groupId>com.networknt</groupId>
             <artifactId>json-schema-validator</artifactId>
+            <version>3.0.7</version>
             <scope>test</scope>
         </dependency>
         <dependency>

@@ -119,19 +119,6 @@
                 <artifactId>poi-ooxml</artifactId>
                 <version>5.5.1</version>
             </dependency>
-            <!--
-                Test scope only, in the spec module, to validate a spec against
-                the published JSON schema the way XsdTest validates one against
-                the XSD. It brings Jackson 3, slf4j and ethlo itu with it, which
-                is a large tree for one assertion - and the alternative was a
-                schema nothing checks, carrying the two exactly-one-of rules
-                that XSD 1.0 cannot express. Nothing ships with it.
-            -->
-            <dependency>
-                <groupId>com.networknt</groupId>
-                <artifactId>json-schema-validator</artifactId>
-                <version>3.0.7</version>
-            </dependency>
         </dependencies>
     </dependencyManagement>
 
