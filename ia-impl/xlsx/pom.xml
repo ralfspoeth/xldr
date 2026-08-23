@@ -3,7 +3,7 @@
 
     <parent>
         <groupId>io.github.ralfspoeth.xldr</groupId>
-        <artifactId>iaimpl</artifactId>
+        <artifactId>ia-impl</artifactId>
         <version>${revision}</version>
     </parent>
     <modelVersion>4.0.0</modelVersion>

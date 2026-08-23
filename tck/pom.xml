@@ -15,7 +15,7 @@
     <dependencies>
         <dependency>
             <groupId>io.github.ralfspoeth.xldr</groupId>
-            <artifactId>ia</artifactId>
+            <artifactId>ia-def</artifactId>
             <version>${project.version}</version>
         </dependency>
         <!--

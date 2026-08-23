@@ -17,12 +17,12 @@
     <modules>
         <!-- the library part -->
         <module>spec</module>
-        <module>ia</module>
+        <module>ia-def</module>
         <module>ldr</module>
         <!-- the input adapters, one module per format, under a parent of their
              own: they are the set a deployment chooses between, and the three
              dependencies every one of them has are declared once there -->
-        <module>iaimpl</module>
+        <module>ia-impl</module>
         <!-- the SPI's obligations, as tests an adapter can be run against -->
         <module>tck</module>
         <!-- bill of materials -->

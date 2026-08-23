@@ -146,7 +146,7 @@ fix their versions in one place:
     </dependencyManagement>
 
 Then take the loader plus the adapters for the formats you read, without repeating the version; each adapter brings
-`ia` and `spec` with it:
+`ia-def` and `spec` with it:
 
     <dependency>
         <groupId>io.github.ralfspoeth.xldr</groupId>
@@ -162,7 +162,7 @@ level, so every type is non-null unless it carries `@Nullable`. The annotations 
 and `provided` scope - so nothing is added to your runtime; a null checker will read them, and a build without one is
 unaffected.
 
-The `bom` manages exactly the published artifacts - `spec`, `ia`, `ldr`, both front ends `server` and `xlet`, and
+The `bom` manages exactly the published artifacts - `spec`, `ia-def`, `ldr`, both front ends `server` and `xlet`, and
 the adapters `csv`, `xml`, `xlsx`, `flt` and `json` - and deliberately no third-party versions, so importing it does
 not bind you to the POI, HikariCP or JDBC driver versions this build happens to use.
 
@@ -252,20 +252,23 @@ between calls.
 The whole toolkit is one reactor under the `xldr` parent POM and builds with a single `mvn install`, which orders the
 modules by their dependencies:
 
-* `spec`, `ia`, `ldr` - the core: the mapping-spec model and readers, the input-adapter SPI, and the JDBC loader;
+* `spec`, `ia-def`, `ldr` - the core: the mapping-spec model and readers, the input-adapter SPI, and the JDBC
+  loader. `ia-def` is the artifact; the Java module and the package it exports stay `io.github.ralfspoeth.xldr.ia`,
+  since every adapter in the world `requires` that name and imports from it, and no adapter is improved by editing
+  it. The artifact was renamed so that the SPI and its implementations read as a pair, `ia-def` beside `ia-impl`;
 * `tck` - the input adapter SPI's obligations, as tests. An adapter author extends `InputAdapterContract`, supplies a
   factory and something for it to read, and gets one named test per obligation the kit can check without knowing the
   format. It exists because the obligations were previously only demonstrated - five worked examples in this
   repository, and an adapter written elsewhere against the published interface that kept nine of them and quietly
-  dropped the tenth. See the package documentation of `ia` for the full contract, and
+  dropped the tenth. See the package documentation of `ia-def` for the full contract, and
   [Writing an adapter](#writing-an-adapter);
 * `bom` - a bill of materials fixing the versions of the published modules in one import;
-* `iaimpl` - the input adapters, `csv`, `xml`, `xlsx`, `flt` and `json`, each an `InputAdapterFactory` provider
+* `ia-impl` - the input adapters, `csv`, `xml`, `xlsx`, `flt` and `json`, each an `InputAdapterFactory` provider
   discovered through `ServiceLoader`. They sit under a parent of their own because they are the one set of modules
   in this build that a deployment picks from - which of them are on the module path is which formats the server
   reads, and `modules/` in the distribution holds exactly these. The parent also declares the three dependencies
-  every adapter has, `ia`, `jspecify` and JUnit, so each module states only what makes it that format: POI for
-  `xlsx`, Greyson for `json`, nothing at all for the other three. The artifacts are unchanged -
+  every adapter has, `ia-def`, `jspecify` and JUnit, so each module states only what makes it that format: POI for
+  `xlsx`, Greyson for `json`, nothing at all for the other three. The adapters' own artifacts are unchanged -
   `io.github.ralfspoeth.xldr:csv` and the rest, at the same coordinates as before;
 * `server` - the watching and the loading: the `Watcher`, the feed registry, the file processor and the JMX
   statistics. It does not `requires` any adapter; JPMS service binding pulls them into the graph via the `uses` here
@@ -358,8 +361,9 @@ leaves both choices where they belong.
 
 Publishing goes through the Central Portal via the `central-publishing-maven-plugin`, inherited from the `plumbum`
 parent. The plugin bundles the whole reactor into a single deployment, so the `xldr` parent POM, the `bom` and the
-nine library modules - `spec`, `ia`, `ldr`, `server`, `csv`, `xml`, `xlsx`, `flt`, `json` - are published together,
-along with `tck` and the `iaimpl` pom that the five adapters inherit from, which Maven has to be able to resolve. `app` (an
+nine library modules - `spec`, `ia-def`, `ldr`, `server`, `csv`, `xml`, `xlsx`, `flt`, `json` - are published
+together, along with `tck` and the `ia-impl` pom that the five adapters inherit from, which Maven has to be able to
+resolve. `app` (an
 executable, not a library) and `it` (integration tests) each set `skipPublishing` on the plugin, so they are left
 out of the bundle.
 

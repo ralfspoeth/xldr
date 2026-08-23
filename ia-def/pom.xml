@@ -8,8 +8,8 @@
         <version>${revision}</version>
     </parent>
 
-    <artifactId>ia</artifactId>
-    <name>xldr ia</name>
+    <artifactId>ia-def</artifactId>
+    <name>xldr ia-def</name>
     <description>Input adapter SPI for xldr: the InputAdapterFactory service and row/field abstractions.</description>
 
     <dependencies>

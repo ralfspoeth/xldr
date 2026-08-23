@@ -3,12 +3,19 @@
     <modelVersion>4.0.0</modelVersion>
     <parent>
         <groupId>io.github.ralfspoeth.xldr</groupId>
-        <artifactId>iaimpl</artifactId>
+        <artifactId>ia-impl</artifactId>
         <version>${revision}</version>
     </parent>
 
-    <artifactId>flt</artifactId>
-    <name>xldr flt</name>
-    <description>Fixed-length file input adapter for xldr</description>
+    <artifactId>json</artifactId>
+    <name>xldr json</name>
+    <description>JSON input adapter for xldr, based on Greyson</description>
+
+    <dependencies>
+        <dependency>
+            <groupId>io.github.ralfspoeth</groupId>
+            <artifactId>json</artifactId>
+        </dependency>
+    </dependencies>
 
 </project>

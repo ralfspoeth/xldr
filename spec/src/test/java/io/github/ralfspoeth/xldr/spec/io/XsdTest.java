@@ -1,11 +1,6 @@
 package io.github.ralfspoeth.xldr.spec.io;
 
-import io.github.ralfspoeth.xldr.spec.DataType;
-import io.github.ralfspoeth.xldr.spec.Discriminator;
-import io.github.ralfspoeth.xldr.spec.FieldSelectorSpec;
-import io.github.ralfspoeth.xldr.spec.Locator;
-import io.github.ralfspoeth.xldr.spec.Selector;
-import io.github.ralfspoeth.xldr.spec.ValueSource;
+import io.github.ralfspoeth.xldr.spec.*;
 import org.junit.jupiter.api.Test;
 import org.xml.sax.SAXException;
 

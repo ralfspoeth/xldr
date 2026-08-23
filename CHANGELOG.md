@@ -8,9 +8,24 @@ The versions are the git tags `xldr-<version>`; the published artifacts carry th
 
 ## Unreleased
 
+### Breaking
+
+- **The SPI artifact is `ia-def`, where it was `ia`.** `io.github.ralfspoeth.xldr:ia` no longer exists, so a pom
+  naming it fails to resolve rather than quietly resolving to the last version published under that name. Anyone
+  importing the `bom` gets the new coordinate with nothing to do; anyone naming the artifact directly - an adapter
+  author, which is who the SPI is for - has one line to change.
+
+  **The Java module and the package are unchanged.** Both are still `io.github.ralfspoeth.xldr.ia`: every adapter
+  in existence `requires` that name and imports from it, and none of them is improved by editing it. So the artifact
+  and the module name differ for this one module, deliberately, and the README says so where it lists the modules.
+
+  The rename is for the pair. With the implementations gathered under `ia-impl`, calling the definition `ia-def`
+  makes the relationship legible in the reactor, in the directory listing and in a dependency block - which the
+  three-letter `ia` beside a five-module directory did not.
+
 ### Changed
 
-- **The five input adapters live under `iaimpl/`**, a pom module that is now their Maven parent, where they used
+- **The five input adapters live under `ia-impl/`**, a pom module that is now their Maven parent, where they used
   to be five directories at the top of the reactor beside `spec`, `ldr` and the rest. Nothing about the artifacts
   changes: an adapter is still `io.github.ralfspoeth.xldr:csv`, `:xml`, `:xlsx`, `:flt`, `:json`, at the same
   coordinates and the same versions, so no consumer has anything to edit.
@@ -19,17 +34,17 @@ The versions are the git tags `xldr-<version>`; the published artifacts carry th
   module path is which formats the server reads, and `modules/` in the distribution holds exactly these five. That
   was already true of the code and true of the assembly, and the reactor was the only place it did not show.
 
-  Having a parent is what makes the grouping worth more than a directory: `ia`, `jspecify` and `junit-jupiter-api`
-  are declared once in `iaimpl/pom.xml`, so each adapter's own pom now says only what makes it that format - POI
-  for `xlsx`, Greyson for `json`, and nothing at all for `csv`, `flt` and `xml`, which need no library to read what
-  they read. `iaimpl` is published for the same reason the parent pom is: Maven has to be able to resolve it to
-  read theirs.
+  Having a parent is what makes the grouping worth more than a directory: `ia-def`, `jspecify` and
+  `junit-jupiter-api` are declared once in `ia-impl/pom.xml`, so each adapter's own pom now says only what makes it
+  that format - POI for `xlsx`, Greyson for `json`, and nothing at all for `csv`, `flt` and `xml`, which need no
+  library to read what they read. `ia-impl` is published for the same reason the parent pom is: Maven has to be
+  able to resolve it to read theirs.
 
 ### Fixed
 
 - **`json` never declared its dependency on `jspecify`.** Its `module-info` says `requires static org.jspecify` and
-  it compiled anyway, because `ia` brought the jar along transitively - which is one upstream change away from not
-  being true. Declaring the three shared dependencies in `iaimpl` is what surfaced it; all five now state it.
+  it compiled anyway, because the SPI brought the jar along transitively - which is one upstream change away from
+  not being true. Declaring the three shared dependencies in `ia-impl` is what surfaced it; all five now state it.
 
 ## 0.40
 

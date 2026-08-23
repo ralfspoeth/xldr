@@ -7,9 +7,7 @@ import java.util.List;
 import java.util.Map;
 
 import static io.github.ralfspoeth.xldr.spec.io.Streams.stream;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.*;
 
 class XmlMappingSpecReaderTest {
 

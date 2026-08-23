@@ -7,7 +7,7 @@
         <version>${revision}</version>
     </parent>
 
-    <artifactId>iaimpl</artifactId>
+    <artifactId>ia-impl</artifactId>
     <packaging>pom</packaging>
     <name>xldr input adapters</name>
     <description>The input adapters that ship with xldr, one module per format.</description>
@@ -45,8 +45,8 @@
         -->
         <dependency>
             <groupId>io.github.ralfspoeth.xldr</groupId>
-            <artifactId>ia</artifactId>
-            <version>${project.version}</version>
+            <artifactId>ia-def</artifactId>
+            <version>${revision}</version>
         </dependency>
         <!--
             Nullness, declared here rather than inherited by accident: every
