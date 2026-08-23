@@ -11,6 +11,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicLong;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -30,17 +31,35 @@ class ServerStatusTest {
     private Statistics statistics;
     private ServerStatus status;
 
+    /**
+     * The watcher's sweep count, which this bean only reports. There is no
+     * watcher here, so the test owns the number and can say what it is.
+     */
+    private final AtomicLong sweeps = new AtomicLong();
+
     @BeforeEach
     void setUp() throws IOException {
         watchService = Feeds.watchService();
         registry = new FeedRegistry(watchService);
         statistics = new Statistics();
-        status = new ServerStatus(registry, statistics);
+        status = new ServerStatus(registry, statistics, sweeps::get);
     }
 
     @AfterEach
     void tearDown() throws Exception {
         watchService.close();
+    }
+
+    /**
+     * The gauge is the watcher's number, passed straight through - which is the
+     * whole of what this bean owes it, and the one thing a monitor watching for a
+     * watcher that stopped looking depends on.
+     */
+    @Test
+    void reportsTheSweepCountItIsGiven() {
+        assertEquals(0L, status.getReconciliations());
+        sweeps.set(7);
+        assertEquals(7L, status.getReconciliations(), "the bean reads the supplier each time");
     }
 
     // ---- the feed gauges -----------------------------------------------------
@@ -200,7 +219,7 @@ class ServerStatusTest {
      */
     @Test
     void registrationHandsBackSomethingThatCloses() throws Exception {
-        try (var registered = closeable(ServerStatus.register(registry, statistics))) {
+        try (var registered = closeable(ServerStatus.register(registry, statistics, sweeps::get))) {
             assertNotNull(registered);
         }
     }
@@ -212,8 +231,8 @@ class ServerStatusTest {
      */
     @Test
     void asecondRegistrationIsSurvivable() throws Exception {
-        try (var first = closeable(ServerStatus.register(registry, statistics));
-             var second = closeable(ServerStatus.register(registry, statistics))) {
+        try (var first = closeable(ServerStatus.register(registry, statistics, sweeps::get));
+             var second = closeable(ServerStatus.register(registry, statistics, sweeps::get))) {
             assertAll(
                     () -> assertNotNull(first),
                     () -> assertNotNull(second));

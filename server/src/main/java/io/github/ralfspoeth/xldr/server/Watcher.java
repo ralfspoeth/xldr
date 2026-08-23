@@ -13,6 +13,7 @@ import java.util.Set;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 
 import static java.lang.System.Logger.Level.INFO;
 import static java.lang.System.Logger.Level.WARNING;
@@ -98,6 +99,9 @@ public class Watcher implements Closeable {
         this.scanner = Executors.newSingleThreadScheduledExecutor(Thread.ofVirtual().factory());
     }
 
+    /** how many sweeps have been attempted, reported through the MXBean */
+    private final AtomicLong reconciliations = new AtomicLong();
+
     private static void validate(Set<Path> roots) {
         for (var root : roots) {
             if (!Files.isDirectory(root)) {
@@ -112,7 +116,7 @@ public class Watcher implements Closeable {
     }
 
     private void start() {
-        statusBean = ServerStatus.register(registry, statistics);
+        statusBean = ServerStatus.register(registry, statistics, reconciliations::get);
         watchThread = Thread.ofVirtual().start(watchService);
         reconcileAll();
         // registered, not active: a feed whose spec was removed while a load was
@@ -132,9 +136,23 @@ public class Watcher implements Closeable {
         }
     }
 
+    /**
+     * One sweep: every root reconciled, then every active feed's inbox scanned.
+     * <p>
+     * The counter is bumped in a {@code finally} so that a sweep which threw
+     * still counts as one having been attempted. A caller waiting for the server
+     * to have looked - a monitor, or a test asserting that nothing happened -
+     * wants to know that it looked, and a count that stalls on a failing
+     * reconcile would leave such a caller waiting for ever rather than telling it
+     * something is wrong.
+     */
     private void reconcileAll() {
-        roots.forEach(registry::reconcileRoot);
-        registry.active().forEach(processor::scanInbox);
+        try {
+            roots.forEach(registry::reconcileRoot);
+            registry.active().forEach(processor::scanInbox);
+        } finally {
+            reconciliations.incrementAndGet();
+        }
     }
 
     /**

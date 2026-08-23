@@ -7,6 +7,7 @@ import javax.management.ObjectName;
 import javax.management.StandardMBean;
 import java.io.IOException;
 import java.lang.management.ManagementFactory;
+import java.util.function.LongSupplier;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.LinkedHashMap;
@@ -38,22 +39,33 @@ public final class ServerStatus implements ServerMXBean {
 
     private final FeedRegistry registry;
     private final Statistics statistics;
+    private final LongSupplier reconciliations;
 
-    public ServerStatus(FeedRegistry registry, Statistics statistics) {
+    /**
+     * @param reconciliations how many sweeps the watcher has attempted. A
+     *                        supplier rather than a number, the count being the
+     *                        watcher's and this bean being a view of it - and
+     *                        rather than another field on {@link Statistics},
+     *                        which lives in {@code ldr} and counts loads, while
+     *                        sweeping is something only a watcher does
+     */
+    public ServerStatus(FeedRegistry registry, Statistics statistics, LongSupplier reconciliations) {
         this.registry = registry;
         this.statistics = statistics;
+        this.reconciliations = reconciliations;
     }
 
     /**
      * Registers the bean, returning what unregisters it again - or nothing at
      * all if it could not be registered.
      */
-    public static AutoCloseable register(FeedRegistry registry, Statistics statistics) {
+    public static AutoCloseable register(FeedRegistry registry, Statistics statistics,
+                                         LongSupplier reconciliations) {
         try {
             var name = new ObjectName(OBJECT_NAME);
             var server = ManagementFactory.getPlatformMBeanServer();
             server.registerMBean(
-                    new StandardMXBeanWrapper(new ServerStatus(registry, statistics)), name);
+                    new StandardMXBeanWrapper(new ServerStatus(registry, statistics, reconciliations)), name);
             LOG.log(DEBUG, () -> "registered " + name);
             return () -> {
                 try {
@@ -89,6 +101,11 @@ public final class ServerStatus implements ServerMXBean {
     @Override
     public int getLoadsInProgress() {
         return statistics.loadsInProgress();
+    }
+
+    @Override
+    public long getReconciliations() {
+        return reconciliations.getAsLong();
     }
 
     @Override

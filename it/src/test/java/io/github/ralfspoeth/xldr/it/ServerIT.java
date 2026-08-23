@@ -154,8 +154,9 @@ class ServerIT {
                 9,Nobody
                 """);
 
-        // give the watcher and a scan interval the chance to react
-        Thread.sleep(Duration.ofSeconds(3));
+        // two full sweeps: the server has looked twice and done nothing, which is
+        // the assertion. Waiting on the count rather than on the clock
+        awaitSweeps(2);
         assertEquals(List.of(), selectPersons(), "a deactivated feed must not load");
         assertTrue(Files.exists(feed.resolve("in").resolve("ignored.csv")),
                 "the file should still be sitting in in/");
@@ -180,7 +181,7 @@ class ServerIT {
                 1,Alice
                 2,Bob
                 """);
-        Thread.sleep(Duration.ofSeconds(3));
+        awaitSweeps(2);
         assertEquals(List.of(), selectPersons(), "no load before the sentinel");
         assertTrue(Files.exists(in.resolve("people-1.csv")), "data file still waiting");
 
@@ -451,8 +452,8 @@ class ServerIT {
         Files.writeString(typo.resolve(Delivery.FILE), "acccepts = glob:*.csv\n");
         Files.writeString(typo.resolve("spec.json"), SPEC);
 
-        // let the watcher and a scan interval try (and refuse) all three
-        Thread.sleep(Duration.ofSeconds(3));
+        // two full sweeps: the watcher has tried all three twice and refused them
+        awaitSweeps(2);
         assertTrue(Files.notExists(neither.resolve("in")), "no delivery rule must not become a feed");
         assertTrue(Files.notExists(both.resolve("in")), "both delivery rules must not become a feed");
         assertTrue(Files.notExists(typo.resolve("in")), "an unknown setting must not become a feed");
@@ -964,9 +965,9 @@ class ServerIT {
                 1,Alice
                 """);
 
-        // a scan interval and more: long enough that a feed which was going to
-        // mishandle the file would have done it by now
-        Thread.sleep(Duration.ofSeconds(3));
+        // two full sweeps: a feed that was going to mishandle the file has had
+        // every chance to, and the count says so rather than a stopwatch
+        awaitSweeps(2);
         assertEquals(List.of(), selectPersons(), "nothing loaded without a spec");
         assertTrue(Files.exists(feed.resolve("in").resolve("early.csv")),
                 "the file waits in in/, neither claimed nor hospitalised");
@@ -1014,6 +1015,23 @@ class ServerIT {
         } catch (IOException e) {
             return List.of();
         }
+    }
+
+    /**
+     * Waits until the watcher has completed {@code sweeps} more reconciliations
+     * than it had when this was called.
+     * <p>
+     * The four places that use this assert that <em>nothing</em> happened, which
+     * cannot be awaited directly - there is no condition to poll for an absence.
+     * They used to sleep three seconds each, twelve seconds of the suite spent
+     * proving a negative by the clock, and the number was a guess that would have
+     * had to grow if the scan interval ever did. The count is the observable the
+     * assertion actually needs: the server has looked, twice, and did not act.
+     */
+    private static void awaitSweeps(int sweeps) throws Exception {
+        var status = serverStatus();
+        var target = status.getReconciliations() + sweeps;
+        await(sweeps + " reconciliation(s)", () -> status.getReconciliations() >= target);
     }
 
     private static void await(String what, BooleanSupplier condition) throws InterruptedException {

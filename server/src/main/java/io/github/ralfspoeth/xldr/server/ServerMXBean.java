@@ -29,6 +29,17 @@ public interface ServerMXBean {
     /** @return how many files are being loaded at this moment */
     int getLoadsInProgress();
 
+    /**
+     * @return how many sweeps the watcher has attempted since it started - roots
+     * reconciled and then every active feed's inbox scanned, once per scan
+     * interval and once at startup. A count that stops climbing is a watcher that
+     * has stopped looking, which nothing else here would show: every other gauge
+     * would simply stay where it was, as it does on a quiet morning. A sweep that
+     * threw still counts, so the number answers "has it looked" rather than "did
+     * it like what it found"
+     */
+    long getReconciliations();
+
     /** @return how many files have been loaded since the server started */
     long getLoadsSucceeded();
 

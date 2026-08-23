@@ -139,7 +139,7 @@ fix their versions in one place:
             <dependency>
                 <groupId>io.github.ralfspoeth.xldr</groupId>
                 <artifactId>bom</artifactId>
-                <version>0.38</version>
+                <version>0.39</version>
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>
@@ -1328,6 +1328,7 @@ read-only: the file system remains the way to make the server do anything.
 |--------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `ActiveFeeds`                                    | How many feeds can load, having both a readable `delivery.properties` and a readable spec. A feed that drops out of this number has lost one of the two - `Feeds` says which.        |
 | `LoadsInProgress`                                | Files being loaded at this moment. Bounded by `xldr.maxConcurrentLoads`.                                                                                                             |
+| `Reconciliations`                                | Sweeps attempted since startup - roots reconciled, then every active feed's inbox scanned - one per `xldr.scanInterval` and one at startup. This is the liveness gauge: every other number here also stops moving on a quiet morning, and only this one tells a stopped watcher from an idle one. A sweep that threw still counts, so it answers whether the server looked rather than whether it liked what it found. |
 | `LoadsSucceeded`, `LoadsFailed`, `RecordsLoaded` | Counted since the process started, so they are rates to be differenced.                                                                                                              |
 | `LastLoad`, `LastFailure`                        | Instants, or empty. A `LastLoad` that stops advancing on a feed that should be busy is the quiet failure worth catching.                                                             |
 | `FilesWaiting`                                   | Files sitting in the `in/` of any registered feed, pending ones included. Should fall back to zero; a number that does not is a feed not claiming what arrives - a delivery rule that matches nothing, or a feed still waiting for its spec. |

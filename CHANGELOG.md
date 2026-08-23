@@ -8,7 +8,32 @@ The versions are the git tags `xldr-<version>`; the published artifacts carry th
 
 ## 0.39
 
+A release about what an adapter owes its caller. The input adapter SPI's contract is written down for the first
+time, and `tck` - a new published module - makes six of its ten obligations executable, so an implementation can be
+run against them rather than compared by eye against five examples. The server MXBean also gains the gauge that
+tells a watcher which has stopped looking from one with nothing to do.
+
+The mapping-spec format is unchanged, so `mapping-spec-0.35` remains its schema and a spec that loaded under 0.38
+loads under 0.39. The one breaking entry touches an embedder who builds `ServerStatus` themselves and nobody else.
+
+### Breaking
+
+- **`ServerStatus`'s constructor and `register` take a third argument**, a `LongSupplier` for the watcher's sweep
+  count. Only an embedder building the bean itself is affected; `Watcher` passes its own counter.
+
 ### Added
+
+- **`Reconciliations` on the server MXBean**: how many sweeps the watcher has attempted since it started, one per
+  scan interval and one at startup. It is the liveness gauge the bean was missing - every other number on it also
+  stops moving on a quiet morning, so nothing there could tell a watcher that had stopped looking from one with
+  nothing to do. A sweep that threw still counts, the question being whether the server looked rather than whether
+  it liked what it found.
+
+  It came out of the integration tests, which is worth admitting: four of them asserted that *nothing* happened,
+  and an absence cannot be awaited, so each slept three seconds - twelve seconds of the suite spent proving a
+  negative by the clock, with a number that was a guess and would have had to grow if the scan interval ever did.
+  They now wait for two sweeps and assert against those. The gauge earns its place on the bean independently, but
+  the tests are what noticed it was missing.
 
 - **The adapter SPI's contract is written down**, in the package documentation of `io.github.ralfspoeth.xldr.ia`:
   ten obligations, each with the reason it exists, and the surface an adapter actually needs - six types from `ia`
