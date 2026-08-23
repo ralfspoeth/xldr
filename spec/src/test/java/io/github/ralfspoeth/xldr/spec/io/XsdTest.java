@@ -28,7 +28,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * The schema is the one served from GitHub Pages, read from the repository so
  * that the file the author downloads is the file tested here.
  */
-public class XsdTest {
+class XsdTest {
 
     private static final Path SCHEMA = Path.of("..", "docs", "schema", "mapping-spec-0.35.xsd");
 
@@ -77,7 +77,7 @@ public class XsdTest {
      * valid is one the server can actually load.
      */
     @Test
-    public void theCompleteSpecIsValidAndReadable() {
+    void theCompleteSpecIsValidAndReadable() {
         assertDoesNotThrow(() -> validate(COMPLETE_SPEC));
 
         var spec = new XmlMappingSpecReader().read(stream(COMPLETE_SPEC));
@@ -92,7 +92,7 @@ public class XsdTest {
      * which is the drift this class exists to catch.
      */
     @Test
-    public void aFieldSelectorMayCountInsteadOfNaming() {
+    void aFieldSelectorMayCountInsteadOfNaming() {
         var xml = """
                 <mappingSpec>
                     <input mimeType="text/csv">
@@ -119,7 +119,7 @@ public class XsdTest {
      * refused by an editor before it is ever read.
      */
     @Test
-    public void theSchemaTypesNthAsANumber() {
+    void theSchemaTypesNthAsANumber() {
         assertThrows(Exception.class, () -> validate("""
                 <mappingSpec>
                     <input mimeType="text/csv">
@@ -136,7 +136,7 @@ public class XsdTest {
      * are of its kind.
      */
     @Test
-    public void aRecordSelectorMayCarryADiscriminator() {
+    void aRecordSelectorMayCarryADiscriminator() {
         var xml = """
                 <mappingSpec>
                     <input mimeType="text/csv">
@@ -168,7 +168,7 @@ public class XsdTest {
      * A minimal spec - only what is required - validates too.
      */
     @Test
-    public void aMinimalSpecIsValid() {
+    void aMinimalSpecIsValid() {
         assertDoesNotThrow(() -> validate("""
                 <mappingSpec>
                     <input mimeType="text/csv"/>
@@ -183,7 +183,7 @@ public class XsdTest {
      * nothing to locate. The adapters that do need one say so themselves.
      */
     @Test
-    public void aRecordSelectorMayOmitItsSelector() {
+    void aRecordSelectorMayOmitItsSelector() {
         var xml = """
                 <mappingSpec>
                     <input mimeType="text/csv">
@@ -207,7 +207,7 @@ public class XsdTest {
      * as a matter of course.
      */
     @Test
-    public void commentsAreAllowed() {
+    void commentsAreAllowed() {
         assertDoesNotThrow(() -> validate("""
                 <mappingSpec>
                     <!-- why this feed exists -->
@@ -224,7 +224,7 @@ public class XsdTest {
      * an unknown attribute usually is.
      */
     @Test
-    public void aCommentAttributeIsAllowedEverywhereAndIgnored() {
+    void aCommentAttributeIsAllowedEverywhereAndIgnored() {
         var xml = """
                 <mappingSpec comment="the fund feed">
                     <input mimeType="text/csv" comment="delivered nightly">
@@ -253,7 +253,7 @@ public class XsdTest {
      * the spec now that it belongs to the feed's delivery.properties.
      */
     @Test
-    public void catchesTheMistakesItShould() {
+    void catchesTheMistakesItShould() {
         assertAllInvalid("""
                 <mappingSpec>
                     <input/>

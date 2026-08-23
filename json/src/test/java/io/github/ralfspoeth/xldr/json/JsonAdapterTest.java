@@ -19,7 +19,7 @@ import java.util.stream.Collectors;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.junit.jupiter.api.Assertions.*;
 
-public class JsonAdapterTest {
+class JsonAdapterTest {
 
     private static final String MIME = "application/json";
 
@@ -61,7 +61,7 @@ public class JsonAdapterTest {
      * field selector reads a member of it.
      */
     @Test
-    public void readsTheElementsOfAnArray() throws IOException {
+    void readsTheElementsOfAnArray() throws IOException {
         var spec = spec("orders",
                 new FieldSelectorSpec("id", "id", DataType.TEXT),
                 new FieldSelectorSpec("qty", "qty", DataType.INTEGRAL));
@@ -88,7 +88,7 @@ public class JsonAdapterTest {
      * member of a record.
      */
     @Test
-    public void followsNestedPaths() throws IOException {
+    void followsNestedPaths() throws IOException {
         var spec = spec("data/orders",
                 new FieldSelectorSpec("id", "id", DataType.TEXT),
                 new FieldSelectorSpec("city", "customer/address/city", DataType.TEXT));
@@ -111,7 +111,7 @@ public class JsonAdapterTest {
      * number keeps its exact value rather than going through a double.
      */
     @Test
-    public void convertsAccordingToTheDeclaredType() throws IOException {
+    void convertsAccordingToTheDeclaredType() throws IOException {
         var spec = spec("rows",
                 new FieldSelectorSpec("txt", "txt", DataType.TEXT),
                 new FieldSelectorSpec("num", "num", DataType.INTEGRAL),
@@ -146,7 +146,7 @@ public class JsonAdapterTest {
      * A member that is absent, and one that is JSON null, are both absent values.
      */
     @Test
-    public void treatsAbsentAndNullMembersAsNull() throws IOException {
+    void treatsAbsentAndNullMembersAsNull() throws IOException {
         var spec = spec("rows",
                 new FieldSelectorSpec("id", "id", DataType.TEXT),
                 new FieldSelectorSpec("note", "note", DataType.TEXT),
@@ -175,7 +175,7 @@ public class JsonAdapterTest {
      * lived.
      */
     @Test
-    public void refusesAnumberThatIsNotAwholeIntegral() throws IOException {
+    void refusesAnumberThatIsNotAwholeIntegral() throws IOException {
         var spec = spec("rows", new FieldSelectorSpec("qty", "qty", DataType.INTEGRAL));
 
         var fraction = assertThrows(RuntimeException.class,
@@ -201,7 +201,7 @@ public class JsonAdapterTest {
      * literal may carry a decimal point and still be an integer.
      */
     @Test
-    public void awholeNumberLoadsHoweverItIsWritten() throws IOException {
+    void awholeNumberLoadsHoweverItIsWritten() throws IOException {
         var spec = spec("rows", new FieldSelectorSpec("qty", "qty", DataType.INTEGRAL));
 
         var rows = adapter(spec, Map.of()).parse(in("""
@@ -215,7 +215,7 @@ public class JsonAdapterTest {
      * Values carried as strings still honor the feed's patterns.
      */
     @Test
-    public void appliesTheConfiguredFormats() throws IOException {
+    void appliesTheConfiguredFormats() throws IOException {
         var spec = spec("rows",
                 new FieldSelectorSpec("day", "day", DataType.DATE),
                 new FieldSelectorSpec("amount", "amount", DataType.DECIMAL));
@@ -241,7 +241,7 @@ public class JsonAdapterTest {
      * looks like.
      */
     @Test
-    public void readsAtopLevelArray() throws IOException {
+    void readsAtopLevelArray() throws IOException {
         var spec = spec(Locator.every(), new FieldSelectorSpec("id", "id", DataType.TEXT));
 
         var result = adapter(spec, Map.of())
@@ -262,7 +262,7 @@ public class JsonAdapterTest {
      * which leaves exactly one way to say "every record" - saying nothing.
      */
     @Test
-    public void refusesAblankSelector() {
+    void refusesAblankSelector() {
         var thrown = assertThrows(IllegalArgumentException.class,
                 () -> spec("", new FieldSelectorSpec("id", "id", DataType.TEXT)));
         assertTrue(thrown.getMessage().contains("blank"), thrown.getMessage());
@@ -273,7 +273,7 @@ public class JsonAdapterTest {
      * yields exactly one record.
      */
     @Test
-    public void readsASingleObjectAsOneRecord() throws IOException {
+    void readsASingleObjectAsOneRecord() throws IOException {
         var spec = spec("data/order", new FieldSelectorSpec("id", "id", DataType.TEXT));
 
         var result = adapter(spec, Map.of()).parse(in("""
@@ -288,7 +288,7 @@ public class JsonAdapterTest {
      * negative one - the pointer syntax of Greyson, in both kinds of selector.
      */
     @Test
-    public void addressesArrayElementsByIndex() throws IOException {
+    void addressesArrayElementsByIndex() throws IOException {
         var spec = spec("batches/[-1]/rows",
                 new FieldSelectorSpec("id", "id", DataType.TEXT),
                 new FieldSelectorSpec("first", "tags/[0]", DataType.TEXT));
@@ -316,7 +316,7 @@ public class JsonAdapterTest {
      * one.
      */
     @Test
-    public void countsTheElementsOfAnArrayRecord() throws IOException {
+    void countsTheElementsOfAnArrayRecord() throws IOException {
         var spec = spec("rows",
                 new FieldSelectorSpec("id", new Selector.Nth(1), DataType.TEXT),
                 new FieldSelectorSpec("name", new Selector.Nth(2), DataType.TEXT),
@@ -346,7 +346,7 @@ public class JsonAdapterTest {
      * document can say.
      */
     @Test
-    public void countingAnObjectRecordYieldsNull() throws IOException {
+    void countingAnObjectRecordYieldsNull() throws IOException {
         var spec = spec("rows",
                 new FieldSelectorSpec("counted", new Selector.Nth(1), DataType.TEXT),
                 new FieldSelectorSpec("named", "id", DataType.TEXT));
@@ -371,7 +371,7 @@ public class JsonAdapterTest {
      * reported success, with the filter the author wrote silently dropped.
      */
     @Test
-    public void rejectsAdiscriminator() {
+    void rejectsAdiscriminator() {
         var spec = new InputSpec(MIME, List.of(new RecordSelectorSpec("rec",
                 new Locator.Where(new Discriminator.Equals(new Selector.Nth(1), "O")),
                 List.of(new FieldSelectorSpec("id", "id", DataType.TEXT)))), List.of(), Map.of());
@@ -393,7 +393,7 @@ public class JsonAdapterTest {
      * is opened rather than as an empty column afterwards.
      */
     @Test
-    public void refusesAnRfc6901Selector() {
+    void refusesAnRfc6901Selector() {
         var record = assertThrows(IllegalArgumentException.class,
                 () -> adapter(spec("/orders", new FieldSelectorSpec("id", "id", DataType.TEXT)), Map.of()));
         var field = assertThrows(IllegalArgumentException.class,
@@ -411,7 +411,7 @@ public class JsonAdapterTest {
      * is not second-guessed into an index.
      */
     @Test
-    public void abareNumberIsStillAmemberName() throws IOException {
+    void abareNumberIsStillAmemberName() throws IOException {
         var spec = spec("rows/0", new FieldSelectorSpec("id", "id", DataType.TEXT));
 
         var result = adapter(spec, Map.of()).parse(in("""
@@ -422,7 +422,7 @@ public class JsonAdapterTest {
     }
 
     @Test
-    public void rejectsAnUnknownRecordSelector() {
+    void rejectsAnUnknownRecordSelector() {
         var spec = spec("rows", new FieldSelectorSpec("id", "id", DataType.TEXT));
         var adapter = adapter(spec, Map.of());
         assertThrows(IllegalArgumentException.class,

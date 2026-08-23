@@ -19,7 +19,7 @@ import static java.nio.charset.StandardCharsets.ISO_8859_1;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.junit.jupiter.api.Assertions.*;
 
-public class FixedLengthAdapterTest {
+class FixedLengthAdapterTest {
 
     private static final String MIME = "text/plain";
 
@@ -63,7 +63,7 @@ public class FixedLengthAdapterTest {
      * bounds rather than an error.
      */
     @Test
-    public void cutsColumnsAtExplicitBounds() throws IOException {
+    void cutsColumnsAtExplicitBounds() throws IOException {
         var spec = spec(
                 new FieldSelectorSpec("id", "0:3", DataType.TEXT),
                 new FieldSelectorSpec("name", "3:8", DataType.TEXT));
@@ -89,7 +89,7 @@ public class FixedLengthAdapterTest {
      * null rather than an error.
      */
     @Test
-    public void stripsPaddingAndToleratesShortLines() throws IOException {
+    void stripsPaddingAndToleratesShortLines() throws IOException {
         var spec = spec(
                 new FieldSelectorSpec("name", "0:8", DataType.TEXT),
                 new FieldSelectorSpec("qty", "8:12", DataType.INTEGRAL),
@@ -113,7 +113,7 @@ public class FixedLengthAdapterTest {
      * layout can be written as a list of end positions.
      */
     @Test
-    public void continuesFromThePreviousFieldWhenLeftIsOmitted() throws IOException {
+    void continuesFromThePreviousFieldWhenLeftIsOmitted() throws IOException {
         var spec = spec(
                 new FieldSelectorSpec("a", ":3", DataType.TEXT),
                 new FieldSelectorSpec("b", ":6", DataType.TEXT),
@@ -134,7 +134,7 @@ public class FixedLengthAdapterTest {
      * exposed fields and in the parsed row.
      */
     @Test
-    public void convertsAccordingToTheDeclaredType() throws IOException {
+    void convertsAccordingToTheDeclaredType() throws IOException {
         var spec = spec(
                 new FieldSelectorSpec("txt", "0:3", DataType.TEXT),
                 new FieldSelectorSpec("num", "3:6", DataType.INTEGRAL),
@@ -163,7 +163,7 @@ public class FixedLengthAdapterTest {
      * declares more.
      */
     @Test
-    public void exposesOnlyTheRequestedFields() throws IOException {
+    void exposesOnlyTheRequestedFields() throws IOException {
         var spec = spec(
                 new FieldSelectorSpec("id", "0:3", DataType.TEXT),
                 new FieldSelectorSpec("name", "3:8", DataType.TEXT));
@@ -179,7 +179,7 @@ public class FixedLengthAdapterTest {
      * second line.
      */
     @Test
-    public void joinsSeveralLinesIntoOneRecord() throws IOException {
+    void joinsSeveralLinesIntoOneRecord() throws IOException {
         var spec = spec(
                 new FieldSelectorSpec("id", "0:3", DataType.TEXT),
                 new FieldSelectorSpec("city", "3:9", DataType.TEXT));
@@ -205,7 +205,7 @@ public class FixedLengthAdapterTest {
      * The charset is honored when decoding the input.
      */
     @Test
-    public void decodesWithTheConfiguredCharset() throws IOException {
+    void decodesWithTheConfiguredCharset() throws IOException {
         var spec = spec(new FieldSelectorSpec("s", "0:5", DataType.TEXT));
         var latin1 = new ByteArrayInputStream("Grüße".getBytes(ISO_8859_1));
 
@@ -227,7 +227,7 @@ public class FixedLengthAdapterTest {
      * Not a garbled value - a garbled record, and one that still parses.
      */
     @Test
-    public void decodesAsUtf8WhenTheSpecSaysNothing() throws IOException {
+    void decodesAsUtf8WhenTheSpecSaysNothing() throws IOException {
         var spec = spec(
                 new FieldSelectorSpec("city", "0:6", DataType.TEXT),
                 new FieldSelectorSpec("id", "6:9", DataType.TEXT));
@@ -252,7 +252,7 @@ public class FixedLengthAdapterTest {
      * A selector that is not a {@code left:right} pair names itself in the error.
      */
     @Test
-    public void rejectsAmalformedSelector() {
+    void rejectsAmalformedSelector() {
         var spec = spec(new FieldSelectorSpec("id", "0-3", DataType.TEXT));
         assertThrows(IllegalArgumentException.class, () -> adapter(spec, Map.of()));
     }
@@ -263,7 +263,7 @@ public class FixedLengthAdapterTest {
      * the adapter is built, and told which of the two it is.
      */
     @Test
-    public void rejectsAcolumn() {
+    void rejectsAcolumn() {
         var spec = spec(new FieldSelectorSpec("id", new Selector.Nth(1), DataType.TEXT));
         var thrown = assertThrows(IllegalArgumentException.class, () -> adapter(spec, Map.of()));
         assertAll(
@@ -280,7 +280,7 @@ public class FixedLengthAdapterTest {
      * fixture in this very class carried {@code "rec"} for exactly that reason.
      */
     @Test
-    public void rejectsAselectorOnTheRecordSelector() {
+    void rejectsAselectorOnTheRecordSelector() {
         var spec = new InputSpec(MIME, List.of(new RecordSelectorSpec("rec", new Locator.At("//record"),
                 List.of(new FieldSelectorSpec("id", "0:3", DataType.TEXT)))), List.of(), Map.of());
         var thrown = assertThrows(IllegalArgumentException.class, () -> adapter(spec, Map.of()));
@@ -298,7 +298,7 @@ public class FixedLengthAdapterTest {
      * like this could not be loaded at all.
      */
     @Test
-    public void twoRecordSelectorsPartitionTheFile() throws IOException {
+    void twoRecordSelectorsPartitionTheFile() throws IOException {
         var spec = new InputSpec(MIME, List.of(
                 new RecordSelectorSpec("orders",
                         new Locator.Where(new Discriminator.Equals(new Selector.Text("0:2"), "OR")),
@@ -350,7 +350,7 @@ public class FixedLengthAdapterTest {
      * is the only thing that says so.
      */
     @Test
-    public void theRunningLeftBoundDoesNotCrossRecordSelectors() throws IOException {
+    void theRunningLeftBoundDoesNotCrossRecordSelectors() throws IOException {
         var spec = new InputSpec(MIME, List.of(
                 new RecordSelectorSpec("first",
                         new Locator.Where(new Discriminator.Equals(new Selector.Text("0:1"), "A")),
@@ -371,7 +371,7 @@ public class FixedLengthAdapterTest {
      * the single-record-type file every earlier test in this class uses.
      */
     @Test
-    public void noDiscriminatorTakesEveryRecord() throws IOException {
+    void noDiscriminatorTakesEveryRecord() throws IOException {
         var rows = adapter(spec(new FieldSelectorSpec("id", "0:3", DataType.TEXT)), Map.of())
                 .parse(in("001\n002\n003\n"), "rec", Set.of("id"))
                 .rows().toList();
@@ -390,7 +390,7 @@ public class FixedLengthAdapterTest {
      * one file's rows in another file's table.
      */
     @Test
-    public void arecordTooShortToDiscriminateBelongsToNoKind() throws IOException {
+    void arecordTooShortToDiscriminateBelongsToNoKind() throws IOException {
         var spec = new InputSpec(MIME, List.of(
                 new RecordSelectorSpec("orders",
                         new Locator.Where(new Discriminator.Equals(new Selector.Text("0:2"), "OR")),
@@ -418,7 +418,7 @@ public class FixedLengthAdapterTest {
      * not: a fixed-length record has offsets and no components.
      */
     @Test
-    public void rejectsAcountingDiscriminator() {
+    void rejectsAcountingDiscriminator() {
         var spec = new InputSpec(MIME, List.of(new RecordSelectorSpec("rec",
                 new Locator.Where(new Discriminator.Equals(new Selector.Nth(1), "A")),
                 List.of(new FieldSelectorSpec("id", "0:3", DataType.TEXT)))), List.of(), Map.of());
@@ -434,7 +434,7 @@ public class FixedLengthAdapterTest {
      * from the field before; a discriminator has no field before it.
      */
     @Test
-    public void rejectsAdiscriminatorRangeWithoutAleftBound() {
+    void rejectsAdiscriminatorRangeWithoutAleftBound() {
         var spec = new InputSpec(MIME, List.of(new RecordSelectorSpec("rec",
                 new Locator.Where(new Discriminator.Equals(new Selector.Text(":2"), "A")),
                 List.of(new FieldSelectorSpec("id", "0:3", DataType.TEXT)))), List.of(), Map.of());
@@ -447,7 +447,7 @@ public class FixedLengthAdapterTest {
      * between.
      */
     @Test
-    public void rejectsTwoRecordSelectorsOfOneName() {
+    void rejectsTwoRecordSelectorsOfOneName() {
         var spec = new InputSpec(MIME, List.of(
                 new RecordSelectorSpec("rec",
                         Locator.every(), List.of(new FieldSelectorSpec("a", "0:3", DataType.TEXT))),
@@ -466,7 +466,7 @@ public class FixedLengthAdapterTest {
      * one checks a mapping's record selector against the input's.
      */
     @Test
-    public void rejectsAnUndeclaredRecordSelector() {
+    void rejectsAnUndeclaredRecordSelector() {
         var adapter = adapter(spec(new FieldSelectorSpec("id", "0:3", DataType.TEXT)), Map.of());
         var thrown = assertThrows(IllegalArgumentException.class,
                 () -> adapter.parse(in("001\n"), "nope", Set.of("id")));
@@ -483,7 +483,7 @@ public class FixedLengthAdapterTest {
      * the field.
      */
     @Test
-    public void rejectsAnUndeclaredField() {
+    void rejectsAnUndeclaredField() {
         var adapter = adapter(spec(new FieldSelectorSpec("id", "0:3", DataType.TEXT)), Map.of());
         var thrown = assertThrows(IllegalArgumentException.class,
                 () -> adapter.parse(in("001\n"), "rec", Set.of("id", "qty")).rows().toList());

@@ -9,10 +9,10 @@ import java.util.Map;
 import static io.github.ralfspoeth.xldr.spec.io.Streams.stream;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
-public class XmlMappingSpecReaderTest {
+class XmlMappingSpecReaderTest {
 
     @Test
-    public void readsAcompleteSpec() {
+    void readsAcompleteSpec() {
         var source = """
                 <?xml version='1.0'?>
                 <mappingSpec>
@@ -70,7 +70,7 @@ public class XmlMappingSpecReaderTest {
      * A spec carrying only an input parses, with no record selectors or mappings.
      */
     @Test
-    public void parsesAnInputOnlySpec() {
+    void parsesAnInputOnlySpec() {
         var source = """
                 <mappingSpec>
                     <input mimeType="text/csv"/>
@@ -86,7 +86,7 @@ public class XmlMappingSpecReaderTest {
      * one with a {@code var} attribute.
      */
     @Test
-    public void parsesVarsAndAVarReference() {
+    void parsesVarsAndAVarReference() {
         var source = """
                 <mappingSpec>
                     <input mimeType="text/csv">

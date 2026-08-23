@@ -11,7 +11,7 @@ import java.util.Map;
 import static io.github.ralfspoeth.xldr.spec.io.Streams.stream;
 import static org.junit.jupiter.api.Assertions.*;
 
-public class JsonValueSourceTest {
+class JsonValueSourceTest {
 
     /**
      * A field mapping is one of fieldSelector / constant / var; a JSON constant
@@ -19,7 +19,7 @@ public class JsonValueSourceTest {
      * record mapping's limit is read.
      */
     @Test
-    public void readsSourcesAndLimit() throws IOException {
+    void readsSourcesAndLimit() throws IOException {
         var source = """
                 {
                     "input": { "mimeType": "text/csv" },
@@ -58,7 +58,7 @@ public class JsonValueSourceTest {
      * and a key that is itself a basic source.
      */
     @Test
-    public void readsAlookup() throws IOException {
+    void readsAlookup() throws IOException {
         var source = """
                 {
                     "input": { "mimeType": "text/csv" },
@@ -91,7 +91,7 @@ public class JsonValueSourceTest {
     }
 
     @Test
-    public void defaultsLimitToNull() throws IOException {
+    void defaultsLimitToNull() throws IOException {
         var source = """
                 {
                     "input": { "mimeType": "text/csv" },
@@ -109,7 +109,7 @@ public class JsonValueSourceTest {
     }
 
     @Test
-    public void rejectsTwoSourcesInOneMapping() {
+    void rejectsTwoSourcesInOneMapping() {
         var source = """
                 {
                     "input": { "mimeType": "text/csv" },
@@ -133,7 +133,7 @@ public class JsonValueSourceTest {
      * mapping.
      */
     @Test
-    public void readsAnExpression() throws IOException {
+    void readsAnExpression() throws IOException {
         var source = """
                 {
                     "input": { "mimeType": "text/csv",
@@ -165,7 +165,7 @@ public class JsonValueSourceTest {
      * it has to go on being ignored rather than becoming an error.
      */
     @Test
-    public void ignoresUnknownMembers() throws IOException {
+    void ignoresUnknownMembers() throws IOException {
         var bare = """
                 {
                     "input": { "mimeType": "text/csv",
@@ -202,7 +202,7 @@ public class JsonValueSourceTest {
      * so a number or a boolean may be written as one.
      */
     @Test
-    public void readsAdapterSettingsFromTheInput() throws IOException {
+    void readsAdapterSettingsFromTheInput() throws IOException {
         var source = """
                 {
                     "input": {
@@ -235,7 +235,7 @@ public class JsonValueSourceTest {
      * for having none - which is how a missing member and a null one differ.
      */
     @Test
-    public void readsANullConstant() throws IOException {
+    void readsANullConstant() throws IOException {
         var source = """
                 {
                     "input": { "mimeType": "text/csv" },
@@ -268,7 +268,7 @@ public class JsonValueSourceTest {
      * have to be pointed at refuse by name.
      */
     @Test
-    public void readsARecordSelectorWithoutASelector() throws IOException {
+    void readsARecordSelectorWithoutASelector() throws IOException {
         var source = """
                 {
                     "input": {
@@ -296,7 +296,7 @@ public class JsonValueSourceTest {
      * the same reason: a spec that cannot load should not be readable.
      */
     @Test
-    public void refusesTwoFieldMappingsOntoOneColumn() {
+    void refusesTwoFieldMappingsOntoOneColumn() {
         var source = """
                 {
                     "input": { "mimeType": "text/csv" },
@@ -323,7 +323,7 @@ public class JsonValueSourceTest {
      * insert above.
      */
     @Test
-    public void refusesTwoSpellingsOfOneUnquotedColumn() {
+    void refusesTwoSpellingsOfOneUnquotedColumn() {
         var source = """
                 {
                     "input": { "mimeType": "text/csv" },
@@ -345,7 +345,7 @@ public class JsonValueSourceTest {
      * {@code "Name"} has two columns, and a spec is entitled to write both.
      */
     @Test
-    public void allowsAquotedColumnBesideItsUnquotedNamesake() throws IOException {
+    void allowsAquotedColumnBesideItsUnquotedNamesake() throws IOException {
         var source = """
                 {
                     "input": { "mimeType": "text/csv" },
@@ -367,7 +367,7 @@ public class JsonValueSourceTest {
      * from different kinds of record.
      */
     @Test
-    public void allowsOneColumnInTwoDifferentMappings() throws IOException {
+    void allowsOneColumnInTwoDifferentMappings() throws IOException {
         var source = """
                 {
                     "input": { "mimeType": "text/csv" },
@@ -393,7 +393,7 @@ public class JsonValueSourceTest {
      * might say, and a reader is the only thing that reads spec files.
      */
     @Test
-    public void refusesASelectorAndADiscriminatorTogether() {
+    void refusesASelectorAndADiscriminatorTogether() {
         var source = """
                 {
                     "input": {

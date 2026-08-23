@@ -25,12 +25,12 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
  * {@code test1.xml} is parsed with XPath selectors, and the records are inserted
  * by the {@code Loader} - input fields and a spec constant in one insert.
  */
-public class EndToEndIT {
+class EndToEndIT {
 
     private static final String JDBC_URL = "jdbc:h2:mem:it;DB_CLOSE_DELAY=-1";
 
     @Test
-    public void loadsXmlThroughTheAdapterIntoH2() throws Exception {
+    void loadsXmlThroughTheAdapterIntoH2() throws Exception {
         var spec = readSpec("spec1.json");
 
         try (var conn = getConnection(JDBC_URL);

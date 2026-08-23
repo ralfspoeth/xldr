@@ -26,7 +26,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * threads - so this belongs beside the command it tests rather than among the
  * integration tests, and runs under surefire.
  */
-public class StartupTest {
+class StartupTest {
 
     private static int run(StringWriter err, String... args) {
         var cmd = new CommandLine(new App()).setErr(new PrintWriter(err));

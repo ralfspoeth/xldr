@@ -18,7 +18,7 @@ import java.util.Set;
 import static java.util.Objects.requireNonNull;
 import static org.junit.jupiter.api.Assertions.*;
 
-public class CsvFileHandlerTest {
+class CsvFileHandlerTest {
 
     /** comma separated, one record per line */
     private static final Map<String, String> COMMAS =
@@ -115,7 +115,7 @@ public class CsvFileHandlerTest {
     }
 
     @Test
-    public void parsesSelectedFields() throws IOException {
+    void parsesSelectedFields() throws IOException {
         try (var in = getClass().getResourceAsStream("simple.csv")) {
             var result = adapter().parse(requireNonNull(in), "people", Set.of("id", "name"));
 
@@ -137,7 +137,7 @@ public class CsvFileHandlerTest {
     }
 
     @Test
-    public void parsesHeaderlessWithRaggedLines() throws IOException {
+    void parsesHeaderlessWithRaggedLines() throws IOException {
         try (var in = getClass().getResourceAsStream("positional.csv")) {
             var result = positionalAdapter().parse(requireNonNull(in), "people", Set.of("1", "2", "3"));
 
@@ -183,7 +183,7 @@ public class CsvFileHandlerTest {
      * line, and in header mode that column then matched no field at all.
      */
     @Test
-    public void readsEveryLineEndingTheSameWay() throws IOException {
+    void readsEveryLineEndingTheSameWay() throws IOException {
         for (var terminator : List.of("\n", "\r\n", "\r")) {
             var csv = String.join(terminator, "id,name", "1,Alice", "2,Bob") + terminator;
             var result = adapter().parse(
@@ -207,7 +207,7 @@ public class CsvFileHandlerTest {
      * rather than as text.
      */
     @Test
-    public void convertsAccordingToTheDeclaredType() throws IOException {
+    void convertsAccordingToTheDeclaredType() throws IOException {
         var spec = spec(COMMAS,
                 new RecordSelectorSpec("people", Locator.every(), List.of(
                         new FieldSelectorSpec("id", "id", DataType.INTEGRAL),
@@ -243,7 +243,7 @@ public class CsvFileHandlerTest {
     }
 
     @Test
-    public void selectsOnlyMatchingRecordType() throws IOException {
+    void selectsOnlyMatchingRecordType() throws IOException {
         try (var in = getClass().getResourceAsStream("discriminated.csv")) {
             var result = discriminatedAdapter().parse(requireNonNull(in), "orders", Set.of("2", "3", "4"));
 
@@ -268,7 +268,7 @@ public class CsvFileHandlerTest {
      * as the field needs, which is what a spreadsheet export looks like.
      */
     @Test
-    public void readsQuotedFields() throws IOException {
+    void readsQuotedFields() throws IOException {
         var csv = """
                 id,name,note
                 1,"Doe, Alice","she said ""no""!"
@@ -294,7 +294,7 @@ public class CsvFileHandlerTest {
      * quotation reads as it did before quoting was understood at all.
      */
     @Test
-    public void aQuoteInsideAFieldIsAnOrdinaryCharacter() throws IOException {
+    void aQuoteInsideAFieldIsAnOrdinaryCharacter() throws IOException {
         var csv = """
                 id,name,note
                 1,5" pipe,he said "no" twice
@@ -312,7 +312,7 @@ public class CsvFileHandlerTest {
      * values do start with a quote and mean it literally.
      */
     @Test
-    public void quotingCanBeSwitchedOff() throws IOException {
+    void quotingCanBeSwitchedOff() throws IOException {
         var spec = spec(Map.of("fieldSeparator", ",", "quote", ""),
                 new RecordSelectorSpec("people", Locator.every(), List.of(
                         new FieldSelectorSpec("id", "id", DataType.TEXT),
@@ -329,7 +329,7 @@ public class CsvFileHandlerTest {
      * it is instead, and the message names the line that opened it.
      */
     @Test
-    public void reportsAnUnterminatedQuote() {
+    void reportsAnUnterminatedQuote() {
         var csv = """
                 id,name,note
                 1,"unclosed,note
@@ -348,7 +348,7 @@ public class CsvFileHandlerTest {
      * be a headerless read of a file that has a header.
      */
     @Test
-    public void headerMaybeSaidToBePresentOrAbsent() throws IOException {
+    void headerMaybeSaidToBePresentOrAbsent() throws IOException {
         var withHeader = spec(Map.of("fieldSeparator", ",", "header", "present"),
                 new RecordSelectorSpec("people", Locator.every(), List.of(
                         new FieldSelectorSpec("id", "id", DataType.TEXT),
@@ -373,7 +373,7 @@ public class CsvFileHandlerTest {
      * line.
      */
     @Test
-    public void anEmptyLineIsSkippedOrStopsTheData() throws IOException {
+    void anEmptyLineIsSkippedOrStopsTheData() throws IOException {
         var csv = """
                 id,name,note
                 1,Alice,a
@@ -399,7 +399,7 @@ public class CsvFileHandlerTest {
      * to find the header.
      */
     @Test
-    public void readsComments() throws IOException {
+    void readsComments() throws IOException {
         var commented = spec(Map.of("fieldSeparator", ",", "comment", "#"),
                 new RecordSelectorSpec("people", Locator.every(), List.of(
                         new FieldSelectorSpec("id", "id", DataType.TEXT),
@@ -428,7 +428,7 @@ public class CsvFileHandlerTest {
      * with a hash.
      */
     @Test
-    public void withoutTheSettingAcommentCharacterIsData() throws IOException {
+    void withoutTheSettingAcommentCharacterIsData() throws IOException {
         var rows = rowsOf(SPEC_WITH_NOTE, "id,name,note\n1,Alice,#12345\n", "id", "name", "note");
         assertEquals("#12345", rows.getFirst().get("note"));
     }
@@ -441,7 +441,7 @@ public class CsvFileHandlerTest {
      * every other adapter allows - read nothing but nulls.
      */
     @Test
-    public void aFieldsSelectorNamesTheColumn() throws IOException {
+    void aFieldsSelectorNamesTheColumn() throws IOException {
         var spec = spec(Map.of("fieldSeparator", ";"),
                 new RecordSelectorSpec("people", Locator.every(), List.of(
                         new FieldSelectorSpec("n1", "Name", DataType.TEXT),
@@ -470,7 +470,7 @@ public class CsvFileHandlerTest {
      * kind of selector and was one only because of a property elsewhere.
      */
     @Test
-    public void aFieldCountsItsComponentWithoutAheader() throws IOException {
+    void aFieldCountsItsComponentWithoutAheader() throws IOException {
         var spec = spec(Map.of("fieldSeparator", ";", "header", "absent"),
                 new RecordSelectorSpec("people", Locator.every(), List.of(
                         new FieldSelectorSpec("name", new Selector.Nth(3), DataType.TEXT),
@@ -491,7 +491,7 @@ public class CsvFileHandlerTest {
      * that is how a column is renamed, or given a type.
      */
     @Test
-    public void takesUndeclaredFieldsFromTheHeader() throws IOException {
+    void takesUndeclaredFieldsFromTheHeader() throws IOException {
         var spec = spec(Map.of("fieldSeparator", ";", "fieldsFromHeader", "true"),
                 new RecordSelectorSpec("people", Locator.every(), List.of(
                         new FieldSelectorSpec("who", "Name", DataType.TEXT)
@@ -517,7 +517,7 @@ public class CsvFileHandlerTest {
      * has claimed is deliberate.
      */
     @Test
-    public void anUndeclaredFieldIsNothingWithoutTheProperty() throws IOException {
+    void anUndeclaredFieldIsNothingWithoutTheProperty() throws IOException {
         var spec = spec(Map.of("fieldSeparator", ";"),
                 new RecordSelectorSpec("people", Locator.every(), List.of(
                         new FieldSelectorSpec("who", "Name", DataType.TEXT)
@@ -535,7 +535,7 @@ public class CsvFileHandlerTest {
      * this is refused rather than left to resolve nothing.
      */
     @Test
-    public void fieldsFromHeaderNeedsAheader() {
+    void fieldsFromHeaderNeedsAheader() {
         var spec = spec(Map.of("fieldSeparator", ";", "header", "absent", "fieldsFromHeader", "true"),
                 new RecordSelectorSpec("people", Locator.every(), List.of()));
         assertThrows(IllegalArgumentException.class, () -> adapterFor(spec));
@@ -548,7 +548,7 @@ public class CsvFileHandlerTest {
      * this is the only one that would notice the default changing.
      */
     @Test
-    public void theDefaultsAreTheOnesRfc4180Registers() throws IOException {
+    void theDefaultsAreTheOnesRfc4180Registers() throws IOException {
         var spec = spec(Map.of(),
                 new RecordSelectorSpec("people", Locator.every(), List.of(
                         new FieldSelectorSpec("id", "id", DataType.TEXT),
@@ -573,7 +573,7 @@ public class CsvFileHandlerTest {
      * rather than against the platform, which this test cannot change.
      */
     @Test
-    public void theDefaultCharsetIsUtf8() throws IOException {
+    void theDefaultCharsetIsUtf8() throws IOException {
         var csv = "id,name\n1,Müller\n";
         var spec = spec(Map.of(),
                 new RecordSelectorSpec("people", Locator.every(), List.of(
@@ -599,7 +599,7 @@ public class CsvFileHandlerTest {
      * nulls and a load reporting success.
      */
     @Test
-    public void aSelectorNamingNoColumnIsRefused() {
+    void aSelectorNamingNoColumnIsRefused() {
         var spec = spec(Map.of(),
                 new RecordSelectorSpec("people", Locator.every(), List.of(
                         new FieldSelectorSpec("id", "id", DataType.TEXT),
@@ -622,7 +622,7 @@ public class CsvFileHandlerTest {
      * nothing needs escaping and a double quote is an ordinary character.
      */
     @Test
-    public void tabSeparatedValuesNeedsNoPropertiesAtAll() throws IOException {
+    void tabSeparatedValuesNeedsNoPropertiesAtAll() throws IOException {
         var spec = new InputSpec("text/tab-separated-values",
                 List.of(new RecordSelectorSpec("people", Locator.every(), List.of(
                         new FieldSelectorSpec("id", "id", DataType.TEXT),
@@ -644,7 +644,7 @@ public class CsvFileHandlerTest {
      * calling it right; the message points at the type that does allow it.
      */
     @Test
-    public void tabSeparatedValuesRefusesAspecThatContradictsIt() {
+    void tabSeparatedValuesRefusesAspecThatContradictsIt() {
         assertAll(
                 () -> assertEquals("\t", tsvSeparatorOf(Map.of("fieldSeparator", "\t")),
                         "saying what the type says is allowed"),
@@ -685,7 +685,7 @@ public class CsvFileHandlerTest {
      * impossible.
      */
     @Test
-    public void countingWorksEvenWhereTheColumnsHaveNames() {
+    void countingWorksEvenWhereTheColumnsHaveNames() {
         var counted = spec(Map.of(),
                 new RecordSelectorSpec("people", Locator.every(), List.of(
                         new FieldSelectorSpec("second", new Selector.Nth(2), DataType.TEXT))));
@@ -709,7 +709,7 @@ public class CsvFileHandlerTest {
      * which said nothing about what to do instead.
      */
     @Test
-    public void aNameNeedsAHeaderToNameSomethingIn() {
+    void aNameNeedsAHeaderToNameSomethingIn() {
         var spec = spec(Map.of("header", "absent"),
                 new RecordSelectorSpec("people", Locator.every(), List.of(
                         new FieldSelectorSpec("who", "name", DataType.TEXT))));
@@ -726,7 +726,7 @@ public class CsvFileHandlerTest {
      * is nothing to check against, and a short line is simply short.
      */
     @Test
-    public void countingPastTheHeaderIsRefused() {
+    void countingPastTheHeaderIsRefused() {
         var spec = spec(Map.of(),
                 new RecordSelectorSpec("people", Locator.every(), List.of(
                         new FieldSelectorSpec("far", new Selector.Nth(9), DataType.TEXT))));
@@ -741,7 +741,7 @@ public class CsvFileHandlerTest {
      * the file that showed the old first-column-only rule was too narrow.
      */
     @Test
-    public void aDiscriminatorMayNameItsColumnInAHeadedFile() throws IOException {
+    void aDiscriminatorMayNameItsColumnInAHeadedFile() throws IOException {
         var spec = spec(Map.of(),
                 new RecordSelectorSpec("ones", new Locator.Where(new Discriminator.Equals(new Selector.Text("A"), "1")),
                         List.of(new FieldSelectorSpec("b", "B", DataType.TEXT))));
@@ -764,7 +764,7 @@ public class CsvFileHandlerTest {
      * sharing a prefix needs.
      */
     @Test
-    public void aDiscriminatorMayMatchAPattern() throws IOException {
+    void aDiscriminatorMayMatchAPattern() throws IOException {
         var spec = spec(Map.of("header", "absent"),
                 new RecordSelectorSpec("orders",
                         new Locator.Where(Discriminator.matching(new Selector.Nth(1), "O[0-9]+")),
@@ -789,7 +789,7 @@ public class CsvFileHandlerTest {
      * a great many rows.
      */
     @Test
-    public void aFlatRecordSelectorWithASelectorIsRefused() {
+    void aFlatRecordSelectorWithASelectorIsRefused() {
         var spec = spec(Map.of("header", "absent"),
                 new RecordSelectorSpec("orders", new Locator.At("O"), List.of(at(2))));
         var thrown = assertThrows(IllegalArgumentException.class,
@@ -810,7 +810,7 @@ public class CsvFileHandlerTest {
      * declares, so this call is where the two names first meet.
      */
     @Test
-    public void anUndeclaredRecordSelectorIsRefused() {
+    void anUndeclaredRecordSelectorIsRefused() {
         var spec = spec(Map.of(), new RecordSelectorSpec("people", Locator.every(),
                 List.of(new FieldSelectorSpec("id", "id", DataType.TEXT))));
         var thrown = assertThrows(IllegalArgumentException.class,
@@ -840,7 +840,7 @@ public class CsvFileHandlerTest {
     }
 
     @Test
-    public void sameFileYieldsDifferentRecordType() throws IOException {
+    void sameFileYieldsDifferentRecordType() throws IOException {
         try (var in = getClass().getResourceAsStream("discriminated.csv")) {
             var result = discriminatedAdapter().parse(requireNonNull(in), "lines", Set.of("2", "3", "4", "5"));
 

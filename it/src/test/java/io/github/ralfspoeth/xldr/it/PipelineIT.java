@@ -34,7 +34,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
  *   <li>a {@code lookup} translating a code field to a surrogate key.</li>
  * </ul>
  */
-public class PipelineIT {
+class PipelineIT {
 
     private static final String JDBC_URL = "jdbc:h2:mem:pipeline;DB_CLOSE_DELAY=-1";
 
@@ -79,7 +79,7 @@ public class PipelineIT {
             """;
 
     @Test
-    public void loadsCsvWithVarsExpressionsAndLookups() throws Exception {
+    void loadsCsvWithVarsExpressionsAndLookups() throws Exception {
         try (var conn = getConnection(JDBC_URL);
              var stmt = conn.createStatement()) {
             stmt.execute("drop table if exists order_line");

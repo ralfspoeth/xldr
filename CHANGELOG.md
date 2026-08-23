@@ -14,11 +14,21 @@ The versions are the git tags `xldr-<version>`; the published artifacts carry th
   the test classes into the module instead, which is what it does when a module has no test module of its own.
   `DataTypeTest` and `SelectorTest` sit in `spec`; the six reader tests and the `Streams` helper in `spec.io`.
 
-  Nothing became less visible today - every public type in `spec` is used by another module already, and
-  `SpecNode`, the one type used nowhere outside its own module, was package-private the whole time. The point is
-  the pressure rather than the present state: with a test in a `.test` package of its own, the cheapest way to make
+  No production type became less visible - every public type in `spec` is used by another module already, and
+  `SpecNode`, the one used nowhere outside its own module, was package-private the whole time. The point is the
+  pressure rather than the present state: with a test in a `.test` package of its own, the cheapest way to make
   anything testable was to make it public, and that is how an API surface grows by accident before a 1.0 freezes
   it. A test beside its subject can reach a package-private member and nobody has to decide anything.
+
+  The test surface itself did shrink, once the moves were done: **twenty test classes and 178 test methods are
+  package-private now**, which is all JUnit 5 has ever required and all that being in a separate module was
+  preventing. `public` on a test says the same thing as `public` on anything else - somebody outside may call this -
+  and of a test that is never true. The four fixture helpers, `Streams`, `Feeds`, `Proxies` and
+  `AnsweringConnection`, were already package-private with no public members.
+
+  The integration tests went the same way, `*IT` being a surefire-versus-failsafe naming rule rather than a
+  category of visibility. One thing stays public on purpose: `XldrServletIT.Deployed`, which is a servlet class an
+  embedded container instantiates by name.
 
   **The five adapters followed**, `csv`, `xml`, `xlsx`, `json` and `flt`, and there the patching forced one change
   to the tests. Each called `ServiceLoader.load(InputAdapterFactory.class)` in its own code, and a module may only

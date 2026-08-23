@@ -37,7 +37,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * between the setup and the run unless kept alive by a connection nobody in the
  * command holds.
  */
-public class CheckIT {
+class CheckIT {
 
     private static final Path DB = Path.of("target", "check-it");
     private static final String JDBC_URL = "jdbc:h2:./" + DB;
@@ -149,7 +149,7 @@ public class CheckIT {
     void findsArecordSelectorTheInputDoesNotDeclare(@TempDir Path dir) throws IOException {
         var run = check(dir, SPEC.formatted("custmoers", "balance"), SAMPLE);
         assertAll(
-                () -> assertFalse(run.exitCode() == 0, "should have found something"),
+                () -> assertNotEquals(0, run.exitCode(), "should have found something"),
                 () -> assertTrue(run.reports("custmoers"), run.out()),
                 () -> assertTrue(run.reports("does not declare"), run.out()),
                 // and says what the input does declare, which is the fix
@@ -164,7 +164,7 @@ public class CheckIT {
     void findsAcolumnTheTableHasNotGot(@TempDir Path dir) throws IOException {
         var run = check(dir, SPEC.formatted("customers", "blance"), SAMPLE);
         assertAll(
-                () -> assertFalse(run.exitCode() == 0, "should have found something"),
+                () -> assertNotEquals(0, run.exitCode(), "should have found something"),
                 () -> assertTrue(run.reports("blance"), run.out()),
                 () -> assertTrue(run.reports("BALANCE"),
                         "and lists the columns the table has: " + run.out()));
@@ -182,7 +182,7 @@ public class CheckIT {
                         "\"name\": \"customers\", \"discriminator\": { \"selector\": \"name\", \"equals\": \"Nobody\" },");
         var run = check(dir, discriminated, SAMPLE);
         assertAll(
-                () -> assertFalse(run.exitCode() == 0, "should have found something"),
+                () -> assertNotEquals(0, run.exitCode(), "should have found something"),
                 () -> assertTrue(run.reports("matches nothing"), run.out()),
                 () -> assertTrue(run.reports("0 record(s) matched"), run.out()));
     }
@@ -200,7 +200,7 @@ public class CheckIT {
     void findsAlookupAgainstAtableThatIsNotThere(@TempDir Path dir) throws IOException {
         var run = check(dir, withLookup("regoin", "id", "city"), SAMPLE);
         assertAll(
-                () -> assertFalse(run.exitCode() == 0, "should have found something"),
+                () -> assertNotEquals(0, run.exitCode(), "should have found something"),
                 () -> assertTrue(run.reports("regoin"), run.out()),
                 () -> assertTrue(run.reports("not in the target database"), run.out()));
     }
@@ -243,7 +243,7 @@ public class CheckIT {
                         "recordSelectors":""");
         var run = check(dir, spec, SAMPLE);
         assertAll(
-                () -> assertFalse(run.exitCode() == 0, "should have found something"),
+                () -> assertNotEquals(0, run.exitCode(), "should have found something"),
                 () -> assertTrue(run.reports("regoin"), run.out()));
     }
 
@@ -297,7 +297,7 @@ public class CheckIT {
         var run = check(dir, SPEC.formatted("customers", "balance"), SAMPLE,
                 "--same-as", xml(dir, "wrong.xml", wrong));
         assertAll(
-                () -> assertFalse(run.exitCode() == 0, "should have found something"),
+                () -> assertNotEquals(0, run.exitCode(), "should have found something"),
                 () -> assertTrue(run.reports("differs"), run.out()),
                 () -> assertTrue(run.reports("mapping 'customers'"), run.out()));
     }
@@ -315,7 +315,7 @@ public class CheckIT {
         var run = check(dir, SPEC.formatted("customers", "balance"), SAMPLE,
                 "--same-as", xml(dir, "broken.xml", "<mappingSpec><input"));
         assertAll(
-                () -> assertFalse(run.exitCode() == 0, "should have found something"),
+                () -> assertNotEquals(0, run.exitCode(), "should have found something"),
                 () -> assertTrue(run.reports("broken.xml"), run.out() + run.err()),
                 () -> assertTrue(run.reports("nothing was compared"), run.out()));
     }

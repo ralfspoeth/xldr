@@ -24,13 +24,13 @@ import static org.junit.jupiter.api.Assertions.*;
  * one reader for a name it should read, and none at all for a name neither
  * format owns.
  */
-public class MappingSpecReaderTest {
+class MappingSpecReaderTest {
 
     private static final MappingSpecReader JSON = new JsonMappingSpecReader();
     private static final MappingSpecReader XML = new XmlMappingSpecReader();
 
     @Test
-    public void eachReaderTakesItsOwnExtension() {
+    void eachReaderTakesItsOwnExtension() {
         assertAll(
                 () -> assertTrue(JSON.accepts(Path.of("spec.json"))),
                 () -> assertFalse(JSON.accepts(Path.of("spec.xml"))),
@@ -46,7 +46,7 @@ public class MappingSpecReaderTest {
      * addressed by its full path.
      */
     @Test
-    public void aSpecDeepInAtreeIsStillTakenByItsName() {
+    void aSpecDeepInAtreeIsStillTakenByItsName() {
         assertAll(
                 () -> assertTrue(JSON.accepts(Path.of("var", "lib", "xldr", "people", "spec.json"))),
                 () -> assertTrue(XML.accepts(Path.of("var", "lib", "xldr", "funds", "spec.xml")))
@@ -59,7 +59,7 @@ public class MappingSpecReaderTest {
      * happened to be asked first.
      */
     @Test
-    public void refusesAnameNeitherFormatOwns() {
+    void refusesAnameNeitherFormatOwns() {
         for (var name : List.of("spec.txt", "spec", "specjson", "spec.json.bak", "spec.xml.tmp")) {
             var path = Path.of(name);
             assertAll(
@@ -76,7 +76,7 @@ public class MappingSpecReaderTest {
      * would notice going missing.
      */
     @Test
-    public void findsTheReaderForAspecFile() {
+    void findsTheReaderForAspecFile() {
         assertAll(
                 () -> assertInstanceOf(JsonMappingSpecReader.class,
                         MappingSpecReader.of(Path.of("people", "spec.json")).orElseThrow()),
@@ -93,7 +93,7 @@ public class MappingSpecReaderTest {
      * a caller with a spec file in hand names the file and gets the spec.
      */
     @Test
-    public void readsAspecFileInEitherFormat(@TempDir Path dir) throws IOException {
+    void readsAspecFileInEitherFormat(@TempDir Path dir) throws IOException {
         var json = Files.writeString(dir.resolve("spec.json"), """
                 {
                   "input": { "mimeType": "text/csv", "recordSelectors": [ { "name": "people",
@@ -126,7 +126,7 @@ public class MappingSpecReaderTest {
      * lives in one place, so the two cannot answer differently.
      */
     @Test
-    public void aLimitIsAWholeNumberInEitherFormat() {
+    void aLimitIsAWholeNumberInEitherFormat() {
         assertAll(
                 () -> assertRefused(() -> JSON.read(bytes("""
                         { "input": { "mimeType": "text/csv", "recordSelectors": [] },
@@ -157,7 +157,7 @@ public class MappingSpecReaderTest {
      * about a format the file was never in.
      */
     @Test
-    public void refusesToReadAnUnknownFormat(@TempDir Path dir) throws IOException {
+    void refusesToReadAnUnknownFormat(@TempDir Path dir) throws IOException {
         var file = Files.writeString(dir.resolve("spec.txt"), "{}");
         var thrown = assertThrows(IllegalArgumentException.class, () -> readSpec(file));
         assertTrue(thrown.getMessage().contains("unsupported"), thrown.getMessage());
@@ -168,7 +168,7 @@ public class MappingSpecReaderTest {
      * not an argument problem: the format was fine, the file was not there.
      */
     @Test
-    public void reportsAmissingFileAsIo(@TempDir Path dir) {
+    void reportsAmissingFileAsIo(@TempDir Path dir) {
         assertThrows(NoSuchFileException.class,
                 () -> readSpec(dir.resolve("spec.json")));
     }

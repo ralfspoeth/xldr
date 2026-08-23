@@ -21,13 +21,13 @@ import java.util.stream.Stream;
 import static org.junit.jupiter.api.Assertions.*;
 
 
-public class LoaderTest {
+class LoaderTest {
 
     private String jdbcUrl;
 
 
     @BeforeEach
-    public void prepareConn() throws SQLException {
+    void prepareConn() throws SQLException {
         jdbcUrl = ResourceBundle.getBundle("h2").getString("url");
         try (var conn = DriverManager.getConnection(jdbcUrl);
              var stmt = conn.createStatement()) {
@@ -42,7 +42,7 @@ public class LoaderTest {
      * so the remaining ones stay null rather than being forced to null.
      */
     @Test
-    public void loadsSeveralMappingsIntoTheSameTable() throws Exception {
+    void loadsSeveralMappingsIntoTheSameTable() throws Exception {
         // column order deliberately differs from the natural one: name before id
         var people = new RecordMappingSpec("people", "person", List.of(
                 new FieldMappingSpec("name", new ValueSource.Field("name")),
@@ -94,7 +94,7 @@ public class LoaderTest {
      * dropped or double-sent final partial batch would show.
      */
     @Test
-    public void loadsMoreRecordsThanOneBatch() throws Exception {
+    void loadsMoreRecordsThanOneBatch() throws Exception {
         var mapping = new RecordMappingSpec("people", "person", List.of(
                 new FieldMappingSpec("id", new ValueSource.Field("id")),
                 new FieldMappingSpec("name", new ValueSource.Field("name"))
@@ -132,7 +132,7 @@ public class LoaderTest {
      * it closed behind it.
      */
     @Test
-    public void reusesTheStatementOfTwoIdenticalMappings() throws Exception {
+    void reusesTheStatementOfTwoIdenticalMappings() throws Exception {
         var columns = List.of(
                 new FieldMappingSpec("id", new ValueSource.Field("id")),
                 new FieldMappingSpec("name", new ValueSource.Field("name")));
@@ -164,7 +164,7 @@ public class LoaderTest {
      * locatable to within a thousand records.
      */
     @Test
-    public void namesTheRecordThatFailed() throws Exception {
+    void namesTheRecordThatFailed() throws Exception {
         try (var conn = DriverManager.getConnection(jdbcUrl);
              var stmt = conn.createStatement()) {
             stmt.execute("drop table if exists narrow");
@@ -198,7 +198,7 @@ public class LoaderTest {
      * - is named just as one the database rejects.
      */
     @Test
-    public void namesTheRecordThatCouldNotBeRead() throws Exception {
+    void namesTheRecordThatCouldNotBeRead() throws Exception {
         var mapping = new RecordMappingSpec("people", "person", List.of(
                 new FieldMappingSpec("id", new ValueSource.Field("id"))
         ), null);
@@ -207,7 +207,7 @@ public class LoaderTest {
         // the adapter throws while producing the third record
         InputAdapter adapter = (source, recordSelector, fieldSelectors) -> new Result(
                 List.of(new Field("id", String.class)),
-                Stream.of(1, 2, 3).map(i -> (Row) name -> {
+                Stream.of(1, 2, 3).map(i -> name -> {
                     if (i == 3) {
                         throw new IllegalArgumentException("not a number: xyz");
                     }
@@ -228,7 +228,7 @@ public class LoaderTest {
      * back instead of committing.
      */
     @Test
-    public void rollsBackWhenAMappingFails() throws Exception {
+    void rollsBackWhenAMappingFails() throws Exception {
         var good = new RecordMappingSpec("people", "person", List.of(
                 new FieldMappingSpec("id", new ValueSource.Field("id"))
         ), null);
@@ -256,7 +256,7 @@ public class LoaderTest {
      * A mapping that does not belong to the loader's own spec is rejected.
      */
     @Test
-    public void rejectsForeignMapping() throws Exception {
+    void rejectsForeignMapping() throws Exception {
         var known = new RecordMappingSpec("people", "person", List.of(
                 new FieldMappingSpec("id", new ValueSource.Field("id"))
         ), null);
@@ -280,7 +280,7 @@ public class LoaderTest {
      * the row, the constant from the spec, and every row carries it.
      */
     @Test
-    public void insertsFieldsAndConstants() throws Exception {
+    void insertsFieldsAndConstants() throws Exception {
         try (var conn = DriverManager.getConnection(jdbcUrl);
              var stmt = conn.createStatement()) {
             stmt.execute("drop table if exists event");
@@ -319,7 +319,7 @@ public class LoaderTest {
      * looked up from a reference table and stamped onto each row.
      */
     @Test
-    public void bindsALookupVarToEveryRow() throws Exception {
+    void bindsALookupVarToEveryRow() throws Exception {
         try (var conn = DriverManager.getConnection(jdbcUrl);
              var stmt = conn.createStatement()) {
             stmt.execute("drop table if exists batch");
@@ -361,7 +361,7 @@ public class LoaderTest {
      * evaluated once, so every row carries the same generated id.
      */
     @Test
-    public void expressionGeneratesAnIdOncePerLoad() throws Exception {
+    void expressionGeneratesAnIdOncePerLoad() throws Exception {
         try (var conn = DriverManager.getConnection(jdbcUrl);
              var stmt = conn.createStatement()) {
             stmt.execute("drop table if exists doc");
@@ -399,7 +399,7 @@ public class LoaderTest {
      * {@code nextval} placeholder keeps its integer type.
      */
     @Test
-    public void expressionNumbersRowsWithNextval() throws Exception {
+    void expressionNumbersRowsWithNextval() throws Exception {
         try (var conn = DriverManager.getConnection(jdbcUrl);
              var stmt = conn.createStatement()) {
             stmt.execute("drop table if exists seq_rows");
@@ -436,7 +436,7 @@ public class LoaderTest {
      * separator.
      */
     @Test
-    public void expressionFormatsATimestampAsText() throws Exception {
+    void expressionFormatsATimestampAsText() throws Exception {
         try (var conn = DriverManager.getConnection(jdbcUrl);
              var stmt = conn.createStatement()) {
             stmt.execute("drop table if exists stamped");
@@ -471,7 +471,7 @@ public class LoaderTest {
      * just as a bare reference would be.
      */
     @Test
-    public void expressionParsesAFieldIntoADate() throws Exception {
+    void expressionParsesAFieldIntoADate() throws Exception {
         try (var conn = DriverManager.getConnection(jdbcUrl);
              var stmt = conn.createStatement()) {
             stmt.execute("drop table if exists dated");
@@ -505,7 +505,7 @@ public class LoaderTest {
      * call would be refused for the arity the author did in fact write.
      */
     @Test
-    public void expressionFunctionsSeeANullArgument() throws Exception {
+    void expressionFunctionsSeeANullArgument() throws Exception {
         try (var conn = DriverManager.getConnection(jdbcUrl);
              var stmt = conn.createStatement()) {
             stmt.execute("drop table if exists absent");
@@ -538,7 +538,7 @@ public class LoaderTest {
      * start still governs the first draw.
      */
     @Test
-    public void expressionSequenceHonoursStartAndIncrement() throws Exception {
+    void expressionSequenceHonoursStartAndIncrement() throws Exception {
         try (var conn = DriverManager.getConnection(jdbcUrl);
              var stmt = conn.createStatement()) {
             stmt.execute("drop table if exists inc_rows");
@@ -572,7 +572,7 @@ public class LoaderTest {
      * keyed here by an input field. A key that matches no row yields SQL NULL.
      */
     @Test
-    public void resolvesLookups() throws Exception {
+    void resolvesLookups() throws Exception {
         try (var conn = DriverManager.getConnection(jdbcUrl);
              var stmt = conn.createStatement()) {
             stmt.execute("drop table if exists country");
@@ -617,7 +617,7 @@ public class LoaderTest {
      * A record mapping with a limit inserts at most that many rows.
      */
     @Test
-    public void honoursTheRowLimit() throws Exception {
+    void honoursTheRowLimit() throws Exception {
         var mapping = new RecordMappingSpec("people", "person", List.of(
                 new FieldMappingSpec("id", new ValueSource.Field("id")),
                 new FieldMappingSpec("name", new ValueSource.Field("name"))
@@ -656,7 +656,7 @@ public class LoaderTest {
      * tutorial says to declare the column with one.
      */
     @Test
-    public void nowReachesAzonedColumnAsTheSameInstant() throws Exception {
+    void nowReachesAzonedColumnAsTheSameInstant() throws Exception {
         try (var conn = DriverManager.getConnection(jdbcUrl);
              var stmt = conn.createStatement()) {
             stmt.execute("drop table if exists arrival");
@@ -712,7 +712,7 @@ public class LoaderTest {
      * other would pass every test that only inserts.
      */
     @Test
-    public void loadsIntoTheSchemaTheTargetNames() throws Exception {
+    void loadsIntoTheSchemaTheTargetNames() throws Exception {
         try (var conn = DriverManager.getConnection(jdbcUrl);
              var stmt = conn.createStatement()) {
             for (var schema : List.of("staging", "elsewhere")) {
@@ -762,7 +762,7 @@ public class LoaderTest {
      * the price of putting the rendering behind a {@link java.sql.Connection}.
      */
     @Test
-    public void qualifiesWithWhicheverPartsTheTargetHas() throws Exception {
+    void qualifiesWithWhicheverPartsTheTargetHas() throws Exception {
         try (var conn = DriverManager.getConnection(jdbcUrl);
              var stmt = conn.createStatement()) {
             stmt.execute("drop schema if exists mixed cascade");
@@ -794,7 +794,7 @@ public class LoaderTest {
      * false, has no driver in this build to exercise it.
      */
     @Test
-    public void aschemaThatIsNotThereFailsTheLoadRatherThanTheRow() throws Exception {
+    void aschemaThatIsNotThereFailsTheLoadRatherThanTheRow() throws Exception {
         var mapping = new RecordMappingSpec("people", "person", List.of(
                 new FieldMappingSpec("id", new ValueSource.Field("id"))), null);
         var spec = new MappingSpec(

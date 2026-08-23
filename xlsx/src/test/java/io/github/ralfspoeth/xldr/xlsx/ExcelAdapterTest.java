@@ -19,7 +19,7 @@ import java.util.Set;
 import static java.util.Objects.requireNonNull;
 import static org.junit.jupiter.api.Assertions.*;
 
-public class ExcelAdapterTest {
+class ExcelAdapterTest {
 
     private static final String XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 
@@ -41,7 +41,7 @@ public class ExcelAdapterTest {
      * the row above the record.
      */
     @Test
-    public void readsAcellRectangleWithTypesAndaRelativeSelector() throws IOException {
+    void readsAcellRectangleWithTypesAndaRelativeSelector() throws IOException {
         var xlsx = workbook(sheet -> {
             header(sheet, 0, "id", "name", "amount");
             dataRow(sheet, 1, 1d, "Alice", 1.5d);
@@ -84,7 +84,7 @@ public class ExcelAdapterTest {
      * columns, and a wholly empty row is skipped.
      */
     @Test
-    public void readsAcolumnRangeByIndexSkippingEmptyRows() throws IOException {
+    void readsAcolumnRangeByIndexSkippingEmptyRows() throws IOException {
         var xlsx = workbook(sheet -> {
             dataRow(sheet, 0, 10d, "x");
             dataRow(sheet, 1, 20d, "y");
@@ -123,7 +123,7 @@ public class ExcelAdapterTest {
      * complaint belongs to it.
      */
     @Test
-    public void rejectsAdiscriminator() {
+    void rejectsAdiscriminator() {
         var spec = new InputSpec(XLSX, List.of(new RecordSelectorSpec("rows",
                 new Locator.Where(new Discriminator.Equals(new Selector.Nth(1), "O")),
                 List.of(new FieldSelectorSpec("id", "A", DataType.TEXT)))), List.of(), Map.of());
@@ -134,7 +134,7 @@ public class ExcelAdapterTest {
     }
 
     @Test
-    public void rejectsAmalformedRange() {
+    void rejectsAmalformedRange() {
         var spec = new InputSpec(XLSX, List.of(
                 new RecordSelectorSpec("bad", new Locator.At("A2:C"), List.of())
         ), List.of(), Map.of());
@@ -154,7 +154,7 @@ public class ExcelAdapterTest {
      * unnoticed.
      */
     @Test
-    public void aRangeWithoutAsheetNameReadsTheFirstSheet() throws IOException {
+    void aRangeWithoutAsheetNameReadsTheFirstSheet() throws IOException {
         var xlsx = workbook(sheet -> {
             header(sheet, 0, "id", "name");
             dataRow(sheet, 1, 1d, "Alice");
@@ -194,7 +194,7 @@ public class ExcelAdapterTest {
      * identified, not the n-th of whatever contains it.
      */
     @Test
-    public void nthCountsFromTheRangeAndAdigitSelectorFromTheSheet() throws IOException {
+    void nthCountsFromTheRangeAndAdigitSelectorFromTheSheet() throws IOException {
         var xlsx = workbook(sheet -> {
             header(sheet, 0, "far", "left", "id", "name");
             dataRow(sheet, 1, "A1", "B1", "1", "Alice");

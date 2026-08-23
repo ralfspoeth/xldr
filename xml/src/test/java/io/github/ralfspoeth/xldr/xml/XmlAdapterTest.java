@@ -13,7 +13,7 @@ import java.util.*;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-public class XmlAdapterTest {
+class XmlAdapterTest {
 
     /**
      * {@link InputAdapterFactory#of} rather than {@link java.util.ServiceLoader}
@@ -35,7 +35,7 @@ public class XmlAdapterTest {
      * what they wrote.
      */
     @Test
-    public void rejectsAdiscriminator() {
+    void rejectsAdiscriminator() {
         var spec = new InputSpec("text/xml", List.of(new RecordSelectorSpec("rec",
                 new Locator.Where(new Discriminator.Equals(new Selector.Nth(1), "O")),
                 List.of(new FieldSelectorSpec("id", "@id", DataType.TEXT)))), List.of(), Map.of());
@@ -62,7 +62,7 @@ public class XmlAdapterTest {
      * a valid selector too, which is how a constant column is written.
      */
     @Test
-    public void evaluatesRelativeAbsoluteAndConstantSelectors() throws IOException {
+    void evaluatesRelativeAbsoluteAndConstantSelectors() throws IOException {
         var spec = new InputSpec("text/xml", List.of(
                 new RecordSelectorSpec("row", new Locator.At("/simple1/row"), List.of(
                         new FieldSelectorSpec("cola", "col[@name='a']", DataType.INTEGRAL),
@@ -117,7 +117,7 @@ public class XmlAdapterTest {
      * would be one more thing to remember.
      */
     @Test
-    public void countsChildElementsWhenAFieldSaysNth() throws IOException {
+    void countsChildElementsWhenAFieldSaysNth() throws IOException {
         var spec = new InputSpec("text/xml", List.of(
                 new RecordSelectorSpec("row", new Locator.At("/simple1/row"), List.of(
                         new FieldSelectorSpec("first", new Selector.Nth(1), DataType.INTEGRAL),
@@ -147,7 +147,7 @@ public class XmlAdapterTest {
      * nulls.
      */
     @Test
-    public void yieldsNoRowsWhenNothingMatches() throws IOException {
+    void yieldsNoRowsWhenNothingMatches() throws IOException {
         var spec = new InputSpec("text/xml", List.of(
                 new RecordSelectorSpec("none", new Locator.At("/simple1/nothing"), List.of(
                         new FieldSelectorSpec("cola", "col[@name='a']", DataType.TEXT)
@@ -164,7 +164,7 @@ public class XmlAdapterTest {
      * only be addressed through a bound prefix.
      */
     @Test
-    public void resolvesNamespacePrefixes() throws IOException {
+    void resolvesNamespacePrefixes() throws IOException {
         var spec = new InputSpec("text/xml", List.of(
                 new RecordSelectorSpec("fund", new Locator.At("/f:portfolio/f:fund"), List.of(
                         new FieldSelectorSpec("id", "@id", DataType.TEXT),
@@ -198,7 +198,7 @@ public class XmlAdapterTest {
      * mode worth knowing about when a spec "silently returns no rows".
      */
     @Test
-    public void findsNothingWithoutTheNamespaceBinding() throws IOException {
+    void findsNothingWithoutTheNamespaceBinding() throws IOException {
         var spec = new InputSpec("text/xml", List.of(
                 new RecordSelectorSpec("fund", new Locator.At("/portfolio/fund"), List.of(
                         new FieldSelectorSpec("id", "@id", DataType.TEXT)
@@ -214,7 +214,7 @@ public class XmlAdapterTest {
      * through a load.
      */
     @Test
-    public void rejectsAmalformedExpressionOnCreation() {
+    void rejectsAmalformedExpressionOnCreation() {
         var spec = new InputSpec("text/xml", List.of(
                 new RecordSelectorSpec("row", new Locator.At("/simple1/row["), List.of())
         ), List.of(), Map.of());
@@ -227,7 +227,7 @@ public class XmlAdapterTest {
      * spec and says so.
      */
     @Test
-    public void rejectsAnUndeclaredFieldSelector() throws IOException {
+    void rejectsAnUndeclaredFieldSelector() throws IOException {
         var spec = new InputSpec("text/xml", List.of(
                 new RecordSelectorSpec("row", new Locator.At("/simple1/row"), List.of(
                         new FieldSelectorSpec("cola", "col[@name='a']", DataType.TEXT)

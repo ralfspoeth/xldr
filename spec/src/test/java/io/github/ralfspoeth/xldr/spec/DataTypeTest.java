@@ -8,13 +8,13 @@ import java.time.LocalDateTime;
 import static java.util.Objects.requireNonNull;
 import static org.junit.jupiter.api.Assertions.*;
 
-public class DataTypeTest {
+class DataTypeTest {
 
     /**
      * Each type converts to the Java class it declares.
      */
     @Test
-    public void parsesEachType() {
+    void parsesEachType() {
         assertAll(
                 () -> assertEquals("abc", DataType.TEXT.parse("abc")),
                 () -> assertEquals(42L, DataType.INTEGRAL.parse("42")),
@@ -30,7 +30,7 @@ public class DataTypeTest {
      * carries dates without a time of day needs no pattern of its own.
      */
     @Test
-    public void acceptsAplainIsoDate() {
+    void acceptsAplainIsoDate() {
         assertAll(
                 () -> assertEquals(LocalDateTime.of(2026, 7, 22, 0, 0),
                         DataType.DATE.parse("2026-07-22")),
@@ -44,7 +44,7 @@ public class DataTypeTest {
      * an unpadded one, for every type.
      */
     @Test
-    public void stripsBeforeConverting() {
+    void stripsBeforeConverting() {
         assertAll(
                 () -> assertEquals("abc", DataType.TEXT.parse("  abc  ")),
                 () -> assertEquals(42L, DataType.INTEGRAL.parse("   42")),
@@ -58,7 +58,7 @@ public class DataTypeTest {
      * numeric types, where a blank column is a missing value, not a zero.
      */
     @Test
-    public void treatsNullAndBlankAsAbsent() {
+    void treatsNullAndBlankAsAbsent() {
         for (var type : DataType.values()) {
             assertNull(type.parse(null), type + " of null");
             assertNull(type.parse(""), type + " of empty");
@@ -70,7 +70,7 @@ public class DataTypeTest {
      * Text that is not a value of the type is an error, not a silent null.
      */
     @Test
-    public void rejectsMalformedValues() {
+    void rejectsMalformedValues() {
         assertAll(
                 () -> assertThrows(RuntimeException.class, () -> DataType.INTEGRAL.parse("x")),
                 () -> assertThrows(RuntimeException.class, () -> DataType.DECIMAL.parse("1,5")),
@@ -82,7 +82,7 @@ public class DataTypeTest {
      * The declared Java class matches what {@code parse} produces.
      */
     @Test
-    public void clazzMatchesTheParsedValue() {
+    void clazzMatchesTheParsedValue() {
         for (var type : DataType.values()) {
             var sample = switch (type) {
                 case TEXT -> "x";

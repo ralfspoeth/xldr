@@ -30,7 +30,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * The schema is read from the repository rather than the classpath, so that the
  * file an author downloads from GitHub Pages is the file tested here.
  */
-public class JsonSchemaTest {
+class JsonSchemaTest {
 
     private static final Path SCHEMA = Path.of("..", "docs", "schema", "mapping-spec-0.35.json");
 
@@ -105,7 +105,7 @@ public class JsonSchemaTest {
      * valid is one the server can actually load.
      */
     @Test
-    public void theCompleteSpecIsValidAndReadable() throws IOException {
+    void theCompleteSpecIsValidAndReadable() throws IOException {
         assertValid(COMPLETE_SPEC);
 
         var spec = new JsonMappingSpecReader().read(stream(COMPLETE_SPEC));
@@ -118,7 +118,7 @@ public class JsonSchemaTest {
      * A minimal spec - only what is required - validates too.
      */
     @Test
-    public void aMinimalSpecIsValid() throws IOException {
+    void aMinimalSpecIsValid() throws IOException {
         assertValid("""
                 { "input": { "mimeType": "text/csv" }, "mapping": [] }
                 """);
@@ -131,7 +131,7 @@ public class JsonSchemaTest {
      * and refuses none; so does this schema, and the XSD can do neither.
      */
     @Test
-    public void aFieldMappingHasOneSource() throws IOException {
+    void aFieldMappingHasOneSource() throws IOException {
         assertRefused("""
                 { "input": { "mimeType": "text/csv" },
                   "mapping": [ { "recordSelector": "r", "table": "t", "fieldMapping": [
@@ -149,7 +149,7 @@ public class JsonSchemaTest {
      * among its sources.
      */
     @Test
-    public void aVarCannotReadAField() throws IOException {
+    void aVarCannotReadAField() throws IOException {
         assertRefused("""
                 { "input": { "mimeType": "text/csv",
                     "vars": [ { "name": "v", "fieldSelector": "id" } ] },
@@ -164,7 +164,7 @@ public class JsonSchemaTest {
      * now the only two things that can catch it, and they should agree.
      */
     @Test
-    public void aRecordSelectorIsNotBothPointedAtAndFiltered() throws IOException {
+    void aRecordSelectorIsNotBothPointedAtAndFiltered() throws IOException {
         var both = """
                 { "input": { "mimeType": "text/csv", "recordSelectors": [
                     { "name": "orders", "selector": "//order",
@@ -186,7 +186,7 @@ public class JsonSchemaTest {
      * Excel adapters refused it, the JSON one resolved it to the whole document.
      */
     @Test
-    public void aSelectorIsNeverBlank() throws IOException {
+    void aSelectorIsNeverBlank() throws IOException {
         for (var blank : List.of("\"\"", "\"   \"")) {
             var spec = """
                     { "input": { "mimeType": "text/csv", "recordSelectors": [
@@ -206,7 +206,7 @@ public class JsonSchemaTest {
      * places a selector appears.
      */
     @Test
-    public void norIsAfieldSelectorOrAdiscriminatorSelector() throws IOException {
+    void norIsAfieldSelectorOrAdiscriminatorSelector() throws IOException {
         assertRefused("""
                 { "input": { "mimeType": "text/csv", "recordSelectors": [
                     { "name": "r", "fieldSelectors": [ { "name": "id", "selector": "" } ] } ] },
@@ -225,7 +225,7 @@ public class JsonSchemaTest {
      * point of refusing blank being that there is one spelling rather than two.
      */
     @Test
-    public void sayingNothingIsHowYouMeanEveryRecord() throws IOException {
+    void sayingNothingIsHowYouMeanEveryRecord() throws IOException {
         var spec = """
                 { "input": { "mimeType": "text/csv", "recordSelectors": [
                     { "name": "people", "fieldSelectors": [ { "name": "id", "selector": "id" } ] } ] },
@@ -246,7 +246,7 @@ public class JsonSchemaTest {
      * every one of its fields without anything saying so.
      */
     @Test
-    public void anUnknownMemberIsRefused() throws IOException {
+    void anUnknownMemberIsRefused() throws IOException {
         assertRefused("""
                 { "input": { "mimeType": "text/csv", "recordSelectors": [
                     { "name": "r", "fieldSelector": [ { "name": "id", "nth": 1 } ] } ] },
@@ -259,7 +259,7 @@ public class JsonSchemaTest {
      * note is sayable where any other unknown member is not.
      */
     @Test
-    public void commentIsAllowedEverywhere() throws IOException {
+    void commentIsAllowedEverywhere() throws IOException {
         assertDoesNotThrow(() -> assertValid("""
                 { "comment": "the nightly delivery",
                   "input": { "mimeType": "text/csv", "comment": "why this feed exists",

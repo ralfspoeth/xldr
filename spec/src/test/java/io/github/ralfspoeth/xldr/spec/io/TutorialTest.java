@@ -44,7 +44,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * what a reader following in order has: each page redefines {@code customer} for
  * its own lesson, page 8's having a balance where page 2's has a city.
  */
-public class TutorialTest {
+class TutorialTest {
 
     private static final Path TUTORIAL = Path.of("..", "docs", "tutorial");
     private static final Path JSON_SCHEMA = Path.of("..", "docs", "schema", "mapping-spec-0.35.json");
@@ -136,7 +136,7 @@ public class TutorialTest {
      * about a second implementation's opinion.
      */
     @Test
-    public void everyJsonSpecValidatesAgainstThePublishedSchema() throws IOException {
+    void everyJsonSpecValidatesAgainstThePublishedSchema() throws IOException {
         var schema = SchemaRegistry.withDefaultDialect(SpecificationVersion.DRAFT_2020_12)
                 .getSchema(Files.readString(JSON_SCHEMA));
         var findings = new ArrayList<String>();
@@ -151,7 +151,7 @@ public class TutorialTest {
 
     /** and every XML one against the XSD, which is page 3 and nothing else today */
     @Test
-    public void everyXmlSpecValidatesAgainstThePublishedSchema() throws Exception {
+    void everyXmlSpecValidatesAgainstThePublishedSchema() throws Exception {
         var schema = SchemaFactory.newInstance(XMLConstants.W3C_XML_SCHEMA_NS_URI)
                 .newSchema(new File(XSD.toString()));
         for (var page : pages()) {
@@ -173,7 +173,7 @@ public class TutorialTest {
      * and a column the target table has not got.
      */
     @Test
-    public void everySpecAgreesWithItsOwnPage() throws IOException {
+    void everySpecAgreesWithItsOwnPage() throws IOException {
         var findings = new ArrayList<String>();
         for (var page : pages()) {
             for (var text : specs(page, "json", "\"input\"")) {
@@ -243,7 +243,7 @@ public class TutorialTest {
      * documentation that makes the promise.
      */
     @Test
-    public void theXmlPageSaysWhatTheJsonPageSaid() throws IOException {
+    void theXmlPageSaysWhatTheJsonPageSaid() throws IOException {
         var byName = pages().stream().collect(Collectors.toMap(Page::name, p -> p));
         var json = specs(byName.get("02-first-spec.md"), "json", "\"input\"");
         var xml = specs(byName.get("03-in-xml.md"), "xml", "<mappingSpec");
@@ -267,7 +267,7 @@ public class TutorialTest {
      * so it would be a poor thing to be prone to.
      */
     @Test
-    public void thePagesActuallyYieldSpecs() throws IOException {
+    void thePagesActuallyYieldSpecs() throws IOException {
         var pages = pages();
         var json = pages.stream().mapToLong(p -> specs(p, "json", "\"input\"").size()).sum();
         var xml = pages.stream().mapToLong(p -> specs(p, "xml", "<mappingSpec").size()).sum();

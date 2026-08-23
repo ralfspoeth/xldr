@@ -7,7 +7,7 @@ import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-public class SentinelTest {
+class SentinelTest {
 
     private static final Path DIR = Path.of("/feed/in");
 
@@ -16,7 +16,7 @@ public class SentinelTest {
      * last dotted suffix.
      */
     @Test
-    public void globStripsTheLastSuffix() {
+    void globStripsTheLastSuffix() {
         var sentinel = Sentinel.parse("glob:*.{ok,ready,done}");
 
         assertTrue(sentinel.isMarker(DIR.resolve("report.csv.done")));
@@ -32,7 +32,7 @@ public class SentinelTest {
      * the name minus its last dotted suffix.
      */
     @Test
-    public void regexStripsTheLastSuffix() {
+    void regexStripsTheLastSuffix() {
         var sentinel = Sentinel.parse("regex:x.*\\.xml\\.done");
 
         assertTrue(sentinel.isMarker(DIR.resolve("x123.xml.done")));
@@ -43,12 +43,12 @@ public class SentinelTest {
     }
 
     @Test
-    public void rejectsAnUnprefixedPattern() {
+    void rejectsAnUnprefixedPattern() {
         assertThrows(IllegalArgumentException.class, () -> Sentinel.parse(".done"));
     }
 
     @Test
-    public void rejectsAnUncompilablePattern() {
+    void rejectsAnUncompilablePattern() {
         assertThrows(IllegalArgumentException.class, () -> Sentinel.parse("regex:(unbalanced"));
     }
 }

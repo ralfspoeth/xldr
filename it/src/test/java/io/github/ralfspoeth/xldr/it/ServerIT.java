@@ -39,7 +39,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * registry or the processor - so this covers the reconcile, register, claim,
  * load and archive path as a whole, including the timing between them.
  */
-public class ServerIT {
+class ServerIT {
 
     private static final String JDBC_URL = "jdbc:h2:mem:appit;DB_CLOSE_DELAY=-1";
     private static final Duration TIMEOUT = Duration.ofSeconds(20);

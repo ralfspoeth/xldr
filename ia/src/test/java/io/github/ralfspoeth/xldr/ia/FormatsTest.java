@@ -9,14 +9,14 @@ import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-public class FormatsTest {
+class FormatsTest {
 
     /**
      * Without any pattern every value is read in its canonical form, exactly as
      * {@link DataType#parse} would.
      */
     @Test
-    public void fallsBackToTheCanonicalForm() {
+    void fallsBackToTheCanonicalForm() {
         var formats = Formats.defaults();
         assertAll(
                 () -> assertEquals("abc", formats.parse(DataType.TEXT, " abc ")),
@@ -33,13 +33,13 @@ public class FormatsTest {
      * start of the day.
      */
     @Test
-    public void appliesADatePattern() {
+    void appliesADatePattern() {
         var formats = Formats.of(Map.of(Formats.DATE_FORMAT, "yyyyMMdd"));
         assertEquals(LocalDateTime.of(2026, 7, 26, 0, 0), formats.parse(DataType.DATE, "20260726"));
     }
 
     @Test
-    public void appliesADatePatternWithATimeOfDay() {
+    void appliesADatePatternWithATimeOfDay() {
         var formats = Formats.of(Map.of(Formats.DATE_FORMAT, "dd.MM.yyyy HH:mm"));
         assertEquals(LocalDateTime.of(2026, 7, 26, 8, 30), formats.parse(DataType.DATE, "26.07.2026 08:30"));
     }
@@ -49,7 +49,7 @@ public class FormatsTest {
      * and grouping separators.
      */
     @Test
-    public void appliesANumberPatternInALocale() {
+    void appliesANumberPatternInALocale() {
         var german = Formats.of(Map.of(
                 Formats.NUMBER_FORMAT, "#,##0.00",
                 Formats.LOCALE, "de-DE"));
@@ -71,7 +71,7 @@ public class FormatsTest {
      * page said it.
      */
     @Test
-    public void readsTheGermanFileOfTutorialPageEight() {
+    void readsTheGermanFileOfTutorialPageEight() {
         var formats = Formats.of(Map.of(
                 Formats.DATE_FORMAT, "dd.MM.yyyy",
                 Formats.NUMBER_FORMAT, "#,##0.00",
@@ -105,7 +105,7 @@ public class FormatsTest {
      * that had very likely been set for the money column beside it.
      */
     @Test
-    public void anIntegralThatIsNotWholeIsRefusedEitherWay() {
+    void anIntegralThatIsNotWholeIsRefusedEitherWay() {
         var german = Formats.of(Map.of(
                 Formats.NUMBER_FORMAT, "#,##0.00",
                 Formats.LOCALE, "de-DE"));
@@ -125,7 +125,7 @@ public class FormatsTest {
      * number loaded as whatever its low bits said.
      */
     @Test
-    public void anIntegralBeyondSixtyFourBitsIsRefused() {
+    void anIntegralBeyondSixtyFourBitsIsRefused() {
         var formats = Formats.of(Map.of(Formats.NUMBER_FORMAT, "#,##0.##"));
         var tooBig = "9999999999999999999999999";
         var thrown = assertThrows(IllegalArgumentException.class,
@@ -142,7 +142,7 @@ public class FormatsTest {
      * where some columns are whole - and {@code 1.00} is exactly one.
      */
     @Test
-    public void awholeNumberUnderAdecimalPatternStillLoads() {
+    void awholeNumberUnderAdecimalPatternStillLoads() {
         var formats = Formats.of(Map.of(Formats.NUMBER_FORMAT, "#,##0.00"));
         assertAll(
                 () -> assertEquals(1L, formats.parse(DataType.INTEGRAL, "1.00")),
@@ -158,7 +158,7 @@ public class FormatsTest {
      * rather than rounding through a double.
      */
     @Test
-    public void keepsDecimalsExact() {
+    void keepsDecimalsExact() {
         var formats = Formats.of(Map.of(Formats.NUMBER_FORMAT, "#,##0.00"));
         assertEquals(new BigDecimal("100000000000000000.01"),
                 formats.parse(DataType.DECIMAL, "100,000,000,000,000,000.01"));
@@ -169,7 +169,7 @@ public class FormatsTest {
      * for every type.
      */
     @Test
-    public void treatsBlankAsAbsent() {
+    void treatsBlankAsAbsent() {
         var formats = Formats.of(Map.of(
                 Formats.DATE_FORMAT, "yyyyMMdd",
                 Formats.NUMBER_FORMAT, "#,##0.00"));
@@ -183,18 +183,18 @@ public class FormatsTest {
      * An absent type reads the value as text.
      */
     @Test
-    public void defaultsAmissingTypeToString() {
+    void defaultsAmissingTypeToString() {
         assertEquals("x", Formats.defaults().parse(null, " x "));
     }
 
     @Test
-    public void rejectsAnInvalidPattern() {
+    void rejectsAnInvalidPattern() {
         assertThrows(IllegalArgumentException.class,
                 () -> Formats.of(Map.of(Formats.DATE_FORMAT, "yyyyQQQQQQ")));
     }
 
     @Test
-    public void reportsUnparsableInput() {
+    void reportsUnparsableInput() {
         var formats = Formats.of(Map.of(Formats.NUMBER_FORMAT, "#,##0.00"));
         assertThrows(RuntimeException.class, () -> formats.parse(DataType.INTEGRAL, "abc"));
     }
