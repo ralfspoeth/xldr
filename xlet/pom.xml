@@ -20,33 +20,12 @@
         forked it - and a fork receives no fix made here.
     -->
 
-    <properties>
-        <!--
-            EE11 is the Jakarta release that carries Servlet 6.1, which is the API
-            this module compiles against - hence the ee11 artifacts and a 12.1 line.
-            Pairing 6.1 with Jetty's ee10 modules would not resolve.
-        -->
-        <jetty.version>12.1.12</jetty.version>
-    </properties>
-
-    <build>
-        <plugins>
-            <!--
-                Bare on purpose, and not removable. The integration-test and
-                verify goals are bound in plumbum's pluginManagement, two poms
-                up, and pluginManagement binds nothing by itself - it supplies
-                version, configuration and executions to a module that declares
-                the plugin. This declaration is that, and inherits the lot.
-                Deleting it leaves the *IT classes matching no surefire pattern
-                and no failsafe execution, so they are not run and nothing says
-                so. `it` carries the same three lines for the same reason.
-            -->
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-failsafe-plugin</artifactId>
-            </plugin>
-        </plugins>
-    </build>
+    <!--
+        No failsafe declaration, because there is no *IT here to run: the servlet's
+        container test is XldrServletIT in the `it` module. That is also why there
+        is no Jetty below - this module is published, and a consumer reading its
+        pom should find the servlet API and xldr, not a container.
+    -->
 
     <dependencies>
         <!-- Greyson -->
@@ -94,18 +73,6 @@
             <groupId>io.github.ralfspoeth.xldr</groupId>
             <artifactId>csv</artifactId>
             <version>${project.version}</version>
-            <scope>test</scope>
-        </dependency>
-        <!--
-            An embedded container for the integration test. Jetty rather than
-            Tomcat: it is built to be embedded, and ServletContextHandler takes a
-            resource base directly - which is what lets the test exercise the real
-            /WEB-INF/specs/ lookup rather than a fake of it.
-        -->
-        <dependency>
-            <groupId>org.eclipse.jetty.ee11</groupId>
-            <artifactId>jetty-ee11-servlet</artifactId>
-            <version>${jetty.version}</version>
             <scope>test</scope>
         </dependency>
     </dependencies>

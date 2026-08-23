@@ -232,13 +232,15 @@ modules by their dependencies:
   `/WEB-INF/specs/`, for a servlet container. It is a peer of `app` rather than a part of `server` - the request *is*
   the delivery, so nothing there watches a directory or claims a file by moving it - and it reaches the same
   `Loader.load` from the other side, and reports what it has loaded through an MXBean of its own, named after the
-  context it is deployed at so that two deployments do not collide. Not published: it is a front end to read and
-  adapt to a deployment, not a library to depend on. Its own README argues the design;
-* `it` - integration tests exercising the whole pipeline end to end against a local H2 database. It depends on
-  `server` and the adapters, not on `app`: a test supplies its own `ConnectionSource` as a lambda, so what is
-  exercised is the server rather than the way the distribution happens to run it. Tests that need no database and no
-  server - where the configuration is looked for, and what is said when it is not there - live in `app` and run
-  under surefire.
+  context it is deployed at so that two deployments do not collide. Published since 0.36, having carried enough by
+  then that a deployment copying it had forked it; its own README argues both the design and the reversal;
+* `it` - integration tests exercising the whole pipeline end to end against a local H2 database, and the only module
+  binding failsafe. It depends on `server` and the adapters, and on the two front ends for the tests that drive
+  them: `CheckIT` runs the shipped command line from `app` rather than the class behind it, and `XldrServletIT`
+  deploys `xlet`'s servlet into an embedded Jetty. Everything else supplies its own `ConnectionSource` as a lambda,
+  so what is exercised is the server rather than the way the distribution happens to run it. Tests that need no
+  database and no server - where the configuration is looked for, and what is said when it is not there - live in
+  `app` and run under surefire.
 
 `revision` is a CI-friendly version property resolved by the `flatten-maven-plugin`, so the installed and deployed POMs
 carry the concrete version rather than a literal `${revision}`.

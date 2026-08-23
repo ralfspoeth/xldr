@@ -10,6 +10,15 @@
     <artifactId>it</artifactId>
     <name>integration tests</name>
 
+    <properties>
+        <!--
+            EE11 is the Jakarta release that carries Servlet 6.1, which is the API
+            xlet compiles against - hence the ee11 artifacts and a 12.1 line.
+            Pairing 6.1 with Jetty's ee10 modules would not resolve.
+        -->
+        <jetty.version>12.1.12</jetty.version>
+    </properties>
+
     <build>
         <plugins>
             <plugin>
@@ -19,7 +28,17 @@
                     <skipPublishing>true</skipPublishing>
                 </configuration>
             </plugin>
-            <!-- bare, and not removable: see the same three lines in xlet -->
+            <!--
+                Bare on purpose, and not removable. The integration-test and
+                verify goals are bound in plumbum's pluginManagement, two poms
+                up, and pluginManagement binds nothing by itself - it supplies
+                version, configuration and executions to a module that declares
+                the plugin. This declaration is that, and inherits the lot.
+                Deleting it leaves every *IT in this module matching no surefire
+                pattern and no failsafe execution, so they are not run and nothing
+                says so. This is now the only module that has one, xlet's having
+                gone with XldrServletIT.
+            -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-failsafe-plugin</artifactId>
@@ -73,6 +92,37 @@
             <groupId>io.github.ralfspoeth.xldr</groupId>
             <artifactId>xlsx</artifactId>
             <version>${project.version}</version>
+        </dependency>
+        <!--
+            XldrServletIT deploys the servlet, so the front end and the API it is
+            written against. jakarta.servlet-api is provided in xlet, which means
+            it does not come along with it and has to be named here; Jetty would
+            drag one in, but the version the test compiles against should be the
+            one xlet compiled against and not whichever the container ships.
+        -->
+        <dependency>
+            <groupId>io.github.ralfspoeth.xldr</groupId>
+            <artifactId>xlet</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>jakarta.servlet</groupId>
+            <artifactId>jakarta.servlet-api</artifactId>
+            <version>6.1.0</version>
+            <scope>test</scope>
+        </dependency>
+        <!--
+            And a container to deploy it into. Jetty rather than Tomcat: it is
+            built to be embedded, a server on an ephemeral port is three lines, and
+            ServletContextHandler takes a resource base directly - which is what
+            lets the test exercise the real /WEB-INF/specs/ lookup rather than a
+            fake of it.
+        -->
+        <dependency>
+            <groupId>org.eclipse.jetty.ee11</groupId>
+            <artifactId>jetty-ee11-servlet</artifactId>
+            <version>${jetty.version}</version>
+            <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>com.h2database</groupId>

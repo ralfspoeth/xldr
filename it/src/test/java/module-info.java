@@ -5,6 +5,15 @@ open module io.github.ralfspoeth.xldr.it.test {
     // so that what is tested is what an author actually types
     requires io.github.ralfspoeth.xldr.app;
     requires info.picocli;
+    // XldrServletIT deploys the servlet into an embedded Jetty and talks to it
+    // with the JDK's own HTTP client. It lives here rather than in xlet because
+    // that module is published: a consumer reading its pom should not find a
+    // container in it
+    requires io.github.ralfspoeth.xldr.xlet;
+    requires jakarta.servlet;
+    requires org.eclipse.jetty.ee11.servlet;
+    requires org.eclipse.jetty.server;
+    requires java.net.http;
     // require the adapters
     requires io.github.ralfspoeth.xldr.xml;
     requires io.github.ralfspoeth.xldr.csv;

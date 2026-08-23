@@ -2,6 +2,10 @@
  * Open, because JUnit reflects on the tests. Nothing else here needs it: the
  * servlet API is stood in for by java.lang.reflect proxies, which ask no favours
  * of the module system.
+ * <p>
+ * Proxies all the way down, and deliberately - the one test that runs the servlet
+ * in a real container is {@code XldrServletIT} in the {@code it} module, which is
+ * where the embedded Jetty and the HTTP client live too.
  */
 open module io.github.ralfspoeth.xldr.xlet.test {
 
@@ -25,10 +29,4 @@ open module io.github.ralfspoeth.xldr.xlet.test {
     // requiring it is what puts it in the graph, and the lookup inside ia then
     // finds it - which is exactly how a deployment chooses its formats
     requires io.github.ralfspoeth.xldr.csv;
-
-    // the integration test runs the servlet in an embedded container, and talks
-    // to it with the JDK's own HTTP client
-    requires org.eclipse.jetty.ee11.servlet;
-    requires org.eclipse.jetty.server;
-    requires java.net.http;
 }

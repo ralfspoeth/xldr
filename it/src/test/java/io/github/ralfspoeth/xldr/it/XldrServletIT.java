@@ -1,4 +1,4 @@
-package io.github.ralfspoeth.xldr.xlet.it;
+package io.github.ralfspoeth.xldr.it;
 
 import io.github.ralfspoeth.xldr.xlet.XldrServlet;
 import jakarta.servlet.ServletException;
@@ -28,9 +28,10 @@ import static org.junit.jupiter.api.Assertions.*;
 /**
  * The servlet in a real container, over a real socket.
  * <p>
- * {@code XldrServletTest} covers the decisions; this covers the assumptions
- * underneath them, which are the things no proxy can settle on the container's
- * behalf:
+ * {@code XldrServletTest}, over in {@code xlet}'s own tests, covers the
+ * decisions with {@code java.lang.reflect} proxies standing in for the container.
+ * This covers the assumptions underneath them - the things no proxy can settle on
+ * the container's behalf, since a proxy answers whatever the test told it to:
  * <ul>
  *   <li>that {@code /WEB-INF/specs/} is found through
  *       {@link jakarta.servlet.ServletContext#getResourcePaths}, from a directory

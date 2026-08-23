@@ -8,6 +8,22 @@ The versions are the git tags `xldr-<version>`; the published artifacts carry th
 
 ## 0.38
 
+### Changed
+
+- **`XldrServletIT` moved from `xlet` to `it`**, taking its `src/test/webapp` with it. `it` is the module for
+  integration tests, and this was the one living somewhere else; it is also the only module binding failsafe now,
+  which is one place to explain that rather than two.
+
+  Publishing `xlet` at 0.36 is what makes the move worth more than tidiness. A published pom is read by people
+  deciding whether to depend on the thing, and this one carried an embedded Jetty and a failsafe binding, neither
+  of which has anything to do with the artifact. Both are gone; what is left is the servlet API, `ia`, `ldr`, and
+  H2 and `csv` for the unit tests that do load for real.
+
+  Nothing had to be widened to allow it. The test uses `XldrServlet` from an exported package and overrides the
+  `protected dataSource()` seam, which a subclass reaches from any module that reads `xlet`. `xlet`'s own tests are
+  now proxies all the way down, which was already their design - a proxy answers whatever the test told it to, and
+  the container test exists to check the things it therefore cannot settle.
+
 ### Fixed
 
 - **The README said the fixed-length adapter has no discriminator.** It has had one since 0.32, and the same file
@@ -24,6 +40,15 @@ The versions are the git tags `xldr-<version>`; the published artifacts carry th
   This survived the pass that was meant to reconcile the README's two accounts of a flat file, which is worth
   recording: that pass fixed the account that was being discussed and left the one further down the page. Two
   descriptions of one adapter in one file is the defect; fixing them one at a time is how it lasted five releases.
+
+- **Two more of the same, in the module list.** It still said `xlet` is "not published: a front end to read and
+  adapt, not a library to depend on", which 0.36 reversed and argued at length elsewhere in the same file; and it
+  said `it` depends on `server` and the adapters "not on `app`", which stopped being true when `CheckIT` began
+  driving the shipped command line, also at 0.36. Both now say what the poms say, `xlet` included.
+
+  Three stale paragraphs in one release, each surviving a change that was documented properly somewhere else in the
+  same file, is a pattern rather than three accidents. The tutorial has a test that reads it; the README has
+  nothing, and its module list makes claims a build could check - which module publishes, what depends on what.
 
 ### Added
 
