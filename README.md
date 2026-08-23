@@ -398,23 +398,24 @@ Both formats have a published schema, so an editor can check a spec before it ev
 only reports a broken spec in its log, by leaving the feed inactive. Point at the schema from the spec itself:
 
     {
-      "$schema": "https://ralfspoeth.github.io/xldr/schema/mapping-spec-0.35.json",
+      "$schema": "https://ralfspoeth.github.io/xldr/schema/mapping-spec-0.40.json",
       "input": { ... }
     }
 
     <mappingSpec xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-                 xsi:noNamespaceSchemaLocation="https://ralfspoeth.github.io/xldr/schema/mapping-spec-0.35.xsd">
+                 xsi:noNamespaceSchemaLocation="https://ralfspoeth.github.io/xldr/schema/mapping-spec-0.40.xsd">
 
 Both are ignored by the readers - `$schema` is just another unrecognised member, and `xsi:` attributes carry no
 meaning for a spec that has no namespace of its own. IntelliJ and VS Code both validate and autocomplete from them.
 
-The schemas catch what a schema can: missing or misspelled names, a `type` that is not one of the five, and - in
-JSON - a field mapping with no source or several, and a var that reads a field. The rest is checked when the spec is
-read, in particular that every selector compiles. How the feed's files arrive is no longer among them: that moved to
+The schemas catch what a schema can: missing or misspelled names, a `type` that is not one of the five, a column
+calling a function, a var reading a field - the last two being a matter of which sources each place declares, which
+both formats can say - and, in JSON only, a field mapping with no source or with several. The rest is checked when
+the spec is read, in particular that every selector compiles. How the feed's files arrive is no longer among them: that moved to
 `delivery.properties`, which the server reads and no schema describes, so a spec still carrying `accepts` or
 `sentinel` is refused rather than ignored.
 
-The XSD is the more permissive of the two, because XSD 1.0 cannot state either of those exactly-one rules. Nor can it
+The XSD is the more permissive of the two, because XSD 1.0 cannot state the exactly-one rule. Nor can it
 allow arbitrary extra elements next to the named ones, so a longer note belongs in an XML comment rather than in an
 element of your own.
 
@@ -429,7 +430,8 @@ written for `fieldSelectors` costs a record every one of its fields, and no read
 unknown is exactly what it promises.
 
 A schema is published whenever the format changes, and is named after the release that changed it:
-`mapping-spec-0.35` describes the format from 0.35 onwards, `mapping-spec-0.32` that of 0.32 to 0.34,
+`mapping-spec-0.40` describes the format from 0.40 onwards, `mapping-spec-0.35` that of 0.35 to 0.39,
+`mapping-spec-0.32` that of 0.32 to 0.34,
 `mapping-spec-0.23` that of 0.23 to 0.31,
 `mapping-spec-0.21` that of 0.21 to 0.22,
 `mapping-spec-0.13` that of 0.13 to 0.20,
@@ -630,8 +632,9 @@ referenced from any field mapping by `{"var": "name"}`. A value looked up from a
 time and stamped onto every row of every table in the file, rather than re-resolved per row; a constant can be named
 once and reused across mappings.
 
-A var is row-independent by construction, so its source is a `constant`, `lookup`, or another `var` declared earlier -
-never a `fieldSelector`. Vars are evaluated in declaration order.
+A var is row-independent by construction, so its source is a `constant`, an `expr`, a `lookup`, an `fn`, or another
+`var` declared earlier - never a `fieldSelector`, at any depth: not as the source, not as a lookup's key, not as an
+argument to a call. Vars are evaluated in declaration order.
 
     "input": {
         "mimeType": "text/csv",
@@ -653,6 +656,52 @@ never a `fieldSelector`. Vars are evaluated in declaration order.
             ]
         }
     ]
+
+### Calling a function
+
+An `fn` source calls a function in the target database. It is a **var source only**:
+
+    "vars": [
+        {"name": "loadId", "fn": {"name": "pkg_load.next_id", "type": "INTEGRAL",
+                                  "args": [{"constant": "funds"}]}}
+    ]
+
+    <var name="loadId">
+        <fn name="pkg_load.next_id" type="INTEGRAL">
+            <arg constant="funds"/>
+        </fn>
+    </var>
+
+and a column reaches the result the way it reaches any var, with `{"var": "loadId"}`.
+
+**Why only a var.** A var is evaluated once per load, a column bound once per record, so the same call in a field
+mapping would be a round trip a row - for a sequence, a batch number or a run id, which are drawn once by nature.
+Both halves of that rule are enforced where they can be seen rather than where they break: a var refuses a
+`fieldSelector` at any depth and a field mapping refuses an `fn` at any depth, so a spec saying either is refused
+when it is read rather than on the first file after it is deployed.
+
+The call goes out as JDBC's `{? = call name(?)}` escape through a `CallableStatement`, and `type` says what the OUT
+parameter is registered as - hence required, where a field selector's `type` may be left out and defaults to `TEXT`:
+the parameter is registered before the call, so there is nothing left to infer it from. The five types are the same
+five as everywhere else.
+
+`name` is one or more identifiers separated by dots and nothing else. It is the only part of a value source that
+reaches the text of a statement - everything a spec otherwise contributes is bound as a parameter - so it is held to
+being a name. A spec with a call in it therefore depends on the target **schema**, in that the function has to exist
+there, exactly as a `lookup` already depends on a table existing. It still depends on no **dialect**: no spec carries
+SQL.
+
+Each argument is a value source in its own right, so an argument may be a constant, a var, an expression, a lookup, or
+another call, and nesting costs nothing:
+
+    {"name": "batch", "fn": {"name": "open_batch", "type": "INTEGRAL", "args": [
+        {"var": "feed"},
+        {"fn": {"name": "today", "type": "DATE"}}
+    ]}}
+
+`args` left out is a call with none. A call may return null and nothing fails for it: a function saying "no such
+thing" by returning nothing is saying something a loader has no business overruling, and the same now goes for a
+`lookup` whose key matches no row.
 
 ### Expressions
 
@@ -846,7 +895,10 @@ is optional here.
     </mappingSpec>
 
 A value source is one attribute of a `fieldMapping` - `fieldSelector`, `constant`, `var` or `expr` - except for a
-`lookup`, which is a child element of the mapping and carries its own source attribute for the key. A constant in XML
+`lookup`, which is a child element of the mapping and carries its own source attribute for the key, and for an `fn`,
+which is a child of a `<var>` and carries one `<arg>` per argument. An `<arg>` carries exactly what a
+`<fieldMapping>` carries, minus what a var may not say, which is what lets an argument be a nested `<lookup>` or
+`<fn>`. A constant in XML
 is always a string, since an attribute has no type of its own; the `null` a JSON spec can write has no XML form. Where
 a column must be given a NULL from an XML spec, leave the mapping out - an unmapped column keeps whatever default the
 table gives it.

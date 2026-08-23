@@ -139,8 +139,8 @@ public class JsonMappingSpecReader implements MappingSpecReader {
             throw new IllegalArgumentException("a lookup and an fn are two sources, and one is wanted: " + fm);
         }
         if (node(fm).hasSource()) {
-            throw new IllegalArgumentException(
-                    "a " + (fn == null ? "lookup" : "fn") + " mapping must carry no other source: " + fm);
+            throw new IllegalArgumentException("a " + (fn == null ? "lookup" : "fn")
+                    + " and a source member are two sources, and one is wanted: " + fm);
         }
         if (fn != null) {
             return functionCall(fn);

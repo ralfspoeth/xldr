@@ -8,6 +8,8 @@ import java.util.Map;
 
 import static io.github.ralfspoeth.xldr.spec.io.Streams.stream;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class XmlMappingSpecReaderTest {
 
@@ -112,4 +114,83 @@ class XmlMappingSpecReaderTest {
         assertEquals(new ValueSource.Var("batchId"), fm.source());
     }
 
+    /**
+     * A call carries its name, the type it returns, and one {@code <arg>} per
+     * argument - each of which carries exactly what a {@code <fieldMapping>}
+     * carries, so an argument may be a var, a nested {@code <lookup>} or another
+     * {@code <fn>}.
+     * <p>
+     * The nested {@code today} is also the no-argument case: no {@code <arg>}
+     * children reads as none.
+     */
+    @Test
+    void parsesAcallWithItsArguments() {
+        var source = """
+                <mappingSpec>
+                    <input mimeType="text/csv">
+                        <var name="feed" constant="funds"/>
+                        <var name="loadId">
+                            <fn name="pkg_load.next_id" type="INTEGRAL">
+                                <arg var="feed"/>
+                                <arg>
+                                    <lookup table="load_batch" column="id" keyColumn="feed"
+                                            constant="funds"/>
+                                </arg>
+                                <arg>
+                                    <fn name="today" type="DATE"/>
+                                </arg>
+                            </fn>
+                        </var>
+                    </input>
+                </mappingSpec>
+                """;
+        var vars = List.copyOf(new XmlMappingSpecReader().read(stream(source)).inputSpec().vars());
+
+        assertEquals(
+                new VarSpec("loadId", new ValueSource.FunctionCall(
+                        "pkg_load.next_id", DataType.INTEGRAL, List.of(
+                                new ValueSource.Var("feed"),
+                                new ValueSource.Lookup("load_batch", "id", "feed",
+                                        new ValueSource.Constant("funds")),
+                                new ValueSource.FunctionCall("today", DataType.DATE, List.of())))),
+                vars.get(1));
+    }
+
+    /**
+     * One source, and a call is one: a var carrying both an {@code <fn>} and a
+     * {@code constant} attribute says two things, and the reader will not pick.
+     */
+    @Test
+    void refusesAcallBesideAsourceAttribute() {
+        var source = """
+                <mappingSpec>
+                    <input mimeType="text/csv">
+                        <var name="loadId" constant="1">
+                            <fn name="next_id" type="INTEGRAL"/>
+                        </var>
+                    </input>
+                </mappingSpec>
+                """;
+        var thrown = assertThrows(IllegalArgumentException.class,
+                () -> new XmlMappingSpecReader().read(stream(source)));
+        assertTrue(thrown.getMessage().contains("one source is wanted"), thrown.getMessage());
+    }
+
+    /** and the two child elements are two sources, for the same reason */
+    @Test
+    void refusesAlookupAndAcallTogether() {
+        var source = """
+                <mappingSpec>
+                    <input mimeType="text/csv">
+                        <var name="loadId">
+                            <lookup table="t" column="c" keyColumn="k" constant="x"/>
+                            <fn name="next_id" type="INTEGRAL"/>
+                        </var>
+                    </input>
+                </mappingSpec>
+                """;
+        var thrown = assertThrows(IllegalArgumentException.class,
+                () -> new XmlMappingSpecReader().read(stream(source)));
+        assertTrue(thrown.getMessage().contains("one source is wanted"), thrown.getMessage());
+    }
 }

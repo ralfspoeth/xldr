@@ -6,6 +6,85 @@ ways that break existing code and existing specs; those changes are listed here 
 The versions are the git tags `xldr-<version>`; the published artifacts carry the same version under the group
 `io.github.ralfspoeth.xldr`.
 
+## 0.40
+
+A release about reaching into the target database from a spec. A var may now call a function there - a sequence, a
+batch opener, a run id - which is the one thing a spec could not get at before except through a `lookup`, and the
+reason it took this long is that letting a spec call something is one short step from letting it carry SQL, which it
+never will.
+
+The mapping-spec format changes for the first time since 0.35, so `mapping-spec-0.40` is published in both formats.
+Beyond the new source it splits the value sources into two definitions - what a column may say and what a var may
+say - which is what makes the new rule statable and closes one the old pair had wrong by omission.
+
+Two entries are breaking, and both refuse specs that were readable yesterday. Neither refuses one that ever loaded:
+each was a spec that read cleanly, deployed, and threw from the loader on the first file. Moving the refusal to the
+document is the whole point - nothing about the input could have made either work.
+
+### Breaking
+
+- **A var may not read a field, at any depth.** `VarSpec` refuses a `fieldSelector` as its source, as a `lookup`'s
+  key, and as an argument to a call. The rule was in the class documentation and in no code: the two readers checked
+  the top level only, so a field buried in a lookup key slipped past both and failed at load. A var is evaluated
+  once before the first record is read, so there is no record for it to read a field from, and no file it could ever
+  be given that would change that.
+
+- **`ValueSource` has a fifth case**, so an exhaustive switch over it in code outside this repository no longer
+  compiles. That is the sealed hierarchy working: a call is neither a constant nor a lookup, and every place that
+  takes a value source apart has to say what it does with one. The two inside the repository that needed it -
+  `Check`'s description and the tutorial harness's field collection - are updated.
+
+- **A column may not call a function**, the mirror rule, enforced by `FieldMappingSpec` at any depth. Breaking only
+  in the sense the sealed interface is: no spec written before this release contains a call.
+
+### Added
+
+- **`ValueSource.FunctionCall`**, a call on a function in the target database: a `name`, the `type` it returns, and
+  `args`, each of which is a value source in its own right - so an argument may be a constant, a var, an expression,
+  a lookup, or another call.
+
+      "vars": [ {"name": "loadId", "fn": {"name": "pkg_load.next_id", "type": "INTEGRAL",
+                                          "args": [{"constant": "funds"}]}} ]
+
+  It is a var source and nothing else. A var is evaluated once per load and a column is bound once per record, so
+  the same call in a field mapping would be a round trip a row - against a value that a sequence or a batch number
+  is drawn once by nature. A column reaches the result the way it reaches any var.
+
+  The loader prepares it as JDBC's `{? = call name(?)}` escape through a `CallableStatement` and binds every
+  argument, which is why `type` is required where a field selector's may be left out: the OUT parameter is
+  registered before the call is made, so there is nothing left to infer it from.
+
+  `name` is one or more identifiers separated by dots and nothing else, checked when the spec is read. It is the
+  only part of a value source that reaches the text of a statement - everything a spec otherwise contributes goes in
+  bound - so it is held to being a name. A spec with a call in it therefore depends on the target **schema**, in
+  that the function has to be there, exactly as a `lookup` already depends on a table being there. It depends on no
+  **dialect**: `prepareCall` would not accept raw SQL and no spec carries any.
+
+- **`mapping-spec-0.40`**, in both formats. It adds `fn` and `arg`, and separates a column's sources from a var's,
+  which is how both formats can now say that a column has no `fn` and a var no `fieldSelector` - the second being
+  something the XSD can state as readily as the JSON schema, since it is a matter of which members each place
+  declares rather than of counting them.
+
+- **`DataType.sqlType()`**, the `java.sql.Types` constant each of the five registers an OUT parameter as. It is
+  carried as the literal int rather than the named constant so that `spec` needs nothing of `java.sql`: a mapping
+  spec is a document, and the module that models one should not require a driver to be on the module path.
+
+- **`xldr check` prints a call**, arguments and return type included, in the same column form as every other source.
+
+### Changed
+
+- **A lookup and a call may both return null.** A lookup whose key matched no row used to throw from a var, which
+  contradicted `lookup`'s own documentation of that case; the `requireNonNull` responsible had made the documented
+  branch unreachable since it was written. A function that answers "no such thing" by returning nothing is saying
+  something a loader has no business overruling either, so a null from either binds a SQL NULL.
+
+### Fixed
+
+- **The 0.35 schemas let a var's lookup be keyed by a field.** One `lookup` definition served both a column and a
+  var, so an editor called such a spec valid and the load then threw. The 0.40 pair has two, and `XsdTest` and
+  `JsonSchemaTest` now assert each rule against the schema and the reader both - neither of which catches the
+  other's cases, an editor never running the reader and a deployed spec never having been put through the schema.
+
 ## 0.39
 
 A release about what an adapter owes its caller. The input adapter SPI's contract is written down for the first

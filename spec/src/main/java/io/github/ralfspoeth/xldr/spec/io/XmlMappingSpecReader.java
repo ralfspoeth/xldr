@@ -192,8 +192,8 @@ public class XmlMappingSpecReader implements MappingSpecReader {
                     "<" + fm.getNodeName() + "> has both a <lookup> and an <fn>, and one source is wanted");
         }
         if (node(fm).hasSource()) {
-            throw new IllegalArgumentException("a <" + (fn == null ? "lookup" : "fn")
-                    + "> field mapping must carry no source attribute");
+            throw new IllegalArgumentException("<" + fm.getNodeName() + "> has a <"
+                    + (fn == null ? "lookup" : "fn") + "> and a source attribute, and one source is wanted");
         }
         if (fn != null) {
             return functionCall(fn);

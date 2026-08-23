@@ -383,6 +383,79 @@ class JsonValueSourceTest {
     }
 
     /**
+     * A call carries its name, the type it returns, and arguments that are value
+     * sources in their own right - so an argument may be a var, a lookup, or
+     * another call, and the reader builds the whole tree.
+     * <p>
+     * The nested {@code today} is also the no-argument case: {@code args} left
+     * out reads as none rather than as a missing member.
+     */
+    @Test
+    void readsAcallWithItsArguments() throws IOException {
+        var source = """
+                {
+                    "input": { "mimeType": "text/csv", "vars": [
+                        { "name": "feed", "constant": "funds" },
+                        { "name": "loadId", "fn": {
+                            "name": "pkg_load.next_id", "type": "INTEGRAL", "args": [
+                                { "var": "feed" },
+                                { "lookup": { "table": "load_batch", "column": "id",
+                                              "keyColumn": "feed", "constant": "funds" } },
+                                { "fn": { "name": "today", "type": "DATE" } }
+                            ] } }
+                    ] },
+                    "mapping": []
+                }
+                """;
+        var vars = List.copyOf(new JsonMappingSpecReader().read(stream(source)).inputSpec().vars());
+
+        assertEquals(
+                new VarSpec("loadId", new ValueSource.FunctionCall(
+                        "pkg_load.next_id", DataType.INTEGRAL, List.of(
+                                new ValueSource.Var("feed"),
+                                new ValueSource.Lookup("load_batch", "id", "feed",
+                                        new ValueSource.Constant("funds")),
+                                new ValueSource.FunctionCall("today", DataType.DATE, List.of())))),
+                vars.get(1));
+    }
+
+    /**
+     * One source, and a call is one: a var saying both {@code fn} and
+     * {@code constant} says two things, and the reader will not pick.
+     */
+    @Test
+    void refusesAcallBesideAnotherSource() {
+        var source = """
+                {
+                    "input": { "mimeType": "text/csv", "vars": [
+                        { "name": "loadId", "constant": 1,
+                          "fn": { "name": "next_id", "type": "INTEGRAL" } } ] },
+                    "mapping": []
+                }
+                """;
+        var thrown = assertThrows(IllegalArgumentException.class,
+                () -> new JsonMappingSpecReader().read(stream(source)));
+        assertTrue(thrown.getMessage().contains("one is wanted"), thrown.getMessage());
+    }
+
+    /** and the two object sources are two sources, for the same reason */
+    @Test
+    void refusesAlookupAndAcallTogether() {
+        var source = """
+                {
+                    "input": { "mimeType": "text/csv", "vars": [
+                        { "name": "loadId",
+                          "lookup": { "table": "t", "column": "c", "keyColumn": "k", "constant": "x" },
+                          "fn": { "name": "next_id", "type": "INTEGRAL" } } ] },
+                    "mapping": []
+                }
+                """;
+        var thrown = assertThrows(IllegalArgumentException.class,
+                () -> new JsonMappingSpecReader().read(stream(source)));
+        assertTrue(thrown.getMessage().contains("one is wanted"), thrown.getMessage());
+    }
+
+    /**
      * A selector and a discriminator together describe no input, and this is now
      * the only place that can say so.
      * <p>

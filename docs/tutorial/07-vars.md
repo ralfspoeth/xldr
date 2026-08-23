@@ -86,7 +86,7 @@ read could split one file across two batches.
 
 ## What a variable may be
 
-The same four sources a column has, minus the one that would make no sense:
+The same sources a column has, minus the one that would make no sense, plus one only a variable may have:
 
 | source | meaning |
 |---|---|
@@ -94,10 +94,22 @@ The same four sources a column has, minus the one that would make no sense:
 | `lookup` | read from a reference table - [page 8](08-lookups.md) |
 | `expr` | a `${...}` template - [page 9](09-expressions.md) |
 | `var` | another variable |
+| `fn` | a function called in the target database, e.g. a sequence or a batch opener |
 
-A `fieldSelector` is refused. A variable is evaluated once, before any record has been read, so there is no record
-for it to take a field from - and the spec is rejected when it is read, saying that a var must be row-independent,
-rather than failing on the first row.
+A `fieldSelector` is refused, anywhere inside a variable: not as the source, not as a `lookup`'s key, not as an
+argument to an `fn`. A variable is evaluated once, before any record has been read, so there is no record for it to
+take a field from - and the spec is rejected when it is read, saying that a var must be row-independent, rather than
+failing on the first row.
+
+`fn` goes the other way: a column may not have one. A variable is evaluated once per load and a column is bound once
+per record, so the same call in a field mapping would be a round trip a row. Write the call as a variable and map
+the column to it.
+
+    {"name": "loadId", "fn": {"name": "pkg_load.next_id", "type": "INTEGRAL", "args": []}}
+
+`type` says what the function returns, and unlike a field selector's it is required: the call is prepared before it
+is made, so nothing can infer it. Each entry of `args` is a source of its own, so an argument may be a constant, a
+variable, an expression, a lookup, or another call.
 
 Variables may refer to one another, and the order they are declared in is the order they are evaluated in.
 

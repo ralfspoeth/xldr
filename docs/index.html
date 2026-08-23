@@ -76,7 +76,12 @@
         <th>XML</th>
     </tr>
     <tr>
-        <td>0.35 - 0.39 (current)</td>
+        <td>0.40 onwards (current)</td>
+        <td><a href="schema/mapping-spec-0.40.json">mapping-spec-0.40.json</a></td>
+        <td><a href="schema/mapping-spec-0.40.xsd">mapping-spec-0.40.xsd</a></td>
+    </tr>
+    <tr>
+        <td>0.35 - 0.39</td>
         <td><a href="schema/mapping-spec-0.35.json">mapping-spec-0.35.json</a></td>
         <td><a href="schema/mapping-spec-0.35.xsd">mapping-spec-0.35.xsd</a></td>
     </tr>
@@ -123,6 +128,16 @@
     changes nothing about the format - 0.11, 0.12, 0.14 to 0.20, 0.22, 0.24 to 0.31, 0.33, 0.34, 0.36 to 0.39 -
     keeps the previous schema rather than publishing a copy of it. An older one stays where it is, so a spec pinned
     to it keeps validating.
+</p>
+
+<p>
+    In 0.40 a var may call a function in the target database, written as <code>fn</code> with a <code>name</code>,
+    the <code>type</code> it returns and its <code>args</code>, each of which is a value source of its own. It is a
+    var source and not a column one: a var is evaluated once per load and a column bound once per record, so the
+    same call in a field mapping would be a round trip a row. Saying which sources belong where is what the schemas
+    now do - a column's sources and a var's are two separate definitions - and that closes something 0.35 had wrong
+    by omission: one <code>lookup</code> definition served both places, so a var keyed by a <code>fieldSelector</code>
+    validated in an editor and then threw at load, having no record to read the field from.
 </p>
 
 <p>
@@ -196,7 +211,7 @@
 <p>In a JSON spec, as a member the reader does not recognise and therefore ignores:</p>
 
 <pre><code>{
-  "$schema": "https://ralfspoeth.github.io/xldr/schema/mapping-spec-0.35.json",
+  "$schema": "https://ralfspoeth.github.io/xldr/schema/mapping-spec-0.40.json",
   "input": {
     "mimeType": "text/csv",
     "properties": { "fieldSeparator": "," },
@@ -208,7 +223,7 @@
 <p>In an XML spec, as the schema location of a document that has no namespace of its own:</p>
 
 <pre><code>&lt;mappingSpec xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-             xsi:noNamespaceSchemaLocation="https://ralfspoeth.github.io/xldr/schema/mapping-spec-0.35.xsd"&gt;
+             xsi:noNamespaceSchemaLocation="https://ralfspoeth.github.io/xldr/schema/mapping-spec-0.40.xsd"&gt;
     &lt;input mimeType="text/xml"&gt;
         ...
     &lt;/input&gt;
