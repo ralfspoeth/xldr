@@ -1,9 +1,5 @@
-package io.github.ralfspoeth.xldr.spec.test;
+package io.github.ralfspoeth.xldr.spec;
 
-import io.github.ralfspoeth.xldr.spec.Discriminator;
-import io.github.ralfspoeth.xldr.spec.Locator;
-import io.github.ralfspoeth.xldr.spec.MappingSpec;
-import io.github.ralfspoeth.xldr.spec.Selector;
 import io.github.ralfspoeth.xldr.spec.io.JsonMappingSpecReader;
 import io.github.ralfspoeth.xldr.spec.io.XmlMappingSpecReader;
 import org.junit.jupiter.api.Test;
@@ -13,12 +9,7 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
-import static org.junit.jupiter.api.Assertions.assertAll;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertInstanceOf;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * Where a value sits, and which records are of a kind - said twice, once per

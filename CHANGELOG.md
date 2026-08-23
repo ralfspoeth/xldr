@@ -10,6 +10,22 @@ The versions are the git tags `xldr-<version>`; the published artifacts carry th
 
 ### Changed
 
+- **`spec`'s tests moved into the packages they test**, and its test `module-info.java` is gone. Surefire patches
+  the test classes into the module instead, which is what it does when a module has no test module of its own.
+  `DataTypeTest` and `SelectorTest` sit in `spec`; the six reader tests and the `Streams` helper in `spec.io`.
+
+  Nothing became less visible today - every public type in `spec` is used by another module already, and
+  `SpecNode`, the one type used nowhere outside its own module, was package-private the whole time. The point is
+  the pressure rather than the present state: with a test in a `.test` package of its own, the cheapest way to make
+  anything testable was to make it public, and that is how an API surface grows by accident before a 1.0 freezes
+  it. A test beside its subject can reach a package-private member and nobody has to decide anything.
+
+  **`ia` went the same way**, `FormatsTest` moving beside `Formats`. The argument for keeping a blackbox test
+  module there - that it is the one thing proving the SPI is usable from outside - does not survive being checked:
+  nine modules' main sources require `ia`, and seven test modules require it too, every one of them seeing only
+  what `ia` exports, and five of them implementing the SPI rather than merely calling it. The export surface is
+  exercised sixteen ways on every build by code that is not scaffolding. A test module adds nothing to that.
+
 - **`XldrServletIT` moved from `xlet` to `it`**, taking its `src/test/webapp` with it. `it` is the module for
   integration tests, and this was the one living somewhere else; it is also the only module binding failsafe now,
   which is one place to explain that rather than two.

@@ -1,6 +1,5 @@
-package io.github.ralfspoeth.xldr.spec.test;
+package io.github.ralfspoeth.xldr.spec;
 
-import io.github.ralfspoeth.xldr.spec.DataType;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;

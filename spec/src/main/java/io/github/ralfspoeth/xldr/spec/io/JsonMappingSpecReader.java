@@ -8,11 +8,6 @@ import io.github.ralfspoeth.json.query.Pointer;
 import io.github.ralfspoeth.xldr.spec.*;
 import org.jspecify.annotations.Nullable;
 
-// Greyson exports a Selector of its own, and so does the spec. A static member
-// import takes the one method wanted from Greyson's without importing the type,
-// so the bare name still means the spec's wherever it is written.
-import static io.github.ralfspoeth.json.query.Selector.all;
-
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -21,6 +16,12 @@ import java.nio.file.Path;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
+
+import static io.github.ralfspoeth.json.query.Selector.all;
+
+// Greyson exports a Selector of its own, and so does the spec. A static member
+// import takes the one method wanted from Greyson's without importing the type,
+// so the bare name still means the spec's wherever it is written.
 
 /**
  * Reads a JSON mapping specification from an {@code input}, its {@code vars},

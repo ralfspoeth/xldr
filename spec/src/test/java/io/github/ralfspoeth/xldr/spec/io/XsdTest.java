@@ -1,10 +1,9 @@
-package io.github.ralfspoeth.xldr.spec.test;
+package io.github.ralfspoeth.xldr.spec.io;
 
 import io.github.ralfspoeth.xldr.spec.Discriminator;
 import io.github.ralfspoeth.xldr.spec.FieldSelectorSpec;
 import io.github.ralfspoeth.xldr.spec.Locator;
 import io.github.ralfspoeth.xldr.spec.Selector;
-import io.github.ralfspoeth.xldr.spec.io.XmlMappingSpecReader;
 import org.junit.jupiter.api.Test;
 import org.xml.sax.SAXException;
 
@@ -18,7 +17,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 
-import static io.github.ralfspoeth.xldr.spec.test.Streams.stream;
+import static io.github.ralfspoeth.xldr.spec.io.Streams.stream;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**

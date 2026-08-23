@@ -1,4 +1,4 @@
-package io.github.ralfspoeth.xldr.spec.test;
+package io.github.ralfspoeth.xldr.spec.io;
 
 import com.networknt.schema.InputFormat;
 import com.networknt.schema.SchemaRegistry;
@@ -7,8 +7,6 @@ import io.github.ralfspoeth.xldr.spec.FieldSelectorSpec;
 import io.github.ralfspoeth.xldr.spec.MappingSpec;
 import io.github.ralfspoeth.xldr.spec.RecordSelectorSpec;
 import io.github.ralfspoeth.xldr.spec.ValueSource;
-import io.github.ralfspoeth.xldr.spec.io.JsonMappingSpecReader;
-import io.github.ralfspoeth.xldr.spec.io.XmlMappingSpecReader;
 import org.junit.jupiter.api.Test;
 
 import javax.xml.XMLConstants;
@@ -19,17 +17,12 @@ import java.io.IOException;
 import java.io.StringReader;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.TreeSet;
+import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
-import static io.github.ralfspoeth.xldr.spec.test.Streams.stream;
+import static io.github.ralfspoeth.xldr.spec.io.Streams.stream;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 

@@ -1,11 +1,10 @@
-package io.github.ralfspoeth.xldr.spec.test;
+package io.github.ralfspoeth.xldr.spec.io;
 
 import com.networknt.schema.InputFormat;
 import com.networknt.schema.Schema;
 import com.networknt.schema.SchemaRegistry;
 import com.networknt.schema.SpecificationVersion;
 import io.github.ralfspoeth.xldr.spec.Locator;
-import io.github.ralfspoeth.xldr.spec.io.JsonMappingSpecReader;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
@@ -13,12 +12,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 
-import static io.github.ralfspoeth.xldr.spec.test.Streams.stream;
-import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static io.github.ralfspoeth.xldr.spec.io.Streams.stream;
+import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * The published JSON schema has to keep describing what the reader accepts,

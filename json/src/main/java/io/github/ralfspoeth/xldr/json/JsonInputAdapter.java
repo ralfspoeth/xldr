@@ -4,18 +4,8 @@ import io.github.ralfspoeth.json.Greyson;
 import io.github.ralfspoeth.json.data.JsonValue;
 import io.github.ralfspoeth.json.query.Pointer;
 import io.github.ralfspoeth.xldr.ia.*;
-import io.github.ralfspoeth.xldr.spec.DataType;
-import io.github.ralfspoeth.xldr.spec.FieldSelectorSpec;
-import io.github.ralfspoeth.xldr.spec.InputSpec;
-import io.github.ralfspoeth.xldr.spec.Locator;
-import io.github.ralfspoeth.xldr.spec.RecordSelectorSpec;
-import io.github.ralfspoeth.xldr.spec.Selector;
+import io.github.ralfspoeth.xldr.spec.*;
 import org.jspecify.annotations.Nullable;
-
-// Greyson exports a Selector of its own, and so does the spec. Only one can wear
-// the bare name, and here it should be the one a field selector is written in:
-// what is wanted from Greyson's is the single method below.
-import static io.github.ralfspoeth.json.query.Selector.all;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -27,7 +17,12 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Stream;
 
+import static io.github.ralfspoeth.json.query.Selector.all;
 import static java.nio.charset.StandardCharsets.UTF_8;
+
+// Greyson exports a Selector of its own, and so does the spec. Only one can wear
+// the bare name, and here it should be the one a field selector is written in:
+// what is wanted from Greyson's is the single method below.
 
 /**
  * Reads records out of a JSON document, both record and field selectors being

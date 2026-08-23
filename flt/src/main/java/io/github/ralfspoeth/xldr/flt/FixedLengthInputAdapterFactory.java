@@ -5,12 +5,7 @@ import io.github.ralfspoeth.xldr.flt.FixedLengthInputAdapter.Layout;
 import io.github.ralfspoeth.xldr.ia.Formats;
 import io.github.ralfspoeth.xldr.ia.InputAdapter;
 import io.github.ralfspoeth.xldr.ia.InputAdapterFactory;
-import io.github.ralfspoeth.xldr.spec.DataType;
-import io.github.ralfspoeth.xldr.spec.Discriminator;
-import io.github.ralfspoeth.xldr.spec.InputSpec;
-import io.github.ralfspoeth.xldr.spec.Locator;
-import io.github.ralfspoeth.xldr.spec.RecordSelectorSpec;
-import io.github.ralfspoeth.xldr.spec.Selector;
+import io.github.ralfspoeth.xldr.spec.*;
 import org.jspecify.annotations.Nullable;
 
 import java.nio.charset.Charset;

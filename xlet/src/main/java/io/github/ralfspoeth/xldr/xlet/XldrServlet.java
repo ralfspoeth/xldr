@@ -26,9 +26,7 @@ import java.util.TreeSet;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 
-import static java.lang.System.Logger.Level.ERROR;
-import static java.lang.System.Logger.Level.INFO;
-import static java.lang.System.Logger.Level.WARNING;
+import static java.lang.System.Logger.Level.*;
 import static java.nio.charset.StandardCharsets.UTF_8;
 
 /**

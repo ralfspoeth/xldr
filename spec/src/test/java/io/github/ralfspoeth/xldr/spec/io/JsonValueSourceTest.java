@@ -1,11 +1,6 @@
-package io.github.ralfspoeth.xldr.spec.test;
+package io.github.ralfspoeth.xldr.spec.io;
 
-import io.github.ralfspoeth.xldr.spec.FieldMappingSpec;
-import io.github.ralfspoeth.xldr.spec.Locator;
-import io.github.ralfspoeth.xldr.spec.RecordSelectorSpec;
-import io.github.ralfspoeth.xldr.spec.ValueSource;
-import io.github.ralfspoeth.xldr.spec.VarSpec;
-import io.github.ralfspoeth.xldr.spec.io.JsonMappingSpecReader;
+import io.github.ralfspoeth.xldr.spec.*;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
@@ -13,7 +8,7 @@ import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 
-import static io.github.ralfspoeth.xldr.spec.test.Streams.stream;
+import static io.github.ralfspoeth.xldr.spec.io.Streams.stream;
 import static org.junit.jupiter.api.Assertions.*;
 
 public class JsonValueSourceTest {

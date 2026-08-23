@@ -10,14 +10,8 @@ import java.sql.SQLException;
 import java.util.List;
 import java.util.Map;
 
-import static io.github.ralfspoeth.xldr.ldr.test.AnsweringConnection.answering;
-import static io.github.ralfspoeth.xldr.ldr.test.AnsweringConnection.refusesCatalogs;
-import static io.github.ralfspoeth.xldr.ldr.test.AnsweringConnection.refusesSchemas;
-import static io.github.ralfspoeth.xldr.ldr.test.AnsweringConnection.takesBoth;
-import static org.junit.jupiter.api.Assertions.assertAll;
-import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static io.github.ralfspoeth.xldr.ldr.test.AnsweringConnection.*;
+import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * What the loader does with a target, according to what the driver says it may.

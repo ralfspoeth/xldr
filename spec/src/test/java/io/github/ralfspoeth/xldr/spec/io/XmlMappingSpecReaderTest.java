@@ -1,13 +1,12 @@
-package io.github.ralfspoeth.xldr.spec.test;
+package io.github.ralfspoeth.xldr.spec.io;
 
 import io.github.ralfspoeth.xldr.spec.*;
-import io.github.ralfspoeth.xldr.spec.io.XmlMappingSpecReader;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
 import java.util.Map;
 
-import static io.github.ralfspoeth.xldr.spec.test.Streams.stream;
+import static io.github.ralfspoeth.xldr.spec.io.Streams.stream;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 public class XmlMappingSpecReaderTest {

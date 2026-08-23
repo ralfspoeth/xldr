@@ -1,6 +1,5 @@
-package io.github.ralfspoeth.xldr.ia.test;
+package io.github.ralfspoeth.xldr.ia;
 
-import io.github.ralfspoeth.xldr.ia.Formats;
 import io.github.ralfspoeth.xldr.spec.DataType;
 import org.junit.jupiter.api.Test;
 

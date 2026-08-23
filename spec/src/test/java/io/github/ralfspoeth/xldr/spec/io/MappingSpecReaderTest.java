@@ -1,8 +1,5 @@
-package io.github.ralfspoeth.xldr.spec.test;
+package io.github.ralfspoeth.xldr.spec.io;
 
-import io.github.ralfspoeth.xldr.spec.io.JsonMappingSpecReader;
-import io.github.ralfspoeth.xldr.spec.io.MappingSpecReader;
-import io.github.ralfspoeth.xldr.spec.io.XmlMappingSpecReader;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.function.Executable;
 import org.junit.jupiter.api.io.TempDir;

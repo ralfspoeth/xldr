@@ -28,9 +28,7 @@ import java.util.function.BooleanSupplier;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.nio.file.StandardCopyOption.ATOMIC_MOVE;
-import static org.junit.jupiter.api.Assertions.assertAll;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * End to end through the server: a feed directory appears, a spec activates it,
