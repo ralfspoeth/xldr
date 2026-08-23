@@ -82,6 +82,25 @@ document is the whole point - nothing about the input could have made either wor
   built-in `FORMATDATETIME` with two arguments - a var holding `${now()}` and a constant pattern - so both kinds of
   argument and the `Instant`-as-`OffsetDateTime` binding are in one load.
 
+### Removed
+
+- **The Oracle driver is out of the distribution**, and out of the build that produces it. `ojdbc17` was a
+  `provided` dependency of `app` and an include in the assembly's `drivers/` set; both are gone, and `drivers/`
+  now holds H2 and PostgreSQL, which are the two that are ours to ship.
+
+  It was never a dependency in any real sense - nothing names a driver in code, `java.sql` finds one by service
+  binding - so it bought a reader one download and cost the project a licence it had taken on. The release workflow
+  had been deleting the jar since 0.33 for exactly that reason, which meant the download and a local build differed
+  in one respect that had to be explained in the README, in the release notes and in a generated `drivers/README.txt`.
+  Taking it out of the build instead makes all three sentences unnecessary: what you download is what you would have
+  built.
+
+  What replaces it is `app/src/dist/drivers/README.txt`, a real file in the tree rather than a heredoc in the
+  workflow, saying that installing a driver is copying its jar into that directory - `ojdbc17` from Maven Central
+  for Oracle, and the same operation with a different jar for anything else. The workflow keeps a check that fails
+  the release if an Oracle driver ever appears in the archive again, since the thing worth guarding is the licence
+  and not this one artifact.
+
 ### Changed
 
 - **A lookup and a call may both return null.** A lookup whose key matched no row used to throw from a var, which

@@ -47,12 +47,11 @@ H2 and PostgreSQL:
     tar xzf xldr-<version>-dist.tar.gz        # or unzip xldr-<version>-dist.zip
     cd xldr-<version>
 
-For Oracle, drop `ojdbc17` into `drivers/`; it is left out of the download rather than the build, so that
-publishing the archive does not make this project a redistributor of it. That is the one respect in which the
-download differs from a local build, and there is a note in `drivers/` saying so.
+For any other database, drop its driver jar into `drivers/` - `ojdbc17` for Oracle, and so on. The two that ship
+are the two that are ours to ship; a driver is found by service binding rather than named anywhere, so installing
+one is copying a file. There is a note in `drivers/` saying as much.
 
-Or build it from a checkout, which produces the same archive - Oracle driver included - named after the module that
-assembled it:
+Or build it from a checkout, which produces the same archive, named after the module that assembled it:
 
     mvn install
     tar xzf app/target/app-<version>-dist.tar.gz
@@ -292,14 +291,14 @@ carry the concrete version rather than a literal `${revision}`.
 
 `mvn package` on `app` builds a runnable distribution (`app/target/app-<version>-dist.{tar.gz,zip}`) via the
 `maven-assembly-plugin`; the release workflow repacks the same tree as `xldr-<version>-dist`, the name the archive
-unpacks to, and takes the Oracle driver out on the way. Unpacked, it is
+unpacks to, and changes nothing else about it. Unpacked, it is
 
     xldr-<version>/
         bin/xldr, bin/xldr.cmd   launchers
         lib/                     the application and the toolkit
         modules/                 the input adapters
         xl/                      the Excel adapter and Apache POI
-        drivers/                 the JDBC drivers - H2 and PostgreSQL, Oracle too in a local build
+        drivers/                 the JDBC drivers - H2 and PostgreSQL, plus a note on adding others
         conf/                    sample xldr.properties and logging.properties
         README.md
 
@@ -317,8 +316,10 @@ change. Each of the three may be empty, or absent altogether - choosing none of 
 with no adapters starts and then refuses to activate any feed, which is loud in the right place.
 
 **Installing your own driver is copying its jar into `drivers/`.** Removing the ones you do not target is the same
-operation in reverse, and worth doing before passing a distribution on to anyone else: the Oracle driver is
-proprietary and not yours to redistribute.
+operation in reverse. The two that ship are the two that are freely redistributable, which is the whole rule: a
+driver that is not - Oracle's, which was in here until 0.40 - is one line of licence taken on in exchange for
+saving somebody a download, and it is not a trade worth making for a jar that service binding finds wherever it
+comes from.
 
 **`xl/` is Excel, kept apart for weight.** Apache POI brings xmlbeans, curvesapi, several commons libraries and
 log4j-api, which together were most of the distribution and made it hard to see what the toolkit is actually made of.
@@ -339,7 +340,7 @@ class file version. `JAVA_OPTS` carries extra VM options.
 
 `jlink` is deliberately not used, and the reason has narrowed since it was first written down: HikariCP, picocli and
 both SLF4J jars all carry a real `module-info` today, so `lib/` would link. What still would not are **the JDBC
-drivers** - PostgreSQL, Oracle and H2 are all automatic modules, and no vendor ships a real one - and the tail of
+drivers** - PostgreSQL and H2 are automatic modules, as is every other driver, no vendor shipping a real one - and the tail of
 POI's dependencies, `SparseBitSet`, `commons-math3` and `curvesapi`. `jlink` refuses an automatic module outright.
 
 That is not a passing inconvenience but the same point `drivers/` and `xl/` are making: which database a deployment
@@ -1088,8 +1089,9 @@ file of your own still overrides the lot.
     jdbc.user     = dbuser
     jdbc.password = secret
 
-The JDBC drivers for Oracle and PostgreSQL are `provided` dependencies: the deployment supplies the one matching its
-target database.
+The JDBC drivers are `provided` dependencies: the deployment supplies the one matching its target database. H2 and
+PostgreSQL are in the distribution because they are ours to ship; anything else, Oracle included, is a jar dropped
+into `drivers/`.
 
 ### Feed configuration
 
@@ -1423,6 +1425,8 @@ XLDR is released under the [MIT License](LICENSE) - use it, embed it, ship it, w
 libraries it is built on are permissive too: Greyson, filews and SLF4J are MIT, POI, HikariCP and picocli Apache-2.0.
 
 The JDBC drivers are not xldr's to license, and none is pulled in transitively - they are `provided` dependencies, so
-a consumer of the libraries supplies the driver for the database it feeds and accepts that driver's own terms. Note
-that the [distribution](#distribution) does bundle them into `lib/` for convenience; the Oracle driver in particular
-is proprietary, so a distribution you pass on to anyone else should have `lib/ojdbc*.jar` removed.
+a consumer of the libraries supplies the driver for the database it feeds and accepts that driver's own terms. The
+[distribution](#distribution) bundles two of them into `drivers/` for convenience, and those two only because both
+are freely redistributable: H2 under MPL-2.0 or EPL-1.0, the PostgreSQL driver under BSD-2-Clause.
+A proprietary driver is not bundled at any version, so a distribution passed on to anyone else needs nothing taken
+out of it first.

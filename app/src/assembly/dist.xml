@@ -85,14 +85,20 @@
              deployment feeds is its own business, so this is where it adds the
              driver it needs and removes the ones it does not. The launcher puts
              the directory on the module path beside lib/, where java.sql finds
-             a Driver by service binding as it does any other provider. -->
+             a Driver by service binding as it does any other provider.
+
+             Two, and both freely redistributable. A driver that is not - the
+             Oracle one, which this shipped until 0.40 - makes the project a
+             redistributor of somebody else's licence, and there is nothing here
+             that needs it: a driver is found by service binding, so installing
+             one is copying a jar into this directory. src/dist/drivers/README.txt
+             says so, and is copied in beside them. -->
         <dependencySet>
             <outputDirectory>drivers</outputDirectory>
             <useProjectArtifact>false</useProjectArtifact>
             <scope>provided</scope>
             <includes>
                 <include>org.postgresql:postgresql</include>
-                <include>com.oracle.database.jdbc:ojdbc17</include>
                 <include>com.h2database:h2</include>
             </includes>
         </dependencySet>
@@ -107,6 +113,11 @@
         <fileSet>
             <directory>${project.basedir}/src/dist/conf</directory>
             <outputDirectory>conf</outputDirectory>
+            <fileMode>0644</fileMode>
+        </fileSet>
+        <fileSet>
+            <directory>${project.basedir}/src/dist/drivers</directory>
+            <outputDirectory>drivers</outputDirectory>
             <fileMode>0644</fileMode>
         </fileSet>
     </fileSets>
