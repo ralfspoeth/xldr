@@ -56,7 +56,7 @@ read two ways. Keeping the formats able to say the same things is what drives th
 ## Which to choose
 
 Whichever your team reads more comfortably, and whichever your tooling handles. Both have a published schema and
-both get validation and autocompletion in IntelliJ and VS Code - page 11 shows how to switch that on, and it is
+both get validation and autocompletion in IntelliJ and VS Code - page 12 shows how to switch that on, and it is
 the single most useful line you can add to a spec.
 
 Two practical differences. XML is more verbose but its nesting is visible, which tells in a spec with a dozen

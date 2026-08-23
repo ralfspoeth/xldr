@@ -29,7 +29,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /**
  * The specs printed in the tutorial are specs this release can read.
  * <p>
- * Twelve pages carry specs, sample files and {@code create table} statements,
+ * Thirteen pages carry specs, sample files and {@code create table} statements,
  * and nothing compiled ever looked at them. That is how the schema page went
  * stale for four releases: documentation drifts silently, because drifting is
  * all it can do. What a reader copies off a page ought to be held to the same
@@ -274,7 +274,7 @@ class TutorialTest {
         var pages = pages();
         var json = pages.stream().mapToLong(p -> specs(p, "json", "\"input\"").size()).sum();
         var xml = pages.stream().mapToLong(p -> specs(p, "xml", "<mappingSpec").size()).sum();
-        assertTrue(pages.size() >= 12, "twelve pages and an index, found " + pages.size());
+        assertTrue(pages.size() >= 13, "thirteen pages and an index, found " + pages.size());
         assertTrue(json >= 8, "eight whole JSON specs at the last count, found " + json);
         assertEquals(1, xml, "one XML spec, on page 3, found " + xml);
         assertTrue(pages.getLast().tables().size() >= 5,

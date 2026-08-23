@@ -1,6 +1,6 @@
-# 10. Types and notation
+# 11. Types and notation
 
-[← expressions](09-expressions.md) · [index](README.md) · [next: when it goes wrong →](11-when-it-goes-wrong.md)
+[← calling a function](10-calling-a-function.md) · [index](README.md) · [next: when it goes wrong →](12-when-it-goes-wrong.md)
 
 The mapping side of a spec is now familiar - four sources, and a column for each. This page changes the file
 instead, as pages 4 and 5 did, and keeps the mapping short so that the input side is what you are reading.
@@ -119,4 +119,4 @@ and the CSV adapter's defaults are the RFC's: comma, double quote, UTF-8.
 
 ---
 
-[← expressions](09-expressions.md) · [index](README.md) · [next: when it goes wrong →](11-when-it-goes-wrong.md)
+[← calling a function](10-calling-a-function.md) · [index](README.md) · [next: when it goes wrong →](12-when-it-goes-wrong.md)

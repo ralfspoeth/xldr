@@ -1,6 +1,6 @@
-# 11. When it goes wrong
+# 12. When it goes wrong
 
-[← types and notation](10-types.md) · [index](README.md) · [next: drafting one with an assistant →](12-with-an-assistant.md)
+[← types and notation](11-types.md) · [index](README.md) · [next: drafting one with an assistant →](13-with-an-assistant.md)
 
 Every page so far has worked. This one is about two ways to find a mistake before it costs anything, and the three
 moments at which one shows up if you did not - and the moment is the useful thing, because it tells you where to
@@ -38,7 +38,7 @@ The schema reads your document. `check` reads it against your file and your data
 
     xldr check spec.json --sample customers.csv --url jdbc:h2:./tutorial
 
-Point it at the spec from [page 10](10-types.md) and the file that page shows, and it says:
+Point it at the spec from [page 11](11-types.md) and the file that page shows, and it says:
 
     checking spec.json
       input          text/csv, 1 record selector(s)
@@ -172,11 +172,11 @@ You can now write a spec that reads a file of any of the supported formats, conv
 notation, fills columns from four different kinds of source, and separates several kinds of record into several
 tables - and, as importantly, read one and say whether it is right.
 
-Which is what the [last page](12-with-an-assistant.md) needs: having a language model draft a spec is a reasonable
+Which is what the [last page](13-with-an-assistant.md) needs: having a language model draft a spec is a reasonable
 way to start, and worth nothing at all unless you can review what comes back.
 
 The rest is reference, in the [README](../../README.md): the properties of each adapter, XML and JSON and Excel and
 fixed-length inputs, the server's configuration, how files are delivered, and how to embed the loader in an
 application rather than running the server at all.
 
-[← types and notation](10-types.md) · [index](README.md) · [next: drafting one with an assistant →](12-with-an-assistant.md)
+[← types and notation](11-types.md) · [index](README.md) · [next: drafting one with an assistant →](13-with-an-assistant.md)

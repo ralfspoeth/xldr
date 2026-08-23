@@ -116,7 +116,7 @@ set of settings, and [Delivering files](#delivering-files) for why the file must
 place.
 
 **Writing the spec is the actual work**, and this README is the reference rather than the path through it. For that,
-see the [tutorial](docs/tutorial/README.md). It is twelve short pages, each adding one thing to the spec built by
+see the [tutorial](docs/tutorial/README.md). It is thirteen short pages, each adding one thing to the spec built by
 the page before: a first spec and the same one in XML, then the headerless pair - counting a file's components
 instead of naming them, and separating several kinds of record into several tables - then constants, variables,
 lookups, expressions, types and notation, and last, because it needs everything before it, having a language model
@@ -139,7 +139,7 @@ fix their versions in one place:
             <dependency>
                 <groupId>io.github.ralfspoeth.xldr</groupId>
                 <artifactId>bom</artifactId>
-                <version>0.39</version>
+                <version>0.40</version>
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>

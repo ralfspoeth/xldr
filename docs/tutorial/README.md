@@ -13,9 +13,10 @@ the series reads as a diff rather than as a catalogue.
 7. [Variables](07-vars.md) - a value computed once per load
 8. [Lookups](08-lookups.md) - a value resolved against another table
 9. [Expressions](09-expressions.md) - `${...}`, the file's own name, a sequence
-10. [Types and notation](10-types.md) - what a value is, and how the producer wrote it
-11. [When it goes wrong](11-when-it-goes-wrong.md) - `xldr check` before you deploy, and the hospital after
-12. [Drafting one with an assistant](12-with-an-assistant.md) - what to give a model, and what to check in the answer
+10. [Calling a function](10-calling-a-function.md) - a value the target database itself hands out
+11. [Types and notation](11-types.md) - what a value is, and how the producer wrote it
+12. [When it goes wrong](12-when-it-goes-wrong.md) - `xldr check` before you deploy, and the hospital after
+13. [Drafting one with an assistant](13-with-an-assistant.md) - what to give a model, and what to check in the answer
 
 The [README](../../README.md) is the reference: every adapter's properties, every field type, the full expression
 grammar, the server's configuration. This is the path, not the map.

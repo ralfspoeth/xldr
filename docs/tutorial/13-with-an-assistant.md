@@ -1,6 +1,6 @@
-# 12. Drafting one with an assistant
+# 13. Drafting one with an assistant
 
-[← when it goes wrong](11-when-it-goes-wrong.md) · [index](README.md)
+[← when it goes wrong](12-when-it-goes-wrong.md) · [index](README.md)
 
 A mapping spec is a structured document with a published schema, derived mechanically from a file and a table you
 can both show. That is close to the ideal shape for a language model to draft, and Claude, Copilot, ChatGPT and the
@@ -80,10 +80,10 @@ actual names are in the [README](../../README.md#feed-configuration), and the on
 ## Then let the machine check it
 
 Everything above is mechanical, so do not do it by eye. Save the spec with its `$schema` member, open it in
-IntelliJ or VS Code, and read the squiggles - as [page 11](11-when-it-goes-wrong.md) describes. The schema catches
+IntelliJ or VS Code, and read the squiggles - as [page 12](12-when-it-goes-wrong.md) describes. The schema catches
 every one of the six except the first, and catches a good deal else besides.
 
-Then run `check`, as [page 11](11-when-it-goes-wrong.md#before-you-deploy-xldr-check) describes:
+Then run `check`, as [page 12](12-when-it-goes-wrong.md#before-you-deploy-xldr-check) describes:
 
     xldr check spec.json --sample sample.csv --url jdbc:h2:./tutorial
 
@@ -116,4 +116,4 @@ sends you the file.
 
 That really is the end of the tutorial. The [README](../../README.md) has the rest.
 
-[← when it goes wrong](11-when-it-goes-wrong.md) · [index](README.md)
+[← when it goes wrong](12-when-it-goes-wrong.md) · [index](README.md)

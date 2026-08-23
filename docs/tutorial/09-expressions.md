@@ -1,8 +1,8 @@
 # 9. Expressions
 
-[← lookups](08-lookups.md) · [index](README.md) · [next: types and notation →](10-types.md)
+[← lookups](08-lookups.md) · [index](README.md) · [next: calling a function →](10-calling-a-function.md)
 
-The fourth and last source. An **expression** is a `${...}` template evaluated in the JVM, and it is the one that
+The fourth source. An **expression** is a `${...}` template evaluated in the JVM, and it is the one that
 can combine things: literal text with a field, two fields together, a value the server supplies about the load
 itself.
 
@@ -97,7 +97,8 @@ increment - `${nextval('row', 100, 10)}` gives 100, 110, 120.
 start value for the next file. So it is the right thing for a position within the file - the `record_no` above,
 which is what makes a row traceable to a line - and the wrong thing for a primary key, because the second file
 would generate the numbers the first one already used. For a key, use the database's own sequence or identity
-column and leave it out of the spec, or pair the counter with a batch variable so that the two together are unique.
+column and leave it out of the spec, call it from the spec as [the next page](10-calling-a-function.md) shows, or
+pair the counter with a batch variable so that the two together are unique.
 
 There are two more, for moving between text and the date types: `format(value, 'pattern')` renders a date or
 timestamp as text in a pattern you control, which is how to put a timestamp into a `varchar` column and know what
@@ -124,4 +125,4 @@ that has a language for it.
 
 ---
 
-[← lookups](08-lookups.md) · [index](README.md) · [next: types and notation →](10-types.md)
+[← lookups](08-lookups.md) · [index](README.md) · [next: calling a function →](10-calling-a-function.md)

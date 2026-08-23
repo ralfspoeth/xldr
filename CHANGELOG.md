@@ -70,6 +70,17 @@ document is the whole point - nothing about the input could have made either wor
   spec is a document, and the module that models one should not require a driver to be on the module path.
 
 - **`xldr check` prints a call**, arguments and return type included, in the same column form as every other source.
+  It does not verify that the function exists, where it does verify a lookup's table and columns - the metadata is
+  there to do it with, and this is the obvious next thing for the command.
+
+- **A tutorial page on calling a function**, [page 10](docs/tutorial/10-calling-a-function.md), after expressions
+  and before types - which is where it belongs, since the page it answers is the one that explains why `nextval` is
+  a counter in memory and therefore the wrong thing for a key. The four pages after it are renumbered.
+
+- **`FunctionCallIT`**, which is the only test that exercises the call at all: `prepareCall`, the escape, the OUT
+  parameter and the argument indices are the driver's, and nothing in `spec` or `ldr` reaches them. It calls H2's
+  built-in `FORMATDATETIME` with two arguments - a var holding `${now()}` and a constant pattern - so both kinds of
+  argument and the `Instant`-as-`OffsetDateTime` binding are in one load.
 
 ### Changed
 
