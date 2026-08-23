@@ -8,6 +8,15 @@ The versions are the git tags `xldr-<version>`; the published artifacts carry th
 
 ## 0.38
 
+A release about where test code lives. Every module but `xlet` and `it` now has its tests in the package they test
+and no test `module-info.java`, so a class need not be public merely to be reachable from a test - and the tests
+themselves stopped being public, twenty classes and 178 methods of them. Nothing a consumer can see has changed
+shape.
+
+The mapping-spec format is untouched, so `mapping-spec-0.35` remains its schema and a spec that loaded under 0.37
+loads under 0.38. The one entry under **Fixed** is a README that had been denying, for five releases, that
+fixed-length files can carry several record types - which they have been able to do since 0.32.
+
 ### Changed
 
 - **`spec`'s tests moved into the packages they test**, and its test `module-info.java` is gone. Surefire patches
@@ -61,6 +70,13 @@ The versions are the git tags `xldr-<version>`; the published artifacts carry th
   nine modules' main sources require `ia`, and seven test modules require it too, every one of them seeing only
   what `ia` exports, and five of them implementing the SPI rather than merely calling it. The export surface is
   exercised sixteen ways on every build by code that is not scaffolding. A test module adds nothing to that.
+
+  **What it costs: IntelliJ cannot compile the patched tests.** Running one from the IDE fails with
+  `Modul nicht gefunden: io.github.ralfspoeth.xmls` while compiling `spec` - naming the modules `spec`'s *main*
+  descriptor requires, so the IDE is rebuilding the module path wrongly rather than missing a test-only entry.
+  Reloading the Maven project, invalidating caches and delegating the build to Maven were all tried and none of
+  them helped; `mvn` itself is green throughout. Tests are run with Maven, and that is the trade this layout was
+  accepted on, not a defect waiting to be fixed by putting the test module-infos back.
 
 - **`XldrServletIT` moved from `xlet` to `it`**, taking its `src/test/webapp` with it. `it` is the module for
   integration tests, and this was the one living somewhere else; it is also the only module binding failsafe now,
