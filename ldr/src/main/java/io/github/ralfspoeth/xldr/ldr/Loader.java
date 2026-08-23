@@ -60,7 +60,8 @@ public class Loader implements AutoCloseable {
     private final Map<String, Integer> sequences = new HashMap<>();
     /** compiled once per pattern rather than per row, the patterns coming from the spec */
     private final Map<String, DateTimeFormatter> formatters = new HashMap<>();
-    private final Map<String, Object> varValues;
+    /** a var may hold null: a lookup that matched nothing, or a function that returned NULL */
+    private final Map<String, @Nullable Object> varValues;
     private final Map<TabCol, PreparedStatement> statementCache = new HashMap<>();
     private boolean failed = false;
 
@@ -300,16 +301,28 @@ public class Loader implements AutoCloseable {
      * Evaluates every input variable once, in declaration order, so a variable
      * may reference an earlier one. Each value is a plain object that a {@link
      * ValueSource.Var} then binds wherever it is referenced.
+     * <p>
+     * A variable may be null, and that is a value rather than a failure. A
+     * {@link ValueSource.Lookup} whose key matches no row and a {@link
+     * ValueSource.FunctionCall} that returns SQL NULL are both ordinary answers
+     * from the database, and the column they feed takes NULL - which is what the
+     * same lookup does in a field mapping already. Refusing them here would fail
+     * a load at its first moment over a row that is simply not there, and a
+     * reference table with a gap in it is a thing that happens.
+     * <p>
+     * Every reader of this map tests {@code containsKey} rather than a non-null
+     * {@code get}, so a declared variable that is null stays distinct from one
+     * that was never declared.
      */
-    private Map<String, Object> evaluateVars() throws SQLException {
-        var values = new LinkedHashMap<String, Object>();
+    private Map<String, @Nullable Object> evaluateVars() throws SQLException {
+        var values = new LinkedHashMap<String, @Nullable Object>();
         for (var v : mappingSpec.inputSpec().vars()) {
-            values.put(v.name(), requireNonNull(evaluate(v.source(), values)));
+            values.put(v.name(), evaluate(v.source(), values));
         }
         return values;
     }
 
-    private @Nullable Object evaluate(ValueSource source, Map<String, Object> resolved) throws SQLException {
+    private @Nullable Object evaluate(ValueSource source, Map<String, @Nullable Object> resolved) throws SQLException {
         return switch (source) {
             case ValueSource.Constant c -> c.value();
             case ValueSource.Var v -> {
@@ -319,11 +332,57 @@ public class Loader implements AutoCloseable {
                 }
                 yield resolved.get(v.name());
             }
-            case ValueSource.Lookup lk -> lookup(lk, requireNonNull(evaluate(lk.key(), resolved)));
+            // the key may be null, and lookup says what it does about that: the
+            // requireNonNull that used to be here made that branch unreachable
+            case ValueSource.Lookup lk -> lookup(lk, evaluate(lk.key(), resolved));
             case ValueSource.Expr e -> Expression.compile(e.template()).eval(bindings(resolved, null));
+            case ValueSource.FunctionCall fc -> call(fc, resolved);
+            // unreachable, and kept because the switch has to be exhaustive:
+            // VarSpec refuses a field at any depth when the spec is read, which
+            // is where a rule the document alone proves broken belongs. This is
+            // what would happen if something built a VarSpec another way
             case ValueSource.Field _ -> throw new IllegalArgumentException(
                     "a var cannot read an input field: it is evaluated with no record in hand");
         };
+    }
+
+    /**
+     * Calls a function in the target database and hands back what it returned.
+     * <p>
+     * Once, here, and nowhere else. A var is evaluated before any record is read,
+     * so this costs one round trip per load - the same order as the {@link
+     * #lookup} beside it. In a field mapping it would cost one per row and end the
+     * batching, which is why {@link #plan} refuses it.
+     * <p>
+     * The arguments are evaluated first, each by this same method, so a call may
+     * take a constant, an earlier var, a lookup or another call - and a field
+     * among them meets the refusal every other var source meets.
+     * <p>
+     * {@code {? = call name(?, ?)}} is JDBC's own escape and the driver renders it
+     * for the product it is talking to. The one thing that has to be said outright
+     * is the type of what comes back, which is why a {@link
+     * ValueSource.FunctionCall} carries one: an OUT parameter is registered before
+     * the call, so there is nothing to infer it from.
+     */
+    private @Nullable Object call(ValueSource.FunctionCall fc, Map<String, @Nullable Object> resolved) throws SQLException {
+        var arguments = new ArrayList<@Nullable Object>(fc.parameters().size());
+        for (var parameter : fc.parameters()) {
+            arguments.add(evaluate(parameter, resolved));
+        }
+        var placeholders = String.join(", ", Collections.nCopies(arguments.size(), "?"));
+        try (var cs = connection.prepareCall("{? = call " + fc.name() + "(" + placeholders + ")}")) {
+            cs.registerOutParameter(1, fc.returnType().sqlType());
+            for (int i = 0; i < arguments.size(); i++) {
+                // the OUT parameter is 1, so the arguments start at 2
+                cs.setObject(i + 2, jdbcValue(arguments.get(i)));
+            }
+            cs.execute();
+            var value = cs.getObject(1);
+            // wasNull rather than a null check: a driver may hand back 0 or false
+            // for a SQL NULL of a primitive type, and only this tells the two
+            // apart. What happens to a null afterwards is evaluateVars' business
+            return cs.wasNull() ? null : value;
+        }
     }
 
     /**
@@ -347,7 +406,7 @@ public class Loader implements AutoCloseable {
      * {@code format(value, pattern)} and {@code parse(text, pattern)} convert
      * between text and the date types.
      */
-    private Expression.Bindings bindings(Map<String, Object> vars, @Nullable Row row) {
+    private Expression.Bindings bindings(Map<String, @Nullable Object> vars, @Nullable Row row) {
         return new Expression.Bindings() {
             @Override
             public @Nullable Object variable(String name) {
@@ -770,6 +829,14 @@ public class Loader implements AutoCloseable {
                         + " from " + qualify(lk.table())
                         + " where " + normalizeIdentifier(lk.keyColumn()) + " = " + keyExpr + ")";
             }
+            // unreachable, and kept because the switch has to be exhaustive:
+            // FieldMappingSpec refuses a call at any depth when the spec is read,
+            // as VarSpec refuses a field. A call here would be a CallableStatement
+            // per row - a round trip each, and the end of the batching that makes
+            // a load of a hundred thousand records finish
+            case ValueSource.FunctionCall fc -> throw new IllegalArgumentException(
+                    "a column cannot call '" + fc.name() + "' directly: a function is called once per load,"
+                            + " so declare it as a var of the input and map the column to that var");
         };
     }
 

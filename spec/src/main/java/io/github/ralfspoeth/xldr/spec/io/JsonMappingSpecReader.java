@@ -93,12 +93,14 @@ public class JsonMappingSpecReader implements MappingSpecReader {
                 .or(() -> value.bool().map(String::valueOf));
     }
 
+    /**
+     * A var reads whatever a field mapping reads, minus a field - which
+     * {@link VarSpec} refuses itself, at any depth, so there is nothing to check
+     * here. It used to be checked here and only at the top level, so a field
+     * inside a lookup key slipped through and failed at load instead.
+     */
     private static VarSpec varSpec(JsonValue v) {
-        var source = valueSource(v);
-        if (source instanceof ValueSource.Field) {
-            throw new IllegalArgumentException("a var must be row-independent, not a fieldSelector: " + v);
-        }
-        return new VarSpec(PTR.member("name").stringOrThrow(v), source);
+        return new VarSpec(PTR.member("name").stringOrThrow(v), valueSource(v));
     }
 
     private static RecordMappingSpec recordMappingSpec(JsonValue element) {
@@ -121,24 +123,62 @@ public class JsonMappingSpecReader implements MappingSpecReader {
     }
 
     /**
-     * A field mapping carries exactly one source: {@code fieldSelector},
-     * {@code constant}, {@code var}, {@code expr}, or a {@code lookup} object.
-     * Which one, and the refusal when it is not one, is
-     * {@link SpecNode#source()}; where the lookup sits is this format's business.
+     * Exactly one source: {@code fieldSelector}, {@code constant}, {@code var} or
+     * {@code expr} as a scalar member, or a {@code lookup} or {@code fn} object.
+     * Which of the four scalars, and the refusal when it is not one, is
+     * {@link SpecNode#source()}; where the two objects sit is this format's
+     * business.
      */
     private static ValueSource valueSource(JsonValue fm) {
         var lookup = PTR.member("lookup").apply(fm).orElse(null);
-        if (lookup == null) {
+        var fn = PTR.member("fn").apply(fm).orElse(null);
+        if (lookup == null && fn == null) {
             return node(fm).source();
         }
+        if (lookup != null && fn != null) {
+            throw new IllegalArgumentException("a lookup and an fn are two sources, and one is wanted: " + fm);
+        }
         if (node(fm).hasSource()) {
-            throw new IllegalArgumentException("a lookup mapping must carry no other source: " + fm);
+            throw new IllegalArgumentException(
+                    "a " + (fn == null ? "lookup" : "fn") + " mapping must carry no other source: " + fm);
+        }
+        if (fn != null) {
+            return functionCall(fn);
         }
         return new ValueSource.Lookup(
                 PTR.member("table").stringOrThrow(lookup),
                 PTR.member("column").stringOrThrow(lookup),
                 PTR.member("keyColumn").stringOrThrow(lookup),
                 node(lookup).source());
+    }
+
+    /**
+     * A call: its {@code name}, the {@code type} it returns, and its {@code args}.
+     * <p>
+     * {@code type} is required, where a field selector's may be left out and
+     * defaults to {@code TEXT}: the loader registers an OUT parameter before the
+     * call and has nothing to infer it from.
+     * <p>
+     * Each argument is a value source of its own, read by the same method that
+     * reads a field mapping's - so an argument may be a constant, a var, an
+     * expression, a lookup, or another call, and nesting costs nothing. A field
+     * among them is refused by {@link VarSpec}, which is where the rule belongs:
+     * an argument is evaluated at the same moment as the var it feeds.
+     */
+    private static ValueSource.FunctionCall functionCall(JsonValue fn) {
+        return new ValueSource.FunctionCall(
+                PTR.member("name").stringOrThrow(fn),
+                PTR.member("type")
+                        .stringValue(fn)
+                        .map(String::toUpperCase)
+                        .map(DataType::valueOf)
+                        .orElseThrow(() -> new IllegalArgumentException(
+                                "an fn says the type it returns, so that the call can be prepared: " + fn)),
+                PTR.member("args")
+                        .select(all())
+                        .apply(fn)
+                        .map(JsonMappingSpecReader::valueSource)
+                        .toList());
     }
 
     /**

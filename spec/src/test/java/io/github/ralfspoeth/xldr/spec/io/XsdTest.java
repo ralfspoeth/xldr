@@ -1,9 +1,11 @@
 package io.github.ralfspoeth.xldr.spec.io;
 
+import io.github.ralfspoeth.xldr.spec.DataType;
 import io.github.ralfspoeth.xldr.spec.Discriminator;
 import io.github.ralfspoeth.xldr.spec.FieldSelectorSpec;
 import io.github.ralfspoeth.xldr.spec.Locator;
 import io.github.ralfspoeth.xldr.spec.Selector;
+import io.github.ralfspoeth.xldr.spec.ValueSource;
 import org.junit.jupiter.api.Test;
 import org.xml.sax.SAXException;
 
@@ -30,7 +32,7 @@ import static org.junit.jupiter.api.Assertions.*;
  */
 class XsdTest {
 
-    private static final Path SCHEMA = Path.of("..", "docs", "schema", "mapping-spec-0.35.xsd");
+    private static final Path SCHEMA = Path.of("..", "docs", "schema", "mapping-spec-0.40.xsd");
 
     /**
      * Every element and attribute the reader knows, in one document.
@@ -44,6 +46,15 @@ class XsdTest {
                     <var name="batch">
                         <lookup table="load_batch" column="id" keyColumn="feed" constant="funds"/>
                     </var>
+                    <var name="loadId">
+                        <fn name="pkg_load.next_id" type="INTEGRAL">
+                            <arg constant="funds"/>
+                            <arg var="source"/>
+                            <arg>
+                                <fn name="today" type="DATE"/>
+                            </arg>
+                        </fn>
+                    </var>
                     <recordSelector name="fund" selector="/root/fund">
                         <fieldSelector name="id" selector="@id" type="text"/>
                         <fieldSelector name="nav" selector="nav" type="decimal"/>
@@ -54,6 +65,7 @@ class XsdTest {
                     <fieldMapping fieldSelector="id" column="ident1_txt"/>
                     <fieldMapping constant="X" column="status_cd"/>
                     <fieldMapping var="source" column="source_cd"/>
+                    <fieldMapping var="loadId" column="load_id"/>
                     <fieldMapping expr="${xldr.filename}" column="loaded_from"/>
                     <fieldMapping column="country_id">
                         <lookup table="country" column="id" keyColumn="iso" fieldSelector="c"/>
@@ -83,7 +95,18 @@ class XsdTest {
         var spec = new XmlMappingSpecReader().read(stream(COMPLETE_SPEC));
         assertTrue(spec.inputSpec().properties().containsKey("ns.f"));
         assertTrue(spec.recordMappingSpecs().stream()
-                .anyMatch(m -> m.fieldMappings().size() == 5));
+                .anyMatch(m -> m.fieldMappings().size() == 6));
+        assertEquals(
+                new ValueSource.FunctionCall("pkg_load.next_id", DataType.INTEGRAL, List.of(
+                        new ValueSource.Constant("funds"),
+                        new ValueSource.Var("source"),
+                        new ValueSource.FunctionCall("today", DataType.DATE, List.of()))),
+                spec.inputSpec().vars().stream()
+                        .filter(v -> v.name().equals("loadId"))
+                        .findFirst()
+                        .orElseThrow()
+                        .source(),
+                "the nesting the schema allows is the nesting the reader builds");
     }
 
     /**
@@ -282,6 +305,115 @@ class XsdTest {
                     </input>
                 </mappingSpec>
                 """);
+    }
+
+    // ---- and the rules this schema version exists for ------------------------
+
+    /**
+     * A call belongs to a var and not to a column: it is made once per load, and
+     * a column is bound once per record, so the same call in a column would be a
+     * round trip per row. {@code fn} is therefore a child of {@code <var>} and of
+     * {@code <arg>}, and of nothing under {@code <mapping>}.
+     */
+    @Test
+    void aColumnCannotCallAFunction() {
+        assertRefusedByBoth("""
+                <mappingSpec>
+                    <input mimeType="text/csv"/>
+                    <mapping recordSelector="r" table="t">
+                        <fieldMapping column="load_id">
+                            <fn name="next_id" type="INTEGRAL"/>
+                        </fieldMapping>
+                    </mapping>
+                </mappingSpec>
+                """);
+    }
+
+    /**
+     * An argument is evaluated at the same moment as the var it feeds, which is
+     * before the first record is read - so it may be anything a var may be, and
+     * a field is not among them. {@code <arg>} carries no {@code fieldSelector}.
+     */
+    @Test
+    void aCallArgumentCannotReadAField() {
+        assertRefusedByBoth("""
+                <mappingSpec>
+                    <input mimeType="text/csv">
+                        <var name="loadId">
+                            <fn name="next_id" type="INTEGRAL">
+                                <arg fieldSelector="id"/>
+                            </fn>
+                        </var>
+                    </input>
+                </mappingSpec>
+                """);
+    }
+
+    /**
+     * The same rule one level over: a lookup under a var is keyed with no record
+     * in hand either. The schema said this for the first time in 0.40 - until
+     * then one {@code lookup} type served both places, so a var keyed by a field
+     * validated in an editor and threw at load.
+     */
+    @Test
+    void aVarLookupCannotBeKeyedByAField() {
+        assertRefusedByBoth("""
+                <mappingSpec>
+                    <input mimeType="text/csv">
+                        <var name="batch">
+                            <lookup table="load_batch" column="id" keyColumn="feed" fieldSelector="f"/>
+                        </var>
+                    </input>
+                </mappingSpec>
+                """);
+    }
+
+    /**
+     * A call says the type it returns, where a field selector may leave its type
+     * out: the loader registers the OUT parameter before the call and has
+     * nothing to infer it from.
+     */
+    @Test
+    void aCallSaysWhatItReturns() {
+        assertRefusedByBoth("""
+                <mappingSpec>
+                    <input mimeType="text/csv">
+                        <var name="loadId">
+                            <fn name="next_id"/>
+                        </var>
+                    </input>
+                </mappingSpec>
+                """);
+    }
+
+    /**
+     * A function name is the one part of a value source that reaches the text of
+     * a statement, so it is held to being a name - identifiers separated by dots
+     * and nothing else. Everything else a spec contributes goes in as a bound
+     * parameter.
+     */
+    @Test
+    void aFunctionNameIsAName() {
+        assertRefusedByBoth("""
+                <mappingSpec>
+                    <input mimeType="text/csv">
+                        <var name="loadId">
+                            <fn name="next_id(1); drop table t" type="INTEGRAL"/>
+                        </var>
+                    </input>
+                </mappingSpec>
+                """);
+    }
+
+    /**
+     * Both, because neither catches the other's cases: an editor never runs the
+     * reader, and a spec the server loads was never put through the schema.
+     */
+    private static void assertRefusedByBoth(String xml) {
+        assertAllInvalid(xml);
+        assertThrows(IllegalArgumentException.class,
+                () -> new XmlMappingSpecReader().read(stream(xml)),
+                () -> "the reader has to refuse what the schema refuses: " + xml);
     }
 
     private static void assertAllInvalid(String xml) {

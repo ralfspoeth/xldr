@@ -227,7 +227,10 @@ class TutorialTest {
         return switch (source) {
             case ValueSource.Field(var name) -> Set.of(name);
             case ValueSource.Lookup(_, _, _, var key) -> fieldNames(key);
-            case ValueSource.Constant _, ValueSource.Var _, ValueSource.Expr _ -> Set.of();
+            // a call reads no record either: it is a var source, evaluated once
+            // before the first one is read
+            case ValueSource.Constant _, ValueSource.Var _, ValueSource.Expr _,
+                 ValueSource.FunctionCall _ -> Set.of();
         };
     }
 

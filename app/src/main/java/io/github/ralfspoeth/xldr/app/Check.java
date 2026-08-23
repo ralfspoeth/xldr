@@ -255,6 +255,10 @@ public class Check implements Callable<Integer> {
             case ValueSource.Lookup(var table, var column, var keyColumn, var key) ->
                     "lookup    " + table + "." + column + " where " + keyColumn
                             + " = " + describe(key).replaceAll("\\s{2,}", " ").strip();
+            case ValueSource.FunctionCall(var name, var returnType, var parameters) ->
+                    "call      " + name + "(" + parameters.stream()
+                            .map(p -> describe(p).replaceAll("\\s{2,}", " ").strip())
+                            .collect(Collectors.joining(", ")) + ") -> " + returnType;
         };
     }
 
@@ -580,6 +584,10 @@ public class Check implements Callable<Integer> {
             // a constant needs no record, a var is evaluated once per load, and an
             // expression's names are resolved by the loader against several scopes
             case ValueSource.Constant _, ValueSource.Var _, ValueSource.Expr _ -> {
+            }
+            // a call is a var source, so it reads no record either - and the loader
+            // refuses one in a column, which is the only place this walks
+            case ValueSource.FunctionCall _ -> {
             }
         }
     }

@@ -3,6 +3,8 @@ package io.github.ralfspoeth.xldr.spec;
 import org.jspecify.annotations.Nullable;
 
 import java.io.Serializable;
+import java.util.List;
+import java.util.regex.Pattern;
 
 /**
  * Where the value of a mapped database column comes from. Exactly one of:
@@ -22,10 +24,17 @@ import java.io.Serializable;
  *       that is bound as a parameter. It interpolates variables and a small set
  *       of built-in functions ({@code nextval}, {@code now}); it never emits
  *       SQL.</li>
+ *   <li>{@link FunctionCall} - a function in the target database, called through
+ *       JDBC's {@code {? = call name(?)}} escape once per load and bound as a
+ *       parameter thereafter. A {@link VarSpec} source only.</li>
  * </ul>
  * <p>
- * Every value reaches the database as a bound parameter or an identifier that is
- * normalized and, where needed, quoted - a spec never contributes raw SQL.
+ * A spec contributes no SQL of its own: a value is a bound parameter, an
+ * identifier that is normalized and where needed quoted, or - for a function
+ * call - a name checked to be an identifier, placed in an escape the driver
+ * translates. What a spec may depend on is the target's <em>schema</em>: that a
+ * {@code Lookup}'s table is there, and that a {@code FunctionCall}'s function is.
+ * What it never depends on is a dialect.
  */
 public sealed interface ValueSource extends Serializable {
 
@@ -78,4 +87,72 @@ public sealed interface ValueSource extends Serializable {
      * @param template the template text, holes and all
      */
     record Expr(String template) implements ValueSource {}
+
+    /**
+     * A function in the target database, called once per load and bound as a
+     * parameter wherever the variable holding it is referenced.
+     * <p>
+     * A {@link VarSpec} source only. A var is evaluated once, before any record
+     * is read, which is what makes a {@code CallableStatement} affordable here
+     * and nowhere else: in a field mapping the same call would be a round trip
+     * per row and would end the batching. The loader enforces it, refusing this
+     * in a column exactly as it refuses a {@link Field} in a var - each is
+     * meaningless where the other belongs.
+     * <p>
+     * The dependency this creates is on the target's <em>schema</em>, not on its
+     * dialect: {@code {? = call name(?)}} is JDBC's own call escape, which the
+     * driver translates, so what a spec relies on is that the database has the
+     * function - the same kind of reliance a {@link Lookup} already has on a
+     * table existing.
+     *
+     * @param name       the function, optionally qualified. Each dot-separated
+     *                   part must be an identifier, since this is the one part of
+     *                   a value source that reaches the statement text
+     * @param returnType what the function returns. Required, unlike a field
+     *                   selector's type, which may be left out and defaults to
+     *                   {@code TEXT}: an OUT parameter has to be registered
+     *                   before the call, so there is nothing to fall back to
+     * @param parameters the arguments, each a value source of its own and each
+     *                   evaluated with no record in hand - so a {@code Field}
+     *                   among them is refused where every other var source is
+     */
+    record FunctionCall(String name, DataType returnType, List<ValueSource> parameters) implements ValueSource {
+
+        /**
+         * Deliberately narrower than {@link SqlIdentifier}, which tolerates a
+         * quoted name because a column may need one. A function whose name has to
+         * be quoted is beyond what this is for, and admitting quotes would mean
+         * admitting every character they can contain.
+         */
+        private static final Pattern PLAIN_IDENTIFIER = Pattern.compile("[A-Za-z_][A-Za-z0-9_]*");
+
+        public FunctionCall {
+            refuseUncallableName(name);
+            parameters = List.copyOf(parameters);
+        }
+
+        /**
+         * Refuses a name that could be anything but a name.
+         * <p>
+         * Every other value a spec contributes is bound as a parameter or folded
+         * as an identifier; this one is written into the call escape, so it is the
+         * only place where what a spec says becomes part of a statement's text. A
+         * name is therefore one or more identifiers separated by dots -
+         * {@code my_func}, {@code app.my_func}, {@code warehouse.app.my_func} -
+         * and anything carrying a bracket, a quote, a semicolon or whitespace is
+         * refused rather than folded into something harmless-looking.
+         */
+        private static void refuseUncallableName(String name) {
+            if (name.isBlank()) {
+                throw new IllegalArgumentException("a function call needs a name");
+            }
+            for (var part : name.split("\\.", -1)) {
+                if (!PLAIN_IDENTIFIER.matcher(part).matches()) {
+                    throw new IllegalArgumentException("'" + name + "' is not a function this may call: '"
+                            + part + "' is not an identifier. A name is one or more identifiers separated by"
+                            + " dots, each a letter or underscore followed by letters, digits or underscores");
+                }
+            }
+        }
+    }
 }

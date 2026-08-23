@@ -24,32 +24,59 @@ public enum DataType {
      * A date/time field; no timezone;
      * wraps a {@link LocalDateTime}.
      */
-    DATE(LocalDateTime.class),
+    DATE(LocalDateTime.class, 93),
     /**
      * Textual content; represented by
      * {@link String}
      */
-    TEXT(String.class),
+    TEXT(String.class, 12),
     /**
      * 64-bit integral value, represented by a
      * {@link Long}.
      */
-    INTEGRAL(Long.class),
+    INTEGRAL(Long.class, -5),
     /**
      * 64-bit floating point value
      * represented by a {@link Double}.
      */
-    FP(Double.class),
+    FP(Double.class, 8),
     /**
      * Decimal value, represented by
      * {@link BigDecimal}.
      */
-    DECIMAL(BigDecimal.class);
+    DECIMAL(BigDecimal.class, 3);
 
     private final Class<?> clazz;
+    private final int sqlType;
 
-    DataType(Class<?> clazz) {
+    DataType(Class<?> clazz, int sqlType) {
         this.clazz = requireNonNull(clazz);
+        this.sqlType = sqlType;
+    }
+
+    /**
+     * The {@code java.sql.Types} constant a driver should be told this is, when
+     * one has to be named rather than inferred - registering the OUT parameter of
+     * a {@link ValueSource.FunctionCall}, or binding a null.
+     * <p>
+     * The conservative choice in each case, and the one that matches
+     * {@link #clazz()}: {@code TIMESTAMP} rather than {@code TIMESTAMP_WITH_TIMEZONE},
+     * since a {@code LocalDateTime} carries no zone; {@code BIGINT} rather than
+     * {@code INTEGER}, since the value is a {@code Long}; {@code DOUBLE} rather
+     * than the confusingly named {@code FLOAT}, which in JDBC is also double
+     * precision; {@code VARCHAR} rather than {@code LONGVARCHAR}.
+     * <p>
+     * The literals are deliberate. Naming {@code java.sql.Types} here would make
+     * this module - the document model, which a linter or an editor plugin reads
+     * without ever opening a connection - require {@code java.sql} for five
+     * integers. The values are fixed by the JDBC specification and cannot drift:
+     * 93, 12, -5, 8 and 3 are {@code TIMESTAMP}, {@code VARCHAR}, {@code BIGINT},
+     * {@code DOUBLE} and {@code DECIMAL}.
+     *
+     * @return the JDBC type code for this type
+     */
+    public int sqlType() {
+        return sqlType;
     }
 
     /**

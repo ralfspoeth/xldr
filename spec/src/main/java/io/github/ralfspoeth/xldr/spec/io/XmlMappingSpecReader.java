@@ -105,12 +105,14 @@ public class XmlMappingSpecReader implements MappingSpecReader {
         return properties;
     }
 
+    /**
+     * A var reads whatever a field mapping reads, minus a field - which
+     * {@link VarSpec} refuses itself, at any depth, so there is nothing to check
+     * here. It used to be checked here and only at the top level, so a field
+     * inside a lookup key slipped through and failed at load instead.
+     */
     private static VarSpec varSpec(Element element) {
-        var source = valueSource(element);
-        if (source instanceof ValueSource.Field) {
-            throw new IllegalArgumentException("a var must be row-independent, not a fieldSelector");
-        }
-        return new VarSpec(required(element, "name"), source);
+        return new VarSpec(required(element, "name"), valueSource(element));
     }
 
     /**
@@ -181,17 +183,56 @@ public class XmlMappingSpecReader implements MappingSpecReader {
      */
     private static ValueSource valueSource(Element fm) {
         var lookup = elements("lookup").apply(fm).findFirst().orElse(null);
-        if (lookup == null) {
+        var fn = elements("fn").apply(fm).findFirst().orElse(null);
+        if (lookup == null && fn == null) {
             return node(fm).source();
         }
+        if (lookup != null && fn != null) {
+            throw new IllegalArgumentException(
+                    "<" + fm.getNodeName() + "> has both a <lookup> and an <fn>, and one source is wanted");
+        }
         if (node(fm).hasSource()) {
-            throw new IllegalArgumentException("a <lookup> field mapping must carry no source attribute");
+            throw new IllegalArgumentException("a <" + (fn == null ? "lookup" : "fn")
+                    + "> field mapping must carry no source attribute");
+        }
+        if (fn != null) {
+            return functionCall(fn);
         }
         return new ValueSource.Lookup(
                 required(lookup, "table"),
                 required(lookup, "column"),
                 required(lookup, "keyColumn"),
                 node(lookup).source());
+    }
+
+    /**
+     * A call, as an element with a child per argument:
+     *
+     * <pre>
+     * &lt;fn name="next_id" type="INTEGRAL"&gt;
+     *     &lt;arg constant="7"/&gt;
+     *     &lt;arg var="feed"/&gt;
+     * &lt;/fn&gt;
+     * </pre>
+     *
+     * The first repeated child this format carries inside a value source. A
+     * {@code <lookup>} could hold its one key as attributes on itself; a call has
+     * as many arguments as it has, so each needs an element - and an {@code <arg>}
+     * carries exactly what a {@code <fieldMapping>} carries, which is what lets
+     * the same method read both and lets an argument be a nested {@code <lookup>}
+     * or {@code <fn>}.
+     * <p>
+     * {@code type} is required, where a field selector's may be left out and
+     * defaults to {@code TEXT}: the loader registers an OUT parameter before the
+     * call and has nothing to infer it from.
+     */
+    private static ValueSource.FunctionCall functionCall(Element fn) {
+        return new ValueSource.FunctionCall(
+                required(fn, "name"),
+                DataType.valueOf(required(fn, "type").toUpperCase(Locale.ROOT)),
+                elements("arg").apply(fn)
+                        .map(XmlMappingSpecReader::valueSource)
+                        .toList());
     }
 
     /**

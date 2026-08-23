@@ -4,7 +4,9 @@ import com.networknt.schema.InputFormat;
 import com.networknt.schema.Schema;
 import com.networknt.schema.SchemaRegistry;
 import com.networknt.schema.SpecificationVersion;
+import io.github.ralfspoeth.xldr.spec.DataType;
 import io.github.ralfspoeth.xldr.spec.Locator;
+import io.github.ralfspoeth.xldr.spec.ValueSource;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
@@ -32,7 +34,7 @@ import static org.junit.jupiter.api.Assertions.*;
  */
 class JsonSchemaTest {
 
-    private static final Path SCHEMA = Path.of("..", "docs", "schema", "mapping-spec-0.35.json");
+    private static final Path SCHEMA = Path.of("..", "docs", "schema", "mapping-spec-0.40.json");
 
     /**
      * Every member the reader knows, in one document - the JSON transliteration
@@ -48,7 +50,13 @@ class JsonSchemaTest {
                   { "name": "source", "constant": "PD" },
                   { "name": "batch",
                     "lookup": { "table": "load_batch", "column": "id", "keyColumn": "feed",
-                                "constant": "funds" } }
+                                "constant": "funds" } },
+                  { "name": "loadId",
+                    "fn": { "name": "pkg_load.next_id", "type": "INTEGRAL", "args": [
+                              { "constant": "funds" },
+                              { "var": "source" },
+                              { "fn": { "name": "today", "type": "DATE" } }
+                            ] } }
                 ],
                 "recordSelectors": [
                   { "name": "fund", "selector": "/root/fund",
@@ -65,6 +73,7 @@ class JsonSchemaTest {
                     { "fieldSelector": "id", "column": "ident1_txt" },
                     { "constant": "X", "column": "status_cd" },
                     { "var": "source", "column": "source_cd" },
+                    { "var": "loadId", "column": "load_id" },
                     { "expr": "${xldr.filename}", "column": "loaded_from" },
                     { "column": "country_id",
                       "lookup": { "table": "country", "column": "id", "keyColumn": "iso",
@@ -111,7 +120,18 @@ class JsonSchemaTest {
         var spec = new JsonMappingSpecReader().read(stream(COMPLETE_SPEC));
         assertTrue(spec.inputSpec().properties().containsKey("ns.f"));
         assertTrue(spec.recordMappingSpecs().stream()
-                .anyMatch(m -> m.fieldMappings().size() == 5));
+                .anyMatch(m -> m.fieldMappings().size() == 6));
+        assertEquals(
+                new ValueSource.FunctionCall("pkg_load.next_id", DataType.INTEGRAL, List.of(
+                        new ValueSource.Constant("funds"),
+                        new ValueSource.Var("source"),
+                        new ValueSource.FunctionCall("today", DataType.DATE, List.of()))),
+                spec.inputSpec().vars().stream()
+                        .filter(v -> v.name().equals("loadId"))
+                        .findFirst()
+                        .orElseThrow()
+                        .source(),
+                "the nesting the schema allows is the nesting the reader builds");
     }
 
     /**
@@ -178,7 +198,7 @@ class JsonSchemaTest {
                 "the reader has to refuse what the schema refuses");
     }
 
-    // ---- and the rule this schema version exists for -------------------------
+    // ---- the rule 0.35 was published for -------------------------------------
 
     /**
      * A selector says where something is, so it may not be blank - the change
@@ -269,5 +289,94 @@ class JsonSchemaTest {
                   "mapping": [ { "recordSelector": "r", "table": "t", "comment": "lands here",
                       "fieldMapping": [ { "fieldSelector": "id", "column": "id" } ] } ] }
                 """));
+    }
+
+    // ---- and the rules 0.40 was published for --------------------------------
+
+    /**
+     * A call belongs to a var and not to a column: it is made once per load, and
+     * a column is bound once per record, so the same call in a column would be a
+     * round trip per row. {@code fn} is a member of a var and of an argument,
+     * and of nothing under {@code mapping}.
+     */
+    @Test
+    void aColumnCannotCallAFunction() throws IOException {
+        assertRefusedByBoth("""
+                { "input": { "mimeType": "text/csv" },
+                  "mapping": [ { "recordSelector": "r", "table": "t", "fieldMapping": [
+                      { "column": "load_id", "fn": { "name": "next_id", "type": "INTEGRAL" } } ] } ] }
+                """, "lets a column call a function");
+    }
+
+    /**
+     * An argument is evaluated at the same moment as the var it feeds, which is
+     * before the first record is read - so it may be anything a var may be, and
+     * a field is not among them.
+     */
+    @Test
+    void aCallArgumentCannotReadAField() throws IOException {
+        assertRefusedByBoth("""
+                { "input": { "mimeType": "text/csv", "vars": [
+                    { "name": "loadId", "fn": { "name": "next_id", "type": "INTEGRAL",
+                        "args": [ { "fieldSelector": "id" } ] } } ] },
+                  "mapping": [] }
+                """, "lets a call argument read a field");
+    }
+
+    /**
+     * The same rule one level over: a lookup under a var is keyed with no record
+     * in hand either. The schemas said this for the first time in 0.40 - until
+     * then one {@code lookup} definition served both places, so a var keyed by a
+     * field validated in an editor and threw at load.
+     */
+    @Test
+    void aVarLookupCannotBeKeyedByAField() throws IOException {
+        assertRefusedByBoth("""
+                { "input": { "mimeType": "text/csv", "vars": [
+                    { "name": "batch", "lookup": { "table": "load_batch", "column": "id",
+                        "keyColumn": "feed", "fieldSelector": "f" } } ] },
+                  "mapping": [] }
+                """, "keys a var's lookup by a field");
+    }
+
+    /**
+     * A call says the type it returns, where a field selector may leave its type
+     * out: the loader registers the OUT parameter before the call and has
+     * nothing to infer it from.
+     */
+    @Test
+    void aCallSaysWhatItReturns() throws IOException {
+        assertRefusedByBoth("""
+                { "input": { "mimeType": "text/csv", "vars": [
+                    { "name": "loadId", "fn": { "name": "next_id" } } ] },
+                  "mapping": [] }
+                """, "calls a function without saying what it returns");
+    }
+
+    /**
+     * A function name is the one part of a value source that reaches the text of
+     * a statement, so it is held to being a name - identifiers separated by dots
+     * and nothing else. Everything else a spec contributes goes in as a bound
+     * parameter.
+     */
+    @Test
+    void aFunctionNameIsAName() throws IOException {
+        assertRefusedByBoth("""
+                { "input": { "mimeType": "text/csv", "vars": [
+                    { "name": "loadId", "fn": { "name": "next_id(1); drop table t",
+                        "type": "INTEGRAL" } } ] },
+                  "mapping": [] }
+                """, "calls something that is not a name");
+    }
+
+    /**
+     * Both, because neither catches the other's cases: an editor never runs the
+     * reader, and a spec the server loads was never put through the schema.
+     */
+    private static void assertRefusedByBoth(String json, String because) throws IOException {
+        assertRefused(json, because);
+        assertThrows(IllegalArgumentException.class,
+                () -> new JsonMappingSpecReader().read(stream(json)),
+                "the reader has to refuse what the schema refuses");
     }
 }
