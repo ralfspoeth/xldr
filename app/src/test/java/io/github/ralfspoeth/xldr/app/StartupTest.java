@@ -1,6 +1,5 @@
-package io.github.ralfspoeth.xldr.app.test;
+package io.github.ralfspoeth.xldr.app;
 
-import io.github.ralfspoeth.xldr.app.App;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import picocli.CommandLine;

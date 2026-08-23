@@ -6,6 +6,17 @@
  * Proxies all the way down, and deliberately - the one test that runs the servlet
  * in a real container is {@code XldrServletIT} in the {@code it} module, which is
  * where the embedded Jetty and the HTTP client live too.
+ * <p>
+ * A module of its own, where every library module's tests are now patched into
+ * the module they test, and for a reason that has nowhere else to live: the
+ * {@code requires} on {@code csv} below. An adapter is found by service binding
+ * over the module graph - the jars carry {@code provides} in their descriptors
+ * and no {@code META-INF/services} - so an adapter reaches the graph only by
+ * being required by something. {@code xlet} itself must not require one, a front
+ * end having no business choosing formats, and a patched test cannot add a
+ * {@code requires} because it has no descriptor. This file is the only place
+ * that can say it, and without it most of {@code XldrServletTest} posts
+ * {@code text/csv} at a servlet that can find no adapter for it.
  */
 open module io.github.ralfspoeth.xldr.xlet.test {
 

@@ -1,4 +1,4 @@
-package io.github.ralfspoeth.xldr.server.test;
+package io.github.ralfspoeth.xldr.server;
 
 import io.github.ralfspoeth.filews.DirectoryWatchService;
 
@@ -67,7 +67,7 @@ final class Feeds {
             }
             """;
 
-    static Path file(Path directory, String name) throws IOException {
-        return Files.writeString(directory.resolve(name), "id\n1\n");
+    static void file(Path directory, String name) throws IOException {
+        Files.writeString(directory.resolve(name), "id\n1\n");
     }
 }

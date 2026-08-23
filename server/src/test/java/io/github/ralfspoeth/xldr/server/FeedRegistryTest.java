@@ -1,7 +1,6 @@
-package io.github.ralfspoeth.xldr.server.test;
+package io.github.ralfspoeth.xldr.server;
 
 import io.github.ralfspoeth.filews.DirectoryWatchService;
-import io.github.ralfspoeth.xldr.server.FeedRegistry;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

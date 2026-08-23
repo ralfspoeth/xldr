@@ -1,6 +1,5 @@
-package io.github.ralfspoeth.xldr.server.test;
+package io.github.ralfspoeth.xldr.server;
 
-import io.github.ralfspoeth.xldr.server.Config;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 

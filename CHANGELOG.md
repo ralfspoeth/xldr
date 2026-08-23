@@ -33,9 +33,18 @@ The versions are the git tags `xldr-<version>`; the published artifacts carry th
   The `csv` and `xml` fixtures moved too. Both tests load them with `getClass().getResourceAsStream("simple.csv")`,
   which resolves against the class's own package, so the resources had to follow the classes out of `.test`.
 
-  **`ldr` was a plain move**, its four tests and the `AnsweringConnection` proxy going to `io.github.ralfspoeth.xldr.ldr`.
-  Nothing there discovers a service: `Loader` reaches an adapter through `InputAdapterFactory.of`, whose lookup runs
-  inside `ia` and against `ia`'s own `uses`.
+  **`ldr`, `server` and `app` were plain moves.** None discovers a service in a test - `Loader` reaches an adapter
+  through `InputAdapterFactory.of`, whose lookup runs inside `ia` and against `ia`'s own `uses` - and everything
+  their tests need is already in each main descriptor. `app`'s deleted test module said "no adapters here" and
+  meant it: `StartupTest` gets as far as being refused for want of a configuration, which needs no format at all.
+
+  **`xlet` keeps its test module, and now says why.** Its tests need an adapter that is not its own, and an adapter
+  reaches the module graph only by being required: the jars declare `provides` in their descriptors and ship no
+  `META-INF/services`, so nothing finds one that resolution has not rooted. `xlet` itself must not require an
+  adapter - a front end has no business choosing formats - and a patched test cannot add a `requires`, having no
+  descriptor to add it to. The `requires io.github.ralfspoeth.xldr.csv` in that file is therefore load-bearing, and
+  without it most of `XldrServletTest` would post `text/csv` at a servlet that could find no adapter for it. That
+  is a better reason than the one `ia` was exempted for, which did not survive being checked.
 
   **`ia` went the same way**, `FormatsTest` moving beside `Formats`. The argument for keeping a blackbox test
   module there - that it is the one thing proving the SPI is usable from outside - does not survive being checked:

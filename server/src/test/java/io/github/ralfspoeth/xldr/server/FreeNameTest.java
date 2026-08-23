@@ -1,6 +1,5 @@
-package io.github.ralfspoeth.xldr.server.test;
+package io.github.ralfspoeth.xldr.server;
 
-import io.github.ralfspoeth.xldr.server.FreeName;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -78,8 +77,7 @@ class FreeNameTest {
         assertAll(
                 () -> assertFalse(Files.exists(second),
                         "a free name that already exists is not a free name: " + second.getFileName()),
-                () -> assertFalse(second.equals(first),
-                        "and it is not the one just taken: " + second.getFileName()));
+                () -> assertNotEquals(second, first, "and it is not the one just taken: " + second.getFileName()));
     }
 
     /**
