@@ -6,6 +6,7 @@ import io.github.ralfspoeth.xldr.spec.InputSpec;
 import io.github.ralfspoeth.xldr.spec.Locator;
 import io.github.ralfspoeth.xldr.tck.InputAdapterContract;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+import org.jspecify.annotations.NonNull;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -18,17 +19,17 @@ import static io.github.ralfspoeth.xldr.it.Conformance.field;
 class XlsxConformanceIT extends InputAdapterContract {
 
     @Override
-    protected InputAdapterFactory factory() {
+    protected @NonNull InputAdapterFactory factory() {
         return discovered(spec());
     }
 
     @Override
-    protected String mimeType() {
+    protected @NonNull String mimeType() {
         return "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
     }
 
     @Override
-    protected InputSpec spec() {
+    protected @NonNull InputSpec spec() {
         return Conformance.spec(mimeType(), Map.of(), new Locator.At("data!A2:C3"),
                 field("id", "A", DataType.INTEGRAL),
                 field("name", "B", DataType.TEXT),
@@ -37,7 +38,7 @@ class XlsxConformanceIT extends InputAdapterContract {
 
     /** two data rows under a header, which is the layout the range describes */
     @Override
-    protected byte[] sample() {
+    protected byte @NonNull [] sample() {
         try (var workbook = new XSSFWorkbook(); var out = new ByteArrayOutputStream()) {
             var sheet = workbook.createSheet("data");
             var header = sheet.createRow(0);

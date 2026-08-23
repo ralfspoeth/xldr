@@ -5,6 +5,7 @@ import io.github.ralfspoeth.xldr.spec.DataType;
 import io.github.ralfspoeth.xldr.spec.InputSpec;
 import io.github.ralfspoeth.xldr.spec.Locator;
 import io.github.ralfspoeth.xldr.tck.InputAdapterContract;
+import org.jspecify.annotations.NonNull;
 
 import java.util.Map;
 
@@ -13,17 +14,17 @@ import static io.github.ralfspoeth.xldr.it.Conformance.*;
 class XmlConformanceIT extends InputAdapterContract {
 
     @Override
-    protected InputAdapterFactory factory() {
+    protected @NonNull InputAdapterFactory factory() {
         return discovered(spec());
     }
 
     @Override
-    protected String mimeType() {
+    protected @NonNull String mimeType() {
         return "text/xml";
     }
 
     @Override
-    protected InputSpec spec() {
+    protected @NonNull InputSpec spec() {
         return Conformance.spec(mimeType(), Map.of(), new Locator.At("/rows/row"),
                 field("id", "@id", DataType.INTEGRAL),
                 field("name", "name", DataType.TEXT),
@@ -31,7 +32,7 @@ class XmlConformanceIT extends InputAdapterContract {
     }
 
     @Override
-    protected byte[] sample() {
+    protected byte @NonNull [] sample() {
         return bytes("""
                 <?xml version="1.0" encoding="UTF-8"?>
                 <rows>

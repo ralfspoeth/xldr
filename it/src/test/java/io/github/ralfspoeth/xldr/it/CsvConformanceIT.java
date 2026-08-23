@@ -5,6 +5,7 @@ import io.github.ralfspoeth.xldr.spec.DataType;
 import io.github.ralfspoeth.xldr.spec.InputSpec;
 import io.github.ralfspoeth.xldr.spec.Locator;
 import io.github.ralfspoeth.xldr.tck.InputAdapterContract;
+import org.jspecify.annotations.NonNull;
 
 import java.util.Map;
 
@@ -18,12 +19,12 @@ import static io.github.ralfspoeth.xldr.it.Conformance.*;
 class CsvConformanceIT extends InputAdapterContract {
 
     @Override
-    protected InputAdapterFactory factory() {
+    protected @NonNull InputAdapterFactory factory() {
         return discovered(spec());
     }
 
     @Override
-    protected String mimeType() {
+    protected @NonNull String mimeType() {
         return "text/csv";
     }
 
@@ -33,7 +34,7 @@ class CsvConformanceIT extends InputAdapterContract {
     }
 
     @Override
-    protected InputSpec spec() {
+    protected @NonNull InputSpec spec() {
         return Conformance.spec(mimeType(), Map.of("fieldSeparator", ","), Locator.every(),
                 field("id", "id", DataType.INTEGRAL),
                 field("name", "name", DataType.TEXT),
@@ -41,7 +42,7 @@ class CsvConformanceIT extends InputAdapterContract {
     }
 
     @Override
-    protected byte[] sample() {
+    protected byte @NonNull [] sample() {
         return bytes("""
                 id,name,since
                 1,Alice,2026-03-01T00:00
