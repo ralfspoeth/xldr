@@ -2,8 +2,8 @@ package io.github.ralfspoeth.xldr.csv;
 
 import io.github.ralfspoeth.xldr.ia.Field;
 import io.github.ralfspoeth.xldr.ia.InputAdapter;
-import io.github.ralfspoeth.xldr.ia.Row;
 import io.github.ralfspoeth.xldr.ia.InputAdapterFactory;
+import io.github.ralfspoeth.xldr.ia.Row;
 import io.github.ralfspoeth.xldr.spec.*;
 import org.junit.jupiter.api.Test;
 
