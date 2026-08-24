@@ -242,6 +242,15 @@ public class Check implements Callable<Integer> {
                 out.printf("      %-" + Math.max(width, 8) + "s  %s%n", var.name(), describe(var.source()));
             }
         }
+        if (!spec.transforms().isEmpty()) {
+            out.println();
+            out.println("  transforms, called once after the load and before the commit:");
+            for (var transform : spec.transforms()) {
+                out.printf("      %s(%s)%n", transform.name(), transform.arguments().stream()
+                        .map(a -> describe(a).replaceAll("\\s{2,}", " ").strip())
+                        .collect(Collectors.joining(", ")));
+            }
+        }
     }
 
     /** one value source, as a phrase rather than as a record's toString */

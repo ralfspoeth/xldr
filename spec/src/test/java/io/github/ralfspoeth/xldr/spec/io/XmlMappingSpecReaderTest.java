@@ -174,6 +174,56 @@ class XmlMappingSpecReaderTest {
         assertTrue(thrown.getMessage().contains("one source is wanted"), thrown.getMessage());
     }
 
+    /**
+     * A {@code <transform>} is read as a procedure call, one {@code <arg>} per
+     * argument - the same {@code <arg>} an {@code <fn>} takes, so an argument may
+     * be anything a var may be.
+     */
+    @Test
+    void parsesTransforms() {
+        var source = """
+                <mappingSpec>
+                    <input mimeType="text/csv">
+                        <var name="batch" constant="b1"/>
+                    </input>
+                    <transform name="pkg_load.close_batch">
+                        <arg var="batch"/>
+                        <arg expr="${xldr.rowsLoaded}"/>
+                    </transform>
+                    <transform name="reconcile"/>
+                </mappingSpec>
+                """;
+        assertEquals(
+                List.of(
+                        new ProcedureCall("pkg_load.close_batch", List.of(
+                                new ValueSource.Var("batch"),
+                                new ValueSource.Expr("${xldr.rowsLoaded}"))),
+                        new ProcedureCall("reconcile", List.of())),
+                new XmlMappingSpecReader().read(stream(source)).transforms());
+    }
+
+    /**
+     * The reader takes a {@code <transform>} wherever it stands, though the
+     * schema requires it after the mappings - which is the order that says what
+     * it means. Stricter in the editor than in the reader, and in the safe
+     * direction: nothing the schema accepts is refused here.
+     */
+    @Test
+    void parsesAtransformWrittenBeforeTheMappings() {
+        var source = """
+                <mappingSpec>
+                    <input mimeType="text/csv"/>
+                    <transform name="reconcile"/>
+                    <mapping recordSelector="r" table="t">
+                        <fieldMapping fieldSelector="id" column="id"/>
+                    </mapping>
+                </mappingSpec>
+                """;
+        var spec = new XmlMappingSpecReader().read(stream(source));
+        assertEquals(List.of(new ProcedureCall("reconcile", List.of())), spec.transforms());
+        assertEquals(1, spec.recordMappingSpecs().size());
+    }
+
     /** and the two child elements are two sources, for the same reason */
     @Test
     void refusesAlookupAndAcallTogether() {

@@ -25,7 +25,7 @@ guesses the rest.
 **The schema, and its version.** This is the one that decides whether the answer is any good:
 
     Write an XLDR mapping spec (spec.json) valid against
-    https://ralfspoeth.github.io/xldr/schema/mapping-spec-0.40.json
+    https://ralfspoeth.github.io/xldr/schema/mapping-spec-0.41.json
 
 Say the version. The vocabulary changed at 0.32, and a model that learned from anything written before that - or
 that is generalising from other ETL tools, which is what it is really doing - will reach for the older words with
@@ -35,7 +35,7 @@ most useful thing in the prompt.
 A prompt worth copying:
 
     Write an XLDR mapping spec as spec.json, valid against the JSON schema at
-    https://ralfspoeth.github.io/xldr/schema/mapping-spec-0.40.json
+    https://ralfspoeth.github.io/xldr/schema/mapping-spec-0.41.json
 
     The file arriving looks like this (text/csv):
 

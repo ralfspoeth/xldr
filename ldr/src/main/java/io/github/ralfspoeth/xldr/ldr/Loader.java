@@ -4,6 +4,7 @@ import io.github.ralfspoeth.xldr.ia.InputAdapter;
 import io.github.ralfspoeth.xldr.ia.InputAdapterFactory;
 import io.github.ralfspoeth.xldr.ia.Row;
 import io.github.ralfspoeth.xldr.spec.MappingSpec;
+import io.github.ralfspoeth.xldr.spec.ProcedureCall;
 import io.github.ralfspoeth.xldr.spec.RecordMappingSpec;
 import io.github.ralfspoeth.xldr.spec.SqlIdentifier;
 import io.github.ralfspoeth.xldr.spec.ValueSource;
@@ -64,6 +65,15 @@ public class Loader implements AutoCloseable {
     private final Map<String, @Nullable Object> varValues;
     private final Map<TabCol, PreparedStatement> statementCache = new HashMap<>();
     private boolean failed = false;
+    /** rows inserted so far by this loader, across every mapping; {@code ${xldr.rowsLoaded}} */
+    private int rowsLoaded = 0;
+    /**
+     * The ambient values a transform's arguments see, which are the load's own
+     * plus what only the loader knows by then. Null at every other moment, and
+     * that is what makes {@code ${xldr.rowsLoaded}} an unknown name in a field
+     * mapping: mid-file there is no such number.
+     */
+    private @Nullable Map<String, Object> transformAmbient = null;
 
     /**
      * Key of the prepared-statement cache: a target table plus the columns of one
@@ -149,7 +159,7 @@ public class Loader implements AutoCloseable {
      *                      database does not take in data manipulation
      */
     public static void refuseUnusableTarget(Target target, Connection connection) throws SQLException {
-        qualifierFor(target, connection);
+        var _ = qualifierFor(target, connection);
     }
 
     /**
@@ -195,13 +205,6 @@ public class Loader implements AutoCloseable {
             parts.append(SqlIdentifier.folded(target.schema())).append('.');
         }
         return parts.toString();
-    }
-
-    /**
-     * A loader with no ambient variables.
-     */
-    public Loader(MappingSpec ms, Connection connection) throws SQLException {
-        this(ms, connection, Map.of());
     }
 
     /**
@@ -411,13 +414,17 @@ public class Loader implements AutoCloseable {
             @Override
             public @Nullable Object variable(String name) {
                 if (AMBIENT_PREFIXES.stream().anyMatch(name::startsWith)) {
-                    if (!ambient.containsKey(name)) {
+                    // during a transform, what the loader knows as well as what
+                    // it was told - and only then, so the same name in a field
+                    // mapping is unknown rather than wrong
+                    var available = transformAmbient == null ? ambient : transformAmbient;
+                    if (!available.containsKey(name)) {
                         // the names, never the values: an ambient map may hold
                         // things a log file should not
                         throw new IllegalArgumentException("unknown ambient variable '" + name
-                                + "'; supplied are " + new TreeSet<>(ambient.keySet()));
+                                + "'; supplied are " + new TreeSet<>(available.keySet()));
                     }
-                    return ambient.get(name);
+                    return available.get(name);
                 }
                 if (vars.containsKey(name)) {
                     return vars.get(name);
@@ -676,6 +683,7 @@ public class Loader implements AutoCloseable {
                     count += flush(ps, read - pending, pending, mapping);
                 }
             }
+            rowsLoaded += count;
             return count;
         } catch (IOException | SQLException | RuntimeException e) {
             failed = true;
@@ -841,17 +849,108 @@ public class Loader implements AutoCloseable {
     }
 
     /**
-     * Commits the work of this loader - or rolls it back if any {@code loadInput}
-     * call failed - releases the cached statements, restores the auto-commit
-     * setting the connection had on arrival and closes it.
+     * Calls each of the spec's procedures once, in the order written, on the
+     * load's own connection and before anything is committed.
+     * <p>
+     * A procedure therefore sees the rows this load inserted and no one else
+     * does yet, and one that throws takes the file down with it - the failure is
+     * recorded the way a bad record is, so {@link #close} rolls back what the
+     * mappings did as well as what the procedures did. That is the point of
+     * running here rather than after the commit: the file stays the unit of work
+     * instead of becoming two of them.
+     * <p>
+     * The arguments are evaluated against the vars as they were computed at the
+     * start of the load - so a transform closing a batch is handed the batch the
+     * load opened - plus the ambient values, which for the length of this method
+     * include {@code ${xldr.rowsLoaded}}. That one is the first ambient value the
+     * loader supplies rather than the application: it is the only party that
+     * knows the number, and it does not know it until now.
+     */
+    private void runTransforms() throws SQLException {
+        if (mappingSpec.transforms().isEmpty()) {
+            return;
+        }
+        var withCount = new LinkedHashMap<String, Object>(ambient);
+        withCount.put("xldr.rowsLoaded", rowsLoaded);
+        transformAmbient = Map.copyOf(withCount);
+        try {
+            // a loop rather than a stream, and the reason is the three things
+            // this has to do that a lambda cannot: stop at the first failure,
+            // let a checked exception out, and keep the declared order. A stream
+            // does the first with a side-effecting filter, the second by
+            // smuggling the exception through an AtomicReference, and the third
+            // only by promising the stream stays sequential
+            for (var transform : mappingSpec.transforms()) {
+                transform(transform);
+            }
+        } catch (SQLException | RuntimeException e) {
+            failed = true;
+            throw e;
+        } finally {
+            // once, when they have all run - not after each, which is where a
+            // lambda's finally would have put it
+            transformAmbient = null;
+        }
+    }
+
+    /**
+     * One procedure: its arguments evaluated, then {@code {call name(?, ?)}}.
+     * <p>
+     * JDBC's own escape, as {@link #call} uses for a function, minus the OUT
+     * parameter - which is why a {@link ProcedureCall} carries no type. Whatever
+     * the procedure returns, if the product lets one return anything, is not
+     * read: a spec that wanted a value would be declaring a var with an
+     * {@code fn} in it, and the two are kept apart on purpose.
+     */
+    private void transform(ProcedureCall procedure) throws SQLException {
+        var arguments = new ArrayList<@Nullable Object>(procedure.arguments().size());
+        for (var argument : procedure.arguments()) {
+            arguments.add(evaluate(argument, varValues));
+        }
+        var placeholders = String.join(", ", Collections.nCopies(arguments.size(), "?"));
+        try (var cs = connection.prepareCall("{call " + procedure.name() + "(" + placeholders + ")}")) {
+            for (int i = 0; i < arguments.size(); i++) {
+                cs.setObject(i + 1, jdbcValue(arguments.get(i)));
+            }
+            cs.execute();
+        } catch (SQLException e) {
+            throw new SQLException("transform '" + procedure.name() + "' failed: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Runs the spec's transforms and commits the work of this loader - or rolls
+     * it back if any {@code loadInput} call or any transform failed - then
+     * releases the cached statements and closes the connection.
+     * <p>
+     * The transforms are here rather than in {@link #load}, and this method does
+     * more than its name says as a result. The alternative was worse: {@code load}
+     * drives the whole sequence, but it is not the only caller - {@code xlet} and
+     * the integration tests construct a loader and call {@link #loadInput}
+     * themselves - and under that path a spec carrying transforms would have
+     * done nothing at all, silently. This is the one place that every caller
+     * reaches and that knows the load finished, so it is where "after the load"
+     * actually is.
      */
     @Override
     public void close() throws SQLException {
         try {
-            if (failed) {
-                connection.rollback();
-            } else {
-                connection.commit();
+            try {
+                if (!failed) {
+                    runTransforms();
+                }
+            } finally {
+                // in a finally, because a transform that throws must still leave
+                // this connection decided. Letting the exception carry past here
+                // would close it with a transaction open, and JDBC leaves that to
+                // the driver - several commit. runTransforms sets failed before
+                // it rethrows, so this rolls back and the original failure is
+                // what the caller sees
+                if (failed) {
+                    connection.rollback();
+                } else {
+                    connection.commit();
+                }
             }
         } finally {
             try {

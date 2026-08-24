@@ -20,39 +20,15 @@ import java.io.Serializable;
  */
 public record VarSpec(String name, ValueSource source) implements Serializable {
 
-    public VarSpec {
-        refuseFieldAnywhere(name, source);
-    }
-
     /**
-     * Refuses a field, however deeply it is buried.
-     * <p>
-     * The rule was written here in prose and enforced nowhere: a spec naming a
-     * field in a var read cleanly, deployed, and failed on the first file with an
-     * exception from the loader. It is provable from the document alone - a var
-     * is evaluated before any record exists, so no arrangement of the file could
-     * make it work - and this project's habit is to refuse such a thing when the
-     * thing is written rather than when it is run.
-     * <p>
-     * Recursive, because a field can hide one level down: as a lookup's key, or
-     * as an argument to a call. Both are evaluated in the same breath as the var
-     * itself and have exactly as little to read from.
+     * The rule this class's documentation always asserted, and which lived in no
+     * code until 0.40: shared with {@link ProcedureCall}, whose arguments are
+     * evaluated with the same nothing in hand at the other end of the load.
      */
-    private static void refuseFieldAnywhere(String name, ValueSource source) {
-        switch (source) {
-            case ValueSource.Field(var fieldName) -> throw new IllegalArgumentException(
-                    "var '" + name + "' reads the input field '" + fieldName + "', which it cannot:"
-                            + " a var is evaluated once before the first record is read, so there is no"
-                            + " record to take a field from. Map the column to the field directly instead");
-            case ValueSource.Lookup(_, _, _, var key) -> refuseFieldAnywhere(name, key);
-            case ValueSource.FunctionCall(_, _, var arguments) ->
-                    arguments.forEach(argument -> refuseFieldAnywhere(name, argument));
-            case ValueSource.Constant _, ValueSource.Var _, ValueSource.Expr _ -> {
-                // nothing that could hold a field: a constant is a literal, a var
-                // reference is a name resolved among the vars, and an expression's
-                // names are resolved by the loader - which, with no record in
-                // hand, resolves them against the vars and the ambient values
-            }
-        }
+    public VarSpec {
+        RowIndependence.refuseFieldAnywhere("var '" + name + "'",
+                "a var is evaluated once before the first record is read, so there is no record to take"
+                        + " a field from. Map the column to the field directly instead",
+                source);
     }
 }

@@ -456,6 +456,59 @@ class JsonValueSourceTest {
     }
 
     /**
+     * A {@code transform} is read as a procedure call per entry, in the order
+     * written, each with arguments that are ordinary value sources.
+     */
+    @Test
+    void readsTransforms() throws IOException {
+        var source = """
+                {
+                    "input": { "mimeType": "text/csv", "vars": [
+                        { "name": "batch", "constant": "b1" } ] },
+                    "mapping": [],
+                    "transform": [
+                        { "name": "pkg_load.close_batch", "args": [
+                            { "var": "batch" },
+                            { "expr": "${xldr.rowsLoaded}" } ] },
+                        { "name": "reconcile" }
+                    ]
+                }
+                """;
+        assertEquals(
+                List.of(
+                        new ProcedureCall("pkg_load.close_batch", List.of(
+                                new ValueSource.Var("batch"),
+                                new ValueSource.Expr("${xldr.rowsLoaded}"))),
+                        new ProcedureCall("reconcile", List.of())),
+                new JsonMappingSpecReader().read(stream(source)).transforms());
+    }
+
+    /** and a spec that says nothing about transforms has none, rather than null */
+    @Test
+    void readsNoTransformsAsNone() throws IOException {
+        var source = """
+                { "input": { "mimeType": "text/csv" }, "mapping": [] }
+                """;
+        assertEquals(List.of(), new JsonMappingSpecReader().read(stream(source)).transforms());
+    }
+
+    /**
+     * A transform's argument is evaluated after the last record, so it may not
+     * read a field - the rule {@link ProcedureCall} enforces, met here through
+     * the reader because a spec file is where such a thing gets written.
+     */
+    @Test
+    void refusesAtransformArgumentThatReadsAfield() {
+        var source = """
+                { "input": { "mimeType": "text/csv" }, "mapping": [],
+                  "transform": [ { "name": "close", "args": [ { "fieldSelector": "id" } ] } ] }
+                """;
+        var thrown = assertThrows(IllegalArgumentException.class,
+                () -> new JsonMappingSpecReader().read(stream(source)));
+        assertTrue(thrown.getMessage().contains("id"), thrown.getMessage());
+    }
+
+    /**
      * A selector and a discriminator together describe no input, and this is now
      * the only place that can say so.
      * <p>

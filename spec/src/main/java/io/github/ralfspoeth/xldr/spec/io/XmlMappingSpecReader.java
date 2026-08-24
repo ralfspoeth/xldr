@@ -29,6 +29,9 @@ import static io.github.ralfspoeth.xmls.XmlFunctions.elements;
  *     &lt;mapping recordSelector="fund" table="snmandat"&gt;
  *         &lt;fieldMapping fieldSelector="id" column="ident1_txt"/&gt;
  *     &lt;/mapping&gt;
+ *     &lt;transform name="close_batch"&gt;
+ *         &lt;arg var="batch"/&gt;
+ *     &lt;/transform&gt;
  * &lt;/mappingSpec&gt;
  * </pre>
  * <p>
@@ -65,8 +68,36 @@ public class XmlMappingSpecReader implements MappingSpecReader {
                 elements("mapping")
                         .apply(root)
                         .map(XmlMappingSpecReader::recordMappingSpec)
+                        .toList(),
+                elements("transform")
+                        .apply(root)
+                        .map(XmlMappingSpecReader::procedureCall)
                         .toList()
         );
+    }
+
+    /**
+     * A procedure to call once the input has been loaded, one {@code <arg>} per
+     * argument:
+     *
+     * <pre>
+     * &lt;transform name="close_batch"&gt;
+     *     &lt;arg var="batch"/&gt;
+     *     &lt;arg expr="${xldr.rowsLoaded}"/&gt;
+     * &lt;/transform&gt;
+     * </pre>
+     * <p>
+     * The same {@code <arg>} an {@code <fn>} takes, read by the same method, so
+     * an argument may be a nested lookup or call and nothing new had to be
+     * invented. No {@code type} attribute, where an {@code <fn>} requires one:
+     * nothing comes back from a procedure.
+     */
+    private static ProcedureCall procedureCall(Element transform) {
+        return new ProcedureCall(
+                required(transform, "name"),
+                elements("arg").apply(transform)
+                        .map(XmlMappingSpecReader::valueSource)
+                        .toList());
     }
 
     private static InputSpec inputSpec(Element input) {

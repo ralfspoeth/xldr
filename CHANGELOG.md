@@ -8,7 +8,52 @@ The versions are the git tags `xldr-<version>`; the published artifacts carry th
 
 ## Unreleased
 
+### Added
+
+- **`transform`: procedures called after the load**, a top-level list in both formats, each entry a `name` and its
+  `args`:
+
+      "transform": [ { "name": "pkg_load.close_batch",
+                       "args": [ { "var": "batch" }, { "expr": "${xldr.rowsLoaded}" } ] } ]
+
+  They run in the order written, on the load's own connection, after the last record and **before the commit**. A
+  procedure therefore sees the rows this load inserted while nobody else can, and one that throws rolls the whole
+  file back. That is the point of the placement: a load that half-happened would be two outcomes where the loader
+  has always promised one, and there would be nothing safe to retry.
+
+  `ProcedureCall` is deliberately **not** a `ValueSource`. A function yields a value and so belongs wherever a value
+  belongs; a procedure yields nothing, and putting it in that hierarchy would add a case every exhaustive switch has
+  to name and then discard. It carries no return type for the same reason - no OUT parameter to register, and
+  `{call name(?)}` is the whole statement. A spec that wants a value from the database wants a var with an `fn`.
+
+  Arguments are the sources a var may have, and a `fieldSelector` among them is refused at any depth: the records
+  are gone by the time a transform runs. That is the rule `VarSpec` already enforced at the other end of the load,
+  and the two now share one implementation rather than two that resemble each other.
+
+- **`${xldr.rowsLoaded}`**, the number of rows the load inserted, available to a transform's arguments and nowhere
+  else. It is the first ambient value the loader supplies rather than the application - nobody can pass the count in
+  beforehand - and in a field mapping it stays an unknown name, mid-file there being no such number.
+
+- **`mapping-spec-0.41`**, in both formats, for `transform`. The XSD puts it after the mappings, which the reader
+  does not require; that is the one place the two disagree on purpose, since a transform runs after the load and a
+  spec that writes it first says something it does not mean.
+
+- **`TransformIT`**, which is where the two claims above are actually checked. Both are claims about a transaction,
+  so nothing short of a database can hold the loader to them: the procedure counts the rows it can see and writes
+  the number down, and a second test lets one throw and finds the table empty.
+
 ### Breaking
+
+- **`MappingSpec` has a third component**, `transforms`, so code constructing one positionally in Java no longer
+  compiles. A two-argument constructor is kept for the spec that loads and does nothing afterwards, which is nearly
+  all of them, so most call sites need no edit at all. Nothing changes for a spec read from a file: `transform` is
+  optional in both formats and absent from every spec written before 0.41.
+
+- **`Loader.close()` runs the transforms** before it commits, which makes it do more than its name says. The
+  alternative was worse: `Loader.load` drives the whole sequence but is not the only caller - `xlet` and the
+  integration tests build a loader and call `loadInput` themselves - and on that path a spec carrying transforms
+  would have done nothing whatsoever, silently. `close()` is the one place every caller reaches and the only one
+  that knows the load finished.
 
 - **The SPI artifact is `ia-def`, where it was `ia`.** `io.github.ralfspoeth.xldr:ia` no longer exists, so a pom
   naming it fails to resolve rather than quietly resolving to the last version published under that name. Anyone

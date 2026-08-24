@@ -409,12 +409,12 @@ Both formats have a published schema, so an editor can check a spec before it ev
 only reports a broken spec in its log, by leaving the feed inactive. Point at the schema from the spec itself:
 
     {
-      "$schema": "https://ralfspoeth.github.io/xldr/schema/mapping-spec-0.40.json",
+      "$schema": "https://ralfspoeth.github.io/xldr/schema/mapping-spec-0.41.json",
       "input": { ... }
     }
 
     <mappingSpec xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-                 xsi:noNamespaceSchemaLocation="https://ralfspoeth.github.io/xldr/schema/mapping-spec-0.40.xsd">
+                 xsi:noNamespaceSchemaLocation="https://ralfspoeth.github.io/xldr/schema/mapping-spec-0.41.xsd">
 
 Both are ignored by the readers - `$schema` is just another unrecognised member, and `xsi:` attributes carry no
 meaning for a spec that has no namespace of its own. IntelliJ and VS Code both validate and autocomplete from them.
@@ -441,7 +441,7 @@ written for `fieldSelectors` costs a record every one of its fields, and no read
 unknown is exactly what it promises.
 
 A schema is published whenever the format changes, and is named after the release that changed it:
-`mapping-spec-0.40` describes the format from 0.40 onwards, `mapping-spec-0.35` that of 0.35 to 0.39,
+`mapping-spec-0.41` describes the format from 0.41 onwards, `mapping-spec-0.40` that of 0.40, `mapping-spec-0.35` that of 0.35 to 0.39,
 `mapping-spec-0.32` that of 0.32 to 0.34,
 `mapping-spec-0.23` that of 0.23 to 0.31,
 `mapping-spec-0.21` that of 0.21 to 0.22,
@@ -762,11 +762,49 @@ Where it is used decides how often it runs: as a `var` it is evaluated **once pe
 whole file, one sequence draw); as a field mapping it is evaluated **per row** (so `${nextval('rownum')}` numbers the
 rows). A `var` expression has no record in scope, so it may not reference a field.
 
+### After the load: transforms
+
+A spec may end with `transform`, a list of procedures called once each after every mapping has run:
+
+    "transform": [
+        {"name": "pkg_load.close_batch", "args": [{"var": "batch"}, {"expr": "${xldr.rowsLoaded}"}]},
+        {"name": "reconcile"}
+    ]
+
+    <transform name="pkg_load.close_batch">
+        <arg var="batch"/>
+        <arg expr="${xldr.rowsLoaded}"/>
+    </transform>
+    <transform name="reconcile"/>
+
+They run in the order written, on the load's own connection, **after the last record and before the commit**. So a
+procedure sees the rows this load inserted and nobody else does yet, and a procedure that throws rolls the whole
+file back - the load stays one unit of work rather than becoming a load plus an afterthought. If you want something
+that cannot fail a file, it does not belong here; put it downstream of the commit, where a failure is somebody
+else's to retry.
+
+**Not a value.** `fn` gets you something back and belongs to a var; `transform` gets you nothing back and belongs
+to the spec. That is why a `ProcedureCall` is not a `ValueSource` and carries no `type` - there is no OUT parameter,
+and `{call name(?)}` is the whole statement. A spec that wants a number out of the database wants a var with an
+`fn` in it.
+
+Arguments are the sources a var may have - a constant, a var, an expression, a lookup, another call - and never a
+`fieldSelector`, at any depth, because the records are gone by then. A `var` argument is the value the var was given
+at the **start** of the load: the batch a transform closes is the one the load opened.
+
+`${xldr.rowsLoaded}` is available to an expression here and nowhere else. It is the first ambient value the loader
+supplies rather than the application - the count is the one thing about a load that nobody can pass in beforehand -
+and it is deliberately unavailable in a field mapping, where mid-file there is no such number and the name is
+therefore unknown.
+
+`xldr check` lists the transforms it found. It does not verify that the procedure exists, the same gap it has for
+`fn`.
+
 ### Committing
 
 The whole input is one transaction: the loader commits when the file has been read in full, or rolls everything back
-if any record mapping fails - all or nothing. This keeps the file the unit of work, so a failed load leaves the target
-tables untouched and the file can be corrected and retried.
+if any record mapping or any transform fails - all or nothing. This keeps the file the unit of work, so a failed load
+leaves the target tables untouched and the file can be corrected and retried.
 
 Which database is fed, and how it is pooled, is configured on the application rather than in the mapping - see
 [Configuration](#configuration). No connection information lives in the spec, so the same mapping can be promoted from

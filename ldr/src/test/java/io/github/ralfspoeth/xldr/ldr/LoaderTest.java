@@ -5,6 +5,7 @@ import io.github.ralfspoeth.xldr.ia.InputAdapter;
 import io.github.ralfspoeth.xldr.ia.Result;
 import io.github.ralfspoeth.xldr.ia.Row;
 import io.github.ralfspoeth.xldr.spec.*;
+import org.jspecify.annotations.NonNull;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -70,7 +71,7 @@ class LoaderTest {
         ));
 
         int inserted;
-        try (var loader = new Loader(spec, DriverManager.getConnection(jdbcUrl))) {
+        try (var loader = createLoader(spec)) {
             inserted = loader.loadInput(adapter, InputStream.nullInputStream(), people)
                     + loader.loadInput(adapter, InputStream.nullInputStream(), visitors);
         }
@@ -85,6 +86,10 @@ class LoaderTest {
                 ),
                 selectPersons()
         );
+    }
+
+    private @NonNull Loader createLoader(MappingSpec spec) throws SQLException {
+        return new Loader(spec, DriverManager.getConnection(jdbcUrl), Map.of());
     }
 
     /**
@@ -112,7 +117,7 @@ class LoaderTest {
         var adapter = adapterFor(Map.of("people", people));
 
         int inserted;
-        try (var loader = new Loader(spec, DriverManager.getConnection(jdbcUrl))) {
+        try (var loader = createLoader(spec)) {
             inserted = loader.loadInput(adapter, InputStream.nullInputStream(), mapping);
         }
         assertEquals(records, inserted);
@@ -147,7 +152,7 @@ class LoaderTest {
                 "people", List.of(Map.of("id", "1", "name", "Alice")),
                 "visitors", List.of(Map.of("id", "2", "name", "Bob"))));
 
-        try (var loader = new Loader(spec, DriverManager.getConnection(jdbcUrl))) {
+        try (var loader = createLoader(spec)) {
             assertEquals(1, loader.loadInput(adapter, InputStream.nullInputStream(), first));
             assertEquals(1, loader.loadInput(adapter, InputStream.nullInputStream(), second));
         }
@@ -183,7 +188,7 @@ class LoaderTest {
         var adapter = adapterFor(Map.of("people", people));
 
         var thrown = assertThrows(SQLException.class, () -> {
-            try (var loader = new Loader(spec, DriverManager.getConnection(jdbcUrl))) {
+            try (var loader = createLoader(spec)) {
                 loader.loadInput(adapter, InputStream.nullInputStream(), mapping);
             }
         });
@@ -215,7 +220,7 @@ class LoaderTest {
                 }));
 
         var thrown = assertThrows(RuntimeException.class, () -> {
-            try (var loader = new Loader(spec, DriverManager.getConnection(jdbcUrl))) {
+            try (var loader = createLoader(spec)) {
                 loader.loadInput(adapter, InputStream.nullInputStream(), mapping);
             }
         });
@@ -242,7 +247,7 @@ class LoaderTest {
         var adapter = adapterFor(Map.of("people", List.of(Map.of("id", "1"))));
 
         assertThrows(SQLException.class, () -> {
-            try (var loader = new Loader(spec, DriverManager.getConnection(jdbcUrl))) {
+            try (var loader = createLoader(spec)) {
                 loader.loadInput(adapter, InputStream.nullInputStream(), good);
                 loader.loadInput(adapter, InputStream.nullInputStream(), broken);
             }
@@ -269,7 +274,7 @@ class LoaderTest {
         );
         var adapter = adapterFor(Map.of());
 
-        try (var loader = new Loader(spec, DriverManager.getConnection(jdbcUrl))) {
+        try (var loader = createLoader(spec)) {
             assertThrows(IllegalArgumentException.class,
                     () -> loader.loadInput(adapter, InputStream.nullInputStream(), foreign));
         }
@@ -293,7 +298,7 @@ class LoaderTest {
         var spec = new MappingSpec(new InputSpec("text/csv", List.of(), List.of(), Map.of()), List.of(mapping));
         var adapter = adapterFor(Map.of("events", List.of(Map.of("id", "1"), Map.of("id", "2"))));
 
-        try (var loader = new Loader(spec, DriverManager.getConnection(jdbcUrl))) {
+        try (var loader = createLoader(spec)) {
             assertEquals(2, loader.loadInput(adapter, InputStream.nullInputStream(), mapping));
         }
 
@@ -340,7 +345,7 @@ class LoaderTest {
         var adapter = adapterFor(Map.of("rows", List.of(
                 Map.of("id", "1"), Map.of("id", "2"), Map.of("id", "3"))));
 
-        try (var loader = new Loader(spec, DriverManager.getConnection(jdbcUrl))) {
+        try (var loader = createLoader(spec)) {
             assertEquals(3, loader.loadInput(adapter, InputStream.nullInputStream(), mapping));
         }
 
@@ -413,7 +418,7 @@ class LoaderTest {
         var adapter = adapterFor(Map.of("rows", List.of(
                 Map.of("id", "a"), Map.of("id", "b"), Map.of("id", "c"))));
 
-        try (var loader = new Loader(spec, DriverManager.getConnection(jdbcUrl))) {
+        try (var loader = createLoader(spec)) {
             assertEquals(3, loader.loadInput(adapter, InputStream.nullInputStream(), mapping));
         }
 
@@ -451,7 +456,7 @@ class LoaderTest {
         var spec = new MappingSpec(new InputSpec("text/csv", List.of(), List.of(), Map.of()), List.of(mapping));
         var adapter = adapterFor(Map.of("rows", List.of(Map.of("id", "1"))));
 
-        try (var loader = new Loader(spec, DriverManager.getConnection(jdbcUrl))) {
+        try (var loader = createLoader(spec)) {
             loader.loadInput(adapter, InputStream.nullInputStream(), mapping);
         }
 
@@ -485,7 +490,7 @@ class LoaderTest {
         var adapter = adapterFor(Map.of("rows", List.of(
                 Map.of("id", "1", "birthdate", "07.03.1975"))));
 
-        try (var loader = new Loader(spec, DriverManager.getConnection(jdbcUrl))) {
+        try (var loader = createLoader(spec)) {
             loader.loadInput(adapter, InputStream.nullInputStream(), mapping);
         }
 
@@ -520,7 +525,7 @@ class LoaderTest {
         // the row carries no birthdate at all, so both calls resolve theirs to null
         var adapter = adapterFor(Map.of("rows", List.of(Map.of("id", "1"))));
 
-        try (var loader = new Loader(spec, DriverManager.getConnection(jdbcUrl))) {
+        try (var loader = createLoader(spec)) {
             assertEquals(1, loader.loadInput(adapter, InputStream.nullInputStream(), mapping));
         }
 
@@ -552,7 +557,7 @@ class LoaderTest {
         var adapter = adapterFor(Map.of("rows", List.of(
                 Map.of("id", "a"), Map.of("id", "b"), Map.of("id", "c"), Map.of("id", "d"))));
 
-        try (var loader = new Loader(spec, DriverManager.getConnection(jdbcUrl))) {
+        try (var loader = createLoader(spec)) {
             assertEquals(4, loader.loadInput(adapter, InputStream.nullInputStream(), mapping));
         }
 
@@ -594,7 +599,7 @@ class LoaderTest {
                 Map.of("name", "Carol", "c", "ZZ")   // no such country -> null
         )));
 
-        try (var loader = new Loader(spec, DriverManager.getConnection(jdbcUrl))) {
+        try (var loader = createLoader(spec)) {
             assertEquals(3, loader.loadInput(adapter, InputStream.nullInputStream(), mapping));
         }
 
@@ -630,7 +635,7 @@ class LoaderTest {
                 Map.of("id", "4", "name", "Dave")
         )));
 
-        try (var loader = new Loader(spec, DriverManager.getConnection(jdbcUrl))) {
+        try (var loader = createLoader(spec)) {
             assertEquals(2, loader.loadInput(adapter, InputStream.nullInputStream(), mapping));
         }
         assertEquals(List.of("1:Alice", "2:Bob"),
@@ -672,7 +677,7 @@ class LoaderTest {
                 List.of(mapping));
 
         var before = Instant.now();
-        try (var loader = new Loader(spec, DriverManager.getConnection(jdbcUrl))) {
+        try (var loader = createLoader(spec)) {
             loader.loadInput(adapterFor(Map.of("rows", List.of(Map.of("id", "1")))),
                     InputStream.nullInputStream(), mapping);
         }

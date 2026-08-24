@@ -25,7 +25,8 @@ import static io.github.ralfspoeth.json.query.Selector.all;
 
 /**
  * Reads a JSON mapping specification from an {@code input}, its {@code vars},
- * and an array of {@code mapping}s.
+ * an array of {@code mapping}s, and an optional {@code transform} array of
+ * procedures to call once the input has been loaded.
  * <p>
  * Members beyond those are ignored at every level, so an author may annotate a
  * spec - for instance with a {@code "comments"} member - without breaking it.
@@ -49,9 +50,29 @@ public class JsonMappingSpecReader implements MappingSpecReader {
         return Greyson.readValue(new InputStreamReader(src))
                 .map(v -> new MappingSpec(
                         PTR.member("input").apply(v).map(JsonMappingSpecReader::inputSpec).orElseThrow(),
-                        PTR.member("mapping").select(all()).apply(v).map(JsonMappingSpecReader::recordMappingSpec).toList()
+                        PTR.member("mapping").select(all()).apply(v).map(JsonMappingSpecReader::recordMappingSpec).toList(),
+                        PTR.member("transform").select(all()).apply(v).map(JsonMappingSpecReader::procedureCall).toList()
                 ))
                 .orElseThrow();
+    }
+
+    /**
+     * A procedure to call once the input has been loaded: its {@code name} and
+     * its {@code args}, each an ordinary value source.
+     * <p>
+     * No {@code type}, where an {@code fn} needs one - nothing comes back from a
+     * procedure, so there is no OUT parameter to declare. That absence is the
+     * only difference between the two in this format, and it is the difference
+     * that decides which of the two a spec means.
+     */
+    private static ProcedureCall procedureCall(JsonValue transform) {
+        return new ProcedureCall(
+                PTR.member("name").stringOrThrow(transform),
+                PTR.member("args")
+                        .select(all())
+                        .apply(transform)
+                        .map(JsonMappingSpecReader::valueSource)
+                        .toList());
     }
 
     private static InputSpec inputSpec(JsonValue is) {

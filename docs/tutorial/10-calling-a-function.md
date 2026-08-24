@@ -1,4 +1,4 @@
-# 10. Calling a function
+# 10. Calling a function, and running one after
 
 [← expressions](09-expressions.md) · [index](README.md) · [next: types and notation →](11-types.md)
 
@@ -153,6 +153,35 @@ your own into the statement, and none is coming; `prepareCall` would not take it
 
 A call may return null, and the load carries on with a null - a function saying "no such thing" by returning nothing
 is answering the question, and a loader has no business overruling it.
+
+## The other direction: a procedure, after the load
+
+An `fn` fetches a value before the records are read. Its opposite is a **transform**: a procedure the database runs
+once the records are in, before the load is committed.
+
+    "transform": [
+        {"name": "close_batch", "args": [{"var": "loadId"}, {"expr": "${xldr.rowsLoaded}"}]}
+    ]
+
+    <transform name="close_batch">
+        <arg var="loadId"/>
+        <arg expr="${xldr.rowsLoaded}"/>
+    </transform>
+
+It sits at the top level of the spec, beside `input` and `mapping`, because it is about the file rather than about
+one table. There may be several, and they run in the order written.
+
+The differences from `fn` are all one difference: a procedure gives nothing back. So there is no `type` to declare,
+there is nowhere for the result to go, and it is not a source a column or a var could use - it is work the spec asks
+for, not a value the spec reads. If you want a number out of the database, you want a var with an `fn` in it.
+
+**Before the commit, not after.** The procedure runs on the same connection and inside the same transaction as the
+load, so it sees the rows that were just inserted while nobody else can yet - and if it throws, the whole file rolls
+back with it. That is deliberate: the file stays the unit of work. A step that must survive a failed load does not
+belong in the spec at all.
+
+`${xldr.rowsLoaded}` is how many rows the load inserted. It exists only here - in a field mapping there is no such
+number yet, and the name is simply unknown.
 
 ## What `check` will and will not tell you
 

@@ -27,7 +27,7 @@ import static org.junit.jupiter.api.Assertions.*;
  */
 class XsdTest {
 
-    private static final Path SCHEMA = Path.of("..", "docs", "schema", "mapping-spec-0.40.xsd");
+    private static final Path SCHEMA = Path.of("..", "docs", "schema", "mapping-spec-0.41.xsd");
 
     /**
      * Every element and attribute the reader knows, in one document.
@@ -66,6 +66,11 @@ class XsdTest {
                         <lookup table="country" column="id" keyColumn="iso" fieldSelector="c"/>
                     </fieldMapping>
                 </mapping>
+                <transform name="pkg_load.close_batch">
+                    <arg var="batch"/>
+                    <arg expr="${xldr.rowsLoaded}"/>
+                </transform>
+                <transform name="reconcile"/>
             </mappingSpec>
             """;
 
@@ -102,6 +107,13 @@ class XsdTest {
                         .orElseThrow()
                         .source(),
                 "the nesting the schema allows is the nesting the reader builds");
+        assertEquals(
+                List.of(
+                        new ProcedureCall("pkg_load.close_batch", List.of(
+                                new ValueSource.Var("batch"),
+                                new ValueSource.Expr("${xldr.rowsLoaded}"))),
+                        new ProcedureCall("reconcile", List.of())),
+                spec.transforms());
     }
 
     /**
@@ -398,6 +410,77 @@ class XsdTest {
                     </input>
                 </mappingSpec>
                 """);
+    }
+
+    // ---- and the rules 0.41 was published for --------------------------------
+
+    /**
+     * A transform's argument is evaluated after the last record, so it may no
+     * more read a field than a var's source may - the same {@code <arg>} the
+     * schema already gives an {@code <fn>}, and the same refusal.
+     */
+    @Test
+    void aTransformArgumentCannotReadAField() {
+        assertRefusedByBoth("""
+                <mappingSpec>
+                    <input mimeType="text/csv"/>
+                    <transform name="close_batch">
+                        <arg fieldSelector="id"/>
+                    </transform>
+                </mappingSpec>
+                """);
+    }
+
+    /**
+     * A transform has no type, where an {@code <fn>} requires one: nothing comes
+     * back from a procedure, so there is no OUT parameter to declare. Writing
+     * one is the mistake of having meant an {@code <fn>}, and the schema says so
+     * rather than accepting an attribute the reader would ignore.
+     */
+    @Test
+    void aTransformSaysNoType() {
+        assertAllInvalid("""
+                <mappingSpec>
+                    <input mimeType="text/csv"/>
+                    <transform name="close_batch" type="INTEGRAL"/>
+                </mappingSpec>
+                """);
+    }
+
+    /** and its name is a name, as a function's is */
+    @Test
+    void aTransformNameIsAName() {
+        assertRefusedByBoth("""
+                <mappingSpec>
+                    <input mimeType="text/csv"/>
+                    <transform name="close(); drop table t"/>
+                </mappingSpec>
+                """);
+    }
+
+    /**
+     * The schema puts transforms after the mappings, which the reader does not
+     * require - it collects them wherever they stand. Stricter in the editor
+     * than in the reader, and deliberately: a transform runs after the load, and
+     * a spec that writes it first says something it does not mean.
+     * <p>
+     * The one place this file records the two disagreeing on purpose. Everywhere
+     * else a difference between them is the drift it exists to catch.
+     */
+    @Test
+    void theSchemaWantsTransformsLastEvenThoughTheReaderDoesNot() {
+        var outOfOrder = """
+                <mappingSpec>
+                    <input mimeType="text/csv"/>
+                    <transform name="reconcile"/>
+                    <mapping recordSelector="r" table="t">
+                        <fieldMapping fieldSelector="id" column="id"/>
+                    </mapping>
+                </mappingSpec>
+                """;
+        assertAllInvalid(outOfOrder);
+        assertDoesNotThrow(() -> new XmlMappingSpecReader().read(stream(outOfOrder)),
+                "the reader takes it anyway, so the schema is the strict one here");
     }
 
     /**

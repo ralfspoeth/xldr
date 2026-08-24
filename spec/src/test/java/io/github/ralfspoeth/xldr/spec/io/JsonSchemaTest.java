@@ -6,6 +6,7 @@ import com.networknt.schema.SchemaRegistry;
 import com.networknt.schema.SpecificationVersion;
 import io.github.ralfspoeth.xldr.spec.DataType;
 import io.github.ralfspoeth.xldr.spec.Locator;
+import io.github.ralfspoeth.xldr.spec.ProcedureCall;
 import io.github.ralfspoeth.xldr.spec.ValueSource;
 import org.junit.jupiter.api.Test;
 
@@ -34,7 +35,7 @@ import static org.junit.jupiter.api.Assertions.*;
  */
 class JsonSchemaTest {
 
-    private static final Path SCHEMA = Path.of("..", "docs", "schema", "mapping-spec-0.40.json");
+    private static final Path SCHEMA = Path.of("..", "docs", "schema", "mapping-spec-0.41.json");
 
     /**
      * Every member the reader knows, in one document - the JSON transliteration
@@ -79,6 +80,12 @@ class JsonSchemaTest {
                       "lookup": { "table": "country", "column": "id", "keyColumn": "iso",
                                   "fieldSelector": "c" } }
                   ] }
+              ],
+              "transform": [
+                { "name": "pkg_load.close_batch", "args": [
+                    { "var": "batch" },
+                    { "expr": "${xldr.rowsLoaded}" } ] },
+                { "name": "reconcile" }
               ]
             }
             """;
@@ -132,6 +139,13 @@ class JsonSchemaTest {
                         .orElseThrow()
                         .source(),
                 "the nesting the schema allows is the nesting the reader builds");
+        assertEquals(
+                List.of(
+                        new ProcedureCall("pkg_load.close_batch", List.of(
+                                new ValueSource.Var("batch"),
+                                new ValueSource.Expr("${xldr.rowsLoaded}"))),
+                        new ProcedureCall("reconcile", List.of())),
+                spec.transforms());
     }
 
     /**
@@ -367,6 +381,61 @@ class JsonSchemaTest {
                         "type": "INTEGRAL" } } ] },
                   "mapping": [] }
                 """, "calls something that is not a name");
+    }
+
+    // ---- and the rules 0.41 was published for --------------------------------
+
+    /**
+     * A transform's argument is evaluated after the last record, so it may no
+     * more read a field than a var's source may. Its {@code args} therefore take
+     * the same {@code varSource} an {@code fn}'s do, which is the definition
+     * that already refuses a field selector.
+     */
+    @Test
+    void aTransformArgumentCannotReadAField() throws IOException {
+        assertRefusedByBoth("""
+                { "input": { "mimeType": "text/csv" }, "mapping": [],
+                  "transform": [ { "name": "close_batch", "args": [ { "fieldSelector": "id" } ] } ] }
+                """, "lets a transform argument read a field");
+    }
+
+    /**
+     * A transform has no type, where an {@code fn} requires one: nothing comes
+     * back from a procedure. Writing one is the mistake of having meant an
+     * {@code fn}, and it is refused rather than ignored - which is what
+     * {@code additionalProperties} buys here.
+     */
+    @Test
+    void aTransformSaysNoType() throws IOException {
+        assertRefused("""
+                { "input": { "mimeType": "text/csv" }, "mapping": [],
+                  "transform": [ { "name": "close_batch", "type": "INTEGRAL" } ] }
+                """, "gives a transform a return type");
+    }
+
+    /** and its name is a name, as a function's is */
+    @Test
+    void aTransformNameIsAName() throws IOException {
+        assertRefusedByBoth("""
+                { "input": { "mimeType": "text/csv" }, "mapping": [],
+                  "transform": [ { "name": "close(); drop table t" } ] }
+                """, "calls something that is not a name");
+    }
+
+    /**
+     * A transform needs a name and nothing else: a procedure taking no arguments
+     * is the ordinary case.
+     */
+    @Test
+    void aTransformNeedsOnlyItsName() throws IOException {
+        assertValid("""
+                { "input": { "mimeType": "text/csv" }, "mapping": [],
+                  "transform": [ { "name": "reconcile" } ] }
+                """);
+        assertRefused("""
+                { "input": { "mimeType": "text/csv" }, "mapping": [],
+                  "transform": [ { "args": [] } ] }
+                """, "writes a transform with no name");
     }
 
     /**

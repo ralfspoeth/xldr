@@ -10,10 +10,7 @@ import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Objects;
-import java.util.ServiceLoader;
+import java.util.*;
 
 import static java.sql.DriverManager.getConnection;
 import static org.junit.jupiter.api.Assertions.assertAll;
@@ -47,7 +44,7 @@ class EndToEndIT {
         // one adapter for the file, discovered by MIME type through the service
         var adapter = adapterFor(spec.inputSpec());
 
-        try (var loader = new Loader(spec, getConnection(JDBC_URL))) {
+        try (var loader = new Loader(spec, getConnection(JDBC_URL), Map.of())) {
             for (var mapping : spec.recordMappingSpecs()) {
                 try (var in = resource("test1.xml")) {
                     loader.loadInput(adapter, in, mapping);
