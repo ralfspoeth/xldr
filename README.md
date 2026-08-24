@@ -138,7 +138,7 @@ fix their versions in one place:
             <dependency>
                 <groupId>io.github.ralfspoeth.xldr</groupId>
                 <artifactId>bom</artifactId>
-                <version>0.40</version>
+                <version>0.42</version>
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>
@@ -409,12 +409,12 @@ Both formats have a published schema, so an editor can check a spec before it ev
 only reports a broken spec in its log, by leaving the feed inactive. Point at the schema from the spec itself:
 
     {
-      "$schema": "https://ralfspoeth.github.io/xldr/schema/mapping-spec-0.41.json",
+      "$schema": "https://ralfspoeth.github.io/xldr/schema/mapping-spec-0.42.json",
       "input": { ... }
     }
 
     <mappingSpec xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-                 xsi:noNamespaceSchemaLocation="https://ralfspoeth.github.io/xldr/schema/mapping-spec-0.41.xsd">
+                 xsi:noNamespaceSchemaLocation="https://ralfspoeth.github.io/xldr/schema/mapping-spec-0.42.xsd">
 
 Both are ignored by the readers - `$schema` is just another unrecognised member, and `xsi:` attributes carry no
 meaning for a spec that has no namespace of its own. IntelliJ and VS Code both validate and autocomplete from them.
@@ -441,7 +441,8 @@ written for `fieldSelectors` costs a record every one of its fields, and no read
 unknown is exactly what it promises.
 
 A schema is published whenever the format changes, and is named after the release that changed it:
-`mapping-spec-0.41` describes the format from 0.41 onwards, `mapping-spec-0.40` that of 0.40, `mapping-spec-0.35` that of 0.35 to 0.39,
+`mapping-spec-0.42` describes the format from 0.42 onwards, `mapping-spec-0.40` that of 0.40 and 0.41,
+`mapping-spec-0.35` that of 0.35 to 0.39,
 `mapping-spec-0.32` that of 0.32 to 0.34,
 `mapping-spec-0.23` that of 0.23 to 0.31,
 `mapping-spec-0.21` that of 0.21 to 0.22,

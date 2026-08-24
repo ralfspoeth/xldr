@@ -27,7 +27,7 @@ import static org.junit.jupiter.api.Assertions.*;
  */
 class XsdTest {
 
-    private static final Path SCHEMA = Path.of("..", "docs", "schema", "mapping-spec-0.41.xsd");
+    private static final Path SCHEMA = Path.of("..", "docs", "schema", "mapping-spec-0.42.xsd");
 
     /**
      * Every element and attribute the reader knows, in one document.

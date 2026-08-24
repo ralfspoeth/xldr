@@ -35,7 +35,7 @@ import static org.junit.jupiter.api.Assertions.*;
  */
 class JsonSchemaTest {
 
-    private static final Path SCHEMA = Path.of("..", "docs", "schema", "mapping-spec-0.41.json");
+    private static final Path SCHEMA = Path.of("..", "docs", "schema", "mapping-spec-0.42.json");
 
     /**
      * Every member the reader knows, in one document - the JSON transliteration

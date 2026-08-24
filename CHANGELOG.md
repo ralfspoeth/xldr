@@ -6,7 +6,16 @@ ways that break existing code and existing specs; those changes are listed here 
 The versions are the git tags `xldr-<version>`; the published artifacts carry the same version under the group
 `io.github.ralfspoeth.xldr`.
 
-## Unreleased
+## 0.42
+
+A release about what happens once the records are in. A spec may end with `transform`, a list of procedures the
+target database runs after the last record and before the commit - closing a batch, reconciling what arrived. It is
+the counterpart of the `fn` added in 0.40 and deliberately not the same thing: a function hands back a value and
+belongs to a var, a procedure hands back nothing and belongs to the spec.
+
+The mapping-spec format changes, so `mapping-spec-0.42` is published in both formats. Two entries are breaking and
+both are for an embedder: a spec read from a file needs no edit, `transform` being optional and absent from every
+spec written before this release.
 
 ### Added
 
@@ -34,9 +43,23 @@ The versions are the git tags `xldr-<version>`; the published artifacts carry th
   else. It is the first ambient value the loader supplies rather than the application - nobody can pass the count in
   beforehand - and in a field mapping it stays an unknown name, mid-file there being no such number.
 
-- **`mapping-spec-0.41`**, in both formats, for `transform`. The XSD puts it after the mappings, which the reader
+- **`mapping-spec-0.42`**, in both formats, for `transform`. The XSD puts it after the mappings, which the reader
   does not require; that is the one place the two disagree on purpose, since a transform runs after the load and a
   spec that writes it first says something it does not mean.
+
+  It was briefly committed as `mapping-spec-0.41`, which was wrong twice over: 0.41 changed no format and keeps
+  `mapping-spec-0.40`, and a 0.41 server ignores an unrecognised `transform` in silence - so an author validating
+  against a file named for their own release would have been told their spec was fine and then watched the
+  procedure never run. Named after the release that changed the format, as the rule says.
+
+- **`ReleaseReadinessTest`**, which fails the build if the changelog's newest section or the README's BOM version
+  is not the version being released. It reads `<revision>` from the root pom - the property `release:prepare`
+  rewrites before it runs `clean verify` and long before it tags - so it is skipped for every snapshot build, when
+  `## Unreleased` is the right heading, and fires at the one moment the two files can still be fixed.
+
+  Three releases went out wrong this way: 0.28's work under a `## 0.27` heading, 0.33 tagged with `## Unreleased`
+  and a stale BOM, and 0.41 repeating both. The release plugin edits neither file and nothing else was looking. It
+  belongs beside `TutorialTest` for the reason that one exists: a document nothing checks is a document that drifts.
 
 - **`TransformIT`**, which is where the two claims above are actually checked. Both are claims about a transaction,
   so nothing short of a database can hold the loader to them: the procedure counts the rows it can see and writes
@@ -47,13 +70,24 @@ The versions are the git tags `xldr-<version>`; the published artifacts carry th
 - **`MappingSpec` has a third component**, `transforms`, so code constructing one positionally in Java no longer
   compiles. A two-argument constructor is kept for the spec that loads and does nothing afterwards, which is nearly
   all of them, so most call sites need no edit at all. Nothing changes for a spec read from a file: `transform` is
-  optional in both formats and absent from every spec written before 0.41.
+  optional in both formats and absent from every spec written before 0.42.
 
 - **`Loader.close()` runs the transforms** before it commits, which makes it do more than its name says. The
   alternative was worse: `Loader.load` drives the whole sequence but is not the only caller - `xlet` and the
   integration tests build a loader and call `loadInput` themselves - and on that path a spec carrying transforms
   would have done nothing whatsoever, silently. `close()` is the one place every caller reaches and the only one
   that knows the load finished.
+
+## 0.41
+
+A release about names. The five input adapters move under `ia-impl/`, a pom module that becomes their Maven parent,
+and the SPI they implement is renamed from `ia` to `ia-def` so that the definition and its implementations read as a
+pair wherever they appear together.
+
+The mapping-spec format is unchanged, so `mapping-spec-0.40` remains its schema and a spec that loaded under 0.40
+loads under 0.41. The adapters' own coordinates are unchanged too; the one breaking entry is the SPI's.
+
+### Breaking
 
 - **The SPI artifact is `ia-def`, where it was `ia`.** `io.github.ralfspoeth.xldr:ia` no longer exists, so a pom
   naming it fails to resolve rather than quietly resolving to the last version published under that name. Anyone
