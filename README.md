@@ -409,12 +409,12 @@ Both formats have a published schema, so an editor can check a spec before it ev
 only reports a broken spec in its log, by leaving the feed inactive. Point at the schema from the spec itself:
 
     {
-      "$schema": "https://ralfspoeth.github.io/xldr/schema/mapping-spec-0.42.json",
+      "$schema": "https://ralfspoeth.github.io/xldr/schema/mapping-spec-0.43.json",
       "input": { ... }
     }
 
     <mappingSpec xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-                 xsi:noNamespaceSchemaLocation="https://ralfspoeth.github.io/xldr/schema/mapping-spec-0.42.xsd">
+                 xsi:noNamespaceSchemaLocation="https://ralfspoeth.github.io/xldr/schema/mapping-spec-0.43.xsd">
 
 Both are ignored by the readers - `$schema` is just another unrecognised member, and `xsi:` attributes carry no
 meaning for a spec that has no namespace of its own. IntelliJ and VS Code both validate and autocomplete from them.
@@ -441,7 +441,7 @@ written for `fieldSelectors` costs a record every one of its fields, and no read
 unknown is exactly what it promises.
 
 A schema is published whenever the format changes, and is named after the release that changed it:
-`mapping-spec-0.42` describes the format from 0.42 onwards, `mapping-spec-0.40` that of 0.40 and 0.41,
+`mapping-spec-0.43` describes the format from 0.43 onwards, `mapping-spec-0.42` that of 0.42, `mapping-spec-0.40` that of 0.40 and 0.41,
 `mapping-spec-0.35` that of 0.35 to 0.39,
 `mapping-spec-0.32` that of 0.32 to 0.34,
 `mapping-spec-0.23` that of 0.23 to 0.31,
@@ -870,8 +870,9 @@ carries exactly one of these sources:
   boolean), and `null` loads a SQL NULL; in XML, an attribute, it is always a string and there is no way to write a
   null;
 * `lookup` - a value read from a reference table, emitted as an inline scalar subquery
-  `(select column from table where keyColumn = key)`. The `key` is itself a `fieldSelector`, `constant` or `var`;
-  a key that matches no row, or a key that is null, yields NULL;
+  `(select column from table where a = ? and b = ?)`. It matches on one column or on several; each condition's value
+  is itself a `fieldSelector`, `constant` or `var`, and a key that matches no row, or any condition whose value is
+  null, yields NULL;
 * `var` - a reference by name to an input [variable](#variables), bound as a parameter;
 * `expr` - a [`${...}` template](#expressions) evaluated in the JVM, bound as a parameter.
 
@@ -893,6 +894,33 @@ A lookup example - translate an ISO code carried in the input to a surrogate key
 
 The two `column`s are at different levels and mean what their level says: the inner one is the column read *from* the
 reference table, the outer one the column of the target table written *to*.
+
+**A composite key is written as `conditions`**, one entry per column, and they are `and`ed in the order written:
+
+    {
+        "lookup": {
+            "table": "rate",
+            "column": "factor",
+            "conditions": [
+                {"column": "ccy",  "fieldSelector": "currency"},
+                {"column": "asof", "var": "valueDate"}
+            ]
+        },
+        "column": "rate_factor"
+    }
+
+    <lookup table="rate" column="factor">
+        <condition column="ccy" fieldSelector="currency"/>
+        <condition column="asof" var="valueDate"/>
+    </lookup>
+
+`keyColumn` beside a source is the one-condition spelling and stays exactly as it was - a lookup on a single column
+reads better said once than wrapped in an array of one. A lookup writes one form or the other, never both.
+
+The order matters more than `and` being commutative suggests: it is the order of the `where` clause and therefore of
+the bound parameters, so it is kept as written rather than left to a hash map. Two conditions on one column are
+refused, compared the way SQL compares them - `ccy` and `CCY` are one unquoted column, and matching on it twice is
+not something a spec means to say.
 
 Example:
 

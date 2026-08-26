@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 import java.math.BigDecimal;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -88,6 +89,85 @@ class JsonValueSourceTest {
                         "country_id", new ValueSource.Lookup("country", "id", "iso", new ValueSource.Field("c"))
                 )),
                 mapping.fieldMappings());
+    }
+
+    /**
+     * A lookup may match on several columns, written as a {@code conditions}
+     * array so that the order is the document's rather than a map's.
+     */
+    @Test
+    void readsAlookupOnSeveralColumns() throws IOException {
+        var source = """
+                {
+                    "input": { "mimeType": "text/csv" },
+                    "mapping": [
+                        { "recordSelector": "r", "table": "t", "fieldMapping": [
+                            { "column": "factor", "lookup": {
+                                "table": "rate", "column": "factor", "conditions": [
+                                    { "column": "ccy",  "fieldSelector": "currency" },
+                                    { "column": "asof", "var": "day" } ] } } ] }
+                    ]
+                }
+                """;
+        var conditions = new LinkedHashMap<String, ValueSource>();
+        conditions.put("ccy", new ValueSource.Field("currency"));
+        conditions.put("asof", new ValueSource.Var("day"));
+
+        var mapping = List.copyOf(new JsonMappingSpecReader().read(stream(source)).recordMappingSpecs()).getFirst();
+        assertEquals(
+                List.of(new FieldMappingSpec("factor",
+                        new ValueSource.Lookup("rate", "factor", conditions))),
+                mapping.fieldMappings());
+    }
+
+    /**
+     * The one-condition spelling and the many-condition one are two ways to say
+     * the same thing, and a lookup writing both has said it twice.
+     */
+    @Test
+    void refusesKeyColumnAndConditionsTogether() {
+        var source = """
+                { "input": { "mimeType": "text/csv" },
+                  "mapping": [ { "recordSelector": "r", "table": "t", "fieldMapping": [
+                      { "column": "x", "lookup": { "table": "r", "column": "id", "keyColumn": "a",
+                          "fieldSelector": "f", "conditions": [ { "column": "b", "var": "v" } ] } } ] } ] }
+                """;
+        var thrown = assertThrows(IllegalArgumentException.class,
+                () -> new JsonMappingSpecReader().read(stream(source)));
+        assertTrue(thrown.getMessage().contains("one of the two is wanted"), thrown.getMessage());
+    }
+
+    /** and one that names a column twice has contradicted itself */
+    @Test
+    void refusesTwoConditionsOnOneColumn() {
+        var source = """
+                { "input": { "mimeType": "text/csv" },
+                  "mapping": [ { "recordSelector": "r", "table": "t", "fieldMapping": [
+                      { "column": "x", "lookup": { "table": "r", "column": "id", "conditions": [
+                          { "column": "a", "var": "v" }, { "column": "a", "constant": 1 } ] } } ] } ] }
+                """;
+        var thrown = assertThrows(IllegalArgumentException.class,
+                () -> new JsonMappingSpecReader().read(stream(source)));
+        assertTrue(thrown.getMessage().contains("twice"), thrown.getMessage());
+    }
+
+    /**
+     * A var's lookup may be keyed by a function call. The schema has said so
+     * since 0.40 and the reader threw until 0.43, so an editor passed the spec
+     * and the server then refused to load it.
+     */
+    @Test
+    void readsAvarLookupKeyedByAcall() throws IOException {
+        var source = """
+                { "input": { "mimeType": "text/csv", "vars": [
+                    { "name": "batch", "lookup": { "table": "load_batch", "column": "id",
+                        "keyColumn": "feed", "fn": { "name": "current_feed", "type": "TEXT" } } } ] },
+                  "mapping": [] }
+                """;
+        assertEquals(
+                List.of(new VarSpec("batch", new ValueSource.Lookup("load_batch", "id", "feed",
+                        new ValueSource.FunctionCall("current_feed", DataType.TEXT, List.of())))),
+                List.copyOf(new JsonMappingSpecReader().read(stream(source)).inputSpec().vars()));
     }
 
     @Test

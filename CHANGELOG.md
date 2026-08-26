@@ -6,6 +6,43 @@ ways that break existing code and existing specs; those changes are listed here 
 The versions are the git tags `xldr-<version>`; the published artifacts carry the same version under the group
 `io.github.ralfspoeth.xldr`.
 
+## Unreleased
+
+### Added
+
+- **A lookup may match on more than one column.** Where a reference table is keyed by two - a rate by currency and
+  date, a price by article and price list - `keyColumn` becomes `conditions`, one entry per column:
+
+      "lookup": { "table": "rate", "column": "factor", "conditions": [
+                    { "column": "ccy",  "fieldSelector": "currency" },
+                    { "column": "asof", "var": "valueDate" } ] }
+
+  They are `and`ed, and each takes the same sources a single key takes. `keyColumn` beside a source stays the
+  one-condition spelling and is unchanged: a lookup on one column reads better said once than wrapped in an array
+  of one. A lookup writes one form or the other, and a spec writing both is refused rather than picked between.
+
+  `ValueSource.Lookup` carries them as a `SequencedMap<String, ValueSource>`, not a `Map`. The order is the order
+  of the `where` clause and therefore of the bound parameters, and `Map.copyOf` randomises its iteration order per
+  JVM run - the same spec would have produced different SQL, a different statement-cache key and different `check`
+  output on different days. Two conditions on one column are refused, compared through `SqlIdentifier.folded`,
+  because `ccy` and `CCY` are one unquoted column: a map keyed by the name as written holds two entries and is
+  content, which is how a spec would have emitted the same column twice without hearing about it.
+
+- **`mapping-spec-0.43`**, in both formats, for `conditions`. Both lookup flavours gain it and keep their separate
+  definitions, so a var's condition may no more read a field than a var's key ever could.
+
+### Fixed
+
+- **A var's lookup may be keyed by an `fn`, which the schemas have claimed since 0.40 and the reader refused.** An
+  editor passed such a spec and the server then would not load it, throwing "needs exactly one of fieldSelector,
+  constant, var, expr". The reader now does what the published schemas describe.
+
+  It slipped in when the `varLookup` definition was written for 0.40: `fn` was added to it for symmetry with a
+  var's own sources, and nothing checked that `SpecNode.source()` could produce one. Both paired schema tests
+  missed it for three releases because no fixture ever keyed a lookup that way - a reminder that those tests prove
+  agreement only about the shapes they exercise. A call in a *column* lookup is still refused, one call per row
+  being what `FieldMappingSpec` exists to prevent.
+
 ## 0.42
 
 A release about what happens once the records are in. A spec may end with `transform`, a list of procedures the

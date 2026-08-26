@@ -21,9 +21,9 @@ final class RowIndependence {
     /**
      * Refuses a field, however deeply it is buried.
      * <p>
-     * Recursive, because a field can hide a level down: as a lookup's key, or as
-     * an argument to a call. Both are evaluated in the same breath as whatever
-     * holds them and have exactly as little to read from.
+     * Recursive, because a field can hide a level down: as any of a lookup's
+     * conditions, or as an argument to a call. Both are evaluated in the same
+     * breath as whatever holds them and have exactly as little to read from.
      * <p>
      * Provable from the document alone - no arrangement of the input could make
      * such a spec work - and this project's habit is to refuse such a thing when
@@ -39,7 +39,8 @@ final class RowIndependence {
         switch (source) {
             case ValueSource.Field(var fieldName) -> throw new IllegalArgumentException(
                     subject + " reads the input field '" + fieldName + "', which it cannot: " + reason);
-            case ValueSource.Lookup(_, _, _, var key) -> refuseFieldAnywhere(subject, reason, key);
+            case ValueSource.Lookup(_, _, var conditions) ->
+                    conditions.values().forEach(key -> refuseFieldAnywhere(subject, reason, key));
             case ValueSource.FunctionCall(_, _, var arguments) ->
                     arguments.forEach(argument -> refuseFieldAnywhere(subject, reason, argument));
             case ValueSource.Constant _, ValueSource.Var _, ValueSource.Expr _ -> {

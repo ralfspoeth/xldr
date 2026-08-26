@@ -11,6 +11,7 @@ import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.SequencedMap;
 
 import static io.github.ralfspoeth.xmls.XmlFunctions.attributeValue;
 import static io.github.ralfspoeth.xmls.XmlFunctions.elements;
@@ -232,8 +233,75 @@ public class XmlMappingSpecReader implements MappingSpecReader {
         return new ValueSource.Lookup(
                 required(lookup, "table"),
                 required(lookup, "column"),
-                required(lookup, "keyColumn"),
-                node(lookup).source());
+                conditions(lookup));
+    }
+
+    /**
+     * What a lookup matches on: either a {@code keyColumn} attribute beside its
+     * source attribute, which is one condition and how nearly every lookup is
+     * written, or {@code <condition>} children for the composite key.
+     *
+     * <pre>
+     * &lt;lookup table="rate" column="factor"&gt;
+     *     &lt;condition column="ccy" fieldSelector="currency"/&gt;
+     *     &lt;condition column="asof" var="valueDate"/&gt;
+     * &lt;/lookup&gt;
+     * </pre>
+     * <p>
+     * Both spellings, and never both at once: a spec that writes each has said
+     * the same thing twice and is refused rather than picked between.
+     */
+    private static SequencedMap<String, ValueSource> conditions(Element lookup) {
+        var listed = elements("condition").apply(lookup).toList();
+        var keyColumn = attributeValue("keyColumn").apply(lookup).orElse(null);
+        if (!listed.isEmpty() && keyColumn != null) {
+            throw new IllegalArgumentException("<lookup> has a keyColumn attribute and <condition>"
+                    + " children, and one of the two is wanted");
+        }
+        var conditions = new LinkedHashMap<String, ValueSource>();
+        if (listed.isEmpty()) {
+            if (keyColumn == null) {
+                throw new IllegalArgumentException(
+                        "<lookup> matches on something: give it a keyColumn or <condition> children");
+            }
+            conditions.put(keyColumn, conditionValue(lookup));
+            return conditions;
+        }
+        for (var condition : listed) {
+            var column = required(condition, "column");
+            if (conditions.put(column, conditionValue(condition)) != null) {
+                // the map would keep the last quietly; a spec that names a column
+                // twice has contradicted itself and should hear about it
+                throw new IllegalArgumentException("<lookup> matches '" + column + "' twice");
+            }
+        }
+        return conditions;
+    }
+
+    /**
+     * What one condition matches against: one of the four source attributes, or
+     * an {@code <fn>} child, and never a nested {@code <lookup>}.
+     * <p>
+     * The {@code <fn>} half is what the XSD has claimed since 0.40 and the
+     * reader did not do: a var's lookup keyed by a call validated in an editor
+     * and then threw when the spec was read. A call in a *column* lookup's
+     * condition is still refused, by {@link
+     * io.github.ralfspoeth.xldr.spec.FieldMappingSpec}, one call per row being
+     * what that rule exists to prevent.
+     * <p>
+     * A nested lookup stays out: it would be a join, and a join belongs in a
+     * view where the database can plan it.
+     */
+    private static ValueSource conditionValue(Element condition) {
+        var fn = elements("fn").apply(condition).findFirst().orElse(null);
+        if (fn == null) {
+            return node(condition).source();
+        }
+        if (node(condition).hasSource()) {
+            throw new IllegalArgumentException("<" + condition.getNodeName() + "> has an <fn> and a"
+                    + " source attribute, and one source is wanted");
+        }
+        return functionCall(fn);
     }
 
     /**

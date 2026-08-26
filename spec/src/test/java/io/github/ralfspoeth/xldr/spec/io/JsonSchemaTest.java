@@ -35,7 +35,7 @@ import static org.junit.jupiter.api.Assertions.*;
  */
 class JsonSchemaTest {
 
-    private static final Path SCHEMA = Path.of("..", "docs", "schema", "mapping-spec-0.42.json");
+    private static final Path SCHEMA = Path.of("..", "docs", "schema", "mapping-spec-0.43.json");
 
     /**
      * Every member the reader knows, in one document - the JSON transliteration
@@ -78,7 +78,11 @@ class JsonSchemaTest {
                     { "expr": "${xldr.filename}", "column": "loaded_from" },
                     { "column": "country_id",
                       "lookup": { "table": "country", "column": "id", "keyColumn": "iso",
-                                  "fieldSelector": "c" } }
+                                  "fieldSelector": "c" } },
+                    { "column": "factor",
+                      "lookup": { "table": "rate", "column": "factor", "conditions": [
+                          { "column": "ccy",  "fieldSelector": "id" },
+                          { "column": "asof", "var": "source" } ] } }
                   ] }
               ],
               "transform": [
@@ -127,7 +131,7 @@ class JsonSchemaTest {
         var spec = new JsonMappingSpecReader().read(stream(COMPLETE_SPEC));
         assertTrue(spec.inputSpec().properties().containsKey("ns.f"));
         assertTrue(spec.recordMappingSpecs().stream()
-                .anyMatch(m -> m.fieldMappings().size() == 6));
+                .anyMatch(m -> m.fieldMappings().size() == 7));
         assertEquals(
                 new ValueSource.FunctionCall("pkg_load.next_id", DataType.INTEGRAL, List.of(
                         new ValueSource.Constant("funds"),
@@ -436,6 +440,93 @@ class JsonSchemaTest {
                 { "input": { "mimeType": "text/csv" }, "mapping": [],
                   "transform": [ { "args": [] } ] }
                 """, "writes a transform with no name");
+    }
+
+    // ---- and the rules 0.43 was published for --------------------------------
+
+    /**
+     * A lookup matches on one column or on several, and says so one way: a
+     * {@code keyColumn} beside its source, or a {@code conditions} array. Both
+     * at once is the same thing said twice.
+     */
+    @Test
+    void aLookupSaysWhatItMatchesOnOnce() throws IOException {
+        assertRefusedByBoth("""
+                { "input": { "mimeType": "text/csv" },
+                  "mapping": [ { "recordSelector": "r", "table": "t", "fieldMapping": [
+                      { "column": "x", "lookup": { "table": "rate", "column": "factor",
+                          "keyColumn": "ccy", "fieldSelector": "c",
+                          "conditions": [ { "column": "asof", "var": "d" } ] } } ] } ] }
+                """, "gives a lookup a keyColumn and conditions");
+        assertRefused("""
+                { "input": { "mimeType": "text/csv" },
+                  "mapping": [ { "recordSelector": "r", "table": "t", "fieldMapping": [
+                      { "column": "x", "lookup": { "table": "rate", "column": "factor" } } ] } ] }
+                """, "gives a lookup neither");
+    }
+
+    /**
+     * An empty {@code conditions} would select the whole table, which is not a
+     * thing anyone means - the schema says so, and so does the record.
+     */
+    @Test
+    void aLookupMatchesOnAtLeastOneColumn() throws IOException {
+        assertRefused("""
+                { "input": { "mimeType": "text/csv" },
+                  "mapping": [ { "recordSelector": "r", "table": "t", "fieldMapping": [
+                      { "column": "x", "lookup": { "table": "rate", "column": "factor",
+                          "conditions": [] } } ] } ] }
+                """, "matches on no column at all");
+    }
+
+    /** and a condition names its column, and exactly one source for it */
+    @Test
+    void aConditionIsAColumnAndOneSource() throws IOException {
+        assertRefused("""
+                { "input": { "mimeType": "text/csv" },
+                  "mapping": [ { "recordSelector": "r", "table": "t", "fieldMapping": [
+                      { "column": "x", "lookup": { "table": "rate", "column": "factor",
+                          "conditions": [ { "var": "v" } ] } } ] } ] }
+                """, "writes a condition with no column");
+        assertRefused("""
+                { "input": { "mimeType": "text/csv" },
+                  "mapping": [ { "recordSelector": "r", "table": "t", "fieldMapping": [
+                      { "column": "x", "lookup": { "table": "rate", "column": "factor",
+                          "conditions": [ { "column": "a", "var": "v", "constant": 1 } ] } } ] } ] }
+                """, "writes a condition with two sources");
+    }
+
+    /**
+     * A var's conditions are var sources: no field, at any depth, because a var
+     * is evaluated before the first record. The two lookup definitions were
+     * split for this in 0.40 and the split now covers conditions too.
+     */
+    @Test
+    void aVarLookupConditionCannotReadAField() throws IOException {
+        assertRefusedByBoth("""
+                { "input": { "mimeType": "text/csv", "vars": [
+                    { "name": "v", "lookup": { "table": "rate", "column": "factor", "conditions": [
+                        { "column": "ccy", "fieldSelector": "c" } ] } } ] },
+                  "mapping": [] }
+                """, "lets a var's lookup condition read a field");
+    }
+
+    /**
+     * And the rule the schema has stated since 0.40 while the reader refused it:
+     * a var's lookup may be keyed by a function call. Fixed in 0.43 by teaching
+     * the reader, so this now asserts agreement rather than the disagreement.
+     */
+    @Test
+    void aVarLookupMayBeKeyedByAcall() throws IOException {
+        var spec = """
+                { "input": { "mimeType": "text/csv", "vars": [
+                    { "name": "v", "lookup": { "table": "load_batch", "column": "id",
+                        "keyColumn": "feed", "fn": { "name": "current_feed", "type": "TEXT" } } } ] },
+                  "mapping": [] }
+                """;
+        assertValid(spec);
+        assertDoesNotThrow(() -> new JsonMappingSpecReader().read(stream(spec)),
+                "the schema has allowed this since 0.40; the reader threw until 0.43");
     }
 
     /**

@@ -47,8 +47,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class TutorialTest {
 
     private static final Path TUTORIAL = Path.of("..", "docs", "tutorial");
-    private static final Path JSON_SCHEMA = Path.of("..", "docs", "schema", "mapping-spec-0.42.json");
-    private static final Path XSD = Path.of("..", "docs", "schema", "mapping-spec-0.42.xsd");
+    private static final Path JSON_SCHEMA = Path.of("..", "docs", "schema", "mapping-spec-0.43.json");
+    private static final Path XSD = Path.of("..", "docs", "schema", "mapping-spec-0.43.xsd");
 
     /** ```lang ... ``` - the only kind of block a page states a fixture in */
     private static final Pattern FENCED = Pattern.compile("```(\\w*)\\n(.*?)```", Pattern.DOTALL);
@@ -226,7 +226,9 @@ class TutorialTest {
     private static Set<String> fieldNames(ValueSource source) {
         return switch (source) {
             case ValueSource.Field(var name) -> Set.of(name);
-            case ValueSource.Lookup(_, _, _, var key) -> fieldNames(key);
+            case ValueSource.Lookup(_, _, var conditions) -> conditions.values().stream()
+                    .flatMap(key -> fieldNames(key).stream())
+                    .collect(Collectors.toSet());
             // a call reads no record either: it is a var source, evaluated once
             // before the first one is read
             case ValueSource.Constant _, ValueSource.Var _, ValueSource.Expr _,

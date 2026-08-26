@@ -27,7 +27,7 @@ import static org.junit.jupiter.api.Assertions.*;
  */
 class XsdTest {
 
-    private static final Path SCHEMA = Path.of("..", "docs", "schema", "mapping-spec-0.42.xsd");
+    private static final Path SCHEMA = Path.of("..", "docs", "schema", "mapping-spec-0.43.xsd");
 
     /**
      * Every element and attribute the reader knows, in one document.
@@ -65,6 +65,12 @@ class XsdTest {
                     <fieldMapping column="country_id">
                         <lookup table="country" column="id" keyColumn="iso" fieldSelector="c"/>
                     </fieldMapping>
+                    <fieldMapping column="factor">
+                        <lookup table="rate" column="factor">
+                            <condition column="ccy" fieldSelector="id"/>
+                            <condition column="asof" var="source"/>
+                        </lookup>
+                    </fieldMapping>
                 </mapping>
                 <transform name="pkg_load.close_batch">
                     <arg var="batch"/>
@@ -95,7 +101,7 @@ class XsdTest {
         var spec = new XmlMappingSpecReader().read(stream(COMPLETE_SPEC));
         assertTrue(spec.inputSpec().properties().containsKey("ns.f"));
         assertTrue(spec.recordMappingSpecs().stream()
-                .anyMatch(m -> m.fieldMappings().size() == 6));
+                .anyMatch(m -> m.fieldMappings().size() == 7));
         assertEquals(
                 new ValueSource.FunctionCall("pkg_load.next_id", DataType.INTEGRAL, List.of(
                         new ValueSource.Constant("funds"),
@@ -481,6 +487,97 @@ class XsdTest {
         assertAllInvalid(outOfOrder);
         assertDoesNotThrow(() -> new XmlMappingSpecReader().read(stream(outOfOrder)),
                 "the reader takes it anyway, so the schema is the strict one here");
+    }
+
+    // ---- and the rules 0.43 was published for --------------------------------
+
+    /**
+     * A condition names the column it matches on, which is the one thing about
+     * it a schema can insist on.
+     */
+    @Test
+    void aConditionNamesItsColumn() {
+        assertRefusedByBoth("""
+                <mappingSpec>
+                    <input mimeType="text/csv"/>
+                    <mapping recordSelector="r" table="t">
+                        <fieldMapping column="x">
+                            <lookup table="rate" column="factor">
+                                <condition var="v"/>
+                            </lookup>
+                        </fieldMapping>
+                    </mapping>
+                </mappingSpec>
+                """);
+    }
+
+    /**
+     * A var's condition is a var source: no field, because a var is evaluated
+     * before the first record. The XSD can say this, giving the two lookup
+     * flavours their own condition types, exactly as it already gives them their
+     * own lookup types.
+     */
+    @Test
+    void aVarLookupConditionCannotReadAField() {
+        assertRefusedByBoth("""
+                <mappingSpec>
+                    <input mimeType="text/csv">
+                        <var name="v">
+                            <lookup table="rate" column="factor">
+                                <condition column="ccy" fieldSelector="c"/>
+                            </lookup>
+                        </var>
+                    </input>
+                </mappingSpec>
+                """);
+    }
+
+    /**
+     * That a lookup says {@code keyColumn} or {@code <condition>} children and
+     * not both is a rule XSD 1.0 cannot state - it is the exactly-one-of shape
+     * again - so this asserts the schema is the permissive one and the reader
+     * catches it, which is the division the two have everywhere else.
+     */
+    @Test
+    void theSchemaCannotRefuseBothSpellingsAtOnceButTheReaderDoes() {
+        var both = """
+                <mappingSpec>
+                    <input mimeType="text/csv"/>
+                    <mapping recordSelector="r" table="t">
+                        <fieldMapping column="x">
+                            <lookup table="rate" column="factor" keyColumn="ccy" fieldSelector="c">
+                                <condition column="asof" var="d"/>
+                            </lookup>
+                        </fieldMapping>
+                    </mapping>
+                </mappingSpec>
+                """;
+        assertDoesNotThrow(() -> validate(both), "XSD 1.0 has no way to say one of the two");
+        assertThrows(IllegalArgumentException.class,
+                () -> new XmlMappingSpecReader().read(stream(both)),
+                "so the reader is the only thing that can refuse it");
+    }
+
+    /**
+     * And the rule the XSD has stated since 0.40 while the reader refused it: a
+     * var's lookup may be keyed by a call.
+     */
+    @Test
+    void aVarLookupMayBeKeyedByAcall() {
+        var xml = """
+                <mappingSpec>
+                    <input mimeType="text/csv">
+                        <var name="v">
+                            <lookup table="load_batch" column="id" keyColumn="feed">
+                                <fn name="current_feed" type="TEXT"/>
+                            </lookup>
+                        </var>
+                    </input>
+                </mappingSpec>
+                """;
+        assertDoesNotThrow(() -> validate(xml));
+        assertDoesNotThrow(() -> new XmlMappingSpecReader().read(stream(xml)),
+                "the XSD has allowed this since 0.40; the reader threw until 0.43");
     }
 
     /**

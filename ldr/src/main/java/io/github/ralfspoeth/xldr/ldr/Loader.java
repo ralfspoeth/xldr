@@ -335,9 +335,10 @@ public class Loader implements AutoCloseable {
                 }
                 yield resolved.get(v.name());
             }
-            // the key may be null, and lookup says what it does about that: the
-            // requireNonNull that used to be here made that branch unreachable
-            case ValueSource.Lookup lk -> lookup(lk, evaluate(lk.key(), resolved));
+            // a condition's value may be null, and lookup says what it does about
+            // that: the requireNonNull that used to be here made that branch
+            // unreachable
+            case ValueSource.Lookup lk -> lookup(lk, resolved);
             case ValueSource.Expr e -> Expression.compile(e.template()).eval(bindings(resolved, null));
             case ValueSource.FunctionCall fc -> call(fc, resolved);
             // unreachable, and kept because the switch has to be exhaustive:
@@ -583,18 +584,40 @@ public class Loader implements AutoCloseable {
         };
     }
 
-    private @Nullable Object lookup(ValueSource.Lookup lk, @Nullable Object key) throws SQLException {
-        if (key == null) {
-            // = NULL is never true, so the query could only return nothing;
-            // asking spares the round trip and the drivers that will not bind an
-            // untyped null
-            return null;
+    /**
+     * The lookup a var holds, run once against its own statement.
+     * <p>
+     * Every condition is evaluated before anything is sent, and a null among
+     * them ends it: {@code = NULL} is never true, so the query could only return
+     * nothing. Asking anyway would cost a round trip and would fall foul of the
+     * drivers that refuse to bind an untyped null. One null condition is enough,
+     * the conditions being {@code and}ed.
+     * <p>
+     * The values are bound in the order the conditions are written, which is the
+     * order they were placed into the {@code where} clause a few lines above -
+     * one loop over one ordered map, so the two cannot drift apart.
+     */
+    private @Nullable Object lookup(ValueSource.Lookup lk, Map<String, @Nullable Object> resolved)
+            throws SQLException {
+        var values = new ArrayList<@Nullable Object>(lk.conditions().size());
+        var where = new StringBuilder();
+        for (var condition : lk.conditions().entrySet()) {
+            var value = evaluate(condition.getValue(), resolved);
+            if (value == null) {
+                return null;
+            }
+            values.add(value);
+            where.append(where.isEmpty() ? "" : " and ")
+                    .append(normalizeIdentifier(condition.getKey()))
+                    .append(" = ?");
         }
         var sql = "select " + normalizeIdentifier(lk.column())
                 + " from " + qualify(lk.table())
-                + " where " + normalizeIdentifier(lk.keyColumn()) + " = ?";
+                + " where " + where;
         try (var ps = connection.prepareStatement(sql)) {
-            ps.setObject(1, jdbcValue(key));
+            for (int i = 0; i < values.size(); i++) {
+                ps.setObject(i + 1, jdbcValue(values.get(i)));
+            }
             try (var rs = ps.executeQuery()) {
                 return rs.next() ? rs.getObject(1) : null;
             }
@@ -832,10 +855,21 @@ public class Loader implements AutoCloseable {
                 yield "?";
             }
             case ValueSource.Lookup lk -> {
-                var keyExpr = plan(lk.key(), binders, fieldNames);
+                // each condition planned in the order it will be written, since
+                // planning is what appends the binder: the n-th binder has to be
+                // the n-th placeholder in this subquery, and the conditions are
+                // ordered precisely so that "the n-th" means something
+                var where = new StringBuilder();
+                for (var condition : lk.conditions().entrySet()) {
+                    var valueExpr = plan(condition.getValue(), binders, fieldNames);
+                    where.append(where.isEmpty() ? "" : " and ")
+                            .append(normalizeIdentifier(condition.getKey()))
+                            .append(" = ")
+                            .append(valueExpr);
+                }
                 yield "(select " + normalizeIdentifier(lk.column())
                         + " from " + qualify(lk.table())
-                        + " where " + normalizeIdentifier(lk.keyColumn()) + " = " + keyExpr + ")";
+                        + " where " + where + ")";
             }
             // unreachable, and kept because the switch has to be exhaustive:
             // FieldMappingSpec refuses a call at any depth when the spec is read,

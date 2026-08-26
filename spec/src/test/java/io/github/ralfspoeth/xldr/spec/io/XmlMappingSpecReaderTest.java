@@ -3,6 +3,7 @@ package io.github.ralfspoeth.xldr.spec.io;
 import io.github.ralfspoeth.xldr.spec.*;
 import org.junit.jupiter.api.Test;
 
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -110,6 +111,80 @@ class XmlMappingSpecReaderTest {
         var mapping = List.copyOf(spec.recordMappingSpecs()).getFirst();
         var fm = List.copyOf(mapping.fieldMappings()).getFirst();
         assertEquals(new ValueSource.Var("batchId"), fm.source());
+    }
+
+    /**
+     * A lookup may match on several columns, written as {@code <condition>}
+     * children so that the order is the document's.
+     */
+    @Test
+    void parsesAlookupOnSeveralColumns() {
+        var source = """
+                <mappingSpec>
+                    <input mimeType="text/csv"/>
+                    <mapping recordSelector="r" table="t">
+                        <fieldMapping column="factor">
+                            <lookup table="rate" column="factor">
+                                <condition column="ccy" fieldSelector="currency"/>
+                                <condition column="asof" var="day"/>
+                            </lookup>
+                        </fieldMapping>
+                    </mapping>
+                </mappingSpec>
+                """;
+        var conditions = new LinkedHashMap<String, ValueSource>();
+        conditions.put("ccy", new ValueSource.Field("currency"));
+        conditions.put("asof", new ValueSource.Var("day"));
+
+        var mapping = List.copyOf(
+                new XmlMappingSpecReader().read(stream(source)).recordMappingSpecs()).getFirst();
+        assertEquals(
+                List.of(new FieldMappingSpec("factor",
+                        new ValueSource.Lookup("rate", "factor", conditions))),
+                mapping.fieldMappings());
+    }
+
+    /** the two spellings say the same thing, so a lookup writes one of them */
+    @Test
+    void refusesKeyColumnAndConditionsTogether() {
+        var source = """
+                <mappingSpec>
+                    <input mimeType="text/csv"/>
+                    <mapping recordSelector="r" table="t">
+                        <fieldMapping column="x">
+                            <lookup table="r" column="id" keyColumn="a" fieldSelector="f">
+                                <condition column="b" var="v"/>
+                            </lookup>
+                        </fieldMapping>
+                    </mapping>
+                </mappingSpec>
+                """;
+        var thrown = assertThrows(IllegalArgumentException.class,
+                () -> new XmlMappingSpecReader().read(stream(source)));
+        assertTrue(thrown.getMessage().contains("one of the two is wanted"), thrown.getMessage());
+    }
+
+    /**
+     * A var's lookup may be keyed by a call. The XSD has said so since 0.40 and
+     * the reader threw until 0.43.
+     */
+    @Test
+    void parsesAvarLookupKeyedByAcall() {
+        var source = """
+                <mappingSpec>
+                    <input mimeType="text/csv">
+                        <var name="batch">
+                            <lookup table="load_batch" column="id" keyColumn="feed">
+                                <fn name="current_feed" type="TEXT"/>
+                            </lookup>
+                        </var>
+                    </input>
+                </mappingSpec>
+                """;
+        assertEquals(
+                List.of(new VarSpec("batch", new ValueSource.Lookup("load_batch", "id", "feed",
+                        new ValueSource.FunctionCall("current_feed", DataType.TEXT, List.of())))),
+                List.copyOf(new XmlMappingSpecReader().read(stream(source)).inputSpec().vars()));
     }
 
     /**

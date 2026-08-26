@@ -3,7 +3,13 @@ package io.github.ralfspoeth.xldr.spec;
 import org.jspecify.annotations.Nullable;
 
 import java.io.Serializable;
+import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.SequencedMap;
+
+import static java.util.Objects.requireNonNull;
 
 /**
  * Where the value of a mapped database column comes from. Exactly one of:
@@ -14,9 +20,10 @@ import java.util.List;
  *       Java type follows the JSON literal: a {@code String}, a
  *       {@code BigDecimal} for a number, or a {@code Boolean}.</li>
  *   <li>{@link Lookup} - the value read from a reference table, emitted as an
- *       inline scalar subquery {@code (select column from table where keyColumn
- *       = key)} where the {@code key} is itself a {@code Field}, {@code Constant}
- *       or {@code Var}. A key that matches no row yields SQL NULL.</li>
+ *       inline scalar subquery {@code (select column from table where a = ? and
+ *       b = ?)}, where each condition's value is itself a {@code Field},
+ *       {@code Constant} or {@code Var}. A key that matches no row yields SQL
+ *       NULL.</li>
  *   <li>{@link Var} - a reference to an input-level variable, evaluated once per
  *       load and then bound as a parameter. See {@link VarSpec}.</li>
  *   <li>{@link Expr} - a {@code ${...}} template evaluated in the JVM to a value
@@ -57,15 +64,84 @@ public sealed interface ValueSource extends Serializable {
     record Constant(@Nullable Object value) implements ValueSource {}
 
     /**
-     * A value read from a reference table.
+     * A value read from a reference table, matched on one column or on several.
+     * <p>
+     * The conditions are {@code and}ed, and their order is the order they were
+     * written: it decides the text of the {@code where} clause and therefore the
+     * order the parameters are bound in. That is why this is a {@link
+     * SequencedMap} and not a {@code Map} - {@link Map#copyOf} randomises its
+     * iteration order per JVM run, which would make the emitted SQL, the
+     * statement cache key and {@code check}'s output differ between runs of the
+     * same spec on the same file.
+     * <p>
+     * Two conditions on one column are refused, compared the way SQL compares
+     * them: {@code city} and {@code CITY} are one unquoted column, and a map
+     * keyed by the name as written cannot see that. This is the rule {@link
+     * RecordMappingSpec} already applies to the columns of one mapping, for the
+     * same reason and through the same {@link SqlIdentifier#folded}.
      *
-     * @param table     the table to read from
-     * @param column    the column whose value is taken
-     * @param keyColumn the column the key is matched against
-     * @param key       the value matched against {@code keyColumn}; a {@code Field},
-     *                  {@code Constant} or {@code Var}, never a nested {@code Lookup}
+     * @param table      the table to read from
+     * @param column     the column whose value is taken
+     * @param conditions the columns to match on, each against a value source of
+     *                   its own, in the order they are written. At least one; a
+     *                   key that matches no row yields SQL NULL, and so does a
+     *                   condition whose own value is null
      */
-    record Lookup(String table, String column, String keyColumn, ValueSource key) implements ValueSource {}
+    record Lookup(String table, String column, SequencedMap<String, ValueSource> conditions)
+            implements ValueSource {
+
+        public Lookup {
+            conditions = ordered(table, conditions);
+        }
+
+        /**
+         * The one-condition lookup, which is nearly every lookup: this is the
+         * shape a spec writes as {@code keyColumn} beside its source, and it
+         * stays the short way of saying it in Java too.
+         */
+        public Lookup(String table, String column, String keyColumn, ValueSource key) {
+            this(table, column, oneCondition(keyColumn, key));
+        }
+
+        /** the key column of a lookup that has exactly one, for the many that do */
+        public String keyColumn() {
+            if (conditions.size() != 1) {
+                throw new IllegalStateException("this lookup matches on " + conditions.size()
+                        + " columns, so it has no single key column: " + conditions.keySet());
+            }
+            return conditions.firstEntry().getKey();
+        }
+
+        /** likewise the key, where there is exactly one */
+        public ValueSource key() {
+            return conditions.get(keyColumn());
+        }
+
+        private static SequencedMap<String, ValueSource> oneCondition(String keyColumn, ValueSource key) {
+            var one = new LinkedHashMap<String, ValueSource>();
+            one.put(requireNonNull(keyColumn, "keyColumn"), requireNonNull(key, "key"));
+            return one;
+        }
+
+        private static SequencedMap<String, ValueSource> ordered(
+                String table, SequencedMap<String, ValueSource> conditions) {
+            if (conditions.isEmpty()) {
+                throw new IllegalArgumentException(
+                        "a lookup of '" + table + "' matches on no column, so it selects the whole table."
+                                + " Give it at least one condition");
+            }
+            var folded = new LinkedHashMap<String, String>();
+            conditions.forEach((column, _) -> {
+                var previous = folded.put(SqlIdentifier.folded(column), column);
+                if (previous != null) {
+                    throw new IllegalArgumentException("a lookup of '" + table + "' matches '" + previous
+                            + "' and '" + column + "', which are one column: an unquoted identifier is"
+                            + " case-insensitive, so this would emit the same column twice");
+                }
+            });
+            return Collections.unmodifiableSequencedMap(new LinkedHashMap<>(conditions));
+        }
+    }
 
     /**
      * A reference to an input {@link VarSpec} by name; resolves to that

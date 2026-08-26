@@ -81,6 +81,30 @@ The key is a source in its own right, and any of the three you have already met:
 of the record, a `constant` for a fixed key, or a `var`. What it may not be is another lookup - a chain of them is a
 join, and a join belongs in a view rather than in a mapping spec.
 
+## When one column is not enough
+
+A reference table is often keyed by more than one column - a rate by currency *and* date, a price by article *and*
+price list. Then `keyColumn` becomes `conditions`, one entry per column:
+
+    "lookup": {
+        "table": "rate",
+        "column": "factor",
+        "conditions": [
+            {"column": "ccy",  "fieldSelector": "currency"},
+            {"column": "asof", "var": "valueDate"}
+        ]
+    }
+
+which becomes `(select factor from rate where ccy = ? and asof = ?)`. Each condition takes the same three sources a
+single key takes, so they can differ - here one comes from the record and one from a variable.
+
+The conditions are `and`ed, and a lookup either says `keyColumn` or says `conditions`, never both. Matching on one
+column is still written the short way; there is no reason to wrap a single key in an array.
+
+One thing to watch: **every condition must match, and a null in any of them yields NULL** - the same rule as the
+single key, applied to all of them. A row whose currency is known and whose date is not gets a null factor, not a
+factor for that currency.
+
 Both forms appear above, and the difference is the one from [page 7](07-vars.md). `region_id` is looked up **per
 row**, because the key is a field and every record has its own. `batch_id` is a variable, so its lookup runs
 **once** - its key is a constant, and the answer cannot differ between rows.

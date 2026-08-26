@@ -76,7 +76,12 @@
         <th>XML</th>
     </tr>
     <tr>
-        <td>0.41 onwards (current)</td>
+        <td>0.43 onwards (current)</td>
+        <td><a href="schema/mapping-spec-0.43.json">mapping-spec-0.43.json</a></td>
+        <td><a href="schema/mapping-spec-0.43.xsd">mapping-spec-0.43.xsd</a></td>
+    </tr>
+    <tr>
+        <td>0.42</td>
         <td><a href="schema/mapping-spec-0.42.json">mapping-spec-0.42.json</a></td>
         <td><a href="schema/mapping-spec-0.42.xsd">mapping-spec-0.42.xsd</a></td>
     </tr>
@@ -133,6 +138,20 @@
     changes nothing about the format - 0.11, 0.12, 0.14 to 0.20, 0.22, 0.24 to 0.31, 0.33, 0.34, 0.36 to 0.39, 0.41 -
     keeps the previous schema rather than publishing a copy of it. An older one stays where it is, so a spec pinned
     to it keeps validating.
+</p>
+
+<p>
+    In 0.43 a <code>lookup</code> may match on more than one column, written as a <code>conditions</code> array
+    where a single key is written as <code>keyColumn</code> beside its source - a rate by currency and date, a
+    price by article and price list. The conditions are <code>and</code>ed in the order given, which is the order
+    of the <code>where</code> clause and so of the bound parameters. The single-key spelling is unchanged and
+    still the way to write a lookup on one column.
+</p>
+
+<p>
+    Also in 0.43, and a correction rather than a change: a var's <code>lookup</code> may be keyed by an
+    <code>fn</code>. Both schemas have said so since 0.40 while the reader refused it, so an editor passed such a
+    spec and the server would not load it. The reader now does what the schemas describe.
 </p>
 
 <p>
@@ -224,7 +243,7 @@
 <p>In a JSON spec, as a member the reader does not recognise and therefore ignores:</p>
 
 <pre><code>{
-  "$schema": "https://ralfspoeth.github.io/xldr/schema/mapping-spec-0.42.json",
+  "$schema": "https://ralfspoeth.github.io/xldr/schema/mapping-spec-0.43.json",
   "input": {
     "mimeType": "text/csv",
     "properties": { "fieldSeparator": "," },
@@ -236,7 +255,7 @@
 <p>In an XML spec, as the schema location of a document that has no namespace of its own:</p>
 
 <pre><code>&lt;mappingSpec xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-             xsi:noNamespaceSchemaLocation="https://ralfspoeth.github.io/xldr/schema/mapping-spec-0.42.xsd"&gt;
+             xsi:noNamespaceSchemaLocation="https://ralfspoeth.github.io/xldr/schema/mapping-spec-0.43.xsd"&gt;
     &lt;input mimeType="text/xml"&gt;
         ...
     &lt;/input&gt;

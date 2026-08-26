@@ -16,6 +16,7 @@ import java.nio.file.Path;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
+import java.util.SequencedMap;
 
 import static io.github.ralfspoeth.json.query.Selector.all;
 
@@ -169,8 +170,73 @@ public class JsonMappingSpecReader implements MappingSpecReader {
         return new ValueSource.Lookup(
                 PTR.member("table").stringOrThrow(lookup),
                 PTR.member("column").stringOrThrow(lookup),
-                PTR.member("keyColumn").stringOrThrow(lookup),
-                node(lookup).source());
+                conditions(lookup));
+    }
+
+    /**
+     * What a lookup matches on: either a {@code keyColumn} beside its source,
+     * which is one condition and the way nearly every lookup is written, or a
+     * {@code conditions} array for the composite key.
+     * <p>
+     * Both spellings, and never both at once. The short one is not deprecated
+     * sugar - a lookup on one column is the common case and reads better said
+     * once than wrapped in an array of one - but a spec that writes both has
+     * said the same thing two ways and is refused rather than picked between.
+     */
+    private static SequencedMap<String, ValueSource> conditions(JsonValue lookup) {
+        var listed = PTR.member("conditions").apply(lookup).orElse(null);
+        var keyColumn = PTR.member("keyColumn").stringValue(lookup).orElse(null);
+        if (listed != null && keyColumn != null) {
+            throw new IllegalArgumentException(
+                    "a lookup says keyColumn and conditions, and one of the two is wanted: " + lookup);
+        }
+        if (listed == null) {
+            if (keyColumn == null) {
+                throw new IllegalArgumentException(
+                        "a lookup matches on something: give it a keyColumn or conditions: " + lookup);
+            }
+            var one = new LinkedHashMap<String, ValueSource>();
+            one.put(keyColumn, conditionValue(lookup));
+            return one;
+        }
+        var many = new LinkedHashMap<String, ValueSource>();
+        PTR.select(all()).apply(listed).forEach(condition -> {
+            var column = PTR.member("column").stringOrThrow(condition);
+            if (many.put(column, conditionValue(condition)) != null) {
+                // the map would keep the last quietly; a spec that names a column
+                // twice has contradicted itself and should hear about it
+                throw new IllegalArgumentException(
+                        "a lookup matches '" + column + "' twice: " + lookup);
+            }
+        });
+        return many;
+    }
+
+    /**
+     * What one condition matches against: one of the four scalar sources, or an
+     * {@code fn}, and never a nested {@code lookup}.
+     * <p>
+     * The {@code fn} half is what the schema has claimed since 0.40 and the
+     * reader did not do: a var's lookup keyed by a function call validated in an
+     * editor and then threw when the spec was read. A call in a *column*
+     * lookup's condition is still refused, by {@link
+     * io.github.ralfspoeth.xldr.spec.FieldMappingSpec}, which walks a lookup's
+     * conditions for exactly that - one call per row is what it exists to
+     * prevent.
+     * <p>
+     * A nested lookup stays out. It would be a join, and a join belongs in a
+     * view where the database can plan it, not in a mapping spec.
+     */
+    private static ValueSource conditionValue(JsonValue condition) {
+        var fn = PTR.member("fn").apply(condition).orElse(null);
+        if (fn == null) {
+            return node(condition).source();
+        }
+        if (node(condition).hasSource()) {
+            throw new IllegalArgumentException(
+                    "a condition has an fn and a source member, and one is wanted: " + condition);
+        }
+        return functionCall(fn);
     }
 
     /**

@@ -261,9 +261,11 @@ public class Check implements Callable<Integer> {
                     + (value == null ? "null (a SQL NULL)" : "'" + value + "'");
             case ValueSource.Var(var name) -> "var       " + name;
             case ValueSource.Expr(var template) -> "expr      " + template;
-            case ValueSource.Lookup(var table, var column, var keyColumn, var key) ->
-                    "lookup    " + table + "." + column + " where " + keyColumn
-                            + " = " + describe(key).replaceAll("\\s{2,}", " ").strip();
+            case ValueSource.Lookup(var table, var column, var conditions) ->
+                    "lookup    " + table + "." + column + " where " + conditions.entrySet().stream()
+                            .map(c -> c.getKey() + " = "
+                                    + describe(c.getValue()).replaceAll("\\s{2,}", " ").strip())
+                            .collect(Collectors.joining(" and "));
             case ValueSource.FunctionCall(var name, var returnType, var parameters) ->
                     "call      " + name + "(" + parameters.stream()
                             .map(p -> describe(p).replaceAll("\\s{2,}", " ").strip())
@@ -410,16 +412,21 @@ public class Check implements Callable<Integer> {
      * broken one fails the load before a single row is read.
      */
     private void checkLookups(Connection conn, ValueSource source, boolean lower) throws SQLException {
-        if (source instanceof ValueSource.Lookup(String table, String column, String keyColumn, ValueSource key)) {
+        if (source instanceof ValueSource.Lookup(String table, String column, var conditions)) {
             var actual = columnsOf(conn, normalize(table, lower));
             if (actual.isEmpty()) {
                 findings.add("a lookup reads table '" + table
                         + "', which is not in the target database");
             } else {
                 requireColumn(actual, table, column, lower);
-                requireColumn(actual, table, keyColumn, lower);
+                // every column it matches on, not just the first: a composite key
+                // with one good column and one misspelled one reads as valid and
+                // then matches nothing, which is a column of NULLs and no error
+                conditions.keySet().forEach(keyColumn -> requireColumn(actual, table, keyColumn, lower));
             }
-            checkLookups(conn, key, lower);
+            for (var key : conditions.values()) {
+                checkLookups(conn, key, lower);
+            }
         }
     }
 
@@ -589,7 +596,8 @@ public class Check implements Callable<Integer> {
     private static void collectFieldNames(ValueSource source, Set<String> into) {
         switch (source) {
             case ValueSource.Field(var name) -> into.add(name);
-            case ValueSource.Lookup(_, _, _, var key) -> collectFieldNames(key, into);
+            case ValueSource.Lookup(_, _, var conditions) ->
+                    conditions.values().forEach(key -> collectFieldNames(key, into));
             // a constant needs no record, a var is evaluated once per load, and an
             // expression's names are resolved by the loader against several scopes
             case ValueSource.Constant _, ValueSource.Var _, ValueSource.Expr _ -> {

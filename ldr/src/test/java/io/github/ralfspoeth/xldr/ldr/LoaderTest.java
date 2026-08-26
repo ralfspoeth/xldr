@@ -573,6 +573,66 @@ class LoaderTest {
     }
 
     /**
+     * A lookup may match on several columns, and then the conditions are
+     * {@code and}ed in the order they were written.
+     * <p>
+     * Against a real database rather than against the SQL string, because the
+     * thing that can go wrong is not the text: it is the binding. The clause and
+     * the parameters are built by one loop over one ordered map, and if those
+     * two ever came apart the rows would still load - with the values swapped
+     * between the columns, matching whatever they happened to match. Two
+     * conditions of the same type is the case that would hide it, so both here
+     * are text.
+     */
+    @Test
+    void resolvesALookupOnSeveralColumns() throws Exception {
+        try (var conn = DriverManager.getConnection(jdbcUrl);
+             var stmt = conn.createStatement()) {
+            stmt.execute("drop table if exists rate");
+            stmt.execute("drop table if exists priced");
+            stmt.execute("create table rate(ccy varchar(3), asof varchar(10), factor int)");
+            stmt.execute("""
+                    insert into rate values
+                        ('EUR', '2026-01-01', 10), ('EUR', '2026-02-01', 20),
+                        ('USD', '2026-01-01', 30), ('USD', '2026-02-01', 40)""");
+            stmt.execute("create table priced(sku varchar(10), factor int)");
+        }
+        var conditions = new LinkedHashMap<String, ValueSource>();
+        conditions.put("ccy", new ValueSource.Field("currency"));
+        conditions.put("asof", new ValueSource.Field("day"));
+        var mapping = new RecordMappingSpec("lines", "priced", List.of(
+                new FieldMappingSpec("sku", new ValueSource.Field("sku")),
+                new FieldMappingSpec("factor", new ValueSource.Lookup("rate", "factor", conditions))
+        ), null);
+        var spec = new MappingSpec(new InputSpec("text/csv", List.of(), List.of(), Map.of()), List.of(mapping));
+        var adapter = adapterFor(Map.of("lines", List.of(
+                Map.of("sku", "S1", "currency", "EUR", "day", "2026-02-01"),
+                Map.of("sku", "S2", "currency", "USD", "day", "2026-01-01"),
+                // the pair that exists in neither combination, though each value
+                // of it appears in the table on its own
+                Map.of("sku", "S3", "currency", "EUR", "day", "2026-03-01")
+        )));
+
+        try (var loader = createLoader(spec)) {
+            assertEquals(3, loader.loadInput(adapter, InputStream.nullInputStream(), mapping));
+        }
+
+        try (var conn = DriverManager.getConnection(jdbcUrl);
+             var stmt = conn.createStatement();
+             var rs = stmt.executeQuery("select sku, factor from priced order by sku")) {
+            var rows = new ArrayList<List<Object>>();
+            while (rs.next()) {
+                rows.add(Arrays.asList(rs.getString(1), rs.getObject(2)));
+            }
+            assertEquals(List.of(
+                    Arrays.asList("S1", 20),
+                    Arrays.asList("S2", 30),
+                    Arrays.asList("S3", null)
+            ), rows);
+        }
+    }
+
+    /**
      * A lookup resolves a column from a reference table via an inline subquery,
      * keyed here by an input field. A key that matches no row yields SQL NULL.
      */
