@@ -207,14 +207,14 @@ class TutorialTest {
                                 + "', which record selector '" + rs.name() + "' does not declare; it has "
                                 + fields));
             }
-            var columns = page.tables().get(mapping.table().toLowerCase());
+            var columns = page.tables().get(mapping.table().name().toLowerCase());
             if (columns == null) {
                 findings.add(page.name() + ": no create table for '" + mapping.table()
                         + "' on this page or an earlier one; there is " + new TreeSet<>(page.tables().keySet()));
                 continue;
             }
             for (var fm : mapping.fieldMappings()) {
-                if (!columns.contains(fm.column().replace("\"", "").toLowerCase())) {
+                if (!columns.contains(fm.column().unquoted().toLowerCase())) {
                     findings.add(page.name() + ": table '" + mapping.table() + "' has no column '"
                             + fm.column() + "'; it has " + columns);
                 }

@@ -8,6 +8,30 @@ The versions are the git tags `xldr-<version>`; the published artifacts carry th
 
 ## Unreleased
 
+### Breaking
+
+- **`SqlIdentifier` is a record, and the spec model's table and column names are of that type.** It was a static
+  helper with a `folded` method; it is now `record SqlIdentifier(String name)` whose `equals` and `hashCode` compare
+  as a database would, so two instances are equal when the database would resolve them to one column. Quoted names
+  stay exact, being case-sensitive by definition.
+
+  `FieldMappingSpec.column`, `RecordMappingSpec.table`, `ValueSource.Lookup`'s `table` and `column` and the keys of
+  its `conditions` all carry it. Each of those records keeps a constructor taking the names as text, so the code
+  that builds a spec by hand mostly does not change; what changes is what comes back out of an accessor, and any
+  record pattern that destructured one.
+
+  The point is what a collection keyed by it can no longer hold. Two conditions on one column and two field
+  mappings onto one column were both scans looking for a folded collision and throwing; both are now impossible to
+  represent, and `RecordMappingSpec`'s check is a plain `Set.add`. Where a spec author needs to hear about it - a
+  file naming a column twice - the readers report it, their `put` returning the previous value, and that now
+  catches `ccy` beside `CCY` as well as `ccy` beside `ccy`.
+
+  Equality therefore ignores part of the record's state, which is worth knowing: a map keyed by these keeps the
+  spelling put in first, and that is the one a message or `xldr check` shows. The precedent is
+  `Discriminator.Matches`, which compares on `pattern.pattern()` for the same reason.
+
+  The mapping-spec format is untouched - this is a Java type, and a spec file says exactly what it said before.
+
 ### Added
 
 - **A lookup may match on more than one column.** Where a reference table is keyed by two - a rate by currency and
@@ -24,9 +48,8 @@ The versions are the git tags `xldr-<version>`; the published artifacts carry th
   `ValueSource.Lookup` carries them as a `SequencedMap<String, ValueSource>`, not a `Map`. The order is the order
   of the `where` clause and therefore of the bound parameters, and `Map.copyOf` randomises its iteration order per
   JVM run - the same spec would have produced different SQL, a different statement-cache key and different `check`
-  output on different days. Two conditions on one column are refused, compared through `SqlIdentifier.folded`,
-  because `ccy` and `CCY` are one unquoted column: a map keyed by the name as written holds two entries and is
-  content, which is how a spec would have emitted the same column twice without hearing about it.
+  output on different days. Two conditions on one column cannot be expressed at all, the map being keyed by
+  `SqlIdentifier`, for which `ccy` and `CCY` are one key.
 
 - **`mapping-spec-0.43`**, in both formats, for `conditions`. Both lookup flavours gain it and keep their separate
   definitions, so a var's condition may no more read a field than a var's key ever could.

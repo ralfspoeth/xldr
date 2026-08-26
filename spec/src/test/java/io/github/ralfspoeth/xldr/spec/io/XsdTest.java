@@ -280,7 +280,7 @@ class XsdTest {
         assertDoesNotThrow(() -> validate(xml));
 
         var spec = new XmlMappingSpecReader().read(stream(xml));
-        assertEquals("person", List.copyOf(spec.recordMappingSpecs()).getFirst().table());
+        assertEquals(new SqlIdentifier("person"), List.copyOf(spec.recordMappingSpecs()).getFirst().table());
     }
 
     /**

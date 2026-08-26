@@ -3,11 +3,7 @@ package io.github.ralfspoeth.xldr.ldr;
 import io.github.ralfspoeth.xldr.ia.InputAdapter;
 import io.github.ralfspoeth.xldr.ia.InputAdapterFactory;
 import io.github.ralfspoeth.xldr.ia.Row;
-import io.github.ralfspoeth.xldr.spec.MappingSpec;
-import io.github.ralfspoeth.xldr.spec.ProcedureCall;
-import io.github.ralfspoeth.xldr.spec.RecordMappingSpec;
-import io.github.ralfspoeth.xldr.spec.SqlIdentifier;
-import io.github.ralfspoeth.xldr.spec.ValueSource;
+import io.github.ralfspoeth.xldr.spec.*;
 import org.jspecify.annotations.Nullable;
 
 import java.io.IOException;
@@ -21,6 +17,7 @@ import java.util.function.Function;
 
 import static java.util.Objects.requireNonNull;
 import static java.util.Optional.ofNullable;
+import static java.util.stream.Collectors.joining;
 
 /**
  * Inserts the records of a single input into the target database.
@@ -55,17 +52,27 @@ public class Loader implements AutoCloseable {
 
     private final MappingSpec mappingSpec;
     private final Connection connection;
-    /** application-provided values available to expressions, keyed {@code xldr.*} */
+    /**
+     * application-provided values available to expressions, keyed {@code xldr.*}
+     */
     private final Map<String, Object> ambient;
-    /** in-memory sequences, one per name, living for the duration of this load */
+    /**
+     * in-memory sequences, one per name, living for the duration of this load
+     */
     private final Map<String, Integer> sequences = new HashMap<>();
-    /** compiled once per pattern rather than per row, the patterns coming from the spec */
+    /**
+     * compiled once per pattern rather than per row, the patterns coming from the spec
+     */
     private final Map<String, DateTimeFormatter> formatters = new HashMap<>();
-    /** a var may hold null: a lookup that matched nothing, or a function that returned NULL */
+    /**
+     * a var may hold null: a lookup that matched nothing, or a function that returned NULL
+     */
     private final Map<String, @Nullable Object> varValues;
     private final Map<TabCol, PreparedStatement> statementCache = new HashMap<>();
     private boolean failed = false;
-    /** rows inserted so far by this loader, across every mapping; {@code ${xldr.rowsLoaded}} */
+    /**
+     * rows inserted so far by this loader, across every mapping; {@code ${xldr.rowsLoaded}}
+     */
     private int rowsLoaded = 0;
     /**
      * The ambient values a transform's arguments see, which are the load's own
@@ -93,15 +100,15 @@ public class Loader implements AutoCloseable {
      *                       quoted part that was quoted precisely so that it
      *                       would not be
      */
-    record TabCol(String qualifiedTable, List<String> columns, List<String> valueExprs) {
+    record TabCol(String qualifiedTable, List<SqlIdentifier> columns, List<String> valueExprs) {
         TabCol {
             requireNonNull(qualifiedTable);
-            columns = columns.stream().map(Loader::normalizeIdentifier).toList();
+            columns = List.copyOf(columns);
             valueExprs = List.copyOf(valueExprs);
         }
 
         String insertStatement() {
-            var columnList = String.join(", ", columns);
+            var columnList = columns.stream().map(SqlIdentifier::folded).collect(joining(", "));
             var values = String.join(", ", valueExprs);
             return String.format("insert into %s(%s) values(%s)", qualifiedTable, columnList, values);
         }
@@ -116,8 +123,8 @@ public class Loader implements AutoCloseable {
      * names are one column without folding them exactly as this does. Kept as a
      * name here because it reads better in the eight places that build SQL.
      */
-    private static String normalizeIdentifier(String name) {
-        return SqlIdentifier.folded(name);
+    private static String normalizeIdentifier(SqlIdentifier name) {
+        return name.folded();
     }
 
     /**
@@ -136,7 +143,7 @@ public class Loader implements AutoCloseable {
      * A name is the qualifier and the folded table, with no case analysis: the
      * four combinations of catalog and schema are already in the one string.
      */
-    private String qualify(String table) {
+    private String qualify(SqlIdentifier table) {
         return qualifier + normalizeIdentifier(table);
     }
 
@@ -194,7 +201,7 @@ public class Loader implements AutoCloseable {
                         + ", but " + meta.getDatabaseProductName() + " does not take a "
                         + meta.getCatalogTerm() + " in an insert. Remove it from target.properties");
             }
-            parts.append(SqlIdentifier.folded(target.catalog())).append('.');
+            parts.append(new SqlIdentifier(target.catalog()).folded()).append('.');
         }
         if (target.schema() != null) {
             if (!meta.supportsSchemasInDataManipulation()) {
@@ -202,7 +209,7 @@ public class Loader implements AutoCloseable {
                         + ", but " + meta.getDatabaseProductName() + " does not take a "
                         + meta.getSchemaTerm() + " in an insert. Remove it from target.properties");
             }
-            parts.append(SqlIdentifier.folded(target.schema())).append('.');
+            parts.append(new SqlIdentifier(target.schema()).folded()).append('.');
         }
         return parts.toString();
     }
@@ -431,7 +438,7 @@ public class Loader implements AutoCloseable {
                     return vars.get(name);
                 }
                 return ofNullable(row)
-                        .map(r->r.get(name))
+                        .map(r -> r.get(name))
                         .orElse(null);
             }
 
@@ -549,7 +556,7 @@ public class Loader implements AutoCloseable {
                 throw new IllegalArgumentException("nextval start must be an integer: " + args.get(1));
             }
             start = s;
-            if(args.size()>2) {
+            if (args.size() > 2) {
                 if (!(args.get(2) instanceof Integer t)) {
                     throw new IllegalArgumentException("nextval inc must be an integer: " + args.get(2));
                 }
@@ -652,7 +659,7 @@ public class Loader implements AutoCloseable {
                 return 0;
             }
 
-            var columns = new ArrayList<String>(mapping.fieldMappings().size());
+            var columns = new ArrayList<SqlIdentifier>(mapping.fieldMappings().size());
             var valueExprs = new ArrayList<String>(mapping.fieldMappings().size());
             var binders = new ArrayList<Function<Row, @Nullable Object>>();
             var fieldNames = new LinkedHashSet<String>();
@@ -901,29 +908,28 @@ public class Loader implements AutoCloseable {
      * knows the number, and it does not know it until now.
      */
     private void runTransforms() throws SQLException {
-        if (mappingSpec.transforms().isEmpty()) {
-            return;
-        }
-        var withCount = new LinkedHashMap<String, Object>(ambient);
-        withCount.put("xldr.rowsLoaded", rowsLoaded);
-        transformAmbient = Map.copyOf(withCount);
-        try {
-            // a loop rather than a stream, and the reason is the three things
-            // this has to do that a lambda cannot: stop at the first failure,
-            // let a checked exception out, and keep the declared order. A stream
-            // does the first with a side-effecting filter, the second by
-            // smuggling the exception through an AtomicReference, and the third
-            // only by promising the stream stays sequential
-            for (var transform : mappingSpec.transforms()) {
-                transform(transform);
+        if (!mappingSpec.transforms().isEmpty()) {
+            var withCount = new LinkedHashMap<>(ambient);
+            withCount.put("xldr.rowsLoaded", rowsLoaded);
+            transformAmbient = Map.copyOf(withCount);
+            try {
+                // a loop rather than a stream, and the reason is the three things
+                // this has to do that a lambda cannot: stop at the first failure,
+                // let a checked exception out, and keep the declared order. A stream
+                // does the first with a side-effecting filter, the second by
+                // smuggling the exception through an AtomicReference, and the third
+                // only by promising the stream stays sequential
+                for (var transform : mappingSpec.transforms()) {
+                    transform(transform);
+                }
+            } catch (SQLException | RuntimeException e) {
+                failed = true;
+                throw e;
+            } finally {
+                // once, when they have all run - not after each, which is where a
+                // lambda's finally would have put it
+                transformAmbient = null;
             }
-        } catch (SQLException | RuntimeException e) {
-            failed = true;
-            throw e;
-        } finally {
-            // once, when they have all run - not after each, which is where a
-            // lambda's finally would have put it
-            transformAmbient = null;
         }
     }
 

@@ -198,10 +198,10 @@ public class XmlMappingSpecReader implements MappingSpecReader {
     private static RecordMappingSpec recordMappingSpec(Element mapping) {
         return new RecordMappingSpec(
                 required(mapping, "recordSelector"),
-                required(mapping, "table"),
+                new SqlIdentifier(required(mapping, "table")),
                 elements("fieldMapping")
                         .apply(mapping)
-                        .map(fm -> new FieldMappingSpec(required(fm, "column"), valueSource(fm)))
+                        .map(fm -> new FieldMappingSpec(new SqlIdentifier(required(fm, "column")), valueSource(fm)))
                         .toList(),
                 node(mapping).whole("limit").orElse(null)
         );
@@ -231,8 +231,8 @@ public class XmlMappingSpecReader implements MappingSpecReader {
             return functionCall(fn);
         }
         return new ValueSource.Lookup(
-                required(lookup, "table"),
-                required(lookup, "column"),
+                new SqlIdentifier(required(lookup, "table")),
+                new SqlIdentifier(required(lookup, "column")),
                 conditions(lookup));
     }
 
@@ -251,27 +251,28 @@ public class XmlMappingSpecReader implements MappingSpecReader {
      * Both spellings, and never both at once: a spec that writes each has said
      * the same thing twice and is refused rather than picked between.
      */
-    private static SequencedMap<String, ValueSource> conditions(Element lookup) {
+    private static SequencedMap<SqlIdentifier, ValueSource> conditions(Element lookup) {
         var listed = elements("condition").apply(lookup).toList();
         var keyColumn = attributeValue("keyColumn").apply(lookup).orElse(null);
         if (!listed.isEmpty() && keyColumn != null) {
             throw new IllegalArgumentException("<lookup> has a keyColumn attribute and <condition>"
                     + " children, and one of the two is wanted");
         }
-        var conditions = new LinkedHashMap<String, ValueSource>();
+        var conditions = new LinkedHashMap<SqlIdentifier, ValueSource>();
         if (listed.isEmpty()) {
             if (keyColumn == null) {
                 throw new IllegalArgumentException(
                         "<lookup> matches on something: give it a keyColumn or <condition> children");
             }
-            conditions.put(keyColumn, conditionValue(lookup));
+            conditions.put(new SqlIdentifier(keyColumn), conditionValue(lookup));
             return conditions;
         }
         for (var condition : listed) {
-            var column = required(condition, "column");
+            var column = new SqlIdentifier(required(condition, "column"));
             if (conditions.put(column, conditionValue(condition)) != null) {
-                // the map would keep the last quietly; a spec that names a column
-                // twice has contradicted itself and should hear about it
+                // the map keeps the first quietly, and a SqlIdentifier collides
+                // with a differently-spelled one for the same column - so this
+                // catches ccy beside CCY as well as ccy beside ccy
                 throw new IllegalArgumentException("<lookup> matches '" + column + "' twice");
             }
         }

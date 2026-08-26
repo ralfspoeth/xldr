@@ -128,7 +128,7 @@ public class JsonMappingSpecReader implements MappingSpecReader {
     private static RecordMappingSpec recordMappingSpec(JsonValue element) {
         return new RecordMappingSpec(
                 PTR.member("recordSelector").stringOrThrow(element),
-                PTR.member("table").stringOrThrow(element),
+                new SqlIdentifier(PTR.member("table").stringOrThrow(element)),
                 PTR.member("fieldMapping")
                         .select(all())
                         .apply(element)
@@ -141,7 +141,7 @@ public class JsonMappingSpecReader implements MappingSpecReader {
     }
 
     private static FieldMappingSpec fieldMappingSpec(JsonValue fm) {
-        return new FieldMappingSpec(PTR.member("column").stringOrThrow(fm), valueSource(fm));
+        return new FieldMappingSpec(new SqlIdentifier(PTR.member("column").stringOrThrow(fm)), valueSource(fm));
     }
 
     /**
@@ -168,8 +168,8 @@ public class JsonMappingSpecReader implements MappingSpecReader {
             return functionCall(fn);
         }
         return new ValueSource.Lookup(
-                PTR.member("table").stringOrThrow(lookup),
-                PTR.member("column").stringOrThrow(lookup),
+                new SqlIdentifier(PTR.member("table").stringOrThrow(lookup)),
+                new SqlIdentifier(PTR.member("column").stringOrThrow(lookup)),
                 conditions(lookup));
     }
 
@@ -183,7 +183,7 @@ public class JsonMappingSpecReader implements MappingSpecReader {
      * once than wrapped in an array of one - but a spec that writes both has
      * said the same thing two ways and is refused rather than picked between.
      */
-    private static SequencedMap<String, ValueSource> conditions(JsonValue lookup) {
+    private static SequencedMap<SqlIdentifier, ValueSource> conditions(JsonValue lookup) {
         var listed = PTR.member("conditions").apply(lookup).orElse(null);
         var keyColumn = PTR.member("keyColumn").stringValue(lookup).orElse(null);
         if (listed != null && keyColumn != null) {
@@ -195,16 +195,17 @@ public class JsonMappingSpecReader implements MappingSpecReader {
                 throw new IllegalArgumentException(
                         "a lookup matches on something: give it a keyColumn or conditions: " + lookup);
             }
-            var one = new LinkedHashMap<String, ValueSource>();
-            one.put(keyColumn, conditionValue(lookup));
+            var one = new LinkedHashMap<SqlIdentifier, ValueSource>();
+            one.put(new SqlIdentifier(keyColumn), conditionValue(lookup));
             return one;
         }
-        var many = new LinkedHashMap<String, ValueSource>();
+        var many = new LinkedHashMap<SqlIdentifier, ValueSource>();
         PTR.select(all()).apply(listed).forEach(condition -> {
-            var column = PTR.member("column").stringOrThrow(condition);
+            var column = new SqlIdentifier(PTR.member("column").stringOrThrow(condition));
             if (many.put(column, conditionValue(condition)) != null) {
-                // the map would keep the last quietly; a spec that names a column
-                // twice has contradicted itself and should hear about it
+                // the map keeps the first quietly, and a SqlIdentifier collides
+                // with a differently-spelled one for the same column - so this
+                // catches ccy beside CCY as well as ccy beside ccy
                 throw new IllegalArgumentException(
                         "a lookup matches '" + column + "' twice: " + lookup);
             }

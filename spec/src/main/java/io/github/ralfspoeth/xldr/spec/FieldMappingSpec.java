@@ -14,10 +14,15 @@ import java.io.Serializable;
  * @param column the target column
  * @param source where the column's value comes from
  */
-public record FieldMappingSpec(String column, ValueSource source) implements Serializable {
+public record FieldMappingSpec(SqlIdentifier column, ValueSource source) implements Serializable {
 
     public FieldMappingSpec {
         refuseCallAnywhere(column, source);
+    }
+
+    /** the same with the column named as text, which is how a reader has it */
+    public FieldMappingSpec(String column, ValueSource source) {
+        this(new SqlIdentifier(column), source);
     }
 
     /**
@@ -29,7 +34,7 @@ public record FieldMappingSpec(String column, ValueSource source) implements Ser
      * a column. Not through a call's own arguments, since a call cannot be here
      * at all.
      */
-    private static void refuseCallAnywhere(String column, ValueSource source) {
+    private static void refuseCallAnywhere(SqlIdentifier column, ValueSource source) {
         switch (source) {
             case ValueSource.FunctionCall(var name, _, _) -> throw new IllegalArgumentException(
                     "column '" + column + "' calls '" + name + "', which it cannot: a function is called"

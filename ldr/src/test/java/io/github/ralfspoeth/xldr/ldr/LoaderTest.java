@@ -597,9 +597,9 @@ class LoaderTest {
                         ('USD', '2026-01-01', 30), ('USD', '2026-02-01', 40)""");
             stmt.execute("create table priced(sku varchar(10), factor int)");
         }
-        var conditions = new LinkedHashMap<String, ValueSource>();
-        conditions.put("ccy", new ValueSource.Field("currency"));
-        conditions.put("asof", new ValueSource.Field("day"));
+        var conditions = new LinkedHashMap<SqlIdentifier, ValueSource>();
+        conditions.put(new SqlIdentifier("ccy"), new ValueSource.Field("currency"));
+        conditions.put(new SqlIdentifier("asof"), new ValueSource.Field("day"));
         var mapping = new RecordMappingSpec("lines", "priced", List.of(
                 new FieldMappingSpec("sku", new ValueSource.Field("sku")),
                 new FieldMappingSpec("factor", new ValueSource.Lookup("rate", "factor", conditions))

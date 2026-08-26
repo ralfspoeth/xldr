@@ -22,7 +22,6 @@ import java.sql.SQLException;
 import java.util.*;
 import java.util.concurrent.Callable;
 import java.util.function.Function;
-import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 /**
@@ -226,7 +225,7 @@ public class Check implements Callable<Integer> {
             out.printf("  %s <- '%s'%s%n", mapping.table(), mapping.recordSelector(),
                     mapping.limit() == null ? "" : "  (limit " + mapping.limit() + ")");
             var width = mapping.fieldMappings().stream()
-                    .mapToInt(fm -> fm.column().length())
+                    .mapToInt(fm -> fm.column().name().length())
                     .max().orElse(0);
             for (var fm : mapping.fieldMappings()) {
                 out.printf("      %-" + Math.max(width, 8) + "s  %s%n", fm.column(), describe(fm.source()));
@@ -412,7 +411,7 @@ public class Check implements Callable<Integer> {
      * broken one fails the load before a single row is read.
      */
     private void checkLookups(Connection conn, ValueSource source, boolean lower) throws SQLException {
-        if (source instanceof ValueSource.Lookup(String table, String column, var conditions)) {
+        if (source instanceof ValueSource.Lookup(var table, var column, var conditions)) {
             var actual = columnsOf(conn, normalize(table, lower));
             if (actual.isEmpty()) {
                 findings.add("a lookup reads table '" + table
@@ -430,7 +429,7 @@ public class Check implements Callable<Integer> {
         }
     }
 
-    private void requireColumn(Set<String> actual, String table, String column, boolean lower) {
+    private void requireColumn(Set<String> actual, SqlIdentifier table, SqlIdentifier column, boolean lower) {
         if (!actual.contains(normalize(column, lower))) {
             findings.add("table '" + table + "' has no column '" + column
                     + "'; it has " + new TreeSet<>(actual));
@@ -475,14 +474,19 @@ public class Check implements Callable<Integer> {
      * when it builds the insert, so that what is checked here is what will be
      * executed there.
      */
-    private static String normalize(String name, boolean lowerCase) {
-        if (QUOTED.matcher(name).matches()) {
-            return name.substring(1, name.length() - 1);
+    private static String normalize(SqlIdentifier name, boolean lowerCase) {
+        if (name.quoted()) {
+            return name.unquoted();
         }
-        return lowerCase ? name.toLowerCase(Locale.ROOT) : name.toUpperCase(Locale.ROOT);
+        return lowerCase
+                ? name.name().toLowerCase(Locale.ROOT)
+                : name.name().toUpperCase(Locale.ROOT);
     }
 
-    private static final Pattern QUOTED = Pattern.compile("\".*\"");
+    /** the same for the two parts of a target, which are text on the command line */
+    private static String normalize(String name, boolean lowerCase) {
+        return normalize(new SqlIdentifier(name), lowerCase);
+    }
 
     // ---- the spec against the sample -------------------------------------------
 

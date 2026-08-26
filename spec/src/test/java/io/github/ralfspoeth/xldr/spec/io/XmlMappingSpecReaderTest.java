@@ -132,9 +132,9 @@ class XmlMappingSpecReaderTest {
                     </mapping>
                 </mappingSpec>
                 """;
-        var conditions = new LinkedHashMap<String, ValueSource>();
-        conditions.put("ccy", new ValueSource.Field("currency"));
-        conditions.put("asof", new ValueSource.Var("day"));
+        var conditions = new LinkedHashMap<SqlIdentifier, ValueSource>();
+        conditions.put(new SqlIdentifier("ccy"), new ValueSource.Field("currency"));
+        conditions.put(new SqlIdentifier("asof"), new ValueSource.Var("day"));
 
         var mapping = List.copyOf(
                 new XmlMappingSpecReader().read(stream(source)).recordMappingSpecs()).getFirst();

@@ -74,11 +74,12 @@ public sealed interface ValueSource extends Serializable {
      * statement cache key and {@code check}'s output differ between runs of the
      * same spec on the same file.
      * <p>
-     * Two conditions on one column are refused, compared the way SQL compares
-     * them: {@code city} and {@code CITY} are one unquoted column, and a map
-     * keyed by the name as written cannot see that. This is the rule {@link
-     * RecordMappingSpec} already applies to the columns of one mapping, for the
-     * same reason and through the same {@link SqlIdentifier#folded}.
+     * Two conditions on one column cannot be expressed: {@link SqlIdentifier}
+     * is equal to another when the database would resolve the two to one column,
+     * so {@code city} and {@code CITY} are one key here and the map holds one of
+     * them. It keeps the spelling put in first, and a reader detecting the
+     * collision - which it does, its {@code put} returning the previous value -
+     * is what reports it to whoever wrote the spec.
      *
      * @param table      the table to read from
      * @param column     the column whose value is taken
@@ -87,11 +88,19 @@ public sealed interface ValueSource extends Serializable {
      *                   key that matches no row yields SQL NULL, and so does a
      *                   condition whose own value is null
      */
-    record Lookup(String table, String column, SequencedMap<String, ValueSource> conditions)
-            implements ValueSource {
+    record Lookup(SqlIdentifier table, SqlIdentifier column,
+                  SequencedMap<SqlIdentifier, ValueSource> conditions) implements ValueSource {
 
         public Lookup {
-            conditions = ordered(table, conditions);
+            if (conditions.isEmpty()) {
+                throw new IllegalArgumentException(
+                        "a lookup of '" + table + "' matches on no column, so it selects the whole table."
+                                + " Give it at least one condition");
+            }
+            // no scan for two conditions on one column: a SqlIdentifier is equal
+            // to another when the database would call them one column, so this
+            // map could not have been holding both
+            conditions = Collections.unmodifiableSequencedMap(new LinkedHashMap<>(conditions));
         }
 
         /**
@@ -100,11 +109,17 @@ public sealed interface ValueSource extends Serializable {
          * stays the short way of saying it in Java too.
          */
         public Lookup(String table, String column, String keyColumn, ValueSource key) {
-            this(table, column, oneCondition(keyColumn, key));
+            this(new SqlIdentifier(table), new SqlIdentifier(column),
+                    oneCondition(new SqlIdentifier(keyColumn), key));
+        }
+
+        /** and the composite one with its table and column named as text */
+        public Lookup(String table, String column, SequencedMap<SqlIdentifier, ValueSource> conditions) {
+            this(new SqlIdentifier(table), new SqlIdentifier(column), conditions);
         }
 
         /** the key column of a lookup that has exactly one, for the many that do */
-        public String keyColumn() {
+        public SqlIdentifier keyColumn() {
             if (conditions.size() != 1) {
                 throw new IllegalStateException("this lookup matches on " + conditions.size()
                         + " columns, so it has no single key column: " + conditions.keySet());
@@ -117,29 +132,11 @@ public sealed interface ValueSource extends Serializable {
             return conditions.get(keyColumn());
         }
 
-        private static SequencedMap<String, ValueSource> oneCondition(String keyColumn, ValueSource key) {
-            var one = new LinkedHashMap<String, ValueSource>();
-            one.put(requireNonNull(keyColumn, "keyColumn"), requireNonNull(key, "key"));
+        private static SequencedMap<SqlIdentifier, ValueSource> oneCondition(
+                SqlIdentifier keyColumn, ValueSource key) {
+            var one = new LinkedHashMap<SqlIdentifier, ValueSource>();
+            one.put(keyColumn, requireNonNull(key, "key"));
             return one;
-        }
-
-        private static SequencedMap<String, ValueSource> ordered(
-                String table, SequencedMap<String, ValueSource> conditions) {
-            if (conditions.isEmpty()) {
-                throw new IllegalArgumentException(
-                        "a lookup of '" + table + "' matches on no column, so it selects the whole table."
-                                + " Give it at least one condition");
-            }
-            var folded = new LinkedHashMap<String, String>();
-            conditions.forEach((column, _) -> {
-                var previous = folded.put(SqlIdentifier.folded(column), column);
-                if (previous != null) {
-                    throw new IllegalArgumentException("a lookup of '" + table + "' matches '" + previous
-                            + "' and '" + column + "', which are one column: an unquoted identifier is"
-                            + " case-insensitive, so this would emit the same column twice");
-                }
-            });
-            return Collections.unmodifiableSequencedMap(new LinkedHashMap<>(conditions));
         }
     }
 

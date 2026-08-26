@@ -109,9 +109,9 @@ class JsonValueSourceTest {
                     ]
                 }
                 """;
-        var conditions = new LinkedHashMap<String, ValueSource>();
-        conditions.put("ccy", new ValueSource.Field("currency"));
-        conditions.put("asof", new ValueSource.Var("day"));
+        var conditions = new LinkedHashMap<SqlIdentifier, ValueSource>();
+        conditions.put(new SqlIdentifier("ccy"), new ValueSource.Field("currency"));
+        conditions.put(new SqlIdentifier("asof"), new ValueSource.Var("day"));
 
         var mapping = List.copyOf(new JsonMappingSpecReader().read(stream(source)).recordMappingSpecs()).getFirst();
         assertEquals(
@@ -145,6 +145,28 @@ class JsonValueSourceTest {
                   "mapping": [ { "recordSelector": "r", "table": "t", "fieldMapping": [
                       { "column": "x", "lookup": { "table": "r", "column": "id", "conditions": [
                           { "column": "a", "var": "v" }, { "column": "a", "constant": 1 } ] } } ] } ] }
+                """;
+        var thrown = assertThrows(IllegalArgumentException.class,
+                () -> new JsonMappingSpecReader().read(stream(source)));
+        assertTrue(thrown.getMessage().contains("twice"), thrown.getMessage());
+    }
+
+    /**
+     * And two spellings of one column are that same contradiction: an unquoted
+     * identifier is case-insensitive, so {@code a} and {@code A} are one column.
+     * <p>
+     * The reader is where this is reported, and the only place it can be: keying
+     * the conditions by {@link io.github.ralfspoeth.xldr.spec.SqlIdentifier}
+     * means the map cannot hold both, so by the time a {@code Lookup} exists
+     * there is nothing left to notice.
+     */
+    @Test
+    void refusesTwoSpellingsOfOneColumn() {
+        var source = """
+                { "input": { "mimeType": "text/csv" },
+                  "mapping": [ { "recordSelector": "r", "table": "t", "fieldMapping": [
+                      { "column": "x", "lookup": { "table": "r", "column": "id", "conditions": [
+                          { "column": "a", "var": "v" }, { "column": "A", "constant": 1 } ] } } ] } ] }
                 """;
         var thrown = assertThrows(IllegalArgumentException.class,
                 () -> new JsonMappingSpecReader().read(stream(source)));
