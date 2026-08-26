@@ -6,7 +6,18 @@ ways that break existing code and existing specs; those changes are listed here 
 The versions are the git tags `xldr-<version>`; the published artifacts carry the same version under the group
 `io.github.ralfspoeth.xldr`.
 
-## Unreleased
+## 0.43
+
+A release about identifiers. A lookup may match on more than one column, which is what a reference table keyed by a
+currency and a date has always needed; and the names a spec writes for tables and columns become a type of their
+own, so that a collection can hold one column once rather than being scanned for the two spellings of it.
+
+The two go together. Keying a lookup's conditions by `SqlIdentifier` is what makes matching twice on one column
+unrepresentable, where the first draft of the composite key had to look for the collision and refuse it.
+
+The mapping-spec format changes for `conditions`, so `mapping-spec-0.43` is published in both formats. The one
+breaking entry is a Java one: a spec file says exactly what it said before, and the single-column spelling is
+untouched.
 
 ### Breaking
 

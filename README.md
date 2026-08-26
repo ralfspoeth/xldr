@@ -138,7 +138,7 @@ fix their versions in one place:
             <dependency>
                 <groupId>io.github.ralfspoeth.xldr</groupId>
                 <artifactId>bom</artifactId>
-                <version>0.42</version>
+                <version>0.43</version>
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>
