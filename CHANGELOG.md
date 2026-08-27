@@ -6,7 +6,14 @@ ways that break existing code and existing specs; those changes are listed here 
 The versions are the git tags `xldr-<version>`; the published artifacts carry the same version under the group
 `io.github.ralfspoeth.xldr`.
 
-## Unreleased
+## 0.45
+
+A release about two things nothing was checking. A spec's calls on the database are now looked up before a deploy
+rather than discovered by the load, and the release gate itself says on every build that it is still able to do its
+job - three skipped tests having been indistinguishable from three broken ones.
+
+The mapping-spec format is unchanged, so `mapping-spec-0.44` remains its schema and a spec that loaded under 0.44
+loads under 0.45. The one breaking entry is a Java one and touches an embedder reading a `Target` apart.
 
 ### Breaking
 
@@ -34,6 +41,17 @@ The versions are the git tags `xldr-<version>`; the published artifacts carry th
   apart - and a driver whose metadata lists no routines at all is called unusable rather than read as an empty
   database. Functions and procedures are looked for in one set, since which of the two a product reports a routine
   under is its own business: H2 lists an alias among the procedures whatever it is called with.
+
+- **`ReleaseReadinessTest` has a test that always runs**, checking the gate rather than the release. The other
+  three are skipped on every ordinary build, which is right - `## Unreleased` and a lagging BOM version are both
+  correct while the version is a snapshot - and is also indistinguishable from three tests that have quietly
+  stopped working.
+
+  The gap worth closing was not a regex failing, which already throws before the assumption is reached, but a
+  `<revision>` that merely resembles a snapshot: a property left behind after a move off CI-friendly versions would
+  skip the gate forever while releases went out unchecked. It now insists the value is shaped like a version or a
+  snapshot of one, and reads the other two inputs as well, so a pattern that stops matching fails on the next
+  ordinary build rather than on the day of a release.
 
 ## 0.44
 
