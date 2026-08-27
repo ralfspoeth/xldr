@@ -201,7 +201,7 @@ public class Loader implements AutoCloseable {
                         + ", but " + meta.getDatabaseProductName() + " does not take a "
                         + meta.getCatalogTerm() + " in an insert. Remove it from target.properties");
             }
-            parts.append(new SqlIdentifier(target.catalog()).folded()).append('.');
+            parts.append(target.catalog().folded()).append('.');
         }
         if (target.schema() != null) {
             if (!meta.supportsSchemasInDataManipulation()) {
@@ -209,7 +209,7 @@ public class Loader implements AutoCloseable {
                         + ", but " + meta.getDatabaseProductName() + " does not take a "
                         + meta.getSchemaTerm() + " in an insert. Remove it from target.properties");
             }
-            parts.append(new SqlIdentifier(target.schema()).folded()).append('.');
+            parts.append(target.schema().folded()).append('.');
         }
         return parts.toString();
     }

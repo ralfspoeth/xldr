@@ -1,5 +1,6 @@
 package io.github.ralfspoeth.xldr.ldr;
 
+import io.github.ralfspoeth.xldr.spec.SqlIdentifier;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -24,13 +25,19 @@ import org.jspecify.annotations.Nullable;
  * thing holding a {@link java.sql.Connection}. Whether a database will take a
  * catalog or a schema in an insert at all is something only the driver knows,
  * and a type deciding it without one would be guessing.
+ * <p>
+ * Both parts are {@link SqlIdentifier}s, as every other name that reaches SQL
+ * is: they are folded the same way a table name is, and a deployment naming
+ * {@code Staging} means the same schema as one naming {@code STAGING} unless it
+ * quotes it. Reading them from a properties file is where the wrapping happens,
+ * so the loader is handed names rather than strings it has to remember to fold.
  *
  * @param catalog the catalog part, or {@code null} for none
  * @param schema  the schema part, or {@code null} for none
  */
-public record Target(@Nullable String catalog, @Nullable String schema) {
+public record Target(@Nullable SqlIdentifier catalog, @Nullable SqlIdentifier schema) {
 
-    private static final Target NONE = new Target(null, null);
+    private static final Target NONE = new Target((SqlIdentifier) null, null);
 
     /**
      * Neither part: names go to the database exactly as the spec wrote them.
@@ -44,13 +51,28 @@ public record Target(@Nullable String catalog, @Nullable String schema) {
         return NONE;
     }
 
-    public Target {
-        if (catalog != null && catalog.isBlank()) {
-            throw new IllegalArgumentException("a catalog that is blank is not a catalog; leave it out");
+    /**
+     * The two parts as a properties file has them, which is where they come from
+     * everywhere but a test: text, and absent rather than empty.
+     * <p>
+     * The blank check is here rather than left to {@link SqlIdentifier} because
+     * the message is worth more than the type's generic one. A blank setting is
+     * not a mistake about identifiers, it is a line someone half-deleted, and
+     * saying "leave it out" is the instruction they need.
+     */
+    public Target(@Nullable String catalog, @Nullable String schema) {
+        this(identifier(catalog, "catalog"), identifier(schema, "schema"));
+    }
+
+    private static @Nullable SqlIdentifier identifier(@Nullable String part, String kind) {
+        if (part == null) {
+            return null;
         }
-        if (schema != null && schema.isBlank()) {
-            throw new IllegalArgumentException("a schema that is blank is not a schema; leave it out");
+        if (part.isBlank()) {
+            throw new IllegalArgumentException(
+                    "a " + kind + " that is blank is not a " + kind + "; leave it out");
         }
+        return new SqlIdentifier(part);
     }
 
     /** whether this target adds anything to a table name */

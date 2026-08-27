@@ -55,4 +55,18 @@ class TargetTest {
     void isAvalue() {
         assertEquals(new Target("w", "s"), new Target("w", "s"));
     }
+
+    /**
+     * And two targets naming one schema are one target, however they spell it -
+     * the parts being {@link io.github.ralfspoeth.xldr.spec.SqlIdentifier}s
+     * since 0.45, so a deployment saying {@code Staging} means what one saying
+     * {@code STAGING} means. A quoted name is exact, as everywhere else.
+     */
+    @Test
+    void twoSpellingsOfOneSchemaAreOneTarget() {
+        assertAll(
+                () -> assertEquals(new Target(null, "staging"), new Target(null, "STAGING")),
+                () -> assertEquals(new Target("w", "s"), new Target("W", "S")),
+                () -> assertNotEquals(new Target(null, "\"staging\""), new Target(null, "staging")));
+    }
 }
