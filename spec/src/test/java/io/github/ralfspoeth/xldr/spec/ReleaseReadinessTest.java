@@ -7,13 +7,13 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.regex.Pattern;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.*;
 import static org.junit.jupiter.api.Assumptions.assumeFalse;
 
 /**
  * The two files a release has to say its own version in, checked at the one
- * moment they can still be fixed.
+ * moment they can still be fixed - and one test that always runs, checking that
+ * the other three still can.
  * <p>
  * {@code release:prepare} rewrites {@code <revision>} in the root pom from
  * {@code 0.42-SNAPSHOT} to {@code 0.42}, runs {@code clean verify} against that,
@@ -67,6 +67,56 @@ class ReleaseReadinessTest {
         assumeFalse(version.endsWith("-SNAPSHOT"),
                 "a snapshot build: '## Unreleased' and a lagging BOM version are both correct here");
         return version;
+    }
+
+    /** a version, or a snapshot of one: what {@code <revision>} may say */
+    private static final Pattern VERSION = Pattern.compile("\\d+\\.\\d+(\\.\\d+)?(-SNAPSHOT)?");
+
+    /**
+     * The one test here that always runs, and it checks the gate rather than the
+     * release.
+     * <p>
+     * The other three are skipped on every ordinary build, which is correct and
+     * is also the problem: a skip looks exactly like a test that has quietly
+     * stopped working, and nobody reads three skips as a warning. If
+     * {@code <revision>} ever became something that merely resembles a snapshot -
+     * a leftover property after a move off CI-friendly versions, say - the gate
+     * would skip forever while releases went out unchecked, which is the failure
+     * it exists to prevent, one level up.
+     * <p>
+     * So this asserts that the three things the others read are all findable and
+     * shaped as expected, whatever the version is. A pattern that stops matching
+     * because the README snippet or the changelog changed shape then fails on the
+     * next ordinary build, rather than on the day of a release when there is
+     * least appetite for it. It also catches a misspelled heading -
+     * {@code ## Unrelased} is neither a version nor the word - which would
+     * otherwise sail through until the release renamed it.
+     */
+    @Test
+    void theGateCanFindEverythingItChecks() throws IOException {
+        var pom = Files.readString(ROOT.resolve("pom.xml"));
+        var readme = Files.readString(ROOT.resolve("README.md"));
+        var changelog = Files.readString(ROOT.resolve("CHANGELOG.md"));
+
+        var revision = REVISION.matcher(pom);
+        var bom = BOM_VERSION.matcher(readme);
+        var heading = FIRST_HEADING.matcher(changelog);
+
+        assertAll(
+                () -> assertTrue(revision.find(), "no <revision> in the root pom"),
+                () -> assertTrue(VERSION.matcher(revision.group(1)).matches(),
+                        () -> "<revision> is '" + revision.group(1) + "', which is neither a version nor a"
+                                + " snapshot of one - so the skip below can no longer tell them apart"),
+                () -> assertTrue(bom.find(),
+                        "no bom <version> in README.md - has the snippet changed shape?"),
+                () -> assertTrue(VERSION.matcher(bom.group(1)).matches(),
+                        () -> "the README's BOM version is '" + bom.group(1) + "'"),
+                () -> assertTrue(heading.find(), "no '## ' section in CHANGELOG.md"),
+                () -> assertTrue(
+                        heading.group(1).strip().equals("Unreleased")
+                                || VERSION.matcher(heading.group(1).strip()).matches(),
+                        () -> "the newest changelog heading is '" + heading.group(1).strip()
+                                + "', which is neither 'Unreleased' nor a version"));
     }
 
     /**
