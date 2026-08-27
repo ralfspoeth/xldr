@@ -81,10 +81,19 @@ public sealed interface ValueSource extends Serializable {
      * collision - which it does, its {@code put} returning the previous value -
      * is what reports it to whoever wrote the spec.
      *
+     * <p>
+     * There may be no conditions at all, and then the whole table is read: a
+     * single-row view, or Oracle's {@code dual}. That is not the hazard it looks
+     * like, because it is the hazard a keyed lookup already has - a key matching
+     * several rows takes the first one arbitrarily too, and nothing here has
+     * ever refused that. A spec says it by writing an empty list rather than by
+     * leaving the conditions out, so that forgetting a key stays an error
+     * instead of quietly becoming this.
+     *
      * @param table      the table to read from
      * @param column     the column whose value is taken
      * @param conditions the columns to match on, each against a value source of
-     *                   its own, in the order they are written. At least one; a
+     *                   its own, in the order they are written. Possibly none; a
      *                   key that matches no row yields SQL NULL, and so does a
      *                   condition whose own value is null
      */
@@ -92,11 +101,6 @@ public sealed interface ValueSource extends Serializable {
                   SequencedMap<SqlIdentifier, ValueSource> conditions) implements ValueSource {
 
         public Lookup {
-            if (conditions.isEmpty()) {
-                throw new IllegalArgumentException(
-                        "a lookup of '" + table + "' matches on no column, so it selects the whole table."
-                                + " Give it at least one condition");
-            }
             // no scan for two conditions on one column: a SqlIdentifier is equal
             // to another when the database would call them one column, so this
             // map could not have been holding both

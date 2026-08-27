@@ -239,35 +239,45 @@ public class XmlMappingSpecReader implements MappingSpecReader {
     /**
      * What a lookup matches on: either a {@code keyColumn} attribute beside its
      * source attribute, which is one condition and how nearly every lookup is
-     * written, or {@code <condition>} children for the composite key.
+     * written, or a {@code <conditions>} child for anything else.
      *
      * <pre>
      * &lt;lookup table="rate" column="factor"&gt;
-     *     &lt;condition column="ccy" fieldSelector="currency"/&gt;
-     *     &lt;condition column="asof" var="valueDate"/&gt;
+     *     &lt;conditions&gt;
+     *         &lt;condition column="ccy" fieldSelector="currency"/&gt;
+     *         &lt;condition column="asof" var="valueDate"/&gt;
+     *     &lt;/conditions&gt;
      * &lt;/lookup&gt;
      * </pre>
      * <p>
      * Both spellings, and never both at once: a spec that writes each has said
      * the same thing twice and is refused rather than picked between.
+     * <p>
+     * The wrapper earns its nesting by making {@code <conditions/>} sayable,
+     * which is a lookup that matches on nothing - a single-row view, or
+     * {@code dual}. Repeated {@code <condition>} children directly under the
+     * lookup could not express that: an empty list and a forgotten key would
+     * have been the same document, and the second is a mistake worth keeping an
+     * error. The JSON format says it as {@code "conditions": []}, so the two
+     * still transliterate.
      */
     private static SequencedMap<SqlIdentifier, ValueSource> conditions(Element lookup) {
-        var listed = elements("condition").apply(lookup).toList();
+        var listed = elements("conditions").apply(lookup).findFirst().orElse(null);
         var keyColumn = attributeValue("keyColumn").apply(lookup).orElse(null);
-        if (!listed.isEmpty() && keyColumn != null) {
-            throw new IllegalArgumentException("<lookup> has a keyColumn attribute and <condition>"
-                    + " children, and one of the two is wanted");
+        if (listed != null && keyColumn != null) {
+            throw new IllegalArgumentException("<lookup> has a keyColumn attribute and a <conditions>"
+                    + " child, and one of the two is wanted");
         }
         var conditions = new LinkedHashMap<SqlIdentifier, ValueSource>();
-        if (listed.isEmpty()) {
+        if (listed == null) {
             if (keyColumn == null) {
-                throw new IllegalArgumentException(
-                        "<lookup> matches on something: give it a keyColumn or <condition> children");
+                throw new IllegalArgumentException("<lookup> matches on something: give it a keyColumn,"
+                        + " or a <conditions> child - empty, if it is to match on nothing");
             }
             conditions.put(new SqlIdentifier(keyColumn), conditionValue(lookup));
             return conditions;
         }
-        for (var condition : listed) {
+        for (var condition : elements("condition").apply(listed).toList()) {
             var column = new SqlIdentifier(required(condition, "column"));
             if (conditions.put(column, conditionValue(condition)) != null) {
                 // the map keeps the first quietly, and a SqlIdentifier collides

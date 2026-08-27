@@ -27,7 +27,7 @@ import static org.junit.jupiter.api.Assertions.*;
  */
 class XsdTest {
 
-    private static final Path SCHEMA = Path.of("..", "docs", "schema", "mapping-spec-0.43.xsd");
+    private static final Path SCHEMA = Path.of("..", "docs", "schema", "mapping-spec-0.44.xsd");
 
     /**
      * Every element and attribute the reader knows, in one document.
@@ -67,8 +67,10 @@ class XsdTest {
                     </fieldMapping>
                     <fieldMapping column="factor">
                         <lookup table="rate" column="factor">
-                            <condition column="ccy" fieldSelector="id"/>
-                            <condition column="asof" var="source"/>
+                            <conditions>
+                                <condition column="ccy" fieldSelector="id"/>
+                                <condition column="asof" var="source"/>
+                            </conditions>
                         </lookup>
                     </fieldMapping>
                 </mapping>
@@ -503,7 +505,7 @@ class XsdTest {
                     <mapping recordSelector="r" table="t">
                         <fieldMapping column="x">
                             <lookup table="rate" column="factor">
-                                <condition var="v"/>
+                                <conditions><condition var="v"/></conditions>
                             </lookup>
                         </fieldMapping>
                     </mapping>
@@ -524,7 +526,7 @@ class XsdTest {
                     <input mimeType="text/csv">
                         <var name="v">
                             <lookup table="rate" column="factor">
-                                <condition column="ccy" fieldSelector="c"/>
+                                <conditions><condition column="ccy" fieldSelector="c"/></conditions>
                             </lookup>
                         </var>
                     </input>
@@ -546,7 +548,7 @@ class XsdTest {
                     <mapping recordSelector="r" table="t">
                         <fieldMapping column="x">
                             <lookup table="rate" column="factor" keyColumn="ccy" fieldSelector="c">
-                                <condition column="asof" var="d"/>
+                                <conditions><condition column="asof" var="d"/></conditions>
                             </lookup>
                         </fieldMapping>
                     </mapping>

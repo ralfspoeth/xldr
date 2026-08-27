@@ -6,6 +6,44 @@ ways that break existing code and existing specs; those changes are listed here 
 The versions are the git tags `xldr-<version>`; the published artifacts carry the same version under the group
 `io.github.ralfspoeth.xldr`.
 
+## 0.44
+
+A release about a restriction that protected against nothing. A lookup may match on no column at all, which is how
+a single-row view or Oracle's `dual` is read; 0.43 refused it on a hazard it tolerates everywhere else.
+
+Saying it needs an empty condition list, and in XML an empty list needs somewhere to be empty - so the conditions
+moved into a `<conditions>` wrapper. That is the one breaking entry, and it touches XML specs written against 0.43
+and nothing else. `mapping-spec-0.44` is published for it, with `mapping-spec-0.43` frozen as that release shipped
+it.
+
+### Breaking
+
+- **An XML lookup's conditions moved into a `<conditions>` wrapper.** A spec written against 0.43 with
+  `<condition>` children directly under the `<lookup>` is refused; wrap them. The JSON spelling is unchanged, and
+  the single-column `keyColumn` spelling is unchanged in both.
+
+  The wrapper is what makes `<conditions/>` expressible, and that is the point of it: with repeated children, an
+  empty list and a forgotten key are the same document, so one of the two would have had to be unsayable.
+
+### Added
+
+- **A lookup may match on no column at all**, which reads a single-row view or Oracle's `dual`:
+
+      "lookup": { "table": "current_rate", "column": "factor", "conditions": [] }
+      <lookup table="current_rate" column="factor"><conditions/></lookup>
+
+  0.43 refused this, and the refusal protected against nothing. The argument for it was that such a query takes an
+  arbitrary row where the table has several - which is exactly what a keyed lookup does when its key matches
+  several rows, and that has never been refused. A rule that forbids one spelling of a hazard while allowing
+  another is not a rule.
+
+  It has to be said explicitly. A lookup with neither `keyColumn` nor `conditions` is still refused, so that
+  forgetting a key stays an error rather than quietly becoming an unconditional read that stamps one arbitrary row
+  onto every record - which is a wrong value in every row and no complaint anywhere.
+
+- **`mapping-spec-0.44`**, in both formats. `mapping-spec-0.43` is frozen exactly as 0.43 published it: it
+  describes the format that release reads, and a spec pinned to it keeps validating.
+
 ## 0.43
 
 A release about identifiers. A lookup may match on more than one column, which is what a reference table keyed by a

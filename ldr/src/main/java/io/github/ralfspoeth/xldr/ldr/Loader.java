@@ -618,9 +618,12 @@ public class Loader implements AutoCloseable {
                     .append(normalizeIdentifier(condition.getKey()))
                     .append(" = ?");
         }
+        // no conditions, no where: a lookup of a single-row view or of dual
+        // reads the whole table, and "where" with nothing after it is a syntax
+        // error rather than a wider query
         var sql = "select " + normalizeIdentifier(lk.column())
                 + " from " + qualify(lk.table())
-                + " where " + where;
+                + (where.isEmpty() ? "" : " where " + where);
         try (var ps = connection.prepareStatement(sql)) {
             for (int i = 0; i < values.size(); i++) {
                 ps.setObject(i + 1, jdbcValue(values.get(i)));
@@ -876,7 +879,7 @@ public class Loader implements AutoCloseable {
                 }
                 yield "(select " + normalizeIdentifier(lk.column())
                         + " from " + qualify(lk.table())
-                        + " where " + where + ")";
+                        + (where.isEmpty() ? "" : " where " + where) + ")";
             }
             // unreachable, and kept because the switch has to be exhaustive:
             // FieldMappingSpec refuses a call at any depth when the spec is read,

@@ -76,7 +76,12 @@
         <th>XML</th>
     </tr>
     <tr>
-        <td>0.43 onwards (current)</td>
+        <td>0.44 onwards (current)</td>
+        <td><a href="schema/mapping-spec-0.44.json">mapping-spec-0.44.json</a></td>
+        <td><a href="schema/mapping-spec-0.44.xsd">mapping-spec-0.44.xsd</a></td>
+    </tr>
+    <tr>
+        <td>0.43</td>
         <td><a href="schema/mapping-spec-0.43.json">mapping-spec-0.43.json</a></td>
         <td><a href="schema/mapping-spec-0.43.xsd">mapping-spec-0.43.xsd</a></td>
     </tr>
@@ -138,6 +143,14 @@
     changes nothing about the format - 0.11, 0.12, 0.14 to 0.20, 0.22, 0.24 to 0.31, 0.33, 0.34, 0.36 to 0.39, 0.41 -
     keeps the previous schema rather than publishing a copy of it. An older one stays where it is, so a spec pinned
     to it keeps validating.
+</p>
+
+<p>
+    In 0.44 a <code>lookup</code> may match on no column at all, which reads a single-row view or Oracle's
+    <code>dual</code>. It is said as an empty <code>conditions</code> rather than by leaving the conditions out,
+    so that a forgotten key stays an error rather than quietly becoming an unconditional read. In XML the
+    conditions moved into a <code>&lt;conditions&gt;</code> wrapper, which is what makes an empty one sayable at
+    all - so an XML spec written against 0.43 needs its <code>&lt;condition&gt;</code> children wrapped.
 </p>
 
 <p>
@@ -243,7 +256,7 @@
 <p>In a JSON spec, as a member the reader does not recognise and therefore ignores:</p>
 
 <pre><code>{
-  "$schema": "https://ralfspoeth.github.io/xldr/schema/mapping-spec-0.43.json",
+  "$schema": "https://ralfspoeth.github.io/xldr/schema/mapping-spec-0.44.json",
   "input": {
     "mimeType": "text/csv",
     "properties": { "fieldSeparator": "," },
@@ -255,7 +268,7 @@
 <p>In an XML spec, as the schema location of a document that has no namespace of its own:</p>
 
 <pre><code>&lt;mappingSpec xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-             xsi:noNamespaceSchemaLocation="https://ralfspoeth.github.io/xldr/schema/mapping-spec-0.43.xsd"&gt;
+             xsi:noNamespaceSchemaLocation="https://ralfspoeth.github.io/xldr/schema/mapping-spec-0.44.xsd"&gt;
     &lt;input mimeType="text/xml"&gt;
         ...
     &lt;/input&gt;

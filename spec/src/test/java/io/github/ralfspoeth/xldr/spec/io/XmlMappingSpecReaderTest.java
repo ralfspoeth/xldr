@@ -125,8 +125,10 @@ class XmlMappingSpecReaderTest {
                     <mapping recordSelector="r" table="t">
                         <fieldMapping column="factor">
                             <lookup table="rate" column="factor">
-                                <condition column="ccy" fieldSelector="currency"/>
-                                <condition column="asof" var="day"/>
+                                <conditions>
+                                    <condition column="ccy" fieldSelector="currency"/>
+                                    <condition column="asof" var="day"/>
+                                </conditions>
                             </lookup>
                         </fieldMapping>
                     </mapping>
@@ -153,7 +155,7 @@ class XmlMappingSpecReaderTest {
                     <mapping recordSelector="r" table="t">
                         <fieldMapping column="x">
                             <lookup table="r" column="id" keyColumn="a" fieldSelector="f">
-                                <condition column="b" var="v"/>
+                                <conditions><condition column="b" var="v"/></conditions>
                             </lookup>
                         </fieldMapping>
                     </mapping>

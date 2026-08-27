@@ -55,16 +55,20 @@ class LookupTest {
     }
 
     /**
-     * A lookup matching on nothing selects the whole table, which is not a thing
-     * anyone means: it would return an arbitrary row's value, or fail on more
-     * than one, depending on the database.
+     * A lookup may match on nothing, and then it reads the whole table: a
+     * single-row view, or Oracle's {@code dual}.
+     * <p>
+     * This was refused until it turned out the refusal protected against
+     * nothing. The argument for it was that such a query takes an arbitrary row
+     * where the table has several - which is exactly what a keyed lookup does
+     * when its key matches several rows, and that has never been refused. A rule
+     * that forbids one spelling of a hazard while allowing another is not a rule.
      */
     @Test
-    void refusesALookupThatMatchesOnNothing() {
-        var thrown = assertThrows(IllegalArgumentException.class,
-                () -> new ValueSource.Lookup("rate", "factor",
-                        new LinkedHashMap<>()));
-        assertTrue(thrown.getMessage().contains("rate"), thrown.getMessage());
+    void allowsALookupThatMatchesOnNothing() {
+        var lookup = new ValueSource.Lookup("current_rate", "factor",
+                new LinkedHashMap<>());
+        assertEquals(0, lookup.conditions().size());
     }
 
     /**

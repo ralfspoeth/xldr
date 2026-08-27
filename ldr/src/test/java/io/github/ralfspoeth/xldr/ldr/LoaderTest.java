@@ -573,6 +573,49 @@ class LoaderTest {
     }
 
     /**
+     * A lookup with no conditions reads the whole table, which is how a
+     * single-row view or Oracle's {@code dual} is read.
+     * <p>
+     * Against a database because the thing that can go wrong is the SQL text: an
+     * empty condition list must drop the {@code where} rather than emit one with
+     * nothing after it, and a dangling {@code where} is a syntax error no unit
+     * test on the record would see.
+     */
+    @Test
+    void resolvesALookupOnNoColumnsAtAll() throws Exception {
+        try (var conn = DriverManager.getConnection(jdbcUrl);
+             var stmt = conn.createStatement()) {
+            stmt.execute("drop table if exists current_rate");
+            stmt.execute("drop table if exists stamped_rate");
+            stmt.execute("create table current_rate(factor int)");
+            stmt.execute("insert into current_rate values (99)");
+            stmt.execute("create table stamped_rate(sku varchar(10), factor int)");
+        }
+        var mapping = new RecordMappingSpec("lines", "stamped_rate", List.of(
+                new FieldMappingSpec("sku", new ValueSource.Field("sku")),
+                new FieldMappingSpec("factor", new ValueSource.Lookup(
+                        "current_rate", "factor", new LinkedHashMap<>()))
+        ), null);
+        var spec = new MappingSpec(new InputSpec("text/csv", List.of(), List.of(), Map.of()), List.of(mapping));
+        var adapter = adapterFor(Map.of("lines", List.of(
+                Map.of("sku", "S1"), Map.of("sku", "S2"))));
+
+        try (var loader = createLoader(spec)) {
+            assertEquals(2, loader.loadInput(adapter, InputStream.nullInputStream(), mapping));
+        }
+
+        try (var conn = DriverManager.getConnection(jdbcUrl);
+             var stmt = conn.createStatement();
+             var rs = stmt.executeQuery("select sku, factor from stamped_rate order by sku")) {
+            var rows = new ArrayList<List<Object>>();
+            while (rs.next()) {
+                rows.add(Arrays.asList(rs.getString(1), rs.getObject(2)));
+            }
+            assertEquals(List.of(Arrays.asList("S1", 99), Arrays.asList("S2", 99)), rows);
+        }
+    }
+
+    /**
      * A lookup may match on several columns, and then the conditions are
      * {@code and}ed in the order they were written.
      * <p>

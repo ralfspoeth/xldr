@@ -35,7 +35,7 @@ import static org.junit.jupiter.api.Assertions.*;
  */
 class JsonSchemaTest {
 
-    private static final Path SCHEMA = Path.of("..", "docs", "schema", "mapping-spec-0.43.json");
+    private static final Path SCHEMA = Path.of("..", "docs", "schema", "mapping-spec-0.44.json");
 
     /**
      * Every member the reader knows, in one document - the JSON transliteration
@@ -466,17 +466,27 @@ class JsonSchemaTest {
     }
 
     /**
-     * An empty {@code conditions} would select the whole table, which is not a
-     * thing anyone means - the schema says so, and so does the record.
+     * An empty {@code conditions} is a lookup of a single-row view, and it has
+     * to be written rather than implied: a spec that simply left the key out
+     * would otherwise become one silently, which is a wrong value in every row
+     * and no complaint anywhere.
      */
     @Test
-    void aLookupMatchesOnAtLeastOneColumn() throws IOException {
-        assertRefused("""
+    void aLookupMayMatchOnNothingIfItSaysSo() throws IOException {
+        var explicit = """
                 { "input": { "mimeType": "text/csv" },
                   "mapping": [ { "recordSelector": "r", "table": "t", "fieldMapping": [
-                      { "column": "x", "lookup": { "table": "rate", "column": "factor",
+                      { "column": "x", "lookup": { "table": "current_rate", "column": "factor",
                           "conditions": [] } } ] } ] }
-                """, "matches on no column at all");
+                """;
+        assertValid(explicit);
+        assertDoesNotThrow(() -> new JsonMappingSpecReader().read(stream(explicit)));
+
+        assertRefusedByBoth("""
+                { "input": { "mimeType": "text/csv" },
+                  "mapping": [ { "recordSelector": "r", "table": "t", "fieldMapping": [
+                      { "column": "x", "lookup": { "table": "rate", "column": "factor" } } ] } ] }
+                """, "leaves out both the keyColumn and the conditions");
     }
 
     /** and a condition names its column, and exactly one source for it */

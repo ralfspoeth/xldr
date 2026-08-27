@@ -138,7 +138,7 @@ fix their versions in one place:
             <dependency>
                 <groupId>io.github.ralfspoeth.xldr</groupId>
                 <artifactId>bom</artifactId>
-                <version>0.43</version>
+                <version>0.44</version>
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>
@@ -409,12 +409,12 @@ Both formats have a published schema, so an editor can check a spec before it ev
 only reports a broken spec in its log, by leaving the feed inactive. Point at the schema from the spec itself:
 
     {
-      "$schema": "https://ralfspoeth.github.io/xldr/schema/mapping-spec-0.43.json",
+      "$schema": "https://ralfspoeth.github.io/xldr/schema/mapping-spec-0.44.json",
       "input": { ... }
     }
 
     <mappingSpec xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-                 xsi:noNamespaceSchemaLocation="https://ralfspoeth.github.io/xldr/schema/mapping-spec-0.43.xsd">
+                 xsi:noNamespaceSchemaLocation="https://ralfspoeth.github.io/xldr/schema/mapping-spec-0.44.xsd">
 
 Both are ignored by the readers - `$schema` is just another unrecognised member, and `xsi:` attributes carry no
 meaning for a spec that has no namespace of its own. IntelliJ and VS Code both validate and autocomplete from them.
@@ -441,7 +441,7 @@ written for `fieldSelectors` costs a record every one of its fields, and no read
 unknown is exactly what it promises.
 
 A schema is published whenever the format changes, and is named after the release that changed it:
-`mapping-spec-0.43` describes the format from 0.43 onwards, `mapping-spec-0.42` that of 0.42, `mapping-spec-0.40` that of 0.40 and 0.41,
+`mapping-spec-0.44` describes the format from 0.44 onwards, `mapping-spec-0.43` that of 0.43, `mapping-spec-0.42` that of 0.42, `mapping-spec-0.40` that of 0.40 and 0.41,
 `mapping-spec-0.35` that of 0.35 to 0.39,
 `mapping-spec-0.32` that of 0.32 to 0.34,
 `mapping-spec-0.23` that of 0.23 to 0.31,
@@ -910,12 +910,24 @@ reference table, the outer one the column of the target table written *to*.
     }
 
     <lookup table="rate" column="factor">
-        <condition column="ccy" fieldSelector="currency"/>
-        <condition column="asof" var="valueDate"/>
+        <conditions>
+            <condition column="ccy" fieldSelector="currency"/>
+            <condition column="asof" var="valueDate"/>
+        </conditions>
     </lookup>
 
 `keyColumn` beside a source is the one-condition spelling and stays exactly as it was - a lookup on a single column
 reads better said once than wrapped in an array of one. A lookup writes one form or the other, never both.
+
+**No conditions at all is a lookup of the whole table** - a single-row view, or Oracle's `dual`:
+
+    {"lookup": {"table": "current_rate", "column": "factor", "conditions": []}}
+    <lookup table="current_rate" column="factor"><conditions/></lookup>
+
+It has to be written rather than implied. A lookup that says neither `keyColumn` nor `conditions` is refused, so
+that forgetting a key stays an error instead of quietly becoming an unconditional read that stamps one arbitrary
+row onto every record. That an unconditional lookup takes an arbitrary row where the table has several is not a
+new hazard: a key matching several rows does the same, and always has.
 
 The order matters more than `and` being commutative suggests: it is the order of the `where` clause and therefore of
 the bound parameters, so it is kept as written rather than left to a hash map. Two conditions on one column are

@@ -47,8 +47,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class TutorialTest {
 
     private static final Path TUTORIAL = Path.of("..", "docs", "tutorial");
-    private static final Path JSON_SCHEMA = Path.of("..", "docs", "schema", "mapping-spec-0.43.json");
-    private static final Path XSD = Path.of("..", "docs", "schema", "mapping-spec-0.43.xsd");
+    private static final Path JSON_SCHEMA = Path.of("..", "docs", "schema", "mapping-spec-0.44.json");
+    private static final Path XSD = Path.of("..", "docs", "schema", "mapping-spec-0.44.xsd");
 
     /** ```lang ... ``` - the only kind of block a page states a fixture in */
     private static final Pattern FENCED = Pattern.compile("```(\\w*)\\n(.*?)```", Pattern.DOTALL);

@@ -95,11 +95,22 @@ price list. Then `keyColumn` becomes `conditions`, one entry per column:
         ]
     }
 
+    <lookup table="rate" column="factor">
+        <conditions>
+            <condition column="ccy" fieldSelector="currency"/>
+            <condition column="asof" var="valueDate"/>
+        </conditions>
+    </lookup>
+
 which becomes `(select factor from rate where ccy = ? and asof = ?)`. Each condition takes the same three sources a
 single key takes, so they can differ - here one comes from the record and one from a variable.
 
 The conditions are `and`ed, and a lookup either says `keyColumn` or says `conditions`, never both. Matching on one
 column is still written the short way; there is no reason to wrap a single key in an array.
+
+And `"conditions": []` - or `<conditions/>` - is a lookup that matches on nothing, which reads the whole table.
+That is for a single-row view, or Oracle's `dual`. Say it explicitly: a lookup with neither `keyColumn` nor
+`conditions` is an error, because forgetting the key should not quietly become this.
 
 One thing to watch: **every condition must match, and a null in any of them yields NULL** - the same rule as the
 single key, applied to all of them. A row whose currency is known and whose date is not gets a null factor, not a
