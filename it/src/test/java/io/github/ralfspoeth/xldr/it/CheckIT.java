@@ -59,6 +59,13 @@ class CheckIT {
                     """);
             stmt.execute("drop table if exists region");
             stmt.execute("create table region(city varchar(50), id integer)");
+            // one real routine, so that the checks on calls have something to
+            // find as well as something to miss. H2 lists an alias among the
+            // procedures whatever it is called with, which is why the check
+            // looks in functions and procedures together
+            stmt.execute("drop alias if exists current_feed");
+            stmt.execute("create alias current_feed for "
+                    + "'io.github.ralfspoeth.xldr.it.TransformProcedures.currentFeed'");
         }
     }
 
@@ -222,6 +229,53 @@ class CheckIT {
     void acorrectLookupHasNoFindings(@TempDir Path dir) throws IOException {
         var run = check(dir, withLookup("region", "id", "city"), SAMPLE);
         assertEquals(0, run.exitCode(), run.out() + run.err());
+    }
+
+    /**
+     * A function a var calls has to be in the database, and until 0.45 nothing
+     * said so: the tutorial page had to warn that a misspelled name is found by
+     * the load and nothing earlier.
+     */
+    @Test
+    void findsAfunctionThatIsNotThere(@TempDir Path dir) throws IOException {
+        var run = check(dir, withVarCalling("no_such_function"), SAMPLE);
+        assertAll(
+                () -> assertNotEquals(0, run.exitCode(), "should have found something"),
+                () -> assertTrue(run.reports("no_such_function"), run.out()),
+                () -> assertTrue(run.reports("no function or procedure"), run.out()));
+    }
+
+    /** and one that is there is quiet */
+    @Test
+    void acallToArealFunctionHasNoFindings(@TempDir Path dir) throws IOException {
+        var run = check(dir, withVarCalling("current_feed"), SAMPLE);
+        assertEquals(0, run.exitCode(), run.out() + run.err());
+    }
+
+    /**
+     * A qualified name is not checked, and the run says so rather than guessing.
+     * {@code pkg.current_feed} is a schema-qualified function in one product and
+     * a package member in another, and the metadata cannot tell them apart - so
+     * reporting it missing would block a deployment that is fine.
+     */
+    @Test
+    void doesNotGuessAtAqualifiedName(@TempDir Path dir) throws IOException {
+        var run = check(dir, withVarCalling("pkg_load.current_feed"), SAMPLE);
+        assertAll(
+                () -> assertEquals(0, run.exitCode(), run.out() + run.err()),
+                () -> assertTrue(run.reports("not checked"), run.out()),
+                () -> assertTrue(run.reports("pkg_load.current_feed"), run.out()));
+    }
+
+    /** the spec of page 8 with a var that calls {@code name} */
+    private static String withVarCalling(String name) {
+        return SPEC.formatted("customers", "balance").replace(
+                "\"recordSelectors\":",
+                """
+                        "vars": [
+                          { "name": "feed", "fn": { "name": "%s", "type": "TEXT" } }
+                        ],
+                        "recordSelectors":""".formatted(name));
     }
 
     /**

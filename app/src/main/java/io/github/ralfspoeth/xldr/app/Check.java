@@ -17,6 +17,7 @@ import java.io.PrintWriter;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.Connection;
+import java.sql.DatabaseMetaData;
 import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.util.*;
@@ -144,8 +145,10 @@ public class Check implements Callable<Integer> {
         checkRecordSelectorsExist(spec, out);
         if (url != null) {
             checkColumnsExist(spec, out, err);
+            checkRoutinesExist(spec, out, err);
         } else {
             out.println("  columns        not checked, no --url given");
+            out.println("  routines       not checked, no --url given");
         }
         if (sameAs != null) {
             compareWith(spec, out, err);
@@ -399,6 +402,109 @@ public class Check implements Callable<Integer> {
             out.printf("  columns        checked against %s%n", conn.getMetaData().getURL());
         } catch (SQLException e) {
             err.println("  columns        not checked: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Every routine a spec asks the database to run: the functions a var calls
+     * and the procedures a transform runs.
+     * <p>
+     * The gap this closes is the one the tutorial page had to admit to. A
+     * lookup's table and columns have been checked since the command was
+     * written, while a misspelled function name went unmentioned until the load
+     * - and the load is the worst place to learn it, the feed being deployed by
+     * then and a producer waiting.
+     * <p>
+     * <strong>A finding only where an absence means something.</strong> Three
+     * things make it not mean anything, and each is reported as not-checked
+     * rather than as a fault:
+     * <ul>
+     *   <li>a driver whose metadata lists no routines at all. Then a name is
+     *       missing from an empty list, which says nothing about the database;</li>
+     *   <li>a qualified name. {@code pkg_load.next_id} is a schema-qualified
+     *       function in PostgreSQL and a member of a package in Oracle, and
+     *       {@code getFunctions} cannot tell the two apart from the name;</li>
+     *   <li>metadata that throws, which some drivers do for these calls.</li>
+     * </ul>
+     * <p>
+     * Functions and procedures are looked for in one set rather than two.
+     * Whether a routine is reported by {@code getFunctions} or by
+     * {@code getProcedures} is a matter a product decides for itself - H2 lists
+     * an alias among the procedures whatever it is called with - and this is
+     * asking whether the thing is there, not what kind of thing it is.
+     */
+    private void checkRoutinesExist(MappingSpec spec, PrintWriter out, PrintWriter err) {
+        var called = new TreeSet<String>();
+        for (var v : spec.inputSpec().vars()) {
+            collectCalls(v.source(), called);
+        }
+        for (var mapping : spec.recordMappingSpecs()) {
+            for (var fm : mapping.fieldMappings()) {
+                collectCalls(fm.source(), called);
+            }
+        }
+        for (var transform : spec.transforms()) {
+            called.add(transform.name());
+            transform.arguments().forEach(argument -> collectCalls(argument, called));
+        }
+        if (called.isEmpty()) {
+            return;
+        }
+        try (var conn = connect()) {
+            var meta = conn.getMetaData();
+            var lower = meta.storesLowerCaseIdentifiers();
+            var known = routineNames(meta, lower);
+            if (known.isEmpty()) {
+                out.printf("  routines       not checked: %s reports none, so an absence says nothing%n",
+                        meta.getDatabaseProductName());
+                return;
+            }
+            var qualified = called.stream().filter(name -> name.contains(".")).toList();
+            for (var name : called) {
+                if (!qualified.contains(name) && !known.contains(normalize(new SqlIdentifier(name), lower))) {
+                    findings.add("no function or procedure '" + name + "' in the target database");
+                }
+            }
+            out.printf("  routines       %d checked against %s%n", called.size() - qualified.size(), meta.getURL());
+            if (!qualified.isEmpty()) {
+                out.printf("                 %s not checked: a qualified name may be a schema or a package,%n"
+                                + "                 and the metadata cannot say which%n", qualified);
+            }
+        } catch (SQLException e) {
+            err.println("  routines       not checked: " + e.getMessage());
+        }
+    }
+
+    /** what the database says it has, functions and procedures together */
+    private Set<String> routineNames(DatabaseMetaData meta, boolean lower) throws SQLException {
+        var names = new LinkedHashSet<String>();
+        var inCatalog = catalog == null ? null : normalize(catalog, lower);
+        var inSchema = schema == null ? null : normalize(schema, lower);
+        try (var rs = meta.getFunctions(inCatalog, inSchema, null)) {
+            while (rs.next()) {
+                names.add(rs.getString("FUNCTION_NAME"));
+            }
+        }
+        try (var rs = meta.getProcedures(inCatalog, inSchema, null)) {
+            while (rs.next()) {
+                names.add(rs.getString("PROCEDURE_NAME"));
+            }
+        }
+        return names;
+    }
+
+    /** the name of every call in a source, however deeply it is buried */
+    private static void collectCalls(ValueSource source, Set<String> into) {
+        switch (source) {
+            case ValueSource.FunctionCall(var name, _, var arguments) -> {
+                into.add(name);
+                arguments.forEach(argument -> collectCalls(argument, into));
+            }
+            case ValueSource.Lookup(_, _, var conditions) ->
+                    conditions.values().forEach(key -> collectCalls(key, into));
+            case ValueSource.Field _, ValueSource.Constant _, ValueSource.Var _, ValueSource.Expr _ -> {
+                // none of them reaches the database for anything it has to have
+            }
         }
     }
 

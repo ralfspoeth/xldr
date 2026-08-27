@@ -6,6 +6,35 @@ ways that break existing code and existing specs; those changes are listed here 
 The versions are the git tags `xldr-<version>`; the published artifacts carry the same version under the group
 `io.github.ralfspoeth.xldr`.
 
+## Unreleased
+
+### Breaking
+
+- **`Target`'s catalog and schema are `SqlIdentifier`s**, where they were strings. They are folded the way every
+  other name that reaches SQL is, so a deployment whose `target.properties` says `Staging` names the schema one
+  saying `STAGING` names, and two such targets are now equal. A quoted name stays exact.
+
+  Constructing one from text is unchanged - `new Target("warehouse", "staging")` still compiles and is what
+  `target.properties` and the servlet both use - so only code reading `catalog()` or `schema()` back has to move.
+  The blank check stays on `Target` rather than being left to the type: a blank setting is a half-deleted line, not
+  a mistake about identifiers, and "leave it out" is the instruction that helps.
+
+  It closes the last place an identifier lived as a string. `Loader` had been wrapping these two at the point of
+  use, which worked and put the knowledge in the wrong place.
+
+### Added
+
+- **`xldr check` verifies that the functions and procedures a spec calls exist**, which it has never done while
+  checking a lookup's table and columns since it was written. A misspelled `fn` or `transform` name was found by
+  the load, with the feed deployed.
+
+  It reports a missing routine only where an absence means something, because a check that blocks a correct
+  deployment is worse than one that misses a typo. A **qualified** name is listed as unchecked - `pkg_load.next_id`
+  is a schema-qualified function in PostgreSQL and a package member in Oracle, and `getFunctions` cannot tell them
+  apart - and a driver whose metadata lists no routines at all is called unusable rather than read as an empty
+  database. Functions and procedures are looked for in one set, since which of the two a product reports a routine
+  under is its own business: H2 lists an alias among the procedures whatever it is called with.
+
 ## 0.44
 
 A release about a restriction that protected against nothing. A lookup may match on no column at all, which is how

@@ -798,8 +798,8 @@ supplies rather than the application - the count is the one thing about a load t
 and it is deliberately unavailable in a field mapping, where mid-file there is no such number and the name is
 therefore unknown.
 
-`xldr check` lists the transforms it found. It does not verify that the procedure exists, the same gap it has for
-`fn`.
+`xldr check` lists the transforms it found and looks each procedure up in the database's metadata, as it does for
+an `fn`.
 
 ### Committing
 

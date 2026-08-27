@@ -185,9 +185,14 @@ number yet, and the name is simply unknown.
 
 ## What `check` will and will not tell you
 
-`xldr check` verifies that a lookup's table and columns exist. It does not verify that a called function exists: the
-first thing that finds a misspelled name is the load. Until it does, a call is one of the few things on a page where
-the schema, the reader and `check` are all content and the database still is not.
+`xldr check` looks up every function and procedure a spec calls in the database's own metadata, so a misspelled
+name is found before you deploy rather than by the load.
+
+Two cases it will not call a mistake, and says so instead of guessing. A **qualified** name like
+`pkg_load.next_id` is a schema-qualified function in PostgreSQL and a member of a package in Oracle, and the
+metadata cannot tell which - so it is listed as unchecked. And a driver whose metadata reports no routines at all
+is reported as unusable rather than treated as an empty database, since then a name missing from an empty list
+says nothing.
 
 ---
 

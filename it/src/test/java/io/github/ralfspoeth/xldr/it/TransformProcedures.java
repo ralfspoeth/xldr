@@ -54,4 +54,12 @@ public final class TransformProcedures {
     public static void explode() throws SQLException {
         throw new SQLException("this transform refuses to run");
     }
+
+    /**
+     * A routine that exists, for {@code CheckIT}: the check that a spec's calls
+     * are in the database needs something to find as well as something to miss.
+     */
+    public static String currentFeed() {
+        return "shipments";
+    }
 }
