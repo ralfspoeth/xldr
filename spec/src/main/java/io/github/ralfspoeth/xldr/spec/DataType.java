@@ -6,25 +6,40 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeParseException;
+import java.util.Arrays;
+import java.util.Locale;
 
 import static java.util.Objects.requireNonNull;
 
 /**
  * The types a field value may be delivered as, each mapped to its Java class.
  * <p>
- * The names are the spec's own vocabulary and deliberately none of Java's, so
- * that no one reads {@code FP} as {@code float} or {@code INTEGRAL} as
+ * The names are the spec's own vocabulary and deliberately none of Java's or
+ * SQL's, so that no one reads {@code FP} as {@code float} or {@code INTEGRAL} as
  * {@code int} and expects the width that goes with it. {@code FP} is binary
  * floating point, delivered as a {@code Double}, and rounds; {@code DECIMAL} is
  * exact and is what money wants.
+ * <p>
+ * Each name says a kind rather than a type of any particular system, which is
+ * why {@link #TEMPORAL} is not called {@code DATE}. It was, until 0.47, and that
+ * one name broke the rule twice over: it was borrowed from SQL, and it was the
+ * SQL type this is not - a SQL {@code DATE} has no time of day, while this has
+ * carried a {@link LocalDateTime} and bound as {@code TIMESTAMP} since it
+ * existed. Three pieces of prose here used to exist only to walk the name back.
  */
 public enum DataType {
 
     /**
-     * A date/time field; no timezone;
-     * wraps a {@link LocalDateTime}.
+     * A point in time with no zone: a timestamp, or a plain date, which is the
+     * timestamp at the start of that day. Delivered as a {@link LocalDateTime}
+     * and bound as SQL {@code TIMESTAMP}.
+     * <p>
+     * No zone, because a file rarely carries one and a value read without one
+     * must not be given a zone by whichever machine happened to read it. Where
+     * an instant is wanted, {@code ${now()}} produces one and the loader binds
+     * it as an {@code OffsetDateTime}.
      */
-    DATE(LocalDateTime.class, 93),
+    TEMPORAL(LocalDateTime.class, 93),
     /**
      * Textual content; represented by
      * {@link String}
@@ -96,7 +111,7 @@ public enum DataType {
      * blank numeric field is an absent value rather than a parse error - which
      * the loader then binds as SQL NULL.
      * <p>
-     * This is the canonical form of each type: ISO-8601 for {@code DATE} (a
+     * This is the canonical form of each type: ISO-8601 for {@code TEMPORAL} (a
      * plain date as well as a timestamp), and a plain, ungrouped literal for the
      * numeric types. Input in another notation is the business of
      * {@code Formats}, which applies the feed's configured patterns.
@@ -114,7 +129,7 @@ public enum DataType {
             return null;
         }
         return switch (this) {
-            case DATE -> dateTime(s);
+            case TEMPORAL -> temporal(s);
             case TEXT -> s;
             case INTEGRAL -> Long.parseLong(s);
             case FP -> Double.parseDouble(s);
@@ -128,11 +143,45 @@ public enum DataType {
      * @param s the timestamp string
      * @return a date/time instance
      */
-    private static LocalDateTime dateTime(String s) {
+    private static LocalDateTime temporal(String s) {
         try {
             return LocalDateTime.parse(s);
         } catch (DateTimeParseException e) {
             return LocalDate.parse(s).atStartOfDay();
         }
+    }
+
+    /**
+     * The type a spec names, matched without regard to case.
+     * <p>
+     * The one way to read a type name, so that the folding is done once and
+     * done right. Both readers used to call {@link #valueOf} on an upper-cased
+     * string, and the JSON one upper-cased it in the default locale - so under a
+     * Turkish default {@code "integral"} became {@code "İNTEGRAL"} and no type
+     * at all. {@link SqlIdentifier} folds with {@link Locale#ROOT} for exactly
+     * this reason and this now does too.
+     * <p>
+     * It also answers for {@code DATE}, which was {@link #TEMPORAL}'s name until
+     * 0.47. {@code valueOf} would say "No enum constant", which is true and
+     * useless; a name that was right one release ago deserves to be told what
+     * replaced it.
+     *
+     * @param name the type as the spec wrote it
+     * @return the type
+     * @throws IllegalArgumentException if it is not a type
+     */
+    public static DataType named(String name) {
+        var folded = requireNonNull(name, "name").strip().toUpperCase(Locale.ROOT);
+        for (var type : values()) {
+            if (type.name().equals(folded)) {
+                return type;
+            }
+        }
+        if (folded.equals("DATE")) {
+            throw new IllegalArgumentException("DATE was renamed TEMPORAL in 0.47, the type having always"
+                    + " carried a time of day and bound as TIMESTAMP: write \"TEMPORAL\"");
+        }
+        throw new IllegalArgumentException("'" + name + "' is not a type; they are "
+                + Arrays.toString(values()));
     }
 }

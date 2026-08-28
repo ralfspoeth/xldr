@@ -5,6 +5,7 @@ import io.github.ralfspoeth.xldr.spec.DataType;
 import io.github.ralfspoeth.xldr.spec.FieldSelectorSpec;
 import io.github.ralfspoeth.xldr.spec.InputSpec;
 import io.github.ralfspoeth.xldr.spec.RecordSelectorSpec;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.function.Executable;
 
@@ -74,7 +75,7 @@ public abstract class InputAdapterContract {
      * <p>
      * Its first record selector is the one exercised, and it should declare at
      * least two field selectors so that asking for a subset means something. At
-     * least one field with a declared type - a {@code DATE}, an {@code INTEGRAL},
+     * least one field with a declared type - a {@code TEMPORAL}, an {@code INTEGRAL},
      * a {@code DECIMAL} - is what makes the typing obligations bite; a spec that
      * is all {@code TEXT} will pass them without having been asked anything.
      */
@@ -286,11 +287,11 @@ public abstract class InputAdapterContract {
     }
 
     /** rows as plain maps, so that two reads can be compared */
-    private List<Map<String, Object>> valuesOf(List<Row> rows) {
+    private List<Map<String, @Nullable Object>> valuesOf(List<Row> rows) {
         return rows.stream().map(row -> {
             // LinkedHashMap rather than a Map.of: a value may be null, and
             // null is exactly what several of these obligations are about
-            Map<String, Object> values = new LinkedHashMap<>();
+            Map<String, @Nullable Object> values = new LinkedHashMap<>();
             for (var name : fieldNames()) {
                 values.put(name, row.get(name));
             }

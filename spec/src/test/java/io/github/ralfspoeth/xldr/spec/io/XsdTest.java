@@ -27,7 +27,7 @@ import static org.junit.jupiter.api.Assertions.*;
  */
 class XsdTest {
 
-    private static final Path SCHEMA = Path.of("..", "docs", "schema", "mapping-spec-0.46.xsd");
+    private static final Path SCHEMA = Path.of("..", "docs", "schema", "mapping-spec-0.47.xsd");
 
     /**
      * Every element and attribute the reader knows, in one document.
@@ -46,7 +46,7 @@ class XsdTest {
                             <arg constant="funds"/>
                             <arg var="source"/>
                             <arg>
-                                <fn name="today" type="DATE"/>
+                                <fn name="today" type="TEMPORAL"/>
                             </arg>
                         </fn>
                     </var>
@@ -114,7 +114,7 @@ class XsdTest {
                 new ValueSource.FunctionCall("pkg_load.next_id", DataType.INTEGRAL, List.of(
                         new ValueSource.Constant("funds"),
                         new ValueSource.Var("source"),
-                        new ValueSource.FunctionCall("today", DataType.DATE, List.of()))),
+                        new ValueSource.FunctionCall("today", DataType.TEMPORAL, List.of()))),
                 spec.inputSpec().vars().stream()
                         .filter(v -> v.name().equals("loadId"))
                         .findFirst()

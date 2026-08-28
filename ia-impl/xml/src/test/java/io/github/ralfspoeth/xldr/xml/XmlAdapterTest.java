@@ -170,7 +170,7 @@ class XmlAdapterTest {
                         new FieldSelectorSpec("id", "@id", DataType.TEXT),
                         new FieldSelectorSpec("name", "f:name", DataType.TEXT),
                         new FieldSelectorSpec("nav", "f:nav", DataType.DECIMAL),
-                        new FieldSelectorSpec("asOf", "f:asOf", DataType.DATE),
+                        new FieldSelectorSpec("asOf", "f:asOf", DataType.TEMPORAL),
                         new FieldSelectorSpec("version", "/f:portfolio/@version", DataType.INTEGRAL)
                 ))
         ), List.of(), Map.of());

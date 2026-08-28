@@ -6,6 +6,45 @@ ways that break existing code and existing specs; those changes are listed here 
 The versions are the git tags `xldr-<version>`; the published artifacts carry the same version under the group
 `io.github.ralfspoeth.xldr`.
 
+## Unreleased
+
+A release about one name. The field type `DATE` is called `TEMPORAL`, which is what it has always been.
+
+The mapping-spec format changes, so `mapping-spec-0.47` is published in both formats. **A spec that declares a
+`DATE` field has to be changed**, and is refused with that instruction until it is - it is one word per field
+selector, and the reader says which word.
+
+### Breaking
+
+- **`DataType.DATE` is `DataType.TEMPORAL`**, in the Java enum and in the spec format. Nothing about the type's
+  behaviour changed: it was already bound to `LocalDateTime`, already registered as JDBC type 93 - `TIMESTAMP`, not
+  `DATE` - and already read a plain ISO date as the timestamp at the start of that day.
+
+  Which is the argument. Every other name in this enum says a *kind* rather than a type of some particular system -
+  `TEXT`, `INTEGRAL`, `FP`, `DECIMAL` are none of Java's and none of SQL's, deliberately, so that nobody reads `FP`
+  as a `float` and infers a width. `DATE` broke that twice over: it was borrowed from SQL, and it was the one SQL
+  type this is not, a SQL `DATE` having no time of day. Three separate pieces of javadoc existed only to walk the
+  name back - "a date/time field", "ISO-8601 for `DATE` (a plain date as well as a timestamp)", "midnight of that
+  day, the timestamp this type declares". When the documentation's job is apologising for the identifier, the
+  identifier is the thing to change.
+
+  A spec still saying `DATE` gets told what to write rather than `valueOf`'s "No enum constant", which is true and
+  useless. That is the one error message here written with a specific reader in mind: someone whose spec was correct
+  one release ago.
+
+### Fixed
+
+- **A type name was folded in the default locale.** The JSON reader upper-cased `"type"` with `String::toUpperCase`
+  and no locale, so under a Turkish default `"integral"` became `"İNTEGRAL"` - the dotted capital I - and matched no
+  constant. Two of the five names carry an `i`. The XML reader had always used `Locale.ROOT`; both now call
+  `DataType.named`, which is the one place a type name is read and the only place left to get this wrong.
+  `SqlIdentifier` folds with `Locale.ROOT` for exactly this reason and has since 0.43.
+
+### Documentation
+
+- **Tutorial page 11 says what to change** in a spec written before 0.47, that being the page a reader with an old
+  spec will open.
+
 ## 0.46
 
 A release about the value that is inside another one. A feed delivering `prices_EUR_20260101.csv` carries its

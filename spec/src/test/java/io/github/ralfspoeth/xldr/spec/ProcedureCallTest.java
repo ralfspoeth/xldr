@@ -50,7 +50,7 @@ class ProcedureCallTest {
                 new ValueSource.Var("batch"),
                 new ValueSource.Expr("${xldr.rowsLoaded}"),
                 new ValueSource.Lookup("load_batch", "id", "feed", new ValueSource.Constant("funds")),
-                new ValueSource.FunctionCall("today", DataType.DATE, List.of()))));
+                new ValueSource.FunctionCall("today", DataType.TEMPORAL, List.of()))));
     }
 
     /** a procedure with nothing to say to it is the ordinary case */

@@ -38,7 +38,7 @@ class CsvConformanceIT extends InputAdapterContract {
         return Conformance.spec(mimeType(), Map.of("fieldSeparator", ","), Locator.every(),
                 field("id", "id", DataType.INTEGRAL),
                 field("name", "name", DataType.TEXT),
-                field("since", "since", DataType.DATE));
+                field("since", "since", DataType.TEMPORAL));
     }
 
     @Override

@@ -24,7 +24,7 @@ class FormatsTest {
                 () -> assertEquals(new BigDecimal("12.50"), formats.parse(DataType.DECIMAL, "12.50")),
                 () -> assertEquals(0.25d, formats.parse(DataType.FP, "0.25")),
                 () -> assertEquals(LocalDateTime.of(2026, 7, 26, 0, 0),
-                        formats.parse(DataType.DATE, "2026-07-26T00:00"))
+                        formats.parse(DataType.TEMPORAL, "2026-07-26T00:00"))
         );
     }
 
@@ -35,13 +35,13 @@ class FormatsTest {
     @Test
     void appliesADatePattern() {
         var formats = Formats.of(Map.of(Formats.DATE_FORMAT, "yyyyMMdd"));
-        assertEquals(LocalDateTime.of(2026, 7, 26, 0, 0), formats.parse(DataType.DATE, "20260726"));
+        assertEquals(LocalDateTime.of(2026, 7, 26, 0, 0), formats.parse(DataType.TEMPORAL, "20260726"));
     }
 
     @Test
     void appliesADatePatternWithATimeOfDay() {
         var formats = Formats.of(Map.of(Formats.DATE_FORMAT, "dd.MM.yyyy HH:mm"));
-        assertEquals(LocalDateTime.of(2026, 7, 26, 8, 30), formats.parse(DataType.DATE, "26.07.2026 08:30"));
+        assertEquals(LocalDateTime.of(2026, 7, 26, 8, 30), formats.parse(DataType.TEMPORAL, "26.07.2026 08:30"));
     }
 
     /**
@@ -81,10 +81,10 @@ class FormatsTest {
                 () -> assertEquals(1L, formats.parse(DataType.INTEGRAL, "1")),
                 () -> assertEquals("Alice", formats.parse(DataType.TEXT, "Alice")),
                 () -> assertEquals(LocalDateTime.of(2026, 3, 1, 0, 0),
-                        formats.parse(DataType.DATE, "01.03.2026"),
+                        formats.parse(DataType.TEMPORAL, "01.03.2026"),
                         "the first of March, not the third of January"),
                 () -> assertEquals(LocalDateTime.of(2026, 3, 15, 0, 0),
-                        formats.parse(DataType.DATE, "15.03.2026")),
+                        formats.parse(DataType.TEMPORAL, "15.03.2026")),
                 () -> assertEquals(0, new BigDecimal("1234.56").compareTo(
                         (BigDecimal) formats.parse(DataType.DECIMAL, "1.234,56"))),
                 () -> assertEquals(0, new BigDecimal("98.00").compareTo(

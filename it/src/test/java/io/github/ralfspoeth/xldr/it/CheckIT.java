@@ -90,7 +90,7 @@ class CheckIT {
                     "fieldSelectors": [
                       {"name": "id",      "selector": "id",      "type": "INTEGRAL"},
                       {"name": "name",    "selector": "name"},
-                      {"name": "since",   "selector": "since",   "type": "DATE"},
+                      {"name": "since",   "selector": "since",   "type": "TEMPORAL"},
                       {"name": "balance", "selector": "balance", "type": "DECIMAL"}
                     ]
                   }
@@ -382,7 +382,7 @@ class CheckIT {
                     <recordSelector name="customers">
                         <fieldSelector name="id" selector="id" type="INTEGRAL"/>
                         <fieldSelector name="name" selector="name"/>
-                        <fieldSelector name="since" selector="since" type="DATE"/>
+                        <fieldSelector name="since" selector="since" type="TEMPORAL"/>
                         <fieldSelector name="balance" selector="balance" type="DECIMAL"/>
                     </recordSelector>
                 </input>

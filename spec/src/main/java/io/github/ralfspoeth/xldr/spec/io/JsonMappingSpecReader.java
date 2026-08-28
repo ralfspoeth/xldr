@@ -330,8 +330,7 @@ public class JsonMappingSpecReader implements MappingSpecReader {
                 PTR.member("name").stringOrThrow(fn),
                 PTR.member("type")
                         .stringValue(fn)
-                        .map(String::toUpperCase)
-                        .map(DataType::valueOf)
+                        .map(DataType::named)
                         .orElseThrow(() -> new IllegalArgumentException(
                                 "an fn says the type it returns, so that the call can be prepared: " + fn)),
                 PTR.member("args")
@@ -392,8 +391,7 @@ public class JsonMappingSpecReader implements MappingSpecReader {
                 node(fs).selector("a field selector"),
                 PTR.member("type")
                         .stringValue(fs)
-                        .map(String::toUpperCase)
-                        .map(DataType::valueOf)
+                        .map(DataType::named)
                         .orElse(null)
         );
     }

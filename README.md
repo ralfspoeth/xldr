@@ -73,7 +73,7 @@ Then set up a feed - a directory below a root, holding two files: how its files 
         "recordSelectors": [
           { "name": "orders", "discriminator": {"nth": 1, "equals": "O"}, "fieldSelectors": [
               {"name": "id",       "nth": 2},
-              {"name": "ordered",  "nth": 3, "type": "DATE"},
+              {"name": "ordered",  "nth": 3, "type": "TEMPORAL"},
               {"name": "customer", "nth": 4}
           ] },
           { "name": "lines", "discriminator": {"nth": 1, "equals": "L"}, "fieldSelectors": [
@@ -409,12 +409,12 @@ Both formats have a published schema, so an editor can check a spec before it ev
 only reports a broken spec in its log, by leaving the feed inactive. Point at the schema from the spec itself:
 
     {
-      "$schema": "https://ralfspoeth.github.io/xldr/schema/mapping-spec-0.46.json",
+      "$schema": "https://ralfspoeth.github.io/xldr/schema/mapping-spec-0.47.json",
       "input": { ... }
     }
 
     <mappingSpec xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-                 xsi:noNamespaceSchemaLocation="https://ralfspoeth.github.io/xldr/schema/mapping-spec-0.46.xsd">
+                 xsi:noNamespaceSchemaLocation="https://ralfspoeth.github.io/xldr/schema/mapping-spec-0.47.xsd">
 
 Both are ignored by the readers - `$schema` is just another unrecognised member, and `xsi:` attributes carry no
 meaning for a spec that has no namespace of its own. IntelliJ and VS Code both validate and autocomplete from them.
@@ -626,14 +626,16 @@ Example:
 
 ### Field types
 
-A field selector's `type` is one of `TEXT`, `INTEGRAL`, `FP`, `DECIMAL` or `DATE` (matched case-insensitively),
+A field selector's `type` is one of `TEXT`, `INTEGRAL`, `FP`, `DECIMAL` or `TEMPORAL` (matched case-insensitively),
 and decides the Java type the adapter delivers and therefore what the loader binds: `String`, `Long`, `Double`,
 `BigDecimal` and `LocalDateTime`. It is optional; a field without one is read as text. The names are none of Java's
 on purpose, so that `FP` is not read as `float` nor `INTEGRAL` as `int`, and so that the choice between `FP` and
-`DECIMAL` - rounding or exact - is the one the reader is asked to make.
+`DECIMAL` - rounding or exact - is the one the reader is asked to make. They are none of SQL's either, which is why
+`TEMPORAL` is not called `DATE`: it carries a time of day and binds as `TIMESTAMP`, so the old name - used until
+0.47 - promised the one SQL type it is not. A spec still saying `DATE` is refused when it is read.
 
 Values are read in their canonical form: an ungrouped literal such as `1234.56` for the numeric types, ISO-8601 for
-`DATE` - a plain date (`2026-07-22`) as well as a timestamp (`2026-07-21T14:30`), a plain date being midnight of that
+`TEMPORAL` - a plain date (`2026-07-22`) as well as a timestamp (`2026-07-21T14:30`), a plain date being midnight of that
 day. Surrounding whitespace is stripped, so a padded fixed-length column or an indented XML element needs no special
 handling, and **a value that is blank is absent**: it becomes `null` and the loader binds SQL NULL. That holds for the
 numeric types too, where a blank column is a missing value rather than a zero or a parse error.
@@ -712,7 +714,7 @@ another call, and nesting costs nothing:
 
     {"name": "batch", "fn": {"name": "open_batch", "type": "INTEGRAL", "args": [
         {"var": "feed"},
-        {"fn": {"name": "today", "type": "DATE"}}
+        {"fn": {"name": "today", "type": "TEMPORAL"}}
     ]}}
 
 `args` left out is a call with none. A call may return null and nothing fails for it: a function saying "no such
@@ -1256,7 +1258,7 @@ their canonical form.
 
 | Key            | Default            | Meaning                                                                                                                                                        |
 |----------------|--------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `dateFormat`   | ISO-8601           | `DateTimeFormatter` pattern for `DATE` fields, e.g. `yyyyMMdd` or `dd.MM.yyyy HH:mm`. A pattern without a time of day yields midnight.                         |
+| `dateFormat`   | ISO-8601           | `DateTimeFormatter` pattern for `TEMPORAL` fields, e.g. `yyyyMMdd` or `dd.MM.yyyy HH:mm`. A pattern without a time of day yields midnight.                         |
 | `numberFormat` | plain literal      | `DecimalFormat` pattern for `INTEGRAL`, `FP` and `DECIMAL`, e.g. `#,##0.00` for grouped input. `DECIMAL` stays exact - it is never rounded through a double. |
 | `locale`       | `ROOT` (`1234.56`) | Language tag, e.g. `de-DE`, selecting the decimal and grouping separators of `numberFormat` and the symbols of `dateFormat`.                                   |
 

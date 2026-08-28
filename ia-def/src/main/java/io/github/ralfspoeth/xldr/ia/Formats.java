@@ -24,7 +24,7 @@ import static java.util.function.Predicate.not;
  * Two settings, both optional and both taken from the adapter properties of a
  * feed:
  * <ul>
- *   <li>{@code dateFormat} - a {@link DateTimeFormatter} pattern for {@code DATE}
+ *   <li>{@code dateFormat} - a {@link DateTimeFormatter} pattern for {@code TEMPORAL}
  *       fields, e.g. {@code yyyyMMdd} or {@code dd.MM.yyyy}. A pattern that
  *       carries no time of day yields midnight;</li>
  *   <li>{@code numberFormat} - a {@link DecimalFormat} pattern for the numeric
@@ -112,7 +112,7 @@ public final class Formats {
                 .map(String::strip)
                 .filter(not(String::isEmpty))
                 .map(s -> switch (type) {
-                    case DATE -> date == null ? DataType.DATE.parse(s) : dateTime(s);
+                    case TEMPORAL -> date == null ? DataType.TEMPORAL.parse(s) : dateTime(s);
                     case INTEGRAL -> number == null
                             ? DataType.INTEGRAL.parse(s)
                             : integral(bigDecimal(s), s);
@@ -126,7 +126,7 @@ public final class Formats {
 
     /**
      * A pattern without a time of day still yields a {@code LocalDateTime}, at
-     * the start of the day - the type the spec declares for {@code DATE}.
+     * the start of the day - the type the spec declares for {@code TEMPORAL}.
      */
     private LocalDateTime dateTime(String s) {
         try {

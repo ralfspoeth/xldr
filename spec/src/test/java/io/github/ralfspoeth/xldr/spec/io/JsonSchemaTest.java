@@ -35,7 +35,7 @@ import static org.junit.jupiter.api.Assertions.*;
  */
 class JsonSchemaTest {
 
-    private static final Path SCHEMA = Path.of("..", "docs", "schema", "mapping-spec-0.46.json");
+    private static final Path SCHEMA = Path.of("..", "docs", "schema", "mapping-spec-0.47.json");
 
     /**
      * Every member the reader knows, in one document - the JSON transliteration
@@ -56,7 +56,7 @@ class JsonSchemaTest {
                     "fn": { "name": "pkg_load.next_id", "type": "INTEGRAL", "args": [
                               { "constant": "funds" },
                               { "var": "source" },
-                              { "fn": { "name": "today", "type": "DATE" } }
+                              { "fn": { "name": "today", "type": "TEMPORAL" } }
                             ] } },
                   { "name": "currency",
                     "regex": { "pattern": ".*_([A-Z]{3})_.*", "group": 1,
@@ -141,7 +141,7 @@ class JsonSchemaTest {
                 new ValueSource.FunctionCall("pkg_load.next_id", DataType.INTEGRAL, List.of(
                         new ValueSource.Constant("funds"),
                         new ValueSource.Var("source"),
-                        new ValueSource.FunctionCall("today", DataType.DATE, List.of()))),
+                        new ValueSource.FunctionCall("today", DataType.TEMPORAL, List.of()))),
                 spec.inputSpec().vars().stream()
                         .filter(v -> v.name().equals("loadId"))
                         .findFirst()

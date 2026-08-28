@@ -247,7 +247,7 @@ class JsonInputAdapter implements InputAdapter {
             // contract rather than a loss
             case FP -> value.doubleValue();
             // a number where the spec wants text or a date: let the shared rules decide
-            case TEXT, DATE -> formats.parse(type, value.toPlainString());
+            case TEXT, TEMPORAL -> formats.parse(type, value.toPlainString());
         };
     }
 }

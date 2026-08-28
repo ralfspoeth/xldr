@@ -10,7 +10,6 @@ import java.nio.file.Path;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.SequencedCollection;
@@ -194,8 +193,7 @@ public class XmlMappingSpecReader implements MappingSpecReader {
                 node(fieldSelector).selector("a field selector"),
                 attributeValue("type")
                         .apply(fieldSelector)
-                        .map(type -> type.toUpperCase(Locale.ROOT))
-                        .map(DataType::valueOf)
+                        .map(DataType::named)
                         .orElse(null)
         );
     }
@@ -424,7 +422,7 @@ public class XmlMappingSpecReader implements MappingSpecReader {
     private static ValueSource.FunctionCall functionCall(Element fn) {
         return new ValueSource.FunctionCall(
                 required(fn, "name"),
-                DataType.valueOf(required(fn, "type").toUpperCase(Locale.ROOT)),
+                DataType.named(required(fn, "type")),
                 elements("arg").apply(fn)
                         .map(XmlMappingSpecReader::valueSource)
                         .toList());

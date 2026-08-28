@@ -212,7 +212,7 @@ class XmlMappingSpecReaderTest {
                                             constant="funds"/>
                                 </arg>
                                 <arg>
-                                    <fn name="today" type="DATE"/>
+                                    <fn name="today" type="TEMPORAL"/>
                                 </arg>
                             </fn>
                         </var>
@@ -227,7 +227,7 @@ class XmlMappingSpecReaderTest {
                                 new ValueSource.Var("feed"),
                                 new ValueSource.Lookup("load_batch", "id", "feed",
                                         new ValueSource.Constant("funds")),
-                                new ValueSource.FunctionCall("today", DataType.DATE, List.of())))),
+                                new ValueSource.FunctionCall("today", DataType.TEMPORAL, List.of())))),
                 vars.get(1));
     }
 

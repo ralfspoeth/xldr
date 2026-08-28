@@ -117,7 +117,7 @@ class JsonAdapterTest {
                 new FieldSelectorSpec("num", "num", DataType.INTEGRAL),
                 new FieldSelectorSpec("dec", "dec", DataType.DECIMAL),
                 new FieldSelectorSpec("flt", "flt", DataType.FP),
-                new FieldSelectorSpec("day", "day", DataType.DATE));
+                new FieldSelectorSpec("day", "day", DataType.TEMPORAL));
 
         var names = Set.of("txt", "num", "dec", "flt", "day");
         var result = adapter(spec, Map.of()).parse(in("""
@@ -217,7 +217,7 @@ class JsonAdapterTest {
     @Test
     void appliesTheConfiguredFormats() throws IOException {
         var spec = spec("rows",
-                new FieldSelectorSpec("day", "day", DataType.DATE),
+                new FieldSelectorSpec("day", "day", DataType.TEMPORAL),
                 new FieldSelectorSpec("amount", "amount", DataType.DECIMAL));
 
         var result = adapter(spec, Map.of("dateFormat", "dd.MM.yyyy", "numberFormat", "#,##0.00", "locale", "de-DE"))

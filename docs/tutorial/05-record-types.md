@@ -34,7 +34,7 @@ mapped to its own table:
         "discriminator": { "nth": 1, "equals": "O" },
         "fieldSelectors": [
           {"name": "id",       "nth": 2},
-          {"name": "ordered",  "nth": 3, "type": "DATE"},
+          {"name": "ordered",  "nth": 3, "type": "TEMPORAL"},
           {"name": "customer", "nth": 4}
         ]
       },

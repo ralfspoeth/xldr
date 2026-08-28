@@ -76,7 +76,12 @@
         <th>XML</th>
     </tr>
     <tr>
-        <td>0.46 onwards (current)</td>
+        <td>0.47 onwards (current)</td>
+        <td><a href="schema/mapping-spec-0.47.json">mapping-spec-0.47.json</a></td>
+        <td><a href="schema/mapping-spec-0.47.xsd">mapping-spec-0.47.xsd</a></td>
+    </tr>
+    <tr>
+        <td>0.46</td>
         <td><a href="schema/mapping-spec-0.46.json">mapping-spec-0.46.json</a></td>
         <td><a href="schema/mapping-spec-0.46.xsd">mapping-spec-0.46.xsd</a></td>
     </tr>
@@ -148,6 +153,15 @@
     changes nothing about the format - 0.11, 0.12, 0.14 to 0.20, 0.22, 0.24 to 0.31, 0.33, 0.34, 0.36 to 0.39, 0.41, 0.45 -
     keeps the previous schema rather than publishing a copy of it. An older one stays where it is, so a spec pinned
     to it keeps validating.
+</p>
+
+<p>
+    In 0.47 the field type <code>DATE</code> is called <code>TEMPORAL</code>. Only the name changed: it has always
+    been delivered as a <code>LocalDateTime</code> and bound as SQL <code>TIMESTAMP</code>, and has always read a
+    plain date as the timestamp at the start of that day - so <code>DATE</code> named the one SQL type it is not,
+    where every other name here (<code>TEXT</code>, <code>INTEGRAL</code>, <code>FP</code>, <code>DECIMAL</code>)
+    says a kind rather than a type of some particular system. A spec still saying <code>DATE</code> is refused when
+    it is read, and told what to write instead.
 </p>
 
 <p>
@@ -244,7 +258,7 @@
 
 <p>
     In 0.21 the field types <code>STRING</code>, <code>INTEGER</code> and <code>FLOAT</code> became
-    <code>TEXT</code>, <code>INTEGRAL</code> and <code>FP</code>; <code>DECIMAL</code> and <code>DATE</code> are
+    <code>TEXT</code>, <code>INTEGRAL</code> and <code>FP</code>; <code>DECIMAL</code> and <code>TEMPORAL</code> are
     unchanged, as is leaving the type out, which still means text. The names are deliberately none of Java's, so that
     nobody reads <code>FP</code> as a <code>float</code> or <code>INTEGRAL</code> as an <code>int</code> and infers a
     width from it. An old name is refused when the spec is read rather than defaulting quietly, so a spec that has not
@@ -272,7 +286,7 @@
 <p>In a JSON spec, as a member the reader does not recognise and therefore ignores:</p>
 
 <pre><code>{
-  "$schema": "https://ralfspoeth.github.io/xldr/schema/mapping-spec-0.46.json",
+  "$schema": "https://ralfspoeth.github.io/xldr/schema/mapping-spec-0.47.json",
   "input": {
     "mimeType": "text/csv",
     "properties": { "fieldSeparator": "," },
@@ -284,7 +298,7 @@
 <p>In an XML spec, as the schema location of a document that has no namespace of its own:</p>
 
 <pre><code>&lt;mappingSpec xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-             xsi:noNamespaceSchemaLocation="https://ralfspoeth.github.io/xldr/schema/mapping-spec-0.46.xsd"&gt;
+             xsi:noNamespaceSchemaLocation="https://ralfspoeth.github.io/xldr/schema/mapping-spec-0.47.xsd"&gt;
     &lt;input mimeType="text/xml"&gt;
         ...
     &lt;/input&gt;
@@ -331,7 +345,7 @@
     <tr>
         <td><code>dateFormat</code></td>
         <td>ISO-8601</td>
-        <td><code>DateTimeFormatter</code> pattern for <code>DATE</code> fields, e.g. <code>yyyyMMdd</code> or
+        <td><code>DateTimeFormatter</code> pattern for <code>TEMPORAL</code> fields, e.g. <code>yyyyMMdd</code> or
             <code>dd.MM.yyyy HH:mm</code>. A pattern without a time of day yields midnight.</td>
     </tr>
     <tr>

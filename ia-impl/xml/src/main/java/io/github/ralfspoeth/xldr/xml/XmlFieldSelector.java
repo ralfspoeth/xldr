@@ -72,7 +72,7 @@ class XmlFieldSelector {
                 }
                 // the shared formats apply the configured numberFormat/dateFormat
                 // and yield null for an empty result
-                case INTEGRAL, DECIMAL, DATE -> formats.parse(dataType, string(record));
+                case INTEGRAL, DECIMAL, TEMPORAL -> formats.parse(dataType, string(record));
             };
         } catch (XPathExpressionException e) {
             throw new IllegalStateException("cannot evaluate " + selector + " for field " + name, e);

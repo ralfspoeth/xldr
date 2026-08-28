@@ -39,7 +39,7 @@ The spec answers both questions - a `type` per field, and the notation once for 
         "fieldSelectors": [
           {"name": "id",      "selector": "id",      "type": "INTEGRAL"},
           {"name": "name",    "selector": "name"},
-          {"name": "since",   "selector": "since",   "type": "DATE"},
+          {"name": "since",   "selector": "since",   "type": "TEMPORAL"},
           {"name": "balance", "selector": "balance", "type": "DECIMAL"}
         ]
       }
@@ -79,10 +79,14 @@ sql> select id, name, since, balance from customer order by id;
 | `INTEGRAL` | a whole number, up to 64 bits |
 | `DECIMAL` | an exact decimal |
 | `FP` | a floating-point number, allowed to be approximate |
-| `DATE` | a date, or a date and time |
+| `TEMPORAL` | a date, or a date and time |
 
 The names are deliberately none of Java's or SQL's, so that nobody reads `FP` as a `float` and infers a width from
 it, or reads `INTEGRAL` as a 32-bit int. `DECIMAL` is exact - money belongs in it, never in `FP`.
+
+`TEMPORAL` was called `DATE` until 0.47, and if you have a spec from before that, this is the one line to change.
+It carries a time of day and binds as SQL `TIMESTAMP`, so the old name promised the one SQL type it was not. A spec
+still saying `DATE` is refused when it is read and told to write `TEMPORAL`.
 
 `INTEGRAL` is a 64-bit whole number, so ±9223372036854775807. A value with a fraction or beyond that range is
 refused rather than rounded or wrapped, and the message says so - an identifier too long for it belongs in a text
