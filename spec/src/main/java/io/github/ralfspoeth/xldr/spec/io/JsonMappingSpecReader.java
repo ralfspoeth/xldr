@@ -13,10 +13,14 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.math.BigDecimal;
 import java.nio.file.Path;
+import java.util.Collections;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.SequencedCollection;
 import java.util.SequencedMap;
+import java.util.function.Function;
 
 import static io.github.ralfspoeth.json.query.Selector.all;
 
@@ -145,32 +149,111 @@ public class JsonMappingSpecReader implements MappingSpecReader {
     }
 
     /**
+     * The members that hold a source rather than being one, and how each is read.
+     * <p>
+     * Three of them now, where two could be told apart in a line apiece. Named
+     * once, and the same names both checked and dispatched on, so that the list a
+     * spec is measured against cannot come to differ from the list the reader can
+     * actually read - the {@code fn} the schema offered inside a lookup's
+     * condition while the reader threw on it was exactly that divergence, and it
+     * stood for three releases because the two lists were never written down
+     * beside each other.
+     */
+    private static final SequencedMap<String, Function<JsonValue, ValueSource>> NESTED = nested();
+
+    private static SequencedMap<String, Function<JsonValue, ValueSource>> nested() {
+        var sources = new LinkedHashMap<String, Function<JsonValue, ValueSource>>();
+        sources.put("lookup", JsonMappingSpecReader::lookup);
+        sources.put("fn", JsonMappingSpecReader::functionCall);
+        sources.put("regex", JsonMappingSpecReader::regex);
+        return Collections.unmodifiableSequencedMap(sources);
+    }
+
+    /**
+     * The same, minus the lookup, which is what a lookup's own condition may
+     * hold: a condition matching against another lookup is a join, and a join
+     * belongs in a view where the database can plan it.
+     * <p>
+     * A regex here may still read one, its subject being any source at all. That
+     * is not the case this excludes - it is two queries one after the other, the
+     * pattern applied to what the first returned, which is no more a join than a
+     * var reading a lookup is. Where the condition belongs to a *column's*
+     * lookup the loader refuses it regardless, a regex there being planned into
+     * the same statement and having no value in hand to match against.
+     */
+    private static final List<String> IN_A_CONDITION = List.of("fn", "regex");
+
+    /**
      * Exactly one source: {@code fieldSelector}, {@code constant}, {@code var} or
-     * {@code expr} as a scalar member, or a {@code lookup} or {@code fn} object.
+     * {@code expr} as a scalar member, or one of the {@link #NESTED} objects.
      * Which of the four scalars, and the refusal when it is not one, is
-     * {@link SpecNode#source()}; where the two objects sit is this format's
-     * business.
+     * {@link SpecNode#source()}; where the objects sit is this format's business.
      */
     private static ValueSource valueSource(JsonValue fm) {
-        var lookup = PTR.member("lookup").apply(fm).orElse(null);
-        var fn = PTR.member("fn").apply(fm).orElse(null);
-        if (lookup == null && fn == null) {
-            return node(fm).source();
+        return source(fm, NESTED.sequencedKeySet());
+    }
+
+    /**
+     * One source out of the scalars and whichever objects are allowed here.
+     *
+     * @param element the object that carries the source
+     * @param allowed the object members that may carry a source in this position,
+     *                in the order a complaint should list them
+     */
+    private static ValueSource source(JsonValue element, SequencedCollection<String> allowed) {
+        var written = new LinkedHashMap<String, JsonValue>();
+        allowed.forEach(name -> PTR.member(name).apply(element).ifPresent(held -> written.put(name, held)));
+        if (written.isEmpty()) {
+            return node(element).source();
         }
-        if (lookup != null && fn != null) {
-            throw new IllegalArgumentException("a lookup and an fn are two sources, and one is wanted: " + fm);
+        if (written.size() > 1) {
+            throw new IllegalArgumentException(String.join(" and ", written.keySet())
+                    + " are sources, and one is wanted: " + element);
         }
-        if (node(fm).hasSource()) {
-            throw new IllegalArgumentException("a " + (fn == null ? "lookup" : "fn")
-                    + " and a source member are two sources, and one is wanted: " + fm);
+        var only = written.firstEntry();
+        if (node(element).hasSource()) {
+            throw new IllegalArgumentException("a " + only.getKey()
+                    + " and a source member are two sources, and one is wanted: " + element);
         }
-        if (fn != null) {
-            return functionCall(fn);
-        }
+        return NESTED.get(only.getKey()).apply(only.getValue());
+    }
+
+    private static ValueSource.Lookup lookup(JsonValue lookup) {
         return new ValueSource.Lookup(
                 new SqlIdentifier(PTR.member("table").stringOrThrow(lookup)),
                 new SqlIdentifier(PTR.member("column").stringOrThrow(lookup)),
                 conditions(lookup));
+    }
+
+    /**
+     * A pattern applied to another source: the {@code pattern} it matches with,
+     * the capturing {@code group} to take, and the source it reads, written as
+     * that source would be written anywhere else.
+     *
+     * <pre>
+     * {"column": "currency",
+     *  "regex": {"pattern": ".*_([A-Z]{3})_.*", "group": 1, "expr": "${xldr.filename}"}}
+     * </pre>
+     * <p>
+     * The subject sits among the pattern rather than under a member of its own,
+     * which is why this can hand the whole object back to {@link #valueSource}:
+     * everything a field mapping may say about where its value comes from, a
+     * regex may say about where the text it matches comes from, nesting included.
+     * {@code pattern} and {@code group} are not sources and are ignored there.
+     * <p>
+     * {@code group} defaults to 0, the whole match, so the common case of a
+     * pattern written to match exactly what is wanted says nothing. The pattern
+     * is compiled here, by {@link ValueSource.Regex#matching}, so that a spec
+     * that will not compile is refused when it is read rather than when the first
+     * record reaches it - a feed is activated only if its patterns compile.
+     */
+    private static ValueSource.Regex regex(JsonValue rx) {
+        var pattern = PTR.member("pattern")
+                .stringValue(rx)
+                .orElseThrow(() -> new IllegalArgumentException(
+                        "a regex says the pattern it matches with: " + rx));
+        var group = node(rx).whole("group").orElse(0);
+        return ValueSource.Regex.matching(valueSource(rx), pattern, group);
     }
 
     /**
@@ -214,8 +297,8 @@ public class JsonMappingSpecReader implements MappingSpecReader {
     }
 
     /**
-     * What one condition matches against: one of the four scalar sources, or an
-     * {@code fn}, and never a nested {@code lookup}.
+     * What one condition matches against: {@link #IN_A_CONDITION}, which is
+     * everything but a nested lookup.
      * <p>
      * The {@code fn} half is what the schema has claimed since 0.40 and the
      * reader did not do: a var's lookup keyed by a function call validated in an
@@ -223,21 +306,10 @@ public class JsonMappingSpecReader implements MappingSpecReader {
      * lookup's condition is still refused, by {@link
      * io.github.ralfspoeth.xldr.spec.FieldMappingSpec}, which walks a lookup's
      * conditions for exactly that - one call per row is what it exists to
-     * prevent.
-     * <p>
-     * A nested lookup stays out. It would be a join, and a join belongs in a
-     * view where the database can plan it, not in a mapping spec.
+     * prevent, and it walks through a regex as well.
      */
     private static ValueSource conditionValue(JsonValue condition) {
-        var fn = PTR.member("fn").apply(condition).orElse(null);
-        if (fn == null) {
-            return node(condition).source();
-        }
-        if (node(condition).hasSource()) {
-            throw new IllegalArgumentException(
-                    "a condition has an fn and a source member, and one is wanted: " + condition);
-        }
-        return functionCall(fn);
+        return source(condition, IN_A_CONDITION);
     }
 
     /**

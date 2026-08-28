@@ -6,6 +6,81 @@ ways that break existing code and existing specs; those changes are listed here 
 The versions are the git tags `xldr-<version>`; the published artifacts carry the same version under the group
 `io.github.ralfspoeth.xldr`.
 
+## 0.46
+
+A release about the value that is inside another one. A feed delivering `prices_EUR_20260101.csv` carries its
+currency in the name of the file and nowhere else, and until now the only answers were a column in the spec that
+lied or a pre-processing step outside it.
+
+The mapping-spec format changes, so `mapping-spec-0.46` is published in both formats. A spec that loaded under 0.44
+or 0.45 loads unchanged - the two breaking entries are a Java one, and one that refuses a spec no release could ever
+have loaded.
+
+### Breaking
+
+- **`ValueSource` has a sixth case, `Regex`**, so an exhaustive switch over it in embedding code no longer compiles.
+  That is the trade the sealed hierarchy was chosen for: a new source is a compile error at every place that decides
+  what to do with one, rather than a `default` branch quietly doing the wrong thing on the first spec that uses it.
+  Five switches in this repository named it, and one of them - `Check.collectFieldNames` - would have been a silent
+  defect had the compiler not asked.
+
+  It holds a compiled `java.util.regex.Pattern` and carries hand-written `equals` and `hashCode` over the pattern's
+  text and flags, since two compiles of one string are distinct objects and a record's own equality would call two
+  readings of one spec file unequal. `Discriminator.Matches` does the same and for the same reason.
+
+- **A column's `regex` may not read a `lookup`**, and a spec that says so is now refused when it is read. It was
+  refused before too, by the loader, while planning the insert - so the spec validated in an editor, deployed, and
+  failed on its first file. A regex runs in the JVM on a value bound as a parameter, and a column's lookup is a
+  subquery of the insert whose value does not exist until the statement runs; no arrangement of the input could make
+  it work, which is what puts the rule in `FieldMappingSpec` beside the one about calls. A **var's** regex may read a
+  lookup and always could: that is one query and then a match.
+
+### Added
+
+- **A `regex` value source**, wherever a value source may stand - a field mapping, a var, a lookup's key or
+  condition, an argument to an `fn` or a `transform`:
+
+      {"name": "currency",
+       "regex": {"pattern": ".*_([A-Z]{3})_.*", "group": 1, "expr": "${xldr.filename}"}}
+
+      <regex pattern=".*_([A-Z]{3})_.*" group="1" expr="${xldr.filename}"/>
+
+  The subject is written on the regex itself, exactly as it would be written on the element holding it, which is
+  what makes it any source at all rather than a list of the ones that were thought of. `group` defaults to 0, the
+  whole match.
+
+  **No match is NULL**, as is a subject that is null - the answer a lookup already gives for a key matching no row,
+  and for the same reason: one file whose name does not fit should not fail a delivery of a hundred thousand
+  records. The gap is in the data, where it can be reported on.
+
+  **The pattern is compiled when the spec is read**, so a pattern that does not compile, or a `group` the pattern
+  does not capture, is refused there rather than on the first delivery - a feed is activated only if its patterns
+  compile. It was first tried as a `${group(...)}` built-in of the expression language, which does not work: the
+  hole scanner takes the first `}`, so `${group(x, '[A-Z]{3}', 1)}` ends inside the quantifier. A pattern wants a
+  place of its own where nothing else is looking for braces.
+
+- **`mapping-spec-0.46`**, in both formats, for `regex`. Two definitions as always, a row one and a var one: the var
+  flavour reads no `fieldSelector` and the row flavour reads no `lookup`, which are the two rules above stated where
+  an editor can enforce them.
+
+  The XSD also stops accepting a var `lookup` that writes both an `<fn>` key and a `<conditions>` child. It was a
+  sequence of optional children and is now a choice, for `<regex>`'s sake; the combination it used to allow was the
+  one place in this format where the reader took a document, dropped half of it, and said nothing.
+
+### Fixed
+
+- **`xldr check --sample` resolved no field a `regex` reads.** The set of fields the adapter is asked for is built by
+  walking each source, and the `Regex` case returned nothing instead of recursing into its subject - so the preview
+  read the sample without that field and showed a spec behaving differently from the way the loader would run it.
+  The one thing that command must not do. `Check`'s two other walks, over calls and over the rendering, had the same
+  gap.
+
+### Documentation
+
+- **Tutorial page 7 gains a section on taking part of a value**, rather than a fourteenth page. A `regex` is most
+  often reached for while writing a variable - the currency in the name of the file is the case - so it belongs
+  where a reader already is, next to the table of what a variable may be.
+
 ## 0.45
 
 A release about two things nothing was checking. A spec's calls on the database are now looked up before a deploy

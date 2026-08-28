@@ -931,6 +931,117 @@ class LoaderTest {
     }
 
     /**
+     * A regex takes part of a field, once per record, and a record the pattern
+     * does not fit takes NULL.
+     * <p>
+     * NULL rather than a failure, and the same answer a lookup gives for a key
+     * matching no row: a file with one malformed line loads, and the gap is
+     * visible in the data and can be reported on. Failing the load instead would
+     * make one bad record the whole delivery's problem.
+     */
+    @Test
+    void extractsPartOfAfieldIntoAcolumn() throws Exception {
+        var mapping = new RecordMappingSpec("rows", "person", List.of(
+                new FieldMappingSpec("id", new ValueSource.Field("id")),
+                new FieldMappingSpec("name", ValueSource.Regex.matching(
+                        new ValueSource.Field("raw"), "^\\w+_([A-Za-z]+)_v\\d+$", 1))
+        ), null);
+        var spec = new MappingSpec(
+                new InputSpec("text/csv", List.of(), List.of(), Map.of()),
+                List.of(mapping));
+        var adapter = adapterFor(Map.of("rows", List.of(
+                Map.of("id", "1", "raw", "fund_Alice_v3"),
+                Map.of("id", "2", "raw", "nothing like it"),
+                Map.of("id", "3"))));   // no such field at all
+
+        try (var loader = createLoader(spec)) {
+            assertEquals(3, loader.loadInput(adapter, InputStream.nullInputStream(), mapping));
+        }
+
+        assertEquals(
+                List.of(
+                        Arrays.asList("1", "Alice", null),
+                        Arrays.asList("2", null, null),
+                        Arrays.asList("3", null, null)),
+                selectPersons());
+    }
+
+    /**
+     * And a var's regex runs once, before the first record, so every row carries
+     * the same extract - here the currency in the name of the file being loaded,
+     * which is the case the source was added for.
+     */
+    @Test
+    void extractsPartOfAnAmbientValueOncePerLoad() throws Exception {
+        var vars = List.of(new VarSpec("currency", ValueSource.Regex.matching(
+                new ValueSource.Expr("${xldr.filename}"), ".*_([A-Z]{3})_.*", 1)));
+        var mapping = new RecordMappingSpec("rows", "person", List.of(
+                new FieldMappingSpec("id", new ValueSource.Field("id")),
+                new FieldMappingSpec("city", new ValueSource.Var("currency"))
+        ), null);
+        var spec = new MappingSpec(
+                new InputSpec("text/csv", List.of(), vars, Map.of()),
+                List.of(mapping));
+        var adapter = adapterFor(Map.of("rows", List.of(Map.of("id", "1"), Map.of("id", "2"))));
+
+        try (var loader = new Loader(spec, DriverManager.getConnection(jdbcUrl),
+                Map.of("xldr.filename", "positions_CHF_20260821.csv"))) {
+            loader.loadInput(adapter, InputStream.nullInputStream(), mapping);
+        }
+
+        assertEquals(
+                List.of(Arrays.asList("1", null, "CHF"), Arrays.asList("2", null, "CHF")),
+                selectPersons());
+    }
+
+    /**
+     * A lookup may be keyed by part of a field, which is the composite of the
+     * two: the pattern runs here, per record, and its result is bound into the
+     * subquery the insert carries.
+     */
+    @Test
+    void matchesAlookupKeyAgainstPartOfAfield() throws Exception {
+        try (var conn = DriverManager.getConnection(jdbcUrl);
+             var stmt = conn.createStatement()) {
+            stmt.execute("drop table if exists ccy_rate");
+            stmt.execute("create table ccy_rate(ccy varchar(3), factor int)");
+            stmt.execute("insert into ccy_rate values('CHF', 7), ('EUR', 9)");
+            stmt.execute("drop table if exists priced_row");
+            stmt.execute("create table priced_row(sku varchar(20), factor int)");
+        }
+        var mapping = new RecordMappingSpec("rows", "priced_row", List.of(
+                new FieldMappingSpec("sku", new ValueSource.Field("sku")),
+                new FieldMappingSpec("factor", new ValueSource.Lookup("ccy_rate", "factor", "ccy",
+                        ValueSource.Regex.matching(
+                                new ValueSource.Field("sku"), ".*_([A-Z]{3})_.*", 1)))
+        ), null);
+        var spec = new MappingSpec(
+                new InputSpec("text/csv", List.of(), List.of(), Map.of()),
+                List.of(mapping));
+        var adapter = adapterFor(Map.of("rows", List.of(
+                Map.of("sku", "x_CHF_1"),
+                Map.of("sku", "x_EUR_2"),
+                Map.of("sku", "unparseable"))));
+
+        try (var loader = createLoader(spec)) {
+            loader.loadInput(adapter, InputStream.nullInputStream(), mapping);
+        }
+
+        var factors = new ArrayList<Integer>();
+        try (var conn = DriverManager.getConnection(jdbcUrl);
+             var stmt = conn.createStatement();
+             var rs = stmt.executeQuery("select factor from priced_row order by sku")) {
+            while (rs.next()) {
+                Integer factor = rs.getInt(1);
+                factors.add(rs.wasNull() ? null : factor);
+            }
+        }
+        // ordered by sku: unparseable, x_CHF_1, x_EUR_2 - the one the pattern
+        // misses keys on null, and a lookup on null matches nothing
+        assertEquals(Arrays.asList(null, 7, 9), factors);
+    }
+
+    /**
      * Minimal stand-in for a real adapter: hands out the canned records of the
      * requested record selector, so the loader can be tested without pulling in
      * a concrete format module.

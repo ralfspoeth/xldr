@@ -318,4 +318,169 @@ class XmlMappingSpecReaderTest {
                 () -> new XmlMappingSpecReader().read(stream(source)));
         assertTrue(thrown.getMessage().contains("one source is wanted"), thrown.getMessage());
     }
+
+    /**
+     * A {@code <regex>} carries its pattern and group as attributes and its
+     * subject as whatever a source is written as - here another attribute, and
+     * below a child element.
+     * <p>
+     * The attribute is {@code pattern} where a {@code <discriminator>} says
+     * {@code matches}: a discriminator carries its pattern beside the
+     * {@code equals} it is an alternative to, so the attribute has to say which
+     * test is meant, and here the element already says it.
+     */
+    @Test
+    void parsesAregexOverAnExpression() {
+        var source = """
+                <mappingSpec>
+                    <input mimeType="text/csv">
+                        <var name="currency">
+                            <regex pattern=".*_([A-Z]{3})_.*" group="1" expr="${xldr.filename}"/>
+                        </var>
+                    </input>
+                </mappingSpec>
+                """;
+        assertEquals(
+                List.of(new VarSpec("currency", ValueSource.Regex.matching(
+                        new ValueSource.Expr("${xldr.filename}"), ".*_([A-Z]{3})_.*", 1))),
+                List.copyOf(new XmlMappingSpecReader().read(stream(source)).inputSpec().vars()));
+    }
+
+    /**
+     * A field mapping's regex reads a field, and no {@code group} attribute means
+     * the whole match - the common case, a pattern written to match exactly what
+     * is wanted.
+     */
+    @Test
+    void parsesAregexOverAfieldAndDefaultsTheGroupToTheWholeMatch() {
+        var source = """
+                <mappingSpec>
+                    <input mimeType="text/csv"/>
+                    <mapping recordSelector="r" table="t">
+                        <fieldMapping column="year">
+                            <regex pattern="\\d{4}" fieldSelector="booked"/>
+                        </fieldMapping>
+                    </mapping>
+                </mappingSpec>
+                """;
+        var mapping = List.copyOf(
+                new XmlMappingSpecReader().read(stream(source)).recordMappingSpecs()).getFirst();
+
+        assertEquals(
+                List.of(new FieldMappingSpec("year", ValueSource.Regex.matching(
+                        new ValueSource.Field("booked"), "\\d{4}", 0))),
+                mapping.fieldMappings());
+    }
+
+    /**
+     * The subject may be a child element rather than an attribute, which is how a
+     * regex reads what a call returned: the whole {@code <regex>} is handed to the
+     * method that reads a {@code <fieldMapping>}, so it takes everything that
+     * takes.
+     */
+    @Test
+    void parsesAregexOverAcall() {
+        var source = """
+                <mappingSpec>
+                    <input mimeType="text/csv">
+                        <var name="batchDay">
+                            <regex pattern="(\\d{4})-\\d\\d-\\d\\d" group="1">
+                                <fn name="current_batch" type="TEXT"/>
+                            </regex>
+                        </var>
+                    </input>
+                </mappingSpec>
+                """;
+        assertEquals(
+                List.of(new VarSpec("batchDay", ValueSource.Regex.matching(
+                        new ValueSource.FunctionCall("current_batch", DataType.TEXT, List.of()),
+                        "(\\d{4})-\\d\\d-\\d\\d", 1))),
+                List.copyOf(new XmlMappingSpecReader().read(stream(source)).inputSpec().vars()));
+    }
+
+    /**
+     * A pattern that will not compile is refused when the spec is read.
+     * <p>
+     * This is the whole reason the pattern is compiled there rather than at the
+     * first record: a feed whose spec is read is a feed that will run, and a
+     * broken pattern that waits for a file to arrive has already been deployed by
+     * the time anyone hears about it.
+     */
+    @Test
+    void refusesApatternThatDoesNotCompile() {
+        var source = """
+                <mappingSpec>
+                    <input mimeType="text/csv">
+                        <var name="x"><regex pattern="([A-Z]" expr="${xldr.filename}"/></var>
+                    </input>
+                </mappingSpec>
+                """;
+        var thrown = assertThrows(IllegalArgumentException.class,
+                () -> new XmlMappingSpecReader().read(stream(source)));
+        assertTrue(thrown.getMessage().contains("does not compile"), thrown.getMessage());
+    }
+
+    /** a regex without a pattern is not a regex */
+    @Test
+    void refusesAregexWithoutApattern() {
+        var source = """
+                <mappingSpec>
+                    <input mimeType="text/csv">
+                        <var name="x"><regex group="1" expr="${xldr.filename}"/></var>
+                    </input>
+                </mappingSpec>
+                """;
+        var thrown = assertThrows(IllegalArgumentException.class,
+                () -> new XmlMappingSpecReader().read(stream(source)));
+        assertTrue(thrown.getMessage().contains("pattern"), thrown.getMessage());
+    }
+
+    /**
+     * A regex is a source like the other two children, so it counts alongside
+     * them when the reader asks how many have been written.
+     */
+    @Test
+    void refusesAregexBesideAsourceAttribute() {
+        var source = """
+                <mappingSpec>
+                    <input mimeType="text/csv">
+                        <var name="x" constant="a">
+                            <regex pattern="(a)b" group="1" expr="${xldr.filename}"/>
+                        </var>
+                    </input>
+                </mappingSpec>
+                """;
+        var thrown = assertThrows(IllegalArgumentException.class,
+                () -> new XmlMappingSpecReader().read(stream(source)));
+        assertTrue(thrown.getMessage().contains("one source is wanted"), thrown.getMessage());
+    }
+
+    /**
+     * A lookup may match on part of a value, which is a regex in a condition -
+     * allowed there for the same reason an {@code <fn>} is. What a condition may
+     * not hold is another {@code <lookup>}, that being a join.
+     */
+    @Test
+    void parsesAregexAsAlookupCondition() {
+        var source = """
+                <mappingSpec>
+                    <input mimeType="text/csv"/>
+                    <mapping recordSelector="r" table="t">
+                        <fieldMapping column="factor">
+                            <lookup table="rate" column="factor" keyColumn="ccy">
+                                <regex pattern=".*_([A-Z]{3})_.*" group="1" fieldSelector="instrument"/>
+                            </lookup>
+                        </fieldMapping>
+                    </mapping>
+                </mappingSpec>
+                """;
+        var mapping = List.copyOf(
+                new XmlMappingSpecReader().read(stream(source)).recordMappingSpecs()).getFirst();
+
+        assertEquals(
+                List.of(new FieldMappingSpec("factor", new ValueSource.Lookup("rate", "factor", "ccy",
+                        ValueSource.Regex.matching(
+                                new ValueSource.Field("instrument"), ".*_([A-Z]{3})_.*", 1)))),
+                mapping.fieldMappings());
+    }
 }

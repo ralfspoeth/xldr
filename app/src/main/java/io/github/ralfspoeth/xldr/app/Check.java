@@ -272,6 +272,9 @@ public class Check implements Callable<Integer> {
                     "call      " + name + "(" + parameters.stream()
                             .map(p -> describe(p).replaceAll("\\s{2,}", " ").strip())
                             .collect(Collectors.joining(", ")) + ") -> " + returnType;
+            case ValueSource.Regex(var subject, var pattern, var group) ->
+                    "regex     group " + group + " of /" + pattern + "/ over "
+                            + describe(subject).replaceAll("\\s{2,}", " ").strip();
         };
     }
 
@@ -502,6 +505,8 @@ public class Check implements Callable<Integer> {
             }
             case ValueSource.Lookup(_, _, var conditions) ->
                     conditions.values().forEach(key -> collectCalls(key, into));
+            // a regex calls nothing itself, but whatever it reads might
+            case ValueSource.Regex(var subject, _, _) -> collectCalls(subject, into);
             case ValueSource.Field _, ValueSource.Constant _, ValueSource.Var _, ValueSource.Expr _ -> {
                 // none of them reaches the database for anything it has to have
             }
@@ -698,7 +703,15 @@ public class Check implements Callable<Integer> {
         return described;
     }
 
-    /** the field selectors this mapping reads, including those inside a lookup key */
+    /**
+     * The field selectors this mapping reads, including those inside a lookup
+     * key or under a regex.
+     * <p>
+     * This set is what the adapter is asked to resolve, so a source it misses is
+     * a field {@code check} reads the sample without - and then the preview shows
+     * a spec behaving differently from the way the loader will, which is the one
+     * thing this command must not do.
+     */
     private static void collectFieldNames(RecordMappingSpec mapping, Set<String> into) {
         mapping.fieldMappings().forEach(fm -> collectFieldNames(fm.source(), into));
     }
@@ -716,6 +729,9 @@ public class Check implements Callable<Integer> {
             // refuses one in a column, which is the only place this walks
             case ValueSource.FunctionCall _ -> {
             }
+            // a regex reads whatever it is applied to, and that may well be a
+            // field: this is the walk that tells the adapter which to resolve
+            case ValueSource.Regex(var subject, _, _) -> collectFieldNames(subject, into);
         }
     }
 

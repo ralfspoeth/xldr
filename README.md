@@ -138,7 +138,7 @@ fix their versions in one place:
             <dependency>
                 <groupId>io.github.ralfspoeth.xldr</groupId>
                 <artifactId>bom</artifactId>
-                <version>0.45</version>
+                <version>0.46</version>
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>
@@ -409,12 +409,12 @@ Both formats have a published schema, so an editor can check a spec before it ev
 only reports a broken spec in its log, by leaving the feed inactive. Point at the schema from the spec itself:
 
     {
-      "$schema": "https://ralfspoeth.github.io/xldr/schema/mapping-spec-0.44.json",
+      "$schema": "https://ralfspoeth.github.io/xldr/schema/mapping-spec-0.46.json",
       "input": { ... }
     }
 
     <mappingSpec xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-                 xsi:noNamespaceSchemaLocation="https://ralfspoeth.github.io/xldr/schema/mapping-spec-0.44.xsd">
+                 xsi:noNamespaceSchemaLocation="https://ralfspoeth.github.io/xldr/schema/mapping-spec-0.46.xsd">
 
 Both are ignored by the readers - `$schema` is just another unrecognised member, and `xsi:` attributes carry no
 meaning for a spec that has no namespace of its own. IntelliJ and VS Code both validate and autocomplete from them.
@@ -441,7 +441,11 @@ written for `fieldSelectors` costs a record every one of its fields, and no read
 unknown is exactly what it promises.
 
 A schema is published whenever the format changes, and is named after the release that changed it:
-`mapping-spec-0.44` describes the format from 0.44 onwards, `mapping-spec-0.43` that of 0.43, `mapping-spec-0.42` that of 0.42, `mapping-spec-0.40` that of 0.40 and 0.41,
+`mapping-spec-0.46` describes the format from 0.46 onwards,
+`mapping-spec-0.44` that of 0.44 and 0.45,
+`mapping-spec-0.43` that of 0.43,
+`mapping-spec-0.42` that of 0.42,
+`mapping-spec-0.40` that of 0.40 and 0.41,
 `mapping-spec-0.35` that of 0.35 to 0.39,
 `mapping-spec-0.32` that of 0.32 to 0.34,
 `mapping-spec-0.23` that of 0.23 to 0.31,
@@ -644,9 +648,9 @@ referenced from any field mapping by `{"var": "name"}`. A value looked up from a
 time and stamped onto every row of every table in the file, rather than re-resolved per row; a constant can be named
 once and reused across mappings.
 
-A var is row-independent by construction, so its source is a `constant`, an `expr`, a `lookup`, an `fn`, or another
-`var` declared earlier - never a `fieldSelector`, at any depth: not as the source, not as a lookup's key, not as an
-argument to a call. Vars are evaluated in declaration order.
+A var is row-independent by construction, so its source is a `constant`, an `expr`, a `lookup`, an `fn`, a `regex`,
+or another `var` declared earlier - never a `fieldSelector`, at any depth: not as the source, not as a lookup's key,
+not as an argument to a call, not as what a pattern is matched against. Vars are evaluated in declaration order.
 
     "input": {
         "mimeType": "text/csv",
@@ -763,6 +767,42 @@ Where it is used decides how often it runs: as a `var` it is evaluated **once pe
 whole file, one sequence draw); as a field mapping it is evaluated **per row** (so `${nextval('rownum')}` numbers the
 rows). A `var` expression has no record in scope, so it may not reference a field.
 
+### Taking part of a value
+
+Sometimes the value wanted is inside another one. A feed delivering `prices_EUR_20260101.csv` carries its currency
+in the name of the file and nowhere else; a product code has the year in characters 4 to 7. A `regex` picks it out:
+
+    {"name": "currency",
+     "regex": {"pattern": ".*_([A-Z]{3})_.*", "group": 1, "expr": "${xldr.filename}"}}
+
+    <regex pattern=".*_([A-Z]{3})_.*" group="1" expr="${xldr.filename}"/>
+
+Three parts, and the third is the interesting one:
+
+* `pattern` - a regular expression in [`java.util.regex`](https://docs.oracle.com/en/java/javase/25/docs/api/java.base/java/util/regex/Pattern.html)
+  syntax. It is applied with `find`, so it matches anywhere in the value unless it is anchored;
+* `group` - which capturing group to take. Optional, and `0` - the whole match - which is what a pattern written to
+  match exactly what is wanted needs;
+* **the subject**, written on the regex itself exactly as it would be written on the field mapping. Above it is an
+  `expr`; it could as well be a `fieldSelector`, a `constant`, a `var`, or - in a var - a nested `lookup` or `fn`.
+
+**A pattern that does not match yields NULL**, and so does a subject that is null. This is the same answer a lookup
+gives for a key that matches no row, and for the same reason: one file whose name does not fit the pattern should
+not fail a delivery of a hundred thousand records. The gap is in the data, where it can be reported on.
+
+**The pattern is compiled when the spec is read.** A regex that does not compile, or a `group` the pattern does not
+capture, is refused there - so a feed is activated only if its patterns compile, and the mistake lands on the person
+editing the file rather than on the first delivery.
+
+Where it is used decides how often it runs, as with an expression: in a `var` it is applied **once per load**, in a
+field mapping **per row**.
+
+Two things it may not do. A var's regex may not read a `fieldSelector`, there being no record in hand - the rule
+every value source in a var obeys. And a *column's* regex may not read a `lookup`: a regex runs in the JVM, on a
+value bound as a parameter, and a column's lookup is a subquery of the insert whose value does not exist until the
+statement runs. In a var the same spelling is fine - the lookup is one query and the pattern is applied to what came
+back - so read the lookup into a var and match against that, or do the matching in the view the lookup reads.
+
 ### After the load: transforms
 
 A spec may end with `transform`, a list of procedures called once each after every mapping has run:
@@ -871,10 +911,12 @@ carries exactly one of these sources:
   null;
 * `lookup` - a value read from a reference table, emitted as an inline scalar subquery
   `(select column from table where a = ? and b = ?)`. It matches on one column or on several; each condition's value
-  is itself a `fieldSelector`, `constant` or `var`, and a key that matches no row, or any condition whose value is
-  null, yields NULL;
+  is itself a `fieldSelector`, `constant`, `var` or `regex`, and a key that matches no row, or any condition whose
+  value is null, yields NULL;
 * `var` - a reference by name to an input [variable](#variables), bound as a parameter;
-* `expr` - a [`${...}` template](#expressions) evaluated in the JVM, bound as a parameter.
+* `expr` - a [`${...}` template](#expressions) evaluated in the JVM, bound as a parameter;
+* `regex` - [part of another value](#taking-part-of-a-value), picked out by a regular expression in the JVM and
+  bound as a parameter.
 
 Every value reaches the database as a bound parameter or a normalized identifier; a spec never contributes raw SQL.
 
@@ -984,11 +1026,12 @@ is optional here.
         </mapping>
     </mappingSpec>
 
-A value source is one attribute of a `fieldMapping` - `fieldSelector`, `constant`, `var` or `expr` - except for a
-`lookup`, which is a child element of the mapping and carries its own source attribute for the key, and for an `fn`,
-which is a child of a `<var>` and carries one `<arg>` per argument. An `<arg>` carries exactly what a
-`<fieldMapping>` carries, minus what a var may not say, which is what lets an argument be a nested `<lookup>` or
-`<fn>`. A constant in XML
+A value source is one attribute of a `fieldMapping` - `fieldSelector`, `constant`, `var` or `expr` - except for the
+three that are child elements: a `<lookup>`, which carries its own source attribute for the key; an `<fn>`, which is
+a child of a `<var>` and carries one `<arg>` per argument; and a `<regex>`, which carries its `pattern` and `group`
+as attributes and its subject the way whatever holds it would. An `<arg>` carries exactly what a
+`<fieldMapping>` carries, minus what a var may not say, which is what lets an argument be a nested `<lookup>`,
+`<fn>` or `<regex>`. A constant in XML
 is always a string, since an attribute has no type of its own; the `null` a JSON spec can write has no XML form. Where
 a column must be given a NULL from an XML spec, leave the mapping out - an unmapped column keeps whatever default the
 table gives it.

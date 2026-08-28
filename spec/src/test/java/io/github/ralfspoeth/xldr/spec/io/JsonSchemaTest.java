@@ -35,7 +35,7 @@ import static org.junit.jupiter.api.Assertions.*;
  */
 class JsonSchemaTest {
 
-    private static final Path SCHEMA = Path.of("..", "docs", "schema", "mapping-spec-0.44.json");
+    private static final Path SCHEMA = Path.of("..", "docs", "schema", "mapping-spec-0.46.json");
 
     /**
      * Every member the reader knows, in one document - the JSON transliteration
@@ -57,7 +57,10 @@ class JsonSchemaTest {
                               { "constant": "funds" },
                               { "var": "source" },
                               { "fn": { "name": "today", "type": "DATE" } }
-                            ] } }
+                            ] } },
+                  { "name": "currency",
+                    "regex": { "pattern": ".*_([A-Z]{3})_.*", "group": 1,
+                               "expr": "${xldr.filename}" } }
                 ],
                 "recordSelectors": [
                   { "name": "fund", "selector": "/root/fund",
@@ -82,7 +85,9 @@ class JsonSchemaTest {
                     { "column": "factor",
                       "lookup": { "table": "rate", "column": "factor", "conditions": [
                           { "column": "ccy",  "fieldSelector": "id" },
-                          { "column": "asof", "var": "source" } ] } }
+                          { "column": "asof", "var": "source" } ] } },
+                    { "column": "booked_year",
+                      "regex": { "pattern": "[0-9]{4}", "fieldSelector": "desc" } }
                   ] }
               ],
               "transform": [
@@ -131,7 +136,7 @@ class JsonSchemaTest {
         var spec = new JsonMappingSpecReader().read(stream(COMPLETE_SPEC));
         assertTrue(spec.inputSpec().properties().containsKey("ns.f"));
         assertTrue(spec.recordMappingSpecs().stream()
-                .anyMatch(m -> m.fieldMappings().size() == 7));
+                .anyMatch(m -> m.fieldMappings().size() == 8));
         assertEquals(
                 new ValueSource.FunctionCall("pkg_load.next_id", DataType.INTEGRAL, List.of(
                         new ValueSource.Constant("funds"),
@@ -537,6 +542,122 @@ class JsonSchemaTest {
         assertValid(spec);
         assertDoesNotThrow(() -> new JsonMappingSpecReader().read(stream(spec)),
                 "the schema has allowed this since 0.40; the reader threw until 0.43");
+    }
+
+    // ---- and the rules 0.46 was published for --------------------------------
+
+    /**
+     * A regex says the pattern it matches with, and the group it takes is a
+     * capturing group, counted from zero.
+     */
+    @Test
+    void aRegexSaysWhatItMatches() throws IOException {
+        assertRefusedByBoth("""
+                { "input": { "mimeType": "text/csv" },
+                  "mapping": [ { "recordSelector": "r", "table": "t", "fieldMapping": [
+                      { "column": "x", "regex": { "group": 1, "fieldSelector": "f" } } ] } ] }
+                """, "writes a regex with no pattern");
+        assertRefused("""
+                { "input": { "mimeType": "text/csv" },
+                  "mapping": [ { "recordSelector": "r", "table": "t", "fieldMapping": [
+                      { "column": "x", "regex": { "pattern": "(a)", "group": -1,
+                                                  "fieldSelector": "f" } } ] } ] }
+                """, "asks for a negative group");
+    }
+
+    /** and it says what it matches against, exactly once */
+    @Test
+    void aRegexHasOneSubject() throws IOException {
+        assertRefusedByBoth("""
+                { "input": { "mimeType": "text/csv" },
+                  "mapping": [ { "recordSelector": "r", "table": "t", "fieldMapping": [
+                      { "column": "x", "regex": { "pattern": "(a)", "group": 1 } } ] } ] }
+                """, "writes a regex with nothing to match against");
+        assertRefusedByBoth("""
+                { "input": { "mimeType": "text/csv" },
+                  "mapping": [ { "recordSelector": "r", "table": "t", "fieldMapping": [
+                      { "column": "x", "regex": { "pattern": "(a)", "group": 1,
+                          "fieldSelector": "f", "var": "v" } } ] } ] }
+                """, "gives a regex two subjects");
+    }
+
+    /**
+     * A var's regex reads no field, at any depth - the rule that split every
+     * source into a row flavour and a var one, applied to the sixth.
+     */
+    @Test
+    void aVarRegexCannotReadAField() throws IOException {
+        assertRefusedByBoth("""
+                { "input": { "mimeType": "text/csv", "vars": [
+                    { "name": "v", "regex": { "pattern": "(a)", "group": 1,
+                                              "fieldSelector": "f" } } ] },
+                  "mapping": [] }
+                """, "lets a var's regex read a field");
+    }
+
+    /**
+     * And a column's regex reads no lookup, which is the mirror of it.
+     * <p>
+     * A regex runs on this side of the database, on a value bound as a
+     * parameter, and a column's lookup is a subquery of the insert - so there is
+     * nothing to match against until the statement runs. In a var the same
+     * spelling is fine, a var being evaluated one value at a time, and that is
+     * why the two flavours differ here in the direction they do.
+     */
+    @Test
+    void aColumnsRegexCannotReadAlookup() throws IOException {
+        assertRefusedByBoth("""
+                { "input": { "mimeType": "text/csv" },
+                  "mapping": [ { "recordSelector": "r", "table": "t", "fieldMapping": [
+                      { "column": "x", "regex": { "pattern": "(a)", "group": 1,
+                          "lookup": { "table": "rate", "column": "factor",
+                                      "keyColumn": "ccy", "fieldSelector": "c" } } } ] } ] }
+                """, "matches a column's pattern against a lookup");
+
+        var inAvar = """
+                { "input": { "mimeType": "text/csv", "vars": [
+                    { "name": "v", "regex": { "pattern": "(a)", "group": 1,
+                        "lookup": { "table": "rate", "column": "factor",
+                                    "keyColumn": "ccy", "constant": "EUR" } } } ] },
+                  "mapping": [] }
+                """;
+        assertValid(inAvar);
+        assertDoesNotThrow(() -> new JsonMappingSpecReader().read(stream(inAvar)),
+                "the same thing in a var is one query and then a match, and is allowed");
+    }
+
+    /**
+     * A lookup may be keyed by a regex, and a condition may match against one -
+     * a regex being a source like any other wherever a source stands.
+     */
+    @Test
+    void aLookupMayBeKeyedByAregex() throws IOException {
+        assertValid("""
+                { "input": { "mimeType": "text/csv" },
+                  "mapping": [ { "recordSelector": "r", "table": "t", "fieldMapping": [
+                      { "column": "x", "lookup": { "table": "rate", "column": "factor",
+                          "keyColumn": "ccy",
+                          "regex": { "pattern": ".*_([A-Z]{3})_.*", "group": 1,
+                                     "fieldSelector": "instrument" } } },
+                      { "column": "y", "lookup": { "table": "rate", "column": "factor",
+                          "conditions": [
+                              { "column": "ccy", "regex": { "pattern": "(...)", "group": 1,
+                                                            "fieldSelector": "instrument" } } ] } } ] } ] }
+                """);
+    }
+
+    /**
+     * A transform's argument may be a regex, which is where {@code
+     * ${xldr.rowsLoaded}} meets one.
+     */
+    @Test
+    void aTransformArgumentMayBeAregex() throws IOException {
+        assertValid("""
+                { "input": { "mimeType": "text/csv" }, "mapping": [],
+                  "transform": [ { "name": "close_batch", "args": [
+                      { "regex": { "pattern": "([0-9]+)", "group": 1,
+                                   "expr": "${xldr.rowsLoaded}" } } ] } ] }
+                """);
     }
 
     /**

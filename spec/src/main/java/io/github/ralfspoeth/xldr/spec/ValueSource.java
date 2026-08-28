@@ -7,7 +7,10 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.SequencedMap;
+import java.util.regex.Pattern;
+import java.util.regex.PatternSyntaxException;
 
 import static java.util.Objects.requireNonNull;
 
@@ -30,6 +33,9 @@ import static java.util.Objects.requireNonNull;
  *       that is bound as a parameter. It interpolates variables and a small set
  *       of built-in functions ({@code nextval}, {@code now}); it never emits
  *       SQL.</li>
+ *   <li>{@link Regex} - part of another source's value, picked out by a regular
+ *       expression. No match yields NULL; the pattern is compiled when the spec
+ *       is read.</li>
  *   <li>{@link FunctionCall} - a function in the target database, called through
  *       JDBC's {@code {? = call name(?)}} escape once per load and bound as a
  *       parameter thereafter. A {@link VarSpec} source only.</li>
@@ -163,6 +169,93 @@ public sealed interface ValueSource extends Serializable {
      * @param template the template text, holes and all
      */
     record Expr(String template) implements ValueSource {}
+
+    /**
+     * Part of another value, picked out by a regular expression.
+     * <p>
+     * What it is for is the file name. A feed delivering
+     * {@code prices_EUR_20260101.csv} carries its currency in the name and
+     * nowhere else, and this is how a spec says so:
+     *
+     * <pre>
+     * {"name": "currency",
+     *  "regex": {"pattern": ".*_([A-Z]{3})_.*", "group": 1, "expr": "${xldr.filename}"}}
+     * </pre>
+     * <p>
+     * The subject is a source of its own rather than assumed to be the filename,
+     * so the same thing reaches a field - and in a field mapping it is applied
+     * per record, where in a var it is applied once.
+     * <p>
+     * <strong>No match is null.</strong> A file whose name does not fit yields
+     * NULL in that column, which is visible in the data and can be reported on -
+     * the choice a {@link Lookup} already makes for a key matching no row, and
+     * for the same reason: one unrecognised name should not fail a file of a
+     * hundred thousand records.
+     * <p>
+     * <strong>The pattern is compiled when the spec is read</strong>, by
+     * {@link #matching}, so a regex that does not compile is a spec that does not
+     * read - and a feed whose spec does not read is never activated. The failure
+     * lands where the file was edited rather than on the first delivery. That is
+     * the same bargain {@link Discriminator.Matches} makes, and this holds a
+     * compiled {@link Pattern} for the same reason it does.
+     *
+     * @param subject where the text to match comes from
+     * @param pattern the compiled expression
+     * @param group   which capturing group to take; 0 is the whole match
+     */
+    record Regex(ValueSource subject, Pattern pattern, int group) implements ValueSource {
+
+        public Regex {
+            requireNonNull(subject, "subject");
+            requireNonNull(pattern, "pattern");
+            if (group < 0) {
+                throw new IllegalArgumentException("a group number is not negative, but was " + group);
+            }
+            var declared = pattern.matcher("").groupCount();
+            if (group > declared) {
+                throw new IllegalArgumentException("group " + group + " of /" + pattern + "/, which captures "
+                        + declared + ": a pattern captures with parentheses, and group 0 is the whole match");
+            }
+        }
+
+        /**
+         * The one to build with, since it is the one that compiles - and a
+         * pattern that does not compile is a spec that cannot load, so it is
+         * refused where the spec is read.
+         */
+        public static Regex matching(ValueSource subject, String regex, int group) {
+            try {
+                return new Regex(subject, Pattern.compile(regex), group);
+            } catch (PatternSyntaxException e) {
+                throw new IllegalArgumentException(
+                        "the pattern /" + regex + "/ does not compile: " + e.getMessage(), e);
+            }
+        }
+
+        /**
+         * Compared on what the pattern says rather than on the object, two
+         * {@code Pattern}s compiled from one string being distinct objects.
+         * {@link Discriminator.Matches} does the same, and for the same reason.
+         */
+        @Override
+        public boolean equals(Object other) {
+            return other instanceof Regex(var subj, var pat, var grp)
+                    && subject.equals(subj)
+                    && pattern.pattern().equals(pat.pattern())
+                    && pattern.flags() == pat.flags()
+                    && group == grp;
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(subject, pattern.pattern(), pattern.flags(), group);
+        }
+
+        @Override
+        public String toString() {
+            return "group " + group + " of /" + pattern + "/ over " + subject;
+        }
+    }
 
     /**
      * A function in the target database, called once per load and bound as a

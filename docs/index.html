@@ -76,7 +76,12 @@
         <th>XML</th>
     </tr>
     <tr>
-        <td>0.44 onwards (current)</td>
+        <td>0.46 onwards (current)</td>
+        <td><a href="schema/mapping-spec-0.46.json">mapping-spec-0.46.json</a></td>
+        <td><a href="schema/mapping-spec-0.46.xsd">mapping-spec-0.46.xsd</a></td>
+    </tr>
+    <tr>
+        <td>0.44 - 0.45</td>
         <td><a href="schema/mapping-spec-0.44.json">mapping-spec-0.44.json</a></td>
         <td><a href="schema/mapping-spec-0.44.xsd">mapping-spec-0.44.xsd</a></td>
     </tr>
@@ -143,6 +148,17 @@
     changes nothing about the format - 0.11, 0.12, 0.14 to 0.20, 0.22, 0.24 to 0.31, 0.33, 0.34, 0.36 to 0.39, 0.41, 0.45 -
     keeps the previous schema rather than publishing a copy of it. An older one stays where it is, so a spec pinned
     to it keeps validating.
+</p>
+
+<p>
+    In 0.46 a value may be part of another one, picked out by a <code>regex</code>: the currency in
+    <code>prices_EUR_20260101.csv</code>, the year inside a product code. It carries the
+    <code>pattern</code> to match with, the capturing <code>group</code> to take - 0, the whole match, by default -
+    and the source it reads, written on the regex itself exactly as it would be written on the field mapping. So the
+    subject is any source there is: a field, a var, an <code>expr</code>, or in a var a <code>lookup</code> or an
+    <code>fn</code>. A pattern that does not match yields NULL, which is what a lookup already does for a key
+    matching no row; and the pattern is compiled when the spec is read, so a feed is activated only if its patterns
+    compile.
 </p>
 
 <p>
@@ -256,7 +272,7 @@
 <p>In a JSON spec, as a member the reader does not recognise and therefore ignores:</p>
 
 <pre><code>{
-  "$schema": "https://ralfspoeth.github.io/xldr/schema/mapping-spec-0.44.json",
+  "$schema": "https://ralfspoeth.github.io/xldr/schema/mapping-spec-0.46.json",
   "input": {
     "mimeType": "text/csv",
     "properties": { "fieldSeparator": "," },
@@ -268,7 +284,7 @@
 <p>In an XML spec, as the schema location of a document that has no namespace of its own:</p>
 
 <pre><code>&lt;mappingSpec xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-             xsi:noNamespaceSchemaLocation="https://ralfspoeth.github.io/xldr/schema/mapping-spec-0.44.xsd"&gt;
+             xsi:noNamespaceSchemaLocation="https://ralfspoeth.github.io/xldr/schema/mapping-spec-0.46.xsd"&gt;
     &lt;input mimeType="text/xml"&gt;
         ...
     &lt;/input&gt;
