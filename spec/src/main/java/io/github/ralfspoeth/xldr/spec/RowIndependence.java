@@ -43,6 +43,9 @@ final class RowIndependence {
                     conditions.values().forEach(key -> refuseFieldAnywhere(subject, reason, key));
             case ValueSource.FunctionCall(_, _, var arguments) ->
                     arguments.forEach(argument -> refuseFieldAnywhere(subject, reason, argument));
+            // a regex reads whatever it is applied to, so it is exactly as
+            // row-independent as that
+            case ValueSource.Regex(var over, _, _) -> refuseFieldAnywhere(subject, reason, over);
             case ValueSource.Constant _, ValueSource.Var _, ValueSource.Expr _ -> {
                 // nothing that could hold a field: a constant is a literal, a var
                 // reference is a name resolved among the vars, and an expression's

@@ -27,7 +27,7 @@ import static org.junit.jupiter.api.Assertions.*;
  */
 class XsdTest {
 
-    private static final Path SCHEMA = Path.of("..", "docs", "schema", "mapping-spec-0.44.xsd");
+    private static final Path SCHEMA = Path.of("..", "docs", "schema", "mapping-spec-0.46.xsd");
 
     /**
      * Every element and attribute the reader knows, in one document.
@@ -49,6 +49,9 @@ class XsdTest {
                                 <fn name="today" type="DATE"/>
                             </arg>
                         </fn>
+                    </var>
+                    <var name="currency">
+                        <regex pattern=".*_([A-Z]{3})_.*" group="1" expr="${xldr.filename}"/>
                     </var>
                     <recordSelector name="fund" selector="/root/fund">
                         <fieldSelector name="id" selector="@id" type="text"/>
@@ -72,6 +75,9 @@ class XsdTest {
                                 <condition column="asof" var="source"/>
                             </conditions>
                         </lookup>
+                    </fieldMapping>
+                    <fieldMapping column="booked_year">
+                        <regex pattern="[0-9]{4}" fieldSelector="desc"/>
                     </fieldMapping>
                 </mapping>
                 <transform name="pkg_load.close_batch">
@@ -103,7 +109,7 @@ class XsdTest {
         var spec = new XmlMappingSpecReader().read(stream(COMPLETE_SPEC));
         assertTrue(spec.inputSpec().properties().containsKey("ns.f"));
         assertTrue(spec.recordMappingSpecs().stream()
-                .anyMatch(m -> m.fieldMappings().size() == 7));
+                .anyMatch(m -> m.fieldMappings().size() == 8));
         assertEquals(
                 new ValueSource.FunctionCall("pkg_load.next_id", DataType.INTEGRAL, List.of(
                         new ValueSource.Constant("funds"),
@@ -580,6 +586,160 @@ class XsdTest {
         assertDoesNotThrow(() -> validate(xml));
         assertDoesNotThrow(() -> new XmlMappingSpecReader().read(stream(xml)),
                 "the XSD has allowed this since 0.40; the reader threw until 0.43");
+    }
+
+    // ---- and the rules 0.46 was published for --------------------------------
+
+    /** a regex says the pattern it matches with */
+    @Test
+    void aRegexSaysWhatItMatches() {
+        assertRefusedByBoth("""
+                <mappingSpec>
+                    <input mimeType="text/csv"/>
+                    <mapping recordSelector="r" table="t">
+                        <fieldMapping column="x"><regex group="1" fieldSelector="f"/></fieldMapping>
+                    </mapping>
+                </mappingSpec>
+                """);
+    }
+
+    /** and the group it takes is counted from zero */
+    @Test
+    void theSchemaTypesGroupAsACount() {
+        assertAllInvalid("""
+                <mappingSpec>
+                    <input mimeType="text/csv"/>
+                    <mapping recordSelector="r" table="t">
+                        <fieldMapping column="x">
+                            <regex pattern="(a)" group="-1" fieldSelector="f"/>
+                        </fieldMapping>
+                    </mapping>
+                </mappingSpec>
+                """);
+    }
+
+    /**
+     * A var's regex reads no field, at any depth - the rule that split every
+     * source into a row flavour and a var one, applied to the sixth. The XSD can
+     * say this, {@code varRegex} simply having no {@code fieldSelector}.
+     */
+    @Test
+    void aVarRegexCannotReadAField() {
+        assertRefusedByBoth("""
+                <mappingSpec>
+                    <input mimeType="text/csv">
+                        <var name="v"><regex pattern="(a)" group="1" fieldSelector="f"/></var>
+                    </input>
+                </mappingSpec>
+                """);
+    }
+
+    /**
+     * And a column's regex reads no lookup, which is the mirror of it: a regex
+     * runs on this side of the database, on a value bound as a parameter, and a
+     * column's lookup is a subquery of the insert whose value only exists once
+     * the statement runs. In a var the same spelling is one query and then a
+     * match, and is allowed - which is why {@code regex} has no {@code <lookup>}
+     * child and {@code varRegex} has one.
+     */
+    @Test
+    void aColumnsRegexCannotReadAlookup() {
+        assertRefusedByBoth("""
+                <mappingSpec>
+                    <input mimeType="text/csv"/>
+                    <mapping recordSelector="r" table="t">
+                        <fieldMapping column="x">
+                            <regex pattern="(a)" group="1">
+                                <lookup table="rate" column="factor" keyColumn="ccy" fieldSelector="c"/>
+                            </regex>
+                        </fieldMapping>
+                    </mapping>
+                </mappingSpec>
+                """);
+
+        var inAvar = """
+                <mappingSpec>
+                    <input mimeType="text/csv">
+                        <var name="v">
+                            <regex pattern="(a)" group="1">
+                                <lookup table="rate" column="factor" keyColumn="ccy" constant="EUR"/>
+                            </regex>
+                        </var>
+                    </input>
+                </mappingSpec>
+                """;
+        assertDoesNotThrow(() -> validate(inAvar));
+        assertDoesNotThrow(() -> new XmlMappingSpecReader().read(stream(inAvar)));
+    }
+
+    /**
+     * A lookup may be keyed by a regex, and a condition may match against one -
+     * a regex being a source like any other wherever a source stands.
+     */
+    @Test
+    void aLookupMayBeKeyedByAregex() {
+        var xml = """
+                <mappingSpec>
+                    <input mimeType="text/csv"/>
+                    <mapping recordSelector="r" table="t">
+                        <fieldMapping column="x">
+                            <lookup table="rate" column="factor" keyColumn="ccy">
+                                <regex pattern=".*_([A-Z]{3})_.*" group="1" fieldSelector="instrument"/>
+                            </lookup>
+                        </fieldMapping>
+                        <fieldMapping column="y">
+                            <lookup table="rate" column="factor">
+                                <conditions>
+                                    <condition column="ccy">
+                                        <regex pattern="(...)" group="1" fieldSelector="instrument"/>
+                                    </condition>
+                                </conditions>
+                            </lookup>
+                        </fieldMapping>
+                    </mapping>
+                </mappingSpec>
+                """;
+        assertDoesNotThrow(() -> validate(xml));
+        assertDoesNotThrow(() -> new XmlMappingSpecReader().read(stream(xml)));
+    }
+
+    /** and a transform's argument may be one, which is where rowsLoaded meets a pattern */
+    @Test
+    void aTransformArgumentMayBeAregex() {
+        assertDoesNotThrow(() -> validate("""
+                <mappingSpec>
+                    <input mimeType="text/csv"/>
+                    <transform name="close_batch">
+                        <arg><regex pattern="([0-9]+)" group="1" expr="${xldr.rowsLoaded}"/></arg>
+                    </transform>
+                </mappingSpec>
+                """));
+    }
+
+    /**
+     * A var's lookup writes its key or its conditions, and the XSD now says so.
+     * <p>
+     * It could not before, the two being a sequence of optional children rather
+     * than a choice - so a var lookup carrying an {@code <fn>} key and a
+     * {@code <conditions>} child validated, and the reader took the conditions
+     * and dropped the key without a word. The one combination in this format that
+     * was accepted and then quietly ignored, and turning the sequence into a
+     * choice for the sake of {@code <regex>} closed it.
+     */
+    @Test
+    void aVarLookupWritesItsKeyOrItsConditions() {
+        assertAllInvalid("""
+                <mappingSpec>
+                    <input mimeType="text/csv">
+                        <var name="v">
+                            <lookup table="rate" column="factor">
+                                <fn name="current_feed" type="TEXT"/>
+                                <conditions><condition column="asof" var="d"/></conditions>
+                            </lookup>
+                        </var>
+                    </input>
+                </mappingSpec>
+                """);
     }
 
     /**

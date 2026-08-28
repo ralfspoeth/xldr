@@ -95,6 +95,7 @@ The same sources a column has, minus the one that would make no sense, plus one 
 | `expr` | a `${...}` template - [page 9](09-expressions.md) |
 | `var` | another variable |
 | `fn` | a function called in the target database - [page 10](10-calling-a-function.md) |
+| `regex` | part of another value, picked out by a pattern - below |
 
 A `fieldSelector` is refused, anywhere inside a variable: not as the source, not as a `lookup`'s key, not as an
 argument to an `fn`. A variable is evaluated once, before any record has been read, so there is no record for it to
@@ -105,6 +106,31 @@ failing on the first row.
 and a column is bound once per record. Its page is [page 10](10-calling-a-function.md).
 
 Variables may refer to one another, and the order they are declared in is the order they are evaluated in.
+
+## Part of a value
+
+The variable a feed most often needs is one nobody put in the file. `prices_EUR_20260101.csv` says its currency in
+its name, and that is the only place it says it. A `regex` takes it out:
+
+```json
+{"name": "currency",
+ "regex": {"pattern": ".*_([A-Z]{3})_.*", "group": 1, "expr": "${xldr.filename}"}}
+```
+
+`pattern` is the expression, `group` is which pair of parentheses to take - leave it out and you get the whole
+match - and the third part is the value to match against, written on the regex exactly as it would be written on a
+field mapping. Here it is an `expr` reading the name of the file; it could be a `var`, a `constant`, or a `lookup`.
+
+Two things worth knowing before you rely on it. A pattern that does not match yields **null**, not an error, so a
+file whose name does not fit loads with that column empty rather than failing - the same choice a lookup makes for a
+key that matches no row. And the pattern is compiled when the spec is read, so a broken one is a feed that never
+activates rather than a feed that fails on its first delivery.
+
+A `regex` works in a field mapping too, where it runs once per record rather than once per load:
+
+```json
+{"column": "booked_year", "regex": {"pattern": "[0-9]{4}", "fieldSelector": "booked"}}
+```
 
 ---
 

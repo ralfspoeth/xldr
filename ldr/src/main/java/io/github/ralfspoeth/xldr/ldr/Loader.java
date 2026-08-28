@@ -347,6 +347,7 @@ public class Loader implements AutoCloseable {
             // unreachable
             case ValueSource.Lookup lk -> lookup(lk, resolved);
             case ValueSource.Expr e -> Expression.compile(e.template()).eval(bindings(resolved, null));
+            case ValueSource.Regex rx -> extract(rx, evaluate(rx.subject(), resolved));
             case ValueSource.FunctionCall fc -> call(fc, resolved);
             // unreachable, and kept because the switch has to be exhaustive:
             // VarSpec refuses a field at any depth when the spec is read, which
@@ -458,6 +459,26 @@ public class Loader implements AutoCloseable {
                 };
             }
         };
+    }
+
+    /**
+     * The part of {@code value} that {@code rx} picks out, or null.
+     * <p>
+     * Null in three ways, all of them the same answer: the subject was null, the
+     * pattern did not match, or the group matched nothing. A file whose name does
+     * not fit yields NULL in that column, which is visible in the data and can be
+     * reported on - the choice a lookup already makes for a key matching no row.
+     * <p>
+     * Nothing is compiled here. {@link ValueSource.Regex} holds the compiled
+     * pattern, and holds it because the spec would not have been read if it did
+     * not compile.
+     */
+    private static @Nullable String extract(ValueSource.Regex rx, @Nullable Object value) {
+        if (value == null) {
+            return null;
+        }
+        var matcher = rx.pattern().matcher(String.valueOf(value));
+        return matcher.find() ? matcher.group(rx.group()) : null;
     }
 
     /**
@@ -862,6 +883,32 @@ public class Loader implements AutoCloseable {
                     }
                 }
                 binders.add(row -> expr.eval(bindings(varValues, row)));
+                yield "?";
+            }
+            case ValueSource.Regex rx -> {
+                // planned by planning the subject and wrapping the binder it
+                // appended: the subject may be a field, so the adapter has to be
+                // told about it, and only plan knows how to ask
+                var before = binders.size();
+                var subjectExpr = plan(rx.subject(), binders, fieldNames);
+                if (!"?".equals(subjectExpr) || binders.size() != before + 1) {
+                    // a subject that plans to anything but one bound parameter
+                    // would need its SQL kept and its value is not in hand here.
+                    // The only such source is a lookup, and a regex over a value
+                    // the database computed belongs in a view.
+                    //
+                    // Unreachable from a spec: FieldMappingSpec refuses this when
+                    // the spec is read, which is where a rule the document alone
+                    // proves belongs - it used to be refused only here, so an
+                    // editor passed the spec and the first file failed. Kept as
+                    // the invariant this planner rests on: every case above
+                    // yields exactly one placeholder and one binder
+                    throw new IllegalArgumentException(
+                            "a regex reads a value this side of the database, so its subject cannot be a"
+                                    + " lookup: " + rx);
+                }
+                var subject = binders.removeLast();
+                binders.add(row -> extract(rx, subject.apply(row)));
                 yield "?";
             }
             case ValueSource.Lookup lk -> {

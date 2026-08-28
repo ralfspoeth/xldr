@@ -611,6 +611,185 @@ class JsonValueSourceTest {
     }
 
     /**
+     * A regex is a pattern and a group applied to another source, and the source
+     * sits among them rather than under a member of its own.
+     * <p>
+     * Which is what lets it be any source at all: the object is handed to the
+     * same method that reads a field mapping's, so {@code expr} here could as
+     * well have been {@code fieldSelector}, {@code var}, or a nested {@code fn}.
+     */
+    @Test
+    void readsAregexOverAnExpression() throws IOException {
+        var source = """
+                { "input": { "mimeType": "text/csv", "vars": [
+                    { "name": "currency", "regex": {
+                        "pattern": ".*_([A-Z]{3})_.*", "group": 1, "expr": "${xldr.filename}" } } ] },
+                  "mapping": [] }
+                """;
+        assertEquals(
+                List.of(new VarSpec("currency", ValueSource.Regex.matching(
+                        new ValueSource.Expr("${xldr.filename}"), ".*_([A-Z]{3})_.*", 1))),
+                List.copyOf(new JsonMappingSpecReader().read(stream(source)).inputSpec().vars()));
+    }
+
+    /**
+     * A field mapping's regex reads a field, and a spec that says no
+     * {@code group} means the whole match - the common case, a pattern written to
+     * match exactly what is wanted.
+     * <p>
+     * The pattern is JSON text, so a backslash is escaped as JSON escapes it. The
+     * fixture uses one deliberately: it is the character every pattern in earnest
+     * is full of, and the one a format could quietly eat.
+     */
+    @Test
+    void readsAregexOverAfieldAndDefaultsTheGroupToTheWholeMatch() throws IOException {
+        var source = """
+                { "input": { "mimeType": "text/csv" },
+                  "mapping": [ { "recordSelector": "r", "table": "t", "fieldMapping": [
+                      { "column": "year", "regex": {
+                          "pattern": "\\\\d{4}", "fieldSelector": "booked" } } ] } ] }
+                """;
+        var mapping = List.copyOf(
+                new JsonMappingSpecReader().read(stream(source)).recordMappingSpecs()).getFirst();
+
+        assertEquals(
+                List.of(new FieldMappingSpec("year", ValueSource.Regex.matching(
+                        new ValueSource.Field("booked"), "\\d{4}", 0))),
+                mapping.fieldMappings());
+    }
+
+    /**
+     * A pattern that will not compile is refused when the spec is read.
+     * <p>
+     * This is the whole reason the pattern is compiled here rather than at the
+     * first record: a feed whose spec is read is a feed that will run, and a
+     * broken pattern that waits for a file to arrive has already been deployed by
+     * the time anyone hears about it.
+     */
+    @Test
+    void refusesApatternThatDoesNotCompile() {
+        var source = """
+                { "input": { "mimeType": "text/csv", "vars": [
+                    { "name": "x", "regex": { "pattern": "([A-Z]", "expr": "${xldr.filename}" } } ] },
+                  "mapping": [] }
+                """;
+        var thrown = assertThrows(IllegalArgumentException.class,
+                () -> new JsonMappingSpecReader().read(stream(source)));
+        assertTrue(thrown.getMessage().contains("does not compile"), thrown.getMessage());
+    }
+
+    /**
+     * And a group the pattern does not capture is refused for the same reason: it
+     * is a mistake the document alone proves, {@code group 2} of a pattern with
+     * one pair of parentheses being nothing this or any input could supply.
+     */
+    @Test
+    void refusesAgroupThePatternDoesNotCapture() {
+        var source = """
+                { "input": { "mimeType": "text/csv", "vars": [
+                    { "name": "x", "regex": {
+                        "pattern": "(a)b", "group": 2, "expr": "${xldr.filename}" } } ] },
+                  "mapping": [] }
+                """;
+        var thrown = assertThrows(IllegalArgumentException.class,
+                () -> new JsonMappingSpecReader().read(stream(source)));
+        assertTrue(thrown.getMessage().contains("captures"), thrown.getMessage());
+    }
+
+    /** a regex without a pattern is not a regex */
+    @Test
+    void refusesAregexWithoutApattern() {
+        var source = """
+                { "input": { "mimeType": "text/csv", "vars": [
+                    { "name": "x", "regex": { "group": 1, "expr": "${xldr.filename}" } } ] },
+                  "mapping": [] }
+                """;
+        var thrown = assertThrows(IllegalArgumentException.class,
+                () -> new JsonMappingSpecReader().read(stream(source)));
+        assertTrue(thrown.getMessage().contains("pattern"), thrown.getMessage());
+    }
+
+    /** and one without a subject has nothing to match against */
+    @Test
+    void refusesAregexWithoutAsubject() {
+        var source = """
+                { "input": { "mimeType": "text/csv", "vars": [
+                    { "name": "x", "regex": { "pattern": "(a)b", "group": 1 } } ] },
+                  "mapping": [] }
+                """;
+        var thrown = assertThrows(IllegalArgumentException.class,
+                () -> new JsonMappingSpecReader().read(stream(source)));
+        assertTrue(thrown.getMessage().contains("exactly one of"), thrown.getMessage());
+    }
+
+    /**
+     * A regex is a source like the other two objects, so it counts alongside them
+     * when the reader asks how many have been written.
+     */
+    @Test
+    void refusesAregexBesideAnotherSource() {
+        var source = """
+                { "input": { "mimeType": "text/csv", "vars": [
+                    { "name": "x", "constant": "a",
+                      "regex": { "pattern": "(a)b", "group": 1, "expr": "${xldr.filename}" } } ] },
+                  "mapping": [] }
+                """;
+        var thrown = assertThrows(IllegalArgumentException.class,
+                () -> new JsonMappingSpecReader().read(stream(source)));
+        assertTrue(thrown.getMessage().contains("one is wanted"), thrown.getMessage());
+    }
+
+    /**
+     * A lookup may match on part of a value, which is a regex in a condition -
+     * allowed there for the same reason an {@code fn} is, and refused there for
+     * nothing: what a condition may not hold is another lookup, that being a
+     * join.
+     */
+    @Test
+    void readsAregexAsAlookupCondition() throws IOException {
+        var source = """
+                { "input": { "mimeType": "text/csv" },
+                  "mapping": [ { "recordSelector": "r", "table": "t", "fieldMapping": [
+                      { "column": "factor", "lookup": {
+                          "table": "rate", "column": "factor", "keyColumn": "ccy",
+                          "regex": { "pattern": ".*_([A-Z]{3})_.*", "group": 1,
+                                     "fieldSelector": "instrument" } } } ] } ] }
+                """;
+        var mapping = List.copyOf(
+                new JsonMappingSpecReader().read(stream(source)).recordMappingSpecs()).getFirst();
+
+        assertEquals(
+                List.of(new FieldMappingSpec("factor", new ValueSource.Lookup("rate", "factor", "ccy",
+                        ValueSource.Regex.matching(
+                                new ValueSource.Field("instrument"), ".*_([A-Z]{3})_.*", 1)))),
+                mapping.fieldMappings());
+    }
+
+    /**
+     * A call inside a regex inside a column's lookup is still a call in a column,
+     * which is one round trip a row.
+     * <p>
+     * The rule is {@link FieldMappingSpec}'s and it walks the whole tree, so the
+     * new case did not need a new rule - but it did need the walk to know about
+     * it, and a case that returns nothing rather than recursing is invisible.
+     * That is what this fixture is for.
+     */
+    @Test
+    void refusesAcallHiddenInAregexInAcolumnsLookup() {
+        var source = """
+                { "input": { "mimeType": "text/csv" },
+                  "mapping": [ { "recordSelector": "r", "table": "t", "fieldMapping": [
+                      { "column": "factor", "lookup": {
+                          "table": "rate", "column": "factor", "keyColumn": "ccy",
+                          "regex": { "pattern": "(.*)", "group": 1,
+                                     "fn": { "name": "current_feed", "type": "TEXT" } } } } ] } ] }
+                """;
+        var thrown = assertThrows(IllegalArgumentException.class,
+                () -> new JsonMappingSpecReader().read(stream(source)));
+        assertTrue(thrown.getMessage().contains("current_feed"), thrown.getMessage());
+    }
+
+    /**
      * A selector and a discriminator together describe no input, and this is now
      * the only place that can say so.
      * <p>

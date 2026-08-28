@@ -7,14 +7,19 @@ import org.w3c.dom.Element;
 
 import java.io.InputStream;
 import java.nio.file.Path;
+import java.util.Collections;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.SequencedCollection;
 import java.util.SequencedMap;
+import java.util.function.Function;
 
 import static io.github.ralfspoeth.xmls.XmlFunctions.attributeValue;
 import static io.github.ralfspoeth.xmls.XmlFunctions.elements;
+import static java.util.stream.Collectors.joining;
 
 /**
  * Reads a mapping specification from XML. Everything is carried in attributes,
@@ -208,32 +213,123 @@ public class XmlMappingSpecReader implements MappingSpecReader {
     }
 
     /**
+     * The child elements that hold a source rather than being one, and how each
+     * is read.
+     * <p>
+     * Three of them now, where two could be told apart in a line apiece. Named
+     * once, and the same names both checked and dispatched on, so that the list a
+     * spec is measured against cannot come to differ from the list the reader can
+     * actually read - the {@code <fn>} the XSD offered inside a lookup's
+     * condition while the reader threw on it was exactly that divergence, and it
+     * stood for three releases because the two lists were never written down
+     * beside each other.
+     */
+    private static final SequencedMap<String, Function<Element, ValueSource>> NESTED = nested();
+
+    private static SequencedMap<String, Function<Element, ValueSource>> nested() {
+        var sources = new LinkedHashMap<String, Function<Element, ValueSource>>();
+        sources.put("lookup", XmlMappingSpecReader::lookup);
+        sources.put("fn", XmlMappingSpecReader::functionCall);
+        sources.put("regex", XmlMappingSpecReader::regex);
+        return Collections.unmodifiableSequencedMap(sources);
+    }
+
+    /**
+     * The same, minus the lookup, which is what a lookup's own condition may
+     * hold: a condition matching against another lookup is a join, and a join
+     * belongs in a view where the database can plan it.
+     * <p>
+     * A {@code <regex>} here may still read one, its subject being any source at
+     * all. That is not the case this excludes - it is two queries one after the
+     * other, the pattern applied to what the first returned, which is no more a
+     * join than a var reading a lookup is. Where the condition belongs to a
+     * *column's* lookup the loader refuses it regardless, a regex there being
+     * planned into the same statement and having no value in hand to match
+     * against.
+     */
+    private static final List<String> IN_A_CONDITION = List.of("fn", "regex");
+
+    /**
      * A field mapping carries exactly one source: a {@code fieldSelector},
-     * {@code constant}, {@code var} or {@code expr} attribute, or a child
-     * {@code <lookup>} element. Which one, and the refusal when it is not one, is
-     * {@link SpecNode#source()}; where the lookup sits is this format's business.
+     * {@code constant}, {@code var} or {@code expr} attribute, or one of the
+     * {@link #NESTED} children. Which one, and the refusal when it is not one, is
+     * {@link SpecNode#source()}; where the children sit is this format's business.
      */
     private static ValueSource valueSource(Element fm) {
-        var lookup = elements("lookup").apply(fm).findFirst().orElse(null);
-        var fn = elements("fn").apply(fm).findFirst().orElse(null);
-        if (lookup == null && fn == null) {
-            return node(fm).source();
+        return source(fm, NESTED.sequencedKeySet());
+    }
+
+    /**
+     * One source out of the attributes and whichever children are allowed here.
+     *
+     * @param element the element that carries the source
+     * @param allowed the child elements that may carry a source in this position,
+     *                in the order a complaint should list them
+     */
+    private static ValueSource source(Element element, SequencedCollection<String> allowed) {
+        var written = new LinkedHashMap<String, Element>();
+        allowed.forEach(name -> elements(name).apply(element)
+                .findFirst()
+                .ifPresent(held -> written.put(name, held)));
+        if (written.isEmpty()) {
+            return node(element).source();
         }
-        if (lookup != null && fn != null) {
-            throw new IllegalArgumentException(
-                    "<" + fm.getNodeName() + "> has both a <lookup> and an <fn>, and one source is wanted");
+        if (written.size() > 1) {
+            throw new IllegalArgumentException("<" + element.getNodeName() + "> has "
+                    + written.keySet().stream().map(name -> "<" + name + ">").collect(joining(" and "))
+                    + ", and one source is wanted");
         }
-        if (node(fm).hasSource()) {
-            throw new IllegalArgumentException("<" + fm.getNodeName() + "> has a <"
-                    + (fn == null ? "lookup" : "fn") + "> and a source attribute, and one source is wanted");
+        var only = written.firstEntry();
+        if (node(element).hasSource()) {
+            throw new IllegalArgumentException("<" + element.getNodeName() + "> has a <" + only.getKey()
+                    + "> and a source attribute, and one source is wanted");
         }
-        if (fn != null) {
-            return functionCall(fn);
-        }
+        return NESTED.get(only.getKey()).apply(only.getValue());
+    }
+
+    private static ValueSource.Lookup lookup(Element lookup) {
         return new ValueSource.Lookup(
                 new SqlIdentifier(required(lookup, "table")),
                 new SqlIdentifier(required(lookup, "column")),
                 conditions(lookup));
+    }
+
+    /**
+     * A pattern applied to another source: the {@code pattern} it matches with,
+     * the capturing {@code group} to take, and the source it reads, written as
+     * that source would be written anywhere else.
+     *
+     * <pre>
+     * &lt;fieldMapping column="currency"&gt;
+     *     &lt;regex pattern=".*_([A-Z]{3})_.*" group="1" expr="${xldr.filename}"/&gt;
+     * &lt;/fieldMapping&gt;
+     * </pre>
+     * <p>
+     * The subject sits on the element beside the pattern, or as a child of it
+     * where the subject is itself an {@code <fn>} or a {@code <lookup>}, which is
+     * why this can hand the whole element back to {@link #valueSource}:
+     * everything a {@code <fieldMapping>} may say about where its value comes
+     * from, a {@code <regex>} may say about where the text it matches comes from.
+     * {@code pattern} and {@code group} are not sources and are ignored there.
+     * <p>
+     * {@code group} defaults to 0, the whole match, so the common case of a
+     * pattern written to match exactly what is wanted says nothing. The pattern
+     * is compiled here, by {@link ValueSource.Regex#matching}, so that a spec
+     * that will not compile is refused when it is read rather than when the first
+     * record reaches it - a feed is activated only if its patterns compile.
+     * <p>
+     * The attribute is {@code pattern} where a {@code <discriminator>} says
+     * {@code matches}. A discriminator carries its pattern beside the test it is
+     * an alternative to, so the attribute has to say what it does; here the
+     * element already says it.
+     */
+    private static ValueSource.Regex regex(Element regex) {
+        var pattern = attributeValue("pattern")
+                .apply(regex)
+                .orElseThrow(() -> new IllegalArgumentException(
+                        "<regex> says the pattern it matches with: " + node(regex).shown()));
+        var group = node(regex).whole("group").orElse(0);
+        return ValueSource.Regex.matching(valueSource(regex), pattern, group);
     }
 
     /**
@@ -290,29 +386,18 @@ public class XmlMappingSpecReader implements MappingSpecReader {
     }
 
     /**
-     * What one condition matches against: one of the four source attributes, or
-     * an {@code <fn>} child, and never a nested {@code <lookup>}.
+     * What one condition matches against: {@link #IN_A_CONDITION}, which is
+     * everything but a nested {@code <lookup>}.
      * <p>
      * The {@code <fn>} half is what the XSD has claimed since 0.40 and the
      * reader did not do: a var's lookup keyed by a call validated in an editor
      * and then threw when the spec was read. A call in a *column* lookup's
      * condition is still refused, by {@link
      * io.github.ralfspoeth.xldr.spec.FieldMappingSpec}, one call per row being
-     * what that rule exists to prevent.
-     * <p>
-     * A nested lookup stays out: it would be a join, and a join belongs in a
-     * view where the database can plan it.
+     * what that rule exists to prevent, and it walks through a regex as well.
      */
     private static ValueSource conditionValue(Element condition) {
-        var fn = elements("fn").apply(condition).findFirst().orElse(null);
-        if (fn == null) {
-            return node(condition).source();
-        }
-        if (node(condition).hasSource()) {
-            throw new IllegalArgumentException("<" + condition.getNodeName() + "> has an <fn> and a"
-                    + " source attribute, and one source is wanted");
-        }
-        return functionCall(fn);
+        return source(condition, IN_A_CONDITION);
     }
 
     /**
