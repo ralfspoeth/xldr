@@ -6,7 +6,7 @@ ways that break existing code and existing specs; those changes are listed here 
 The versions are the git tags `xldr-<version>`; the published artifacts carry the same version under the group
 `io.github.ralfspoeth.xldr`.
 
-## Unreleased
+## 0.47
 
 A release about one name. The field type `DATE` is called `TEMPORAL`, which is what it has always been.
 
