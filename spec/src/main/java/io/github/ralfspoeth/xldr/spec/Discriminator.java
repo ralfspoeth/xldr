@@ -2,7 +2,6 @@ package io.github.ralfspoeth.xldr.spec;
 
 import org.jspecify.annotations.Nullable;
 
-import java.io.Serializable;
 import java.util.Objects;
 import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
@@ -23,13 +22,13 @@ import java.util.regex.PatternSyntaxException;
  * "discriminator": { "nth": 1, "equals": "O" }
  * "discriminator": { "selector": "type", "matches": "^O.*" }
  * </pre>
- *
+ * <p>
  * Sealed over the two tests rather than a record with two nullable fields, as
  * {@code Delivery} is over its two ways of knowing a file has arrived: exactly one
  * of {@code equals} and {@code matches} is then the type saying so, and neither
  * the constructor nor the reader has to.
  */
-public sealed interface Discriminator extends Serializable {
+public sealed interface Discriminator {
 
     /**
      * Which component of the record to test. A {@link Selector.Nth} counts them;
@@ -46,7 +45,9 @@ public sealed interface Discriminator extends Serializable {
      */
     boolean accepts(@Nullable String value);
 
-    /** The component holds this, exactly. */
+    /**
+     * The component holds this, exactly.
+     */
     record Equals(Selector at, String literal) implements Discriminator {
         @Override
         public boolean accepts(@Nullable String value) {
@@ -77,7 +78,7 @@ public sealed interface Discriminator extends Serializable {
             return obj instanceof Matches(var mat, var mpat)
                     && this.at.equals(mat)
                     && this.pattern.pattern().equals(mpat.pattern())
-                    && this.pattern.flags()==mpat.flags();
+                    && this.pattern.flags() == mpat.flags();
         }
 
         @Override

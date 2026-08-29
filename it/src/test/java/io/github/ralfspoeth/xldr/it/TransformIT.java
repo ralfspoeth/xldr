@@ -11,7 +11,8 @@ import java.io.ByteArrayInputStream;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
-import java.util.*;
+import java.util.Map;
+import java.util.ServiceLoader;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.sql.DriverManager.getConnection;

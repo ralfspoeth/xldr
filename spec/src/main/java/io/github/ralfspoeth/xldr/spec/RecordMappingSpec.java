@@ -2,7 +2,6 @@ package io.github.ralfspoeth.xldr.spec;
 
 import org.jspecify.annotations.Nullable;
 
-import java.io.Serializable;
 import java.util.HashSet;
 import java.util.List;
 
@@ -20,7 +19,7 @@ public record RecordMappingSpec(
         SqlIdentifier table,
         List<FieldMappingSpec> fieldMappings,
         @Nullable Integer limit
-) implements Serializable {
+) {
 
     /**
      * Canonical constructor.

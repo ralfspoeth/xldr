@@ -1,6 +1,5 @@
 package io.github.ralfspoeth.xldr.spec;
 
-import java.io.Serializable;
 import java.util.List;
 
 /**
@@ -40,7 +39,7 @@ import java.util.List;
  *                  what a spec says reaches the text of a statement
  * @param arguments the arguments, in order, each evaluated once after the load
  */
-public record ProcedureCall(String name, List<ValueSource> arguments) implements Serializable {
+public record ProcedureCall(String name, List<ValueSource> arguments) {
 
     public ProcedureCall {
         CallableName.refuseUncallable("procedure", name);

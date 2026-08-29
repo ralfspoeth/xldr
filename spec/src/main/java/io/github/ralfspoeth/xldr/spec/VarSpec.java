@@ -1,7 +1,5 @@
 package io.github.ralfspoeth.xldr.spec;
 
-import java.io.Serializable;
-
 /**
  * An input-level variable: a named value computed once at the start of a load
  * and then reused wherever a {@link ValueSource.Var} references it - a code
@@ -18,7 +16,7 @@ import java.io.Serializable;
  * @param name   how a {@link ValueSource.Var} refers to this variable
  * @param source how the variable's value is produced
  */
-public record VarSpec(String name, ValueSource source) implements Serializable {
+public record VarSpec(String name, ValueSource source) {
 
     /**
      * The rule this class's documentation always asserted, and which lived in no

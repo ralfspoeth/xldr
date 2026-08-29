@@ -1,7 +1,5 @@
 package io.github.ralfspoeth.xldr.spec;
 
-import java.io.Serializable;
-
 /**
  * Which records of an input belong to one record selector.
  * <p>
@@ -38,7 +36,7 @@ import java.io.Serializable;
  * neither is {@link Every}, exactly as before. This is the shape of the parsed
  * result, not of the file.
  */
-public sealed interface Locator extends Serializable {
+public sealed interface Locator {
 
     /**
      * The complaint that this locator is not one the input can honour.

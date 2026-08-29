@@ -1,6 +1,5 @@
 package io.github.ralfspoeth.xldr.spec;
 
-import java.io.Serializable;
 import java.util.Locale;
 import java.util.regex.Pattern;
 
@@ -35,22 +34,74 @@ import static java.util.Objects.requireNonNull;
  * which compares on {@code pattern.pattern()} for the same reason: the field's
  * natural equality is not the equality the domain has.
  *
+ * <h2>Why the shape is checked</h2>
+ *
+ * An identifier is the one thing a spec contributes to a statement that is not
+ * bound as a parameter. {@link #folded()} is concatenated into the text of the
+ * insert and of every lookup subquery, so a name free to be anything is a name
+ * free to be a fragment of SQL. {@link ValueSource.FunctionCall} has been held to
+ * being a name since 0.40 for exactly this reason, on the grounds that a
+ * function name was "the only part of a value source that reaches the statement
+ * text" - which was never true. A table and a column reach it too, and until
+ * 0.50 nothing looked.
+ * <p>
+ * So a name is either a plain one - a letter or underscore, then letters,
+ * digits, underscore, {@code $} or {@code #} - or a delimited one in double
+ * quotes. The plain set is the union of what the target databases accept
+ * unquoted rather than the intersection: {@code $} and {@code #} are Oracle's,
+ * and a letter is any letter because PostgreSQL takes them. What it excludes is
+ * everything that could end a token and start another - whitespace, quotes,
+ * semicolons, parentheses, operators, and the dot. Anything outside it is
+ * written in quotes, which is what quotes are for.
+ * <p>
+ * A dot is refused rather than folded through, so {@code "table":
+ * "reporting.orders"} says what it means in {@code target.properties} instead.
+ * That is the reversible direction: allowing a qualified name later breaks
+ * nothing, and refusing one later would.
+ *
  * @param name the identifier exactly as the spec wrote it, quotes and all
  */
-public record SqlIdentifier(String name) implements Serializable {
+public record SqlIdentifier(String name) {
 
-    private static final Pattern QUOTED = Pattern.compile("\".*\"");
+    /**
+     * An unquoted name. Deliberately a superset of any one database's rule and a
+     * subset of what could alter a statement.
+     */
+    private static final Pattern PLAIN = Pattern.compile("[\\p{L}_][\\p{L}\\p{N}_$#]*");
+
+    /**
+     * A delimited name: quoted at both ends, not empty, and any quote inside it
+     * doubled, which is how SQL escapes one. So the column {@code a"b} is written
+     * {@code "a""b"}.
+     */
+    private static final Pattern DELIMITED = Pattern.compile("\"([^\"]|\"\")+\"");
 
     public SqlIdentifier {
         requireNonNull(name, "an identifier needs a name");
         if (name.isBlank()) {
             throw new IllegalArgumentException("an identifier may not be blank");
         }
+        if (name.startsWith("\"") || name.endsWith("\"")) {
+            if (!DELIMITED.matcher(name).matches()) {
+                throw new IllegalArgumentException("'" + name + "' is not a quoted identifier:"
+                        + " it is quoted at both ends, holds at least one character, and doubles any"
+                        + " quote inside it - the column a\"b is written \"a\"\"b\"");
+            }
+        } else if (name.indexOf('.') >= 0) {
+            throw new IllegalArgumentException("'" + name + "' is qualified, and a name here is one"
+                    + " part: say the catalog and the schema in target.properties, which is where a"
+                    + " deployment says where its tables are");
+        } else if (!PLAIN.matcher(name).matches()) {
+            throw new IllegalArgumentException("'" + name + "' is not an identifier: unquoted, it is"
+                    + " a letter or underscore followed by letters, digits, underscore, $ or #. This"
+                    + " is written into the statement rather than bound to it, so it is held to being"
+                    + " a name; quote it to mean anything else");
+        }
     }
 
     /** whether the spec quoted this name, and so meant it exactly as written */
     public boolean quoted() {
-        return QUOTED.matcher(name).matches();
+        return name.startsWith("\"");
     }
 
     /**
@@ -69,9 +120,16 @@ public record SqlIdentifier(String name) implements Serializable {
      * The name with its quotes taken off, which is the form a database's own
      * metadata reports - {@code DatabaseMetaData.getColumns} gives the stored
      * name and never the quotes a statement would need.
+     * <p>
+     * The doubling comes off with them: {@code "a""b"} is the one column
+     * {@code a"b}, and comparing the stored name against {@code a""b} would have
+     * matched nothing. Rare, and wrong in a way that reads as the column being
+     * absent.
      */
     public String unquoted() {
-        return quoted() ? name.substring(1, name.length() - 1) : name;
+        return quoted()
+                ? name.substring(1, name.length() - 1).replace("\"\"", "\"")
+                : name;
     }
 
     /**

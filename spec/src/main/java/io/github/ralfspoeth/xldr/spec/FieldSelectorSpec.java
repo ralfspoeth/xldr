@@ -2,8 +2,6 @@ package io.github.ralfspoeth.xldr.spec;
 
 import org.jspecify.annotations.Nullable;
 
-import java.io.Serializable;
-
 /**
  * Selects one field of a record and names the type its value is delivered as.
  *
@@ -18,7 +16,7 @@ public record FieldSelectorSpec(
         String name,
         Selector selector,
         @Nullable DataType dataType
-) implements Serializable {
+) {
 
     /**
      * The common case, spelled without ceremony: a field selected by the

@@ -1,6 +1,5 @@
 package io.github.ralfspoeth.xldr.spec;
 
-import java.io.Serializable;
 import java.util.Collection;
 import java.util.List;
 
@@ -18,7 +17,7 @@ public record MappingSpec(
         InputSpec inputSpec,
         Collection<RecordMappingSpec> recordMappingSpecs,
         List<ProcedureCall> transforms
-) implements Serializable {
+) {
     /**
      * Canonical constructor.
      */

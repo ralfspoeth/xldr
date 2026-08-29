@@ -1,6 +1,5 @@
 package io.github.ralfspoeth.xldr.spec;
 
-import java.io.Serializable;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
@@ -26,7 +25,7 @@ public record RecordSelectorSpec(
         String name,
         Locator locator,
         Collection<FieldSelectorSpec> fieldSelectors
-) implements Serializable {
+) {
 
     public RecordSelectorSpec {
         refuseDuplicateNames(name, fieldSelectors);

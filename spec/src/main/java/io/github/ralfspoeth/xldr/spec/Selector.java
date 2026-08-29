@@ -1,7 +1,5 @@
 package io.github.ralfspoeth.xldr.spec;
 
-import java.io.Serializable;
-
 /**
  * Where a value sits within a record: either in the adapter's own words, or by
  * counting.
@@ -26,7 +24,7 @@ import java.io.Serializable;
  * { "name": "id", "nth": 1 }              &lt;fieldSelector name="id" nth="1"/&gt;
  * </pre>
  */
-public sealed interface Selector extends Serializable {
+public sealed interface Selector {
 
     /**
      * The adapter's own syntax - an XPath, a character range, a JSON pointer, a
@@ -83,7 +81,9 @@ public sealed interface Selector extends Serializable {
             }
         }
 
-        /** the 0-based index the adapters actually address with */
+        /**
+         * the 0-based index the adapters actually address with
+         */
         public int index() {
             return n - 1;
         }

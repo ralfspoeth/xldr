@@ -2,13 +2,7 @@ package io.github.ralfspoeth.xldr.spec;
 
 import org.jspecify.annotations.Nullable;
 
-import java.io.Serializable;
-import java.util.Collections;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.SequencedMap;
+import java.util.*;
 import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
 
@@ -48,7 +42,7 @@ import static java.util.Objects.requireNonNull;
  * {@code Lookup}'s table is there, and that a {@code FunctionCall}'s function is.
  * What it never depends on is a dialect.
  */
-public sealed interface ValueSource extends Serializable {
+public sealed interface ValueSource {
 
     /**
      * A field of the input record.

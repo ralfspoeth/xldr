@@ -1,7 +1,5 @@
 package io.github.ralfspoeth.xldr.spec;
 
-import java.io.Serializable;
-
 /**
  * Maps one database column to its {@link ValueSource}.
  * <p>
@@ -14,13 +12,15 @@ import java.io.Serializable;
  * @param column the target column
  * @param source where the column's value comes from
  */
-public record FieldMappingSpec(SqlIdentifier column, ValueSource source) implements Serializable {
+public record FieldMappingSpec(SqlIdentifier column, ValueSource source) {
 
     public FieldMappingSpec {
         refuseWhatAcolumnCannotHold(column, source);
     }
 
-    /** the same with the column named as text, which is how a reader has it */
+    /**
+     * the same with the column named as text, which is how a reader has it
+     */
     public FieldMappingSpec(String column, ValueSource source) {
         this(new SqlIdentifier(column), source);
     }
