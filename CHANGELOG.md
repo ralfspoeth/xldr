@@ -6,6 +6,47 @@ ways that break existing code and existing specs; those changes are listed here 
 The versions are the git tags `xldr-<version>`; the published artifacts carry the same version under the group
 `io.github.ralfspoeth.xldr`.
 
+## 0.49
+
+A release about which types a caller is meant to name. A sealed interface can be public with its cases hidden or
+public with its cases the point, and the two are different designs; this sorts three of them into the right one and
+gives two more the factories that say how a call site should read.
+
+The mapping-spec format is unchanged, so `mapping-spec-0.47` remains its schema and a spec that loaded under 0.48
+loads under 0.49.
+
+### Breaking
+
+- **`Delivery`'s two cases are no longer public.** `Delivery.Atomic` and `Delivery.Signalled` are now
+  `AtomicDelivery` and `SignalledDelivery`, package-private in `server`, and the interface `permits` them by name.
+  Code outside that package can read a `delivery.properties` and ask `claims(file)`, which is the whole of what
+  there was to ask; it can no longer name a case, match on one, or construct one.
+
+  Nothing in this repository did. Every use of the two was `FileProcessor` and `DeliveryTest`, both in the same
+  package, and the only thing crossing a module boundary was the `Delivery.FILE` constant that `ServerIT` writes.
+
+  It is the opposite of what `spec`'s sealed types do, and deliberately so. `ValueSource` and `Locator` exist
+  precisely so a caller can ask which case it is - the loader and every adapter switch over them, and a new case
+  becoming a compile error at every site is what that buys. `Delivery` answers a question rather than describing a
+  value, so which case answered is nobody's business and the smaller surface is worth having before 1.0 fixes it.
+  `Feed` keeps its public cases for a third reason again: `Feed.Active` appears in five public signatures as the
+  feed that *has* a spec, so hiding it would trade a compile-time guarantee for a cast.
+
+### Added
+
+- **`Locator.at`, `Locator.where`, `Selector.nth` and `Selector.text`**, joining `Locator.every` which had been
+  alone since the type was introduced. The constructors are unchanged and still public; this is how a call site
+  spells one, and every one in the repository - 91 of them - now does.
+
+  `every()` was a factory because `new Locator.Every()` reads badly for a record with no components. The other four
+  are there so that the three answers to *which records* read as three answers, and so that a field selector's two
+  ways to say *where* read as two.
+
+  `Selector`'s two return their case - `Nth` and `Text` - where `Locator`'s three return the interface. The
+  difference is that these cases carry something worth asking for afterwards, `Nth.index()` being what an adapter
+  addresses with, so a factory that erased the case would make `Selector.nth(1).index()` fail to compile for no
+  reason. A locator's cases have no such accessor and lose nothing.
+
 ## 0.48
 
 A release about an overload nobody called. A convenience constructor threw away the type it was handed, and the

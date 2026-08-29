@@ -49,7 +49,7 @@ class ExcelAdapterTest {
         });
 
         var spec = new InputSpec(XLSX, List.of(
-                new RecordSelectorSpec("rows", new Locator.At("data!A2:C3"), List.of(
+                new RecordSelectorSpec("rows", Locator.at("data!A2:C3"), List.of(
                         new FieldSelectorSpec("id", "A", DataType.INTEGRAL),
                         new FieldSelectorSpec("name", "B", DataType.TEXT),
                         new FieldSelectorSpec("amount", "C", DataType.DECIMAL),
@@ -93,7 +93,7 @@ class ExcelAdapterTest {
         });
 
         var spec = new InputSpec(XLSX, List.of(
-                new RecordSelectorSpec("all", new Locator.At("data!A:B"), List.of(
+                new RecordSelectorSpec("all", Locator.at("data!A:B"), List.of(
                         new FieldSelectorSpec("v", "1", DataType.INTEGRAL),
                         new FieldSelectorSpec("label", "2", DataType.TEXT)
                 ))
@@ -125,7 +125,7 @@ class ExcelAdapterTest {
     @Test
     void rejectsAdiscriminator() {
         var spec = new InputSpec(XLSX, List.of(new RecordSelectorSpec("rows",
-                new Locator.Where(new Discriminator.Equals(new Selector.Nth(1), "O")),
+                Locator.where(new Discriminator.Equals(Selector.nth(1), "O")),
                 List.of(new FieldSelectorSpec("id", "A", DataType.TEXT)))), List.of(), Map.of());
         var thrown = assertThrows(IllegalArgumentException.class, () -> adapter(spec));
         assertAll(
@@ -136,7 +136,7 @@ class ExcelAdapterTest {
     @Test
     void rejectsAmalformedRange() {
         var spec = new InputSpec(XLSX, List.of(
-                new RecordSelectorSpec("bad", new Locator.At("A2:C"), List.of())
+                new RecordSelectorSpec("bad", Locator.at("A2:C"), List.of())
         ), List.of(), Map.of());
         assertThrows(IllegalArgumentException.class, () -> adapter(spec));
     }
@@ -161,7 +161,7 @@ class ExcelAdapterTest {
         });
 
         var spec = new InputSpec(XLSX, List.of(
-                new RecordSelectorSpec("rows", new Locator.At("A2:B2"), List.of(
+                new RecordSelectorSpec("rows", Locator.at("A2:B2"), List.of(
                         new FieldSelectorSpec("id", "A", DataType.INTEGRAL),
                         new FieldSelectorSpec("name", "B", DataType.TEXT)
                 ))
@@ -202,9 +202,9 @@ class ExcelAdapterTest {
         });
 
         var spec = new InputSpec(XLSX, List.of(
-                new RecordSelectorSpec("rows", new Locator.At("data!C2:D3"), List.of(
-                        new FieldSelectorSpec("counted", new Selector.Nth(1), DataType.TEXT),
-                        new FieldSelectorSpec("alsoCounted", new Selector.Nth(2), DataType.TEXT),
+                new RecordSelectorSpec("rows", Locator.at("data!C2:D3"), List.of(
+                        new FieldSelectorSpec("counted", Selector.nth(1), DataType.TEXT),
+                        new FieldSelectorSpec("alsoCounted", Selector.nth(2), DataType.TEXT),
                         new FieldSelectorSpec("absoluteDigit", "1", DataType.TEXT),
                         new FieldSelectorSpec("absoluteLetter", "C", DataType.TEXT)
                 ))

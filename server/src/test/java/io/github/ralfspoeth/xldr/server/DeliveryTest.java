@@ -26,7 +26,7 @@ class DeliveryTest {
 
     @Test
     void readsAtomicDelivery() {
-        var delivery = assertInstanceOf(Delivery.Atomic.class, of("accepts", "glob:*.csv"));
+        var delivery = assertInstanceOf(AtomicDelivery.class, of("accepts", "glob:*.csv"));
         assertAll(
                 () -> assertTrue(delivery.claims(Path.of("/feeds/orders/in/orders.csv"))),
                 () -> assertFalse(delivery.claims(Path.of("/feeds/orders/in/orders.txt"))),
@@ -38,7 +38,7 @@ class DeliveryTest {
 
     @Test
     void readsSignalledDelivery() {
-        var delivery = assertInstanceOf(Delivery.Signalled.class, of("sentinel", "glob:*.done"));
+        var delivery = assertInstanceOf(SignalledDelivery.class, of("sentinel", "glob:*.done"));
         assertAll(
                 // the marker is what is claimed, not the data file it vouches for
                 () -> assertTrue(delivery.claims(Path.of("in/report.csv.done"))),

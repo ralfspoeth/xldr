@@ -24,7 +24,7 @@ class JsonAdapterTest {
     private static final String MIME = "application/json";
 
     private static InputSpec spec(String recordSelector, FieldSelectorSpec... fields) {
-        return spec(new Locator.At(recordSelector), fields);
+        return spec(Locator.at(recordSelector), fields);
     }
 
     private static InputSpec spec(Locator locator, FieldSelectorSpec... fields) {
@@ -318,10 +318,10 @@ class JsonAdapterTest {
     @Test
     void countsTheElementsOfAnArrayRecord() throws IOException {
         var spec = spec("rows",
-                new FieldSelectorSpec("id", new Selector.Nth(1), DataType.TEXT),
-                new FieldSelectorSpec("name", new Selector.Nth(2), DataType.TEXT),
+                new FieldSelectorSpec("id", Selector.nth(1), DataType.TEXT),
+                new FieldSelectorSpec("name", Selector.nth(2), DataType.TEXT),
                 // past the end of this record's array
-                new FieldSelectorSpec("spare", new Selector.Nth(9), DataType.TEXT));
+                new FieldSelectorSpec("spare", Selector.nth(9), DataType.TEXT));
 
         var rows = adapter(spec, Map.of()).parse(in("""
                 { "rows": [ ["1", "Alice"], ["2", "Bob"] ] }
@@ -348,7 +348,7 @@ class JsonAdapterTest {
     @Test
     void countingAnObjectRecordYieldsNull() throws IOException {
         var spec = spec("rows",
-                new FieldSelectorSpec("counted", new Selector.Nth(1), DataType.TEXT),
+                new FieldSelectorSpec("counted", Selector.nth(1), DataType.TEXT),
                 new FieldSelectorSpec("named", "id", DataType.TEXT));
 
         var row = adapter(spec, Map.of()).parse(in("""
@@ -373,7 +373,7 @@ class JsonAdapterTest {
     @Test
     void rejectsAdiscriminator() {
         var spec = new InputSpec(MIME, List.of(new RecordSelectorSpec("rec",
-                new Locator.Where(new Discriminator.Equals(new Selector.Nth(1), "O")),
+                Locator.where(new Discriminator.Equals(Selector.nth(1), "O")),
                 List.of(new FieldSelectorSpec("id", "id", DataType.TEXT)))), List.of(), Map.of());
         var thrown = assertThrows(IllegalArgumentException.class, () -> adapter(spec, Map.of()));
         assertAll(

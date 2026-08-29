@@ -25,7 +25,7 @@ public record FieldSelectorSpec(
      * adapter's own syntax.
      */
     public FieldSelectorSpec(String name, String selector, @Nullable DataType dataType) {
-        this(name, new Selector.Text(selector), dataType);
+        this(name, Selector.text(selector), dataType);
     }
 
     /**
@@ -41,12 +41,12 @@ public record FieldSelectorSpec(
      * the canonical constructor whatever it was given, so a field declared
      * {@code DECIMAL} arrived as text and was bound into a numeric column as a
      * string. Nothing called it - every counted field in this repository spells
-     * {@code new Selector.Nth(n)} - which is why nothing failed and why it sat
+     * {@code Selector.nth(n)} - which is why nothing failed and why it sat
      * there: an overload with no caller is tested by nobody and trusted by the
      * next person to find it.
      */
     public FieldSelectorSpec(String name, int nth, @Nullable DataType dataType) {
-        this(name, new Selector.Nth(nth), dataType);
+        this(name, Selector.nth(nth), dataType);
     }
 
     /**

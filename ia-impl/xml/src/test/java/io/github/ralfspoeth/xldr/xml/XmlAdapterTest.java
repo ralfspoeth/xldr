@@ -37,7 +37,7 @@ class XmlAdapterTest {
     @Test
     void rejectsAdiscriminator() {
         var spec = new InputSpec("text/xml", List.of(new RecordSelectorSpec("rec",
-                new Locator.Where(new Discriminator.Equals(new Selector.Nth(1), "O")),
+                Locator.where(new Discriminator.Equals(Selector.nth(1), "O")),
                 List.of(new FieldSelectorSpec("id", "@id", DataType.TEXT)))), List.of(), Map.of());
         var thrown = assertThrows(IllegalArgumentException.class, () -> adapter(spec));
         assertAll(
@@ -64,7 +64,7 @@ class XmlAdapterTest {
     @Test
     void evaluatesRelativeAbsoluteAndConstantSelectors() throws IOException {
         var spec = new InputSpec("text/xml", List.of(
-                new RecordSelectorSpec("row", new Locator.At("/simple1/row"), List.of(
+                new RecordSelectorSpec("row", Locator.at("/simple1/row"), List.of(
                         new FieldSelectorSpec("cola", "col[@name='a']", DataType.INTEGRAL),
                         new FieldSelectorSpec("colb", "col[@name='b']", DataType.INTEGRAL),
                         new FieldSelectorSpec("firstcow", "//cow[1]/sound", DataType.TEXT),
@@ -119,11 +119,11 @@ class XmlAdapterTest {
     @Test
     void countsChildElementsWhenAFieldSaysNth() throws IOException {
         var spec = new InputSpec("text/xml", List.of(
-                new RecordSelectorSpec("row", new Locator.At("/simple1/row"), List.of(
-                        new FieldSelectorSpec("first", new Selector.Nth(1), DataType.INTEGRAL),
-                        new FieldSelectorSpec("second", new Selector.Nth(2), DataType.INTEGRAL),
+                new RecordSelectorSpec("row", Locator.at("/simple1/row"), List.of(
+                        new FieldSelectorSpec("first", Selector.nth(1), DataType.INTEGRAL),
+                        new FieldSelectorSpec("second", Selector.nth(2), DataType.INTEGRAL),
                         // past the end of the children: absent, as a short line is
-                        new FieldSelectorSpec("third", new Selector.Nth(3), DataType.TEXT)
+                        new FieldSelectorSpec("third", Selector.nth(3), DataType.TEXT)
                 ))),
                 List.of(), Map.of());
 
@@ -149,7 +149,7 @@ class XmlAdapterTest {
     @Test
     void yieldsNoRowsWhenNothingMatches() throws IOException {
         var spec = new InputSpec("text/xml", List.of(
-                new RecordSelectorSpec("none", new Locator.At("/simple1/nothing"), List.of(
+                new RecordSelectorSpec("none", Locator.at("/simple1/nothing"), List.of(
                         new FieldSelectorSpec("cola", "col[@name='a']", DataType.TEXT)
                 ))
         ), List.of(), Map.of());
@@ -166,7 +166,7 @@ class XmlAdapterTest {
     @Test
     void resolvesNamespacePrefixes() throws IOException {
         var spec = new InputSpec("text/xml", List.of(
-                new RecordSelectorSpec("fund", new Locator.At("/f:portfolio/f:fund"), List.of(
+                new RecordSelectorSpec("fund", Locator.at("/f:portfolio/f:fund"), List.of(
                         new FieldSelectorSpec("id", "@id", DataType.TEXT),
                         new FieldSelectorSpec("name", "f:name", DataType.TEXT),
                         new FieldSelectorSpec("nav", "f:nav", DataType.DECIMAL),
@@ -200,7 +200,7 @@ class XmlAdapterTest {
     @Test
     void findsNothingWithoutTheNamespaceBinding() throws IOException {
         var spec = new InputSpec("text/xml", List.of(
-                new RecordSelectorSpec("fund", new Locator.At("/portfolio/fund"), List.of(
+                new RecordSelectorSpec("fund", Locator.at("/portfolio/fund"), List.of(
                         new FieldSelectorSpec("id", "@id", DataType.TEXT)
                 ))
         ), List.of(), Map.of());
@@ -216,7 +216,7 @@ class XmlAdapterTest {
     @Test
     void rejectsAmalformedExpressionOnCreation() {
         var spec = new InputSpec("text/xml", List.of(
-                new RecordSelectorSpec("row", new Locator.At("/simple1/row["), List.of())
+                new RecordSelectorSpec("row", Locator.at("/simple1/row["), List.of())
         ), List.of(), Map.of());
         var thrown = assertThrows(IllegalArgumentException.class, () -> adapter(spec));
         assertTrue(thrown.getMessage().contains("/simple1/row["), thrown.getMessage());
@@ -229,7 +229,7 @@ class XmlAdapterTest {
     @Test
     void rejectsAnUndeclaredFieldSelector() throws IOException {
         var spec = new InputSpec("text/xml", List.of(
-                new RecordSelectorSpec("row", new Locator.At("/simple1/row"), List.of(
+                new RecordSelectorSpec("row", Locator.at("/simple1/row"), List.of(
                         new FieldSelectorSpec("cola", "col[@name='a']", DataType.TEXT)
                 ))
         ), List.of(), Map.of());

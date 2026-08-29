@@ -20,7 +20,7 @@ class FieldSelectorSpecTest {
     @Test
     void theTextOverloadSaysWhatTheCanonicalOneSays() {
         assertEquals(
-                new FieldSelectorSpec("nav", new Selector.Text("//nav"), DataType.DECIMAL),
+                new FieldSelectorSpec("nav", Selector.text("//nav"), DataType.DECIMAL),
                 new FieldSelectorSpec("nav", "//nav", DataType.DECIMAL));
     }
 
@@ -28,7 +28,7 @@ class FieldSelectorSpecTest {
     @Test
     void theCountedOverloadSaysWhatTheCanonicalOneSays() {
         assertEquals(
-                new FieldSelectorSpec("price", new Selector.Nth(3), DataType.DECIMAL),
+                new FieldSelectorSpec("price", Selector.nth(3), DataType.DECIMAL),
                 new FieldSelectorSpec("price", 3, DataType.DECIMAL));
     }
 
@@ -41,7 +41,7 @@ class FieldSelectorSpecTest {
         var spec = new FieldSelectorSpec("price", 3, DataType.DECIMAL);
         assertAll(
                 () -> assertEquals(DataType.DECIMAL, spec.dataType()),
-                () -> assertEquals(new Selector.Nth(3), spec.selector()),
+                () -> assertEquals(Selector.nth(3), spec.selector()),
                 () -> assertEquals("price", spec.name()));
     }
 

@@ -98,4 +98,35 @@ public sealed interface Selector extends Serializable {
             } + " component";
         }
     }
+
+    /**
+     * The n-th component of the record, counted from one.
+     * <p>
+     * Returns {@link Nth} rather than {@code Selector}, where {@link
+     * Locator#every()} and its two siblings return the interface. The difference
+     * is that these cases carry something worth asking for afterwards -
+     * {@link Nth#index()} is what an adapter addresses with - so a factory that
+     * erased the case would make {@code Selector.nth(1).index()} not compile for
+     * no reason. A locator's cases have no such accessor, so nothing is lost
+     * there by returning the interface.
+     *
+     * @param n at least 1
+     * @return the selector that counts to it
+     * @throws IllegalArgumentException if {@code n} is less than 1
+     */
+    static Nth nth(int n) {
+        return new Nth(n);
+    }
+
+    /**
+     * A selector in the adapter's own syntax - an XPath, a character range, a
+     * JSON pointer, a cell reference, or the name of a column.
+     *
+     * @param value never blank; a selector that says nothing selects nothing
+     * @return the selector that says it
+     * @throws IllegalArgumentException if the value is blank
+     */
+    static Text text(String value) {
+        return new Text(value);
+    }
 }

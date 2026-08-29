@@ -67,12 +67,12 @@ class FileProcessor {
      */
     public void onArrival(Feed.Active feed, Path file) {
         switch (feed.delivery()) {
-            case Delivery.Atomic atomic -> {
+            case AtomicDelivery atomic -> {
                 if (atomic.claims(file)) {
                     process(feed, file);
                 }
             }
-            case Delivery.Signalled signalled -> {
+            case SignalledDelivery signalled -> {
                 if (signalled.claims(file)) {
                     signalled.sentinel().dataFileOf(file).ifPresentOrElse(
                             data -> processSignalled(feed, file, data),
@@ -447,8 +447,8 @@ class FileProcessor {
         try (var exec = Executors.newVirtualThreadPerTaskExecutor()) {
             for (var file : claimed) {
                 switch (feed.delivery()) {
-                    case Delivery.Atomic _ -> exec.submit(() -> process(feed, file));
-                    case Delivery.Signalled signalled -> signalled.sentinel()
+                    case AtomicDelivery _ -> exec.submit(() -> process(feed, file));
+                    case SignalledDelivery signalled -> signalled.sentinel()
                             .dataFileOf(file)
                             .ifPresentOrElse(data -> {
                                 if (Files.exists(data)) {

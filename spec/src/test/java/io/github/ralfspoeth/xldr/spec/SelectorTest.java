@@ -61,10 +61,10 @@ class SelectorTest {
     @Test
     void bothFormatsCount() throws IOException {
         assertAll(
-                () -> assertEquals(new Selector.Nth(2), onlyFieldSelector(json("""
+                () -> assertEquals(Selector.nth(2), onlyFieldSelector(json("""
                         { "name": "who", "fieldSelectors": [ { "name": "id", "nth": 2 } ] }
                         """))),
-                () -> assertEquals(new Selector.Nth(2), onlyFieldSelector(xml("""
+                () -> assertEquals(Selector.nth(2), onlyFieldSelector(xml("""
                         <recordSelector name="who"><fieldSelector name="id" nth="2"/></recordSelector>
                         """))));
     }
@@ -72,10 +72,10 @@ class SelectorTest {
     @Test
     void bothFormatsReadASelector() throws IOException {
         assertAll(
-                () -> assertEquals(new Selector.Text("id"), onlyFieldSelector(json("""
+                () -> assertEquals(Selector.text("id"), onlyFieldSelector(json("""
                         { "name": "who", "fieldSelectors": [ { "name": "id", "selector": "id" } ] }
                         """))),
-                () -> assertEquals(new Selector.Text("id"), onlyFieldSelector(xml("""
+                () -> assertEquals(Selector.text("id"), onlyFieldSelector(xml("""
                         <recordSelector name="who"><fieldSelector name="id" selector="id"/></recordSelector>
                         """))));
     }
@@ -87,16 +87,16 @@ class SelectorTest {
     @Test
     void aColumnNamedThreeIsNotTheThirdComponent() throws IOException {
         assertAll(
-                () -> assertEquals(new Selector.Text("3"), onlyFieldSelector(json("""
+                () -> assertEquals(Selector.text("3"), onlyFieldSelector(json("""
                         { "name": "who", "fieldSelectors": [ { "name": "id", "selector": "3" } ] }
                         """))),
-                () -> assertEquals(new Selector.Nth(3), onlyFieldSelector(json("""
+                () -> assertEquals(Selector.nth(3), onlyFieldSelector(json("""
                         { "name": "who", "fieldSelectors": [ { "name": "id", "nth": 3 } ] }
                         """))),
-                () -> assertEquals(new Selector.Text("3"), onlyFieldSelector(xml("""
+                () -> assertEquals(Selector.text("3"), onlyFieldSelector(xml("""
                         <recordSelector name="who"><fieldSelector name="id" selector="3"/></recordSelector>
                         """))),
-                () -> assertEquals(new Selector.Nth(3), onlyFieldSelector(xml("""
+                () -> assertEquals(Selector.nth(3), onlyFieldSelector(xml("""
                         <recordSelector name="who"><fieldSelector name="id" nth="3"/></recordSelector>
                         """))));
     }
@@ -158,13 +158,13 @@ class SelectorTest {
     void bothFormatsReadADiscriminator() throws IOException {
         assertAll(
                 () -> assertEquals(
-                        new Discriminator.Equals(new Selector.Nth(1), "O"),
+                        new Discriminator.Equals(Selector.nth(1), "O"),
                         onlyDiscriminator(json("""
                                 { "name": "orders", "discriminator": { "nth": 1, "equals": "O" },
                                   "fieldSelectors": [ { "name": "id", "nth": 2 } ] }
                                 """))),
                 () -> assertEquals(
-                        new Discriminator.Equals(new Selector.Nth(1), "O"),
+                        new Discriminator.Equals(Selector.nth(1), "O"),
                         onlyDiscriminator(xml("""
                                 <recordSelector name="orders">
                                     <discriminator nth="1" equals="O"/>
@@ -185,7 +185,7 @@ class SelectorTest {
                   "fieldSelectors": [ { "name": "b", "selector": "B" } ] }
                 """));
         assertAll(
-                () -> assertEquals(new Selector.Text("A"), d.at()),
+                () -> assertEquals(Selector.text("A"), d.at()),
                 () -> assertTrue(d.accepts("1")),
                 () -> assertFalse(d.accepts("2")));
     }
@@ -312,12 +312,12 @@ class SelectorTest {
      */
     @Test
     void valuesAreStrippedAndAnAbsentComponentMatchesNothing() {
-        var equals = new Discriminator.Equals(new Selector.Nth(1), "O");
+        var equals = new Discriminator.Equals(Selector.nth(1), "O");
         assertAll(
                 () -> assertTrue(equals.accepts("  O  ")),
                 () -> assertFalse(equals.accepts("")),
                 () -> assertFalse(equals.accepts(null)),
-                () -> assertFalse(Discriminator.matching(new Selector.Nth(1), "O.*").accepts(null)));
+                () -> assertFalse(Discriminator.matching(Selector.nth(1), "O.*").accepts(null)));
     }
 
     /**

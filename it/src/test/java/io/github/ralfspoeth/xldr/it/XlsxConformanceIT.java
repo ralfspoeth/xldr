@@ -30,7 +30,7 @@ class XlsxConformanceIT extends InputAdapterContract {
 
     @Override
     protected @NonNull InputSpec spec() {
-        return Conformance.spec(mimeType(), Map.of(), new Locator.At("data!A2:C3"),
+        return Conformance.spec(mimeType(), Map.of(), Locator.at("data!A2:C3"),
                 field("id", "A", DataType.INTEGRAL),
                 field("name", "B", DataType.TEXT),
                 field("amount", "C", DataType.DECIMAL));

@@ -88,10 +88,10 @@ interface SpecNode {
                     + " which are two answers to one question: " + shown());
         }
         if (text.isPresent()) {
-            return new Selector.Text(text.get());
+            return Selector.text(text.get());
         }
         if (nth.isPresent()) {
-            return new Selector.Nth(nth.get());
+            return Selector.nth(nth.get());
         }
         throw new IllegalArgumentException(what + " needs a selector or an nth: " + shown());
     }
@@ -124,10 +124,10 @@ interface SpecNode {
                     + " which records are of this kind, and no input is read both ways: " + shown());
         }
         if (selector.isPresent()) {
-            return new Locator.At(selector.get());
+            return Locator.at(selector.get());
         }
         if (discriminator != null) {
-            return new Locator.Where(discriminator);
+            return Locator.where(discriminator);
         }
         return Locator.every();
     }

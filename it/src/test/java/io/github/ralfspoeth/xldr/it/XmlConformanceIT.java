@@ -25,7 +25,7 @@ class XmlConformanceIT extends InputAdapterContract {
 
     @Override
     protected @NonNull InputSpec spec() {
-        return Conformance.spec(mimeType(), Map.of(), new Locator.At("/rows/row"),
+        return Conformance.spec(mimeType(), Map.of(), Locator.at("/rows/row"),
                 field("id", "@id", DataType.INTEGRAL),
                 field("name", "name", DataType.TEXT),
                 field("amount", "amount", DataType.DECIMAL));

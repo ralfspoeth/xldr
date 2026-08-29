@@ -144,13 +144,44 @@ public sealed interface Locator extends Serializable {
     }
 
     /**
-     * Every record of the input.
+     * Every record of the input: the answer for a file that holds one kind of
+     * record, which a CSV with a header or a fixed-length file usually is.
      * <p>
-     * A factory rather than a constant so that the name reads as an answer at a
-     * call site - {@code Locator.every()} beside {@code new Locator.At(path)} -
-     * and because a record with no components costs nothing to make.
+     * A factory rather than a constant because a record with no components costs
+     * nothing to make, and because the three below read as three answers to one
+     * question where three constructor calls read as three different things.
+     *
+     * @return the locator that keeps every record
      */
     static Locator every() {
         return new Every();
+    }
+
+    /**
+     * The records this selector points at, in the adapter's own syntax - an
+     * XPath, a JSON pointer, a range of cells.
+     * <p>
+     * What the syntax means is the adapter's business and is not checked here;
+     * this only refuses a selector that says nothing at all, since a locator that
+     * points nowhere is a spec that meant {@link #every()} and did not say so.
+     *
+     * @param selector where the records are; never blank
+     * @return the locator that points at them
+     * @throws IllegalArgumentException if the selector is blank
+     */
+    static Locator at(String selector) {
+        return new At(selector);
+    }
+
+    /**
+     * The records a test picks out of a file where every record is a candidate -
+     * a flat file interleaving several kinds of record, told apart by a value in
+     * one of their components.
+     *
+     * @param test which records are of this kind
+     * @return the locator that keeps the ones it accepts
+     */
+    static Locator where(Discriminator test) {
+        return new Where(test);
     }
 }

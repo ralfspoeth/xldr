@@ -153,7 +153,7 @@ class XsdTest {
         var fields = new XmlMappingSpecReader().read(stream(xml))
                 .inputSpec().recordSelectors().iterator().next().fieldSelectors();
         assertEquals(
-                List.of(new Selector.Nth(1), new Selector.Nth(2)),
+                List.of(Selector.nth(1), Selector.nth(2)),
                 fields.stream().map(FieldSelectorSpec::selector).toList());
     }
 
@@ -202,7 +202,7 @@ class XsdTest {
                 .inputSpec().recordSelectors().stream().toList();
         assertAll(
                 () -> assertEquals(
-                        new Locator.Where(new Discriminator.Equals(new Selector.Nth(1), "O")),
+                        Locator.where(new Discriminator.Equals(Selector.nth(1), "O")),
                         selectors.getFirst().locator()),
                 () -> assertInstanceOf(Discriminator.Matches.class,
                         assertInstanceOf(Locator.Where.class, selectors.get(1).locator()).test()));
