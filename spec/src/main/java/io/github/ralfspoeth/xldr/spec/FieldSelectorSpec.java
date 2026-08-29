@@ -29,6 +29,27 @@ public record FieldSelectorSpec(
     }
 
     /**
+     * The other case, spelled the same way: a field selected by counting.
+     * <p>
+     * {@code nth} is counted from one, as {@link Selector.Nth} is - the first
+     * component of the record is 1, and 0 is refused. The 0-based form the
+     * adapters address with is {@link Selector.Nth#index()}, and the two are
+     * deliberately different words; this parameter was called {@code index}
+     * until 0.48, which said the opposite of what it meant.
+     * <p>
+     * It also dropped the {@code dataType} on the floor, passing {@code null} to
+     * the canonical constructor whatever it was given, so a field declared
+     * {@code DECIMAL} arrived as text and was bound into a numeric column as a
+     * string. Nothing called it - every counted field in this repository spells
+     * {@code new Selector.Nth(n)} - which is why nothing failed and why it sat
+     * there: an overload with no caller is tested by nobody and trusted by the
+     * next person to find it.
+     */
+    public FieldSelectorSpec(String name, int nth, @Nullable DataType dataType) {
+        this(name, new Selector.Nth(nth), dataType);
+    }
+
+    /**
      * The selector as the adapter's own syntax, for an adapter that has no notion
      * of a column.
      *

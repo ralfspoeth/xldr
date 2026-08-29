@@ -6,6 +6,30 @@ ways that break existing code and existing specs; those changes are listed here 
 The versions are the git tags `xldr-<version>`; the published artifacts carry the same version under the group
 `io.github.ralfspoeth.xldr`.
 
+## 0.48
+
+A release about an overload nobody called. A convenience constructor threw away the type it was handed, and the
+build was green throughout because every caller in this repository spelled the long form instead.
+
+The mapping-spec format is unchanged, so `mapping-spec-0.47` remains its schema and a spec that loaded under 0.47
+loads under 0.48. Nothing here is breaking: the fix makes a constructor keep an argument it was already being
+given.
+
+### Fixed
+
+- **`new FieldSelectorSpec(name, nth, dataType)` discarded the type.** The counted convenience constructor passed
+  `null` to the canonical one whatever it was given, so a field declared `DECIMAL` or `TEMPORAL` came back untyped,
+  was delivered as text, and was bound into a numeric or timestamp column as a string.
+
+  Nothing in the reactor called it - all 151 constructions of a counted field selector spell
+  `new Selector.Nth(n)` - so the build was green and stayed green. An overload with no caller is tested by nobody
+  and trusted by the next person to find it, which is how this was found: writing a new adapter against it.
+  `FieldSelectorSpecTest` now holds both convenience constructors to saying exactly what the canonical one says.
+
+  Its parameter was also called `index`, where `Selector.Nth` counts from one and reserves `index()` for the
+  0-based form - the name promised the opposite of what the value had to be. It is `nth` now. The parameter name is
+  not part of the signature, so nothing has to change.
+
 ## 0.47
 
 A release about one name. The field type `DATE` is called `TEMPORAL`, which is what it has always been.
