@@ -249,6 +249,30 @@ a record that is broken - so for those the kit does the checking and asks you fo
 abstract, because an adapter whose author has never been asked what it refuses is the adapter that refuses nothing;
 `absences()` and `breakages()` default to empty and skip, naming the obligation that went unchecked in the report.
 
+The snippet above names no `<version>`, which resolves only if you have imported the `bom` as
+[shown earlier](#using-the-toolkit-as-a-library). Without the BOM, give the kit the same version as the `ia` you
+compile against - which is the rule in general: **the kit's version is the SPI's version.** It is built from the
+same revision as every other module and depends on `ia` at exactly that version, so there is no compatibility
+matrix, and no question to answer beyond which `ia` you are on.
+
+**Upgrading the kit may turn a green build red, and that is the point.** A conformance kit that can never newly fail
+anything has stopped doing its job, so a check may be added, or an existing one tightened, in any release - a minor
+one, and after `1.0`. The obligation it checks was already in force in the release you are leaving; what changed is
+that something finally looked, and an adapter that goes red was not conforming before the upgrade either. Three of
+the five adapters shipped here found that out at 0.51.
+
+This is deliberately not what a minor version usually promises. What a minor *will* keep is the shape of what you
+supply: the four methods in the snippet plus `refusals()` are the whole of what an implementer writes, and adding a
+sixth stops a subclass compiling rather than failing it - a different kind of interruption, kept for a major and
+listed under **Breaking** when it happens, as `refusals()` was at 0.51.
+
+**JUnit's major version is part of the same promise.** The kit is test classes you inherit, so it takes
+`junit-jupiter-api` at compile scope and `requires transitive` it - which means depending on the kit pins you to the
+JUnit major it was built against, currently 6. Moving to a new JUnit major would break every adapter still on the
+old one and staying would block every adapter that had moved, so **a JUnit major bump is an xldr major bump**, on
+the same footing as a change to the SPI types. That is the bill for one named failure per obligation appearing in
+your own test report, rather than a list of findings you have to render yourself.
+
 ## Building and Releasing
 
 ### How the modules fit together

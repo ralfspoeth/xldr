@@ -6,6 +6,34 @@ ways that break existing code and existing specs; those changes are listed here 
 The versions are the git tags `xldr-<version>`; the published artifacts carry the same version under the group
 `io.github.ralfspoeth.xldr`.
 
+## Unreleased
+
+### Changed
+
+- **The conformance kit says which version of itself to use, and what an upgrade may do.** Neither was a change to
+  the code: `tck` already carried the build's revision and already pinned `ia` at exactly that version, so the kit's
+  version already *was* the SPI's version. It was true by inheritance from the parent POM rather than by anyone
+  choosing it, which is how `ia-def` happened, so it is now written down in `InputAdapterContract` and in the README.
+  The consequence worth stating is that there is no compatibility matrix and never will be: the kit to use is the
+  one matching the `ia` you compile against.
+
+  The second half is the part that is not ordinary semantic versioning. **Upgrading the kit may turn a green build
+  red, in a minor release and after 1.0**, because a conformance kit that can never newly fail anything has stopped
+  doing its job. The obligation a new check tests was already in force in the release you are leaving; what changed
+  is that something finally looked, and an adapter that goes red was not conforming before the upgrade either -
+  three of the five shipped adapters found that out at 0.51. What a minor does keep is the shape of what an
+  implementer supplies: adding an abstract hook stops a subclass compiling rather than failing it, which is a
+  different kind of interruption and stays a major, as `refusals()` was at 0.51.
+
+  **A JUnit major bump is an xldr major bump**, which is the third thing now stated and the one that was easiest to
+  leave unsaid. The kit is test classes an implementer inherits, so it takes `junit-jupiter-api` at compile scope
+  and `requires transitive` it, and depending on the kit therefore pins an adapter to the JUnit major the kit was
+  built against - currently 6. That constraint has existed since the kit shipped at 0.39; nothing said what it
+  promised. Moving would break every adapter still on the old major and not moving would block every adapter that
+  had moved, so it is not a decision this project can take quietly in a minor, and it is now on the same footing as
+  a change to the SPI types. It is the bill for the trade the `tck` POM already defends: inheriting `@Test` methods,
+  so that each obligation is a named failure in the implementer's own report.
+
 ## 0.52
 
 A short release that undoes a name, and draws the picture that made the name's cost visible.

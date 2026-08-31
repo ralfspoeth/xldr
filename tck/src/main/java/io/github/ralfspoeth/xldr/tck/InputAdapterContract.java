@@ -57,6 +57,44 @@ import static org.junit.jupiter.api.Assumptions.assumeFalse;
  * not say the adapter is right, and no kit could. Where a run skips, read the
  * skip: it names an obligation nothing checked.
  *
+ * <h2>Which kit, and what an upgrade may do to you</h2>
+ *
+ * <strong>The kit's version is the SPI's version.</strong> It carries the same
+ * {@code revision} as every other module of this build and depends on {@code ia}
+ * at exactly that version, so the answer to which kit to use is always the one
+ * matching the {@code ia} you compile against, and there is no compatibility
+ * matrix for anybody to keep current. That was true by inheritance from the
+ * parent POM before 0.53 and is now true on purpose.
+ * <p>
+ * <strong>An upgrade may turn a green build red, and that is the point.</strong>
+ * A conformance kit that can never newly fail anything has stopped doing its
+ * job. So a check may be added, or an existing one tightened, in any release -
+ * a minor one, and after 1.0 - because the obligation it checks was already in
+ * force in the release you are leaving. What changed is that something finally
+ * looked. An adapter that goes red on an upgrade was not conforming before the
+ * upgrade either; three of the five adapters shipped with xldr found that out at
+ * 0.51, on the first run after the last three obligations became checkable.
+ * <p>
+ * This is deliberately not what a minor version usually promises, and it is why
+ * the promise is written here rather than left to be inferred. What a minor
+ * <em>will</em> keep is the shape of what you supply: the four abstract methods
+ * above plus {@link #refusals()} are the whole of what an implementer writes,
+ * and adding a sixth stops a subclass compiling rather than failing it - a
+ * different kind of interruption, and one kept for a major. Adding
+ * {@code refusals()} at 0.51 was exactly that, and went in a release that said
+ * so under <em>Breaking</em>.
+ * <p>
+ * <strong>JUnit's major version is part of this promise.</strong> The kit
+ * {@code requires transitive org.junit.jupiter.api} and takes it at compile
+ * scope - it has to, being test classes you inherit - so depending on the kit
+ * pins you to the JUnit major it was built against. That makes the choice one
+ * this project does not get to make quietly: moving to a new JUnit major breaks
+ * every adapter still on the old one, and staying blocks every adapter that has
+ * moved. So <strong>a JUnit major bump is an xldr major bump</strong>, on the
+ * same footing as a change to the SPI types themselves. It is the bill for
+ * inheriting {@code @Test} methods rather than handing back a list of findings,
+ * and that trade is defended where it is made, in this module's POM.
+ *
  * <h2>Why the methods are public</h2>
  *
  * Tests elsewhere in this project are package-private, which is all JUnit needs.
