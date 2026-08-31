@@ -6,6 +6,46 @@ ways that break existing code and existing specs; those changes are listed here 
 The versions are the git tags `xldr-<version>`; the published artifacts carry the same version under the group
 `io.github.ralfspoeth.xldr`.
 
+## Unreleased
+
+A release about what the input-adapter SPI actually promises, ahead of `1.0` freezing whatever it says.
+
+There were two answers to "what must an adapter do": ten obligations in `ia`'s package documentation, and six of
+them checked by the conformance kit. Two statements of one contract drift, and these had - the prose named an
+obligation as unchecked that the kit had been checking since the day it shipped. The kit is now the contract and
+the prose is its reasoning.
+
+### Breaking
+
+- **`InputAdapterContract` has a new abstract method.** `refusals()` returns the specs your adapter must refuse at
+  `createInputAdapter`, each with a sentence saying what is wrong with it. Abstract rather than defaulted because
+  the answer is the point: an adapter written against this SPI once accepted two selector syntaxes it had never
+  implemented and returned nulls for them, all the way into the database, and nothing in the kit asked. Return
+  `List.of()` where your format proves nothing wrong ahead of time and the check skips, saying so - which is a
+  different thing from never having been asked.
+
+  Two further hooks, `absences()` and `breakages()`, default to empty, so only `refusals()` breaks a compile. They
+  supply a sample with a value missing and a sample that cannot be read, for the two obligations that were
+  previously "yours to test": that an absent value is `null`, and that a failure names the record it happened at.
+
+- **`Header` is no longer part of the SPI.** It lived in `ia` because `xldr validate` reasoned about a header
+  without ever building an adapter; that command was removed, and with it the rule and the only caller outside the
+  CSV module. It is now package-private in `csv`, beside `EmptyLine`, which is the setting it has always described.
+  The `header` spec property is unchanged - this is the Java type going, not the setting. The SPI is six exported
+  types where it was seven.
+
+### Added
+
+- **Obligations 1, 6 and 7 are checked**, on the evidence the three new hooks supply, so all ten of the package
+  documentation's obligations are now either run or explicitly declined. The five shipped adapters each state their
+  refusals - between two and six apiece - `csv`, `flt` and `xml` each supply a sample with a value missing, and
+  `csv` supplies one that cannot be read.
+
+  The four adapters that supply no breakage skip that check, and the skip is the finding: only `csv` names the
+  record in a mid-stream failure today. `flt` says "incomplete final record" and the rest surface whatever the
+  underlying parser said, which is obligation 7 unkept. Recorded rather than fixed here, the fix being a change to
+  four adapters and not to the kit.
+
 ## 0.50
 
 A release about the one thing a spec contributes to a statement that is not bound as a parameter.

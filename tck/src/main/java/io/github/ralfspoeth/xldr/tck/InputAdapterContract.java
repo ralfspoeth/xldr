@@ -16,6 +16,7 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assumptions.assumeFalse;
 
 /**
  * The obligations of an input adapter, as tests. Extend this, say what your
@@ -28,21 +29,33 @@ import static org.junit.jupiter.api.Assertions.*;
  *     protected String mimeType() { return "text/x-swift"; }
  *     protected byte[] sample() { return MESSAGE.getBytes(US_ASCII); }
  *     protected InputSpec spec() { return new InputSpec(mimeType(), List.of, List.of(), Map.of()); } // @replace substring='List.of, List.of(), Map.of()' replacement='...'
+ *     protected List<Refusal> refusals() {
+ *         return List.of(new Refusal("a tag that is not a tag", specSaying("99z")));
+ *     }
  * }
  *}
  *
  * <h2>What it does and does not cover</h2>
  *
- * Six of the ten obligations are checkable without knowing the format, and those
- * are here. The other four are not, and are yours to test: <em>refuse at
- * construction what the spec already proves wrong</em> depends on what your
- * format cannot mean; <em>say what is wrong with the record</em> depends on what
- * a bad record looks like; whether <em>empty differs from absent</em> is a
- * property of the format; and <em>hold no mutable state</em> is only sampled here,
- * by reading twice.
+ * All ten obligations are here, but not all in the same way. Seven are checkable
+ * knowing nothing about the format and are simply run. Three need something only
+ * you can produce - a spec your format cannot mean, a record with a value
+ * missing, a record that is broken - so for those the kit supplies the checking
+ * and asks you for the evidence: {@link #refusals()}, {@link #absences()} and
+ * {@link #breakages()}.
  * <p>
- * A green run therefore says an adapter keeps the obligations that can be stated
- * generically. It does not say the adapter is right, and no kit could.
+ * {@code refusals()} is abstract on purpose. The others default to empty and
+ * skip, because a format may honestly have no way to express the case; there is
+ * no format that can express nothing wrong, and an author who has not thought
+ * about what their adapter refuses is the author whose adapter refuses nothing.
+ * That was not a hypothetical: an adapter written against this SPI accepted two
+ * selector syntaxes it had never implemented and returned nulls for them, all
+ * the way into the database.
+ * <p>
+ * A green run says an adapter keeps the obligations that can be stated
+ * generically, and keeps the other three on the evidence you supplied. It does
+ * not say the adapter is right, and no kit could. Where a run skips, read the
+ * skip: it names an obligation nothing checked.
  *
  * <h2>Why the methods are public</h2>
  *
@@ -100,6 +113,84 @@ public abstract class InputAdapterContract {
     /** A MIME type no adapter should claim. */
     protected String unknownMimeType() {
         return "application/x-nothing-reads-this";
+    }
+
+    // ---- the evidence only the implementation can produce -----------------------
+
+    /**
+     * A spec this adapter must refuse to be built from, and why.
+     * <p>
+     * These carry a {@code byte[]} where they carry a sample, which for a record
+     * means {@code equals} compares references. Nothing here compares one; they
+     * are argument carriers, named so that a failure says which case did not
+     * happen rather than pointing at a lambda.
+     *
+     * @param because what is wrong with the spec, in the words a failure should
+     *                use - "an nth selector over a format with nothing to count"
+     * @param spec    the spec itself, otherwise buildable
+     */
+    public record Refusal(String because, InputSpec spec) {}
+
+    /**
+     * A sample in which a declared field has no value, and the field's name.
+     *
+     * @param because  what is missing and how - "a line that stops before the
+     *                 amount column"
+     * @param sample   an input the {@link #spec()} still reads, yielding at least
+     *                 one record
+     * @param field    a field the record selector declares, absent from every
+     *                 record of this sample
+     */
+    public record Absence(String because, byte[] sample, String field) {}
+
+    /**
+     * A sample holding a record this adapter cannot read, and the text its
+     * complaint must contain.
+     *
+     * @param because    what is broken - "a quoted field never closed"
+     * @param sample     an input that fails, at construction or mid-stream
+     * @param identifies the text that says <em>which</em> record it was: a line
+     *                   number, a key, a tag. The obligation is to name the
+     *                   record, and a message that only says something went wrong
+     *                   sends a person to a file of a million lines
+     */
+    public record Breakage(String because, byte[] sample, String identifies) {}
+
+    /**
+     * Specs this adapter refuses at {@code createInputAdapter}, which is the last
+     * moment before a file exists.
+     * <p>
+     * Abstract rather than defaulted, because the answer is the point. Return
+     * {@link List#of()} where your format truly proves nothing wrong ahead of
+     * time and the check will skip, saying so - which is a different thing from
+     * never having been asked.
+     */
+    protected abstract List<Refusal> refusals();
+
+    /**
+     * Samples with a value missing, for the rule that an absent value is
+     * {@code null}.
+     * <p>
+     * Empty by default and then skipped: a format may have no way to express a
+     * missing value at all - a fixed-length record always has every column, even
+     * if some are blank - and a kit that demanded one would be asking for a
+     * fiction. Where the format <em>can</em> tell empty from absent, this is
+     * where the difference is stated.
+     */
+    protected List<Absence> absences() {
+        return List.of();
+    }
+
+    /**
+     * Samples that fail, for the rule that a failure names the record it happened
+     * at.
+     * <p>
+     * Empty by default and then skipped, on the same terms as {@link #absences()}
+     * - though a format with no unreadable input is rarer than one with no absent
+     * value.
+     */
+    protected List<Breakage> breakages() {
+        return List.of();
     }
 
     // ---- the obligations -------------------------------------------------------
@@ -259,6 +350,70 @@ public abstract class InputAdapterContract {
                 "the second read of the same adapter differed from the first");
     }
 
+    // ---- the three that need evidence ------------------------------------------
+
+    /**
+     * A spec the format cannot mean is refused when the adapter is built, not at
+     * four in the morning halfway through a load.
+     */
+    @Test
+    public void refusesAtConstructionWhatTheSpecProvesWrong() {
+        var refusals = refusals();
+        assumeFalse(refusals.isEmpty(),
+                "this adapter declares no spec it refuses ahead of time, so obligation 1 went unchecked");
+        assertAll(refusals.stream().map(refusal -> () ->
+                assertThrows(IllegalArgumentException.class,
+                        () -> factory().createInputAdapter(refusal.spec()),
+                        () -> "built an adapter from a spec it should have refused: " + refusal.because())));
+    }
+
+    /**
+     * A value that is not there reads as {@code null}, so the loader binds SQL
+     * NULL rather than the empty string or a zero.
+     */
+    @Test
+    public void anAbsentValueIsNull() {
+        var absences = absences();
+        assumeFalse(absences.isEmpty(),
+                "this adapter supplied no sample with a value missing, so obligation 6 went unchecked");
+        assertAll(absences.stream().map(absence -> () -> {
+            assertTrue(fieldNames().contains(absence.field()),
+                    () -> "'" + absence.field() + "' is not a field the spec declares, so this"
+                            + " checked nothing: " + absence.because());
+            var rows = rowsOf(adapter(spec()), absence.sample());
+            assertFalse(rows.isEmpty(),
+                    () -> "the sample yielded no record, so nothing was absent in it: " + absence.because());
+            assertAll(rows.stream().map(row -> () ->
+                    assertNull(row.get(absence.field()),
+                            () -> "'" + absence.field() + "' reads as "
+                                    + row.get(absence.field()) + " where it is absent: " + absence.because())));
+        }));
+    }
+
+    /**
+     * And a record that cannot be read is complained about by name. The loader
+     * adds the record selector and the table; which record it was is the
+     * adapter's to say, and nobody else's.
+     */
+    @Test
+    public void aFailureNamesTheRecordItHappenedAt() {
+        var breakages = breakages();
+        assumeFalse(breakages.isEmpty(),
+                "this adapter supplied no unreadable sample, so obligation 7 went unchecked");
+        assertAll(breakages.stream().map(breakage -> () -> {
+            var thrown = assertThrows(Exception.class,
+                    () -> drain(adapter(spec()).parse(new ByteArrayInputStream(breakage.sample()),
+                            recordSelector().name(), fieldNames())),
+                    () -> "the broken sample was read without complaint: " + breakage.because());
+            var message = thrown.getMessage();
+            assertNotNull(message,
+                    () -> thrown.getClass().getSimpleName() + " carries no message at all: " + breakage.because());
+            assertTrue(message.contains(breakage.identifies()),
+                    () -> "the complaint does not say which record it was - '" + breakage.identifies()
+                            + "' is not in: " + message);
+        }));
+    }
+
     // ---- helpers ---------------------------------------------------------------
 
     private InputAdapter adapter(InputSpec spec) {
@@ -281,7 +436,12 @@ public abstract class InputAdapterContract {
     }
 
     private List<Row> rowsOf(InputAdapter adapter) throws IOException {
-        try (var rows = adapter.parse(source(), recordSelector().name(), fieldNames()).rows()) {
+        return rowsOf(adapter, sample());
+    }
+
+    private List<Row> rowsOf(InputAdapter adapter, byte[] bytes) throws IOException {
+        try (var rows = adapter.parse(new ByteArrayInputStream(bytes),
+                recordSelector().name(), fieldNames()).rows()) {
             return rows.toList();
         }
     }

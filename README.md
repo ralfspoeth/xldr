@@ -223,7 +223,7 @@ regardless hands the loader a `String` for a numeric column and nothing says so 
 cannot be right is refused when the adapter is *built*, not when a file arrives: that is the last moment before a
 deployment starts, and a selector this format cannot mean is knowable there.
 
-Six of the ten can be checked without knowing the format, and the `tck` module checks them:
+All ten are checked by the `tck` module, which is what an adapter is held to:
 
     <dependency>
         <groupId>io.github.ralfspoeth.xldr</groupId>
@@ -237,13 +237,17 @@ class MyConformanceTest extends InputAdapterContract {
     protected String mimeType()             { return "application/x-mine"; }
     protected InputSpec spec()              { return ...; }   // reads the sample below
     protected byte[] sample()               { return ...; }
+    protected List<Refusal> refusals()      { return List.of(...); }  // specs you must not build from
 }
 ```
 
 Declare at least one field with a real type in that spec; a spec that is all `TEXT` passes the typing tests without
-having been asked anything. The other four obligations are format-specific and remain yours to test: what your
-format cannot mean, what a bad record looks like, whether *empty* differs from *absent*, and that no state survives
-between calls.
+having been asked anything.
+
+Three obligations need something no kit can invent - a spec your format cannot mean, a record with a value missing,
+a record that is broken - so for those the kit does the checking and asks you for the evidence. `refusals()` is
+abstract, because an adapter whose author has never been asked what it refuses is the adapter that refuses nothing;
+`absences()` and `breakages()` default to empty and skip, naming the obligation that went unchecked in the report.
 
 ## Building and Releasing
 

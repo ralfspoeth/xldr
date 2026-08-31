@@ -1,7 +1,6 @@
 package io.github.ralfspoeth.xldr.csv;
 
 import io.github.ralfspoeth.xldr.ia.Formats;
-import io.github.ralfspoeth.xldr.ia.Header;
 import io.github.ralfspoeth.xldr.ia.InputAdapter;
 import io.github.ralfspoeth.xldr.ia.InputAdapterFactory;
 import io.github.ralfspoeth.xldr.spec.InputSpec;

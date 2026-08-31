@@ -11,10 +11,13 @@ import org.jspecify.annotations.NonNull;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.util.List;
 import java.util.Map;
 
 import static io.github.ralfspoeth.xldr.it.Conformance.discovered;
 import static io.github.ralfspoeth.xldr.it.Conformance.field;
+import static io.github.ralfspoeth.xldr.it.Conformance.records;
+import static io.github.ralfspoeth.xldr.it.Conformance.twice;
 
 class XlsxConformanceIT extends InputAdapterContract {
 
@@ -52,6 +55,31 @@ class XlsxConformanceIT extends InputAdapterContract {
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
+    }
+
+    /**
+     * A range is the one selector here with a grammar of its own, and three ways
+     * to get it wrong that are all worth catching before a workbook is opened -
+     * opening one being the expensive part of this format.
+     */
+    @Override
+    protected @NonNull List<Refusal> refusals() {
+        return List.of(
+                new Refusal("no locator, in a format where a record is a range of cells",
+                        Conformance.spec(mimeType(), Map.of(), Locator.every(),
+                                field("id", "A", DataType.INTEGRAL))),
+                new Refusal("a range with no ':' in it, so with one endpoint",
+                        Conformance.spec(mimeType(), Map.of(), Locator.at("data!A2"),
+                                field("id", "A", DataType.INTEGRAL))),
+                new Refusal("a range of one column and one cell, which describes no rectangle",
+                        Conformance.spec(mimeType(), Map.of(), Locator.at("data!A:C4"),
+                                field("id", "A", DataType.INTEGRAL))),
+                new Refusal("a field selector that is no cell reference",
+                        Conformance.spec(mimeType(), Map.of(), Locator.at("data!A2:C3"),
+                                field("id", "??", DataType.TEXT))),
+                new Refusal("two record selectors of one name",
+                        twice(mimeType(), records(Locator.at("data!A2:C3"),
+                                field("id", "A", DataType.INTEGRAL)))));
     }
 
     private static void row(org.apache.poi.ss.usermodel.Row row, double id, String name, double amount) {

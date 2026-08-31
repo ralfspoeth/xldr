@@ -7,6 +7,7 @@ import io.github.ralfspoeth.xldr.spec.Locator;
 import io.github.ralfspoeth.xldr.tck.InputAdapterContract;
 import org.jspecify.annotations.NonNull;
 
+import java.util.List;
 import java.util.Map;
 
 import static io.github.ralfspoeth.xldr.it.Conformance.*;
@@ -39,5 +40,21 @@ class JsonConformanceIT extends InputAdapterContract {
                     { "id": 2, "name": "Bob",   "amount": 98.00 }
                 ] }
                 """);
+    }
+
+    /**
+     * The pointer syntax here is close enough to RFC 6901 to be mistaken for it,
+     * so a leading slash is refused with the difference spelled out rather than
+     * read as a member whose name happens to begin with one.
+     */
+    @Override
+    protected @NonNull List<Refusal> refusals() {
+        return List.of(
+                new Refusal("a pointer in RFC 6901's syntax rather than this one",
+                        Conformance.spec(mimeType(), Map.of(), Locator.at("/rows"),
+                                field("id", "id", DataType.INTEGRAL))),
+                new Refusal("two record selectors of one name",
+                        twice(mimeType(), records(Locator.at("rows"),
+                                field("id", "id", DataType.INTEGRAL)))));
     }
 }

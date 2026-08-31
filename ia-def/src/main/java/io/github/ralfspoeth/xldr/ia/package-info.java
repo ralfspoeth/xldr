@@ -18,7 +18,9 @@
  *
  * Five types from this package - {@code InputAdapterFactory}, {@code
  * InputAdapter}, {@code Result}, {@code Row}, {@code Field} - plus {@link
- * io.github.ralfspoeth.xldr.ia.Formats}, and seven from {@code spec}: {@link
+ * io.github.ralfspoeth.xldr.ia.Formats}, which is the whole of it: an adapter
+ * that needs a seventh type from here has found a gap in the SPI rather than a
+ * missing import. And seven from {@code spec}: {@link
  * io.github.ralfspoeth.xldr.spec.InputSpec}, {@link
  * io.github.ralfspoeth.xldr.spec.RecordSelectorSpec}, {@link
  * io.github.ralfspoeth.xldr.spec.FieldSelectorSpec}, {@link
@@ -32,9 +34,9 @@
  * <h2>The obligations</h2>
  *
  * These hold for every adapter in this project and are what the loader, {@code
- * xldr check} and the mapping author rely on. They are written here because
- * nothing enforces them: an implementation that quietly does otherwise compiles,
- * runs, and produces wrong rows.
+ * xldr check} and the mapping author rely on. Each is checked by the {@code tck}
+ * module; the list is written out here because a test tells you that something
+ * failed and not why it was ever required.
  *
  * <ol>
  *   <li><b>Refuse at construction what the spec already proves wrong.</b>
@@ -100,12 +102,28 @@
  *
  * <h2>Checking an implementation against this</h2>
  *
- * Six of the ten are checkable without knowing the format, and the {@code tck}
- * module checks them: extend {@code InputAdapterContract}, supply a factory, a
- * MIME type, a spec and a sample, and each becomes a named test. The other four -
- * the first, the sixth, the seventh and the last - depend on what your format
- * cannot mean, what a bad record looks like, whether it can tell empty from
- * absent, and what state it might have kept, so they stay yours to test.
+ * <strong>The kit is the contract; this list is why.</strong> Extend {@code
+ * InputAdapterContract} in the {@code tck} module, supply a factory, a MIME type,
+ * a spec and a sample, and every obligation above becomes a named test.
+ * <p>
+ * Seven of the ten need nothing from you but those four things. Three do, because
+ * no kit can invent a spec your format cannot mean, a record with a value
+ * missing, or a record that is broken: for those the kit supplies the checking
+ * and asks you for the evidence, through {@code refusals()}, {@code absences()}
+ * and {@code breakages()}. The first of those three is abstract, so an adapter
+ * that has never been asked what it refuses does not compile; the other two
+ * default to empty and skip, saying in the report which obligation went
+ * unchecked.
+ * <p>
+ * That arrangement replaced a plainer one at 0.51, where four of the ten were
+ * "yours to test" and the prose had already drifted from the kit - it named an
+ * obligation as unchecked that the kit had been checking since the day it
+ * shipped. Two statements of one contract is one too many, for the reason two
+ * readings of the {@code header} setting were.
+ * <p>
+ * A green run says an adapter keeps the seven, and keeps the other three on the
+ * evidence its author supplied. It does not say the adapter is right, and no kit
+ * could.
  *
  * <h2>Where the examples are</h2>
  *

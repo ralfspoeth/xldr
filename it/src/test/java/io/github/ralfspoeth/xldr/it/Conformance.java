@@ -41,9 +41,29 @@ final class Conformance {
 
     static InputSpec spec(String mimeType, Map<String, String> properties,
                           Locator locator, FieldSelectorSpec... fields) {
-        return new InputSpec(mimeType,
-                List.of(new RecordSelectorSpec("records", locator, List.of(fields))),
-                List.of(), properties);
+        return new InputSpec(mimeType, List.of(records(locator, fields)), List.of(), properties);
+    }
+
+    /** the one record selector these specs have, named the same in all five */
+    static RecordSelectorSpec records(Locator locator, FieldSelectorSpec... fields) {
+        return new RecordSelectorSpec("records", locator, List.of(fields));
+    }
+
+    /**
+     * The same record selector declared twice, which every adapter refuses when
+     * it is built: a mapping names one of them and could not say which.
+     * <p>
+     * Here rather than in each conformance test because it is the one refusal all
+     * five have in common - {@code InputSpec} itself does not look, the format
+     * modules do, and the kit is where that is now recorded.
+     */
+    static InputSpec twice(String mimeType, RecordSelectorSpec recordSelector) {
+        return new InputSpec(mimeType, List.of(recordSelector, recordSelector), List.of(), Map.of());
+    }
+
+    /** a spec declaring no record selector at all */
+    static InputSpec nothing(String mimeType) {
+        return new InputSpec(mimeType, List.of(), List.of(), Map.of());
     }
 
     static FieldSelectorSpec field(String name, String selector, DataType type) {
