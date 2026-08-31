@@ -1032,7 +1032,7 @@ class LoaderTest {
              var stmt = conn.createStatement();
              var rs = stmt.executeQuery("select factor from priced_row order by sku")) {
             while (rs.next()) {
-                Integer factor = rs.getInt(1);
+                int factor = rs.getInt(1);
                 factors.add(rs.wasNull() ? null : factor);
             }
         }

@@ -7,7 +7,7 @@
  * This is an application, not a library, so the surface is only what someone
  * outside actually holds. Two audiences hold something.
  * <p>
- * An <strong>embedder</strong> builds a {@link
+ * An <strong>embedder</strong> builds a {@code
  * io.github.ralfspoeth.xldr.server.Config}, supplies a {@link
  * io.github.ralfspoeth.xldr.server.ConnectionSource}, and drives a {@link
  * io.github.ralfspoeth.xldr.server.Watcher}. That is the whole of running this

@@ -4,6 +4,7 @@ import io.github.ralfspoeth.xldr.xlet.XldrServlet;
 import jakarta.servlet.ServletConfig;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
+import org.jspecify.annotations.NonNull;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -89,7 +90,7 @@ class XldrServletTest {
         }
 
         @Override
-        protected DataSource dataSource() {
+        protected @NonNull DataSource dataSource() {
             return dataSource;
         }
 

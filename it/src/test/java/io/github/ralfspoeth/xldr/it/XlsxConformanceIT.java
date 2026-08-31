@@ -14,10 +14,7 @@ import java.io.UncheckedIOException;
 import java.util.List;
 import java.util.Map;
 
-import static io.github.ralfspoeth.xldr.it.Conformance.discovered;
-import static io.github.ralfspoeth.xldr.it.Conformance.field;
-import static io.github.ralfspoeth.xldr.it.Conformance.records;
-import static io.github.ralfspoeth.xldr.it.Conformance.twice;
+import static io.github.ralfspoeth.xldr.it.Conformance.*;
 
 class XlsxConformanceIT extends InputAdapterContract {
 

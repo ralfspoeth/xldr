@@ -1,11 +1,7 @@
 package io.github.ralfspoeth.xldr.it;
 
 import io.github.ralfspoeth.xldr.ia.InputAdapterFactory;
-import io.github.ralfspoeth.xldr.spec.DataType;
-import io.github.ralfspoeth.xldr.spec.Discriminator;
-import io.github.ralfspoeth.xldr.spec.InputSpec;
-import io.github.ralfspoeth.xldr.spec.Locator;
-import io.github.ralfspoeth.xldr.spec.Selector;
+import io.github.ralfspoeth.xldr.spec.*;
 import io.github.ralfspoeth.xldr.tck.InputAdapterContract;
 import org.jspecify.annotations.NonNull;
 
