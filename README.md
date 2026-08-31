@@ -251,6 +251,39 @@ abstract, because an adapter whose author has never been asked what it refuses i
 
 ## Building and Releasing
 
+### How the modules fit together
+
+![The xldr modules and what each requires](docs/modules.svg)
+
+Solid arrows point from a module to what it `requires`. Read bottom-up: `spec` is the mapping model and the only
+module with no xldr dependency at all, `ia` is the adapter SPI on top of it, `ldr` turns a spec into inserts, and the
+two front ends - `server` for a watched directory, `xlet` for an HTTP request - sit on those. `app` is the server as
+it is shipped, and adds only what a *runner* decides: a command line, a connection pool, a logging setup.
+
+These are Java modules rather than Maven artifacts, the arrows being `requires` edges, so every box is named for the
+module. The two names coincide everywhere but one: the SPI is the artifact `ia-def` and the module
+`io.github.ralfspoeth.xldr.ia`, which is why its box carries both. An adapter's descriptor writes
+`requires io.github.ralfspoeth.xldr.ia`; its POM depends on `ia-def`. The reasoning for the split is in the module
+list below.
+
+**The dashed arrow is the interesting one.** The five input adapters appear in nobody's `requires`. `ia` declares
+`uses InputAdapterFactory`, each adapter declares `provides ... with`, and JPMS service binding does the rest at
+runtime - so `server` and `xlet` each name only `ia` and `ldr` in their descriptors and still read spreadsheets. What
+a deployment can read is decided by which adapter modules are on its module path, and by nothing in any source file.
+That is why the distribution has a `modules/` directory you can add a jar to, and why adding a sixth format needs no
+change to anything in this diagram.
+
+The same seam is what makes an adapter written outside this repository a first-class one: it is on the module path
+or it is not, and there is no registry to be added to. Two exist -
+[swift-mt](https://github.com/ralfspoeth/swift-mt) and a Bloomberg reply reader - and both are held to the same
+contract by `tck`, which is why that module sits beside `ldr` rather than under the adapters: it depends on the SPI,
+not on any implementation of it.
+
+Two modules are left out of the picture. `bom` is a bill of materials with no code and so no edges. `it` sits below
+everything - its main descriptor requires `server`, `ia` and `ldr`, and its test descriptor additionally requires
+`app`, `xlet`, `tck` and all five adapters *by name*, that being the one place adapters are named explicitly, and
+only because service binding needs the modules in the graph before it can bind them.
+
 ### Modules and building
 
 The whole toolkit is one reactor under the `xldr` parent POM and builds with a single `mvn install`, which orders the
