@@ -178,13 +178,13 @@ check is the factory's own, not string equality, so a spec saying `application/x
 accepts a request saying `text/xml` without either side having to know about the
 other. Parameters after a `;` are stripped first.
 
-| status | when |
-|---|---|
-| `200` | loaded; the body reports how many rows |
-| `400` | no `spec` parameter, or path info where none belongs, or the input did not parse |
-| `404` | no spec of that name |
-| `415` | form-encoded, no content type at all, or the adapter the spec names does not read the one offered |
-| `500` | the load failed; the transaction rolled back and nothing was inserted |
+| status | when                                                                                              |
+|--------|---------------------------------------------------------------------------------------------------|
+| `200`  | loaded; the body reports how many rows                                                            |
+| `400`  | no `spec` parameter, or path info where none belongs, or the input did not parse                  |
+| `404`  | no spec of that name                                                                              |
+| `415`  | form-encoded, no content type at all, or the adapter the spec names does not read the one offered |
+| `500`  | the load failed; the transaction rolled back and nothing was inserted                             |
 
 Nothing is retained on failure. The caller still has the data and the response says
 what was wrong, which is the whole of what `hospital/` exists to preserve when there
@@ -214,11 +214,11 @@ under `/WEB-INF/`, where the container's own access control covers them.
 
 ## Configuration
 
-| where | what |
-|---|---|
-| `/WEB-INF/specs/*.{json,xml}` | one file per feed; the base name is the feed name |
-| `java:comp/env/jdbc/...` | the `DataSource`, named by an init-param |
-| init- and context-params `env.*` | what a spec's `${env.…}` expressions resolve against |
+| where                                       | what                                                      |
+|---------------------------------------------|-----------------------------------------------------------|
+| `/WEB-INF/specs/*.{json,xml}`               | one file per feed; the base name is the feed name         |
+| `java:comp/env/jdbc/...`                    | the `DataSource`, named by an init-param                  |
+| init- and context-params `env.*`            | what a spec's `${env.…}` expressions resolve against      |
 | init- or context-params `schema`, `catalog` | where the rows go, if the connection does not already say |
 
 The `env.` convention is unchanged from the file server, so a spec moves between the
@@ -282,13 +282,13 @@ moved down with the load operation and carried no file concepts along. The one t
 that changed in the move is the key: it counted per *feed*, and now counts per
 *name*, which is the feed there and the spec here.
 
-| what | where it comes from |
-|---|---|
-| `LoadsSucceeded`, `LoadsFailed`, `RecordsLoaded`, `LastLoad`, `LastFailure`, `LoadsInProgress` | `Statistics`, shared with the file server |
-| `RequestsRefused` | this module: a `400`, `404`, `413` or `415` - the caller sent something we will not take |
-| `LoadsRejected` | this module: a `503` - no permit came free, which is *our* limit and not their mistake |
-| `MaxConcurrentLoads`, `AcquireTimeoutMillis`, `MaxBytes` | the init-params, so a reading can be judged without opening `web.xml` |
-| `Specs` | one row per deployed spec, loaded or not |
+| what                                                                                           | where it comes from                                                                      |
+|------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------------------|
+| `LoadsSucceeded`, `LoadsFailed`, `RecordsLoaded`, `LastLoad`, `LastFailure`, `LoadsInProgress` | `Statistics`, shared with the file server                                                |
+| `RequestsRefused`                                                                              | this module: a `400`, `404`, `413` or `415` - the caller sent something we will not take |
+| `LoadsRejected`                                                                                | this module: a `503` - no permit came free, which is *our* limit and not their mistake   |
+| `MaxConcurrentLoads`, `AcquireTimeoutMillis`, `MaxBytes`                                       | the init-params, so a reading can be judged without opening `web.xml`                    |
+| `Specs`                                                                                        | one row per deployed spec, loaded or not                                                 |
 
 The last two rows are the ones the file server has no use for. Rejections rising
 mean nothing on their own: next to `LoadsInProgress` sitting at the maximum they are
