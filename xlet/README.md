@@ -115,17 +115,17 @@ the wildcard.
 
 ## How it corresponds
 
-| file server | xlet |
-|---|---|
-| `<root>/<feed>/spec.json` | `/WEB-INF/specs/<name>.json` (or `.xml`) |
-| the feed's `in/` directory | `POST …?spec=<name>` |
-| `delivery.properties` | the request; an HTTP body is complete or it is not |
-| `env.properties` | the servlet's init- and context-params, under the same `env.` prefix |
-| `jdbc.*` in `xldr.properties` | a `DataSource` from JNDI |
-| `Watcher` + `FeedRegistry` reconciliation | `init()`, once |
-| `archive/` | the `200` response |
-| `hospital/` + `.log` | the `4xx`/`5xx` response and its body |
-| claim by atomic move | *nothing* - see [What is not inherited](#what-is-not-inherited) |
+| file server                               | xlet                                                                 |
+|-------------------------------------------|----------------------------------------------------------------------|
+| `<root>/<feed>/spec.json`                 | `/WEB-INF/specs/<name>.json` (or `.xml`)                             |
+| the feed's `in/` directory                | `POST …?spec=<name>`                                                 |
+| `delivery.properties`                     | the request; an HTTP body is complete or it is not                   |
+| `env.properties`                          | the servlet's init- and context-params, under the same `env.` prefix |
+| `jdbc.*` in `xldr.properties`             | a `DataSource` from JNDI                                             |
+| `Watcher` + `FeedRegistry` reconciliation | `init()`, once                                                       |
+| `archive/`                                | the `200` response                                                   |
+| `hospital/` + `.log`                      | the `4xx`/`5xx` response and its body                                |
+| claim by atomic move                      | *nothing* - see [What is not inherited](#what-is-not-inherited)      |
 
 The specs are read once at `init()` and never again: a redeploy is how they change,
 which is what makes them deployment configuration rather than state. A spec that
