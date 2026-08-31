@@ -6,7 +6,12 @@ ways that break existing code and existing specs; those changes are listed here 
 The versions are the git tags `xldr-<version>`; the published artifacts carry the same version under the group
 `io.github.ralfspoeth.xldr`.
 
-## Unreleased
+## 0.52
+
+A short release that undoes a name, and draws the picture that made the name's cost visible.
+
+The mapping-spec format is unchanged, so `mapping-spec-0.50` remains its schema and a spec that loaded under 0.51
+loads under 0.52.
 
 ### Breaking
 
