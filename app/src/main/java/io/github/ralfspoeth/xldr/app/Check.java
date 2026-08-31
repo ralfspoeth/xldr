@@ -580,10 +580,22 @@ public class Check implements Callable<Integer> {
     }
 
     /**
-     * An unquoted SQL identifier is case-insensitive, and a driver folds it one
-     * way or the other; a quoted one is exact. The same rule the loader applies
-     * when it builds the insert, so that what is checked here is what will be
-     * executed there.
+     * A name in the form {@link DatabaseMetaData} holds it, which is not the
+     * form a statement carries.
+     * <p>
+     * The same rule as {@link SqlIdentifier#sql()} up to a point - a quoted name
+     * is exact, an unquoted one is folded - and then deliberately not the same
+     * call. {@code sql()} always folds up, because that is portable in a
+     * statement: every target folds our upper-case name back onto whatever it
+     * stored. The catalog is the other direction. It holds the name already
+     * folded, in the direction this product chose, so a lookup has to fold the
+     * way {@code storesLowerCaseIdentifiers} says rather than the way SQL is
+     * written. Against PostgreSQL the two disagree, and asking {@code sql()}
+     * here would find no columns at all.
+     * <p>
+     * A quoted name loses its quotes and its doubling for the same reason: the
+     * catalog holds the column {@code a"b}, not the SQL {@code "a""b"} that
+     * names it.
      */
     private static String normalize(SqlIdentifier name, boolean lowerCase) {
         if (name.quoted()) {

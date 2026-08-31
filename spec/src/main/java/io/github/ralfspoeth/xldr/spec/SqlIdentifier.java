@@ -37,7 +37,7 @@ import static java.util.Objects.requireNonNull;
  * <h2>Why the shape is checked</h2>
  *
  * An identifier is the one thing a spec contributes to a statement that is not
- * bound as a parameter. {@link #folded()} is concatenated into the text of the
+ * bound as a parameter. {@link #sql()} is concatenated into the text of the
  * insert and of every lookup subquery, so a name free to be anything is a name
  * free to be a fragment of SQL. {@link ValueSource.FunctionCall} has been held to
  * being a name since 0.40 for exactly this reason, on the grounds that a
@@ -105,23 +105,36 @@ public record SqlIdentifier(String name) {
     }
 
     /**
-     * The name as it should be written into SQL, and the form in which two names
-     * are the same column.
+     * The text of this name as a statement carries it, and the form in which two
+     * names are the same column.
+     * <p>
+     * Two things, not one, which is why this is not called {@code folded}: an
+     * unquoted name is folded up, and a quoted one is passed through with its
+     * quotes, which is no folding at all. What both have in common is that this
+     * is the string that goes into the SQL - and it is the only string a spec
+     * contributes that is written into a statement rather than bound to it, so a
+     * name at a call site saying so is worth having.
      * <p>
      * {@link Locale#ROOT} is required rather than tidy: under a Turkish default
      * locale {@code "id".toUpperCase()} yields {@code "İD"}, and a server would
      * then address a different column depending on where it was started.
      */
-    public String folded() {
+    public String sql() {
         return quoted() ? name : name.toUpperCase(Locale.ROOT);
     }
 
     /**
-     * The name with its quotes taken off, which is the form a database's own
-     * metadata reports - {@code DatabaseMetaData.getColumns} gives the stored
-     * name and never the quotes a statement would need.
+     * The name with its quotes taken off, and nothing else done to it.
      * <p>
-     * The doubling comes off with them: {@code "a""b"} is the one column
+     * Deliberately not the counterpart of {@link #sql()} and deliberately not
+     * called {@code stored}: for an unquoted name this hands back the spelling
+     * the spec used, which is <em>not</em> what the catalog holds - the database
+     * folds that one, and which way depends on the product. A caller comparing
+     * against {@code DatabaseMetaData} has to fold it themselves, in the
+     * direction the driver reports, and {@code xldr check} does exactly that. A
+     * name here that sounded symmetrical would invite skipping the step.
+     * <p>
+     * The doubling comes off with the quotes: {@code "a""b"} is the one column
      * {@code a"b}, and comparing the stored name against {@code a""b} would have
      * matched nothing. Rare, and wrong in a way that reads as the column being
      * absent.
@@ -133,17 +146,18 @@ public record SqlIdentifier(String name) {
     }
 
     /**
-     * Equal when a database would resolve the two to one column. See the class
-     * documentation: this is the point of the type, not a convenience.
+     * Equal when a database would resolve the two to one column - which is to
+     * say, when they reach it as the same text. See the class documentation:
+     * this is the point of the type, not a convenience.
      */
     @Override
     public boolean equals(Object other) {
-        return other instanceof SqlIdentifier that && folded().equals(that.folded());
+        return other instanceof SqlIdentifier that && sql().equals(that.sql());
     }
 
     @Override
     public int hashCode() {
-        return folded().hashCode();
+        return sql().hashCode();
     }
 
     /**

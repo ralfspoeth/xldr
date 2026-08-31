@@ -6,7 +6,7 @@ ways that break existing code and existing specs; those changes are listed here 
 The versions are the git tags `xldr-<version>`; the published artifacts carry the same version under the group
 `io.github.ralfspoeth.xldr`.
 
-## Unreleased
+## 0.50
 
 A release about the one thing a spec contributes to a statement that is not bound as a parameter.
 
@@ -32,6 +32,15 @@ The mapping-spec format changes, so `mapping-spec-0.50` is published in both for
 
   Every table and column in the tutorial, the fixtures and the tests was checked against the new rule before it went
   in; none of them changes.
+
+- **`SqlIdentifier.folded()` is now `SqlIdentifier.sql()`.** The old name described one of the two things the
+  method does: an unquoted name is folded up, and a quoted one is passed through with its quotes, which is no
+  folding at all. What both have in common is the thing this release is about - it is the string written into the
+  statement rather than bound to it - so the name now says that at the call site. `unquoted()` is unchanged and
+  deliberately still not its counterpart: it hands back the spelling the spec used, which is not what a catalog
+  holds, and a caller comparing against `DatabaseMetaData` has to fold it in the direction the driver reports.
+  `Loader`'s private `normalizeIdentifier` wrapper went with it, having existed only because the old name read
+  poorly where SQL is built.
 
 - **The spec model is no longer `Serializable`.** Nothing serialized a spec, so it was a promise made to nobody -
   and a promise that would have had to be kept from 1.0, including the part where adding a record component breaks

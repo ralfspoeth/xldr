@@ -20,7 +20,7 @@ class SqlIdentifierTest {
         assertAll(
                 () -> assertEquals(new SqlIdentifier("ccy"), new SqlIdentifier("CCY")),
                 () -> assertEquals(new SqlIdentifier("ccy").hashCode(), new SqlIdentifier("CcY").hashCode()),
-                () -> assertEquals("CCY", new SqlIdentifier("ccy").folded()));
+                () -> assertEquals("CCY", new SqlIdentifier("ccy").sql()));
     }
 
     /**
@@ -32,7 +32,7 @@ class SqlIdentifierTest {
         assertAll(
                 () -> assertNotEquals(new SqlIdentifier("\"ccy\""), new SqlIdentifier("ccy")),
                 () -> assertNotEquals(new SqlIdentifier("\"ccy\""), new SqlIdentifier("\"CCY\"")),
-                () -> assertEquals("\"ccy\"", new SqlIdentifier("\"ccy\"").folded()),
+                () -> assertEquals("\"ccy\"", new SqlIdentifier("\"ccy\"").sql()),
                 () -> assertEquals("ccy", new SqlIdentifier("\"ccy\"").unquoted()));
     }
 
@@ -65,7 +65,7 @@ class SqlIdentifierTest {
         var previous = Locale.getDefault();
         try {
             Locale.setDefault(Locale.forLanguageTag("tr"));
-            assertEquals("ID", new SqlIdentifier("id").folded());
+            assertEquals("ID", new SqlIdentifier("id").sql());
         } finally {
             Locale.setDefault(previous);
         }
@@ -97,7 +97,7 @@ class SqlIdentifierTest {
      * A name is written into the statement rather than bound to it, so it is
      * held to being a name.
      * <p>
-     * {@code Loader} concatenates {@link SqlIdentifier#folded()} into the insert
+     * {@code Loader} concatenates {@link SqlIdentifier#sql()} into the insert
      * and into every lookup subquery. Until 0.50 the only rule was non-blank, so
      * a table called {@code t where 1=1 --} went in as written - and both
      * published schemas would have validated the spec that said it. The project
@@ -168,14 +168,14 @@ class SqlIdentifierTest {
     void unquotingUndoublesAnInteriorQuote() {
         assertAll(
                 () -> assertEquals("a\"b", new SqlIdentifier("\"a\"\"b\"").unquoted()),
-                () -> assertEquals("\"a\"\"b\"", new SqlIdentifier("\"a\"\"b\"").folded(),
+                () -> assertEquals("\"a\"\"b\"", new SqlIdentifier("\"a\"\"b\"").sql(),
                         "but the statement still gets it doubled, that being the SQL for it"),
                 () -> assertEquals("order id", new SqlIdentifier("\"order id\"").unquoted()));
     }
 
     /**
      * A qualified name is refused rather than folded through. It used to work by
-     * accident - {@code folded()} upper-cased across the dot and the emitted SQL
+     * accident - {@code sql()} upper-cased across the dot and the emitted SQL
      * happened to be valid - which made {@code target.properties} and the table
      * name two ways to say where a table is.
      * <p>

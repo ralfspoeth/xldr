@@ -94,8 +94,9 @@ public class Loader implements AutoCloseable {
      *
      * @param qualifiedTable the table as it goes into SQL, already carrying
      *                       whatever {@link Target} the load has and already
-     *                       folded. Folded before it gets here rather than in
-     *                       this constructor, because folding an assembled
+     *                       through {@link SqlIdentifier#sql()}. Each part goes
+     *                       through it before it gets here rather than in this
+     *                       constructor, because folding an assembled
      *                       {@code "My Schema".customer} would upper-case the
      *                       quoted part that was quoted precisely so that it
      *                       would not be
@@ -108,28 +109,16 @@ public class Loader implements AutoCloseable {
         }
 
         String insertStatement() {
-            var columnList = columns.stream().map(SqlIdentifier::folded).collect(joining(", "));
+            var columnList = columns.stream().map(SqlIdentifier::sql).collect(joining(", "));
             var values = String.join(", ", valueExprs);
             return String.format("insert into %s(%s) values(%s)", qualifiedTable, columnList, values);
         }
     }
 
     /**
-     * How a table or column name reaches the database.
-     * <p>
-     * The rule and its reasoning moved to {@link SqlIdentifier}, in the spec
-     * module, when a second place needed the same answer: a record mapping
-     * refuses two field mappings onto one column, and cannot tell whether two
-     * names are one column without folding them exactly as this does. Kept as a
-     * name here because it reads better in the eight places that build SQL.
-     */
-    private static String normalizeIdentifier(SqlIdentifier name) {
-        return name.folded();
-    }
-
-    /**
      * What this load's {@link Target} adds in front of a table name: each part
-     * folded, each followed by its dot, or empty where the target is.
+     * as {@link SqlIdentifier#sql()} gives it, each followed by its dot, or
+     * empty where the target is.
      * <p>
      * Resolved once in the constructor rather than per statement, so the
      * metadata is asked once per load and every name a load builds is qualified
@@ -140,11 +129,12 @@ public class Loader implements AutoCloseable {
     /**
      * {@code table} as it goes into SQL from this load.
      * <p>
-     * A name is the qualifier and the folded table, with no case analysis: the
-     * four combinations of catalog and schema are already in the one string.
+     * A name is the qualifier and the table's {@link SqlIdentifier#sql()}, with
+     * no case analysis: the four combinations of catalog and schema are already
+     * in the one string.
      */
     private String qualify(SqlIdentifier table) {
-        return qualifier + normalizeIdentifier(table);
+        return qualifier + table.sql();
     }
 
     /**
@@ -201,7 +191,7 @@ public class Loader implements AutoCloseable {
                         + ", but " + meta.getDatabaseProductName() + " does not take a "
                         + meta.getCatalogTerm() + " in an insert. Remove it from target.properties");
             }
-            parts.append(target.catalog().folded()).append('.');
+            parts.append(target.catalog().sql()).append('.');
         }
         if (target.schema() != null) {
             if (!meta.supportsSchemasInDataManipulation()) {
@@ -209,7 +199,7 @@ public class Loader implements AutoCloseable {
                         + ", but " + meta.getDatabaseProductName() + " does not take a "
                         + meta.getSchemaTerm() + " in an insert. Remove it from target.properties");
             }
-            parts.append(target.schema().folded()).append('.');
+            parts.append(target.schema().sql()).append('.');
         }
         return parts.toString();
     }
@@ -636,13 +626,13 @@ public class Loader implements AutoCloseable {
             }
             values.add(value);
             where.append(where.isEmpty() ? "" : " and ")
-                    .append(normalizeIdentifier(condition.getKey()))
+                    .append(condition.getKey().sql())
                     .append(" = ?");
         }
         // no conditions, no where: a lookup of a single-row view or of dual
         // reads the whole table, and "where" with nothing after it is a syntax
         // error rather than a wider query
-        var sql = "select " + normalizeIdentifier(lk.column())
+        var sql = "select " + lk.column().sql()
                 + " from " + qualify(lk.table())
                 + (where.isEmpty() ? "" : " where " + where);
         try (var ps = connection.prepareStatement(sql)) {
@@ -920,11 +910,11 @@ public class Loader implements AutoCloseable {
                 for (var condition : lk.conditions().entrySet()) {
                     var valueExpr = plan(condition.getValue(), binders, fieldNames);
                     where.append(where.isEmpty() ? "" : " and ")
-                            .append(normalizeIdentifier(condition.getKey()))
+                            .append(condition.getKey().sql())
                             .append(" = ")
                             .append(valueExpr);
                 }
-                yield "(select " + normalizeIdentifier(lk.column())
+                yield "(select " + lk.column().sql()
                         + " from " + qualify(lk.table())
                         + (where.isEmpty() ? "" : " where " + where) + ")";
             }
