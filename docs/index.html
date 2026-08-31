@@ -76,7 +76,12 @@
         <th>XML</th>
     </tr>
     <tr>
-        <td>0.47 onwards (current)</td>
+        <td>0.50 onwards (current)</td>
+        <td><a href="schema/mapping-spec-0.50.json">mapping-spec-0.50.json</a></td>
+        <td><a href="schema/mapping-spec-0.50.xsd">mapping-spec-0.50.xsd</a></td>
+    </tr>
+    <tr>
+        <td>0.47 - 0.49</td>
         <td><a href="schema/mapping-spec-0.47.json">mapping-spec-0.47.json</a></td>
         <td><a href="schema/mapping-spec-0.47.xsd">mapping-spec-0.47.xsd</a></td>
     </tr>
@@ -153,6 +158,17 @@
     changes nothing about the format - 0.11, 0.12, 0.14 to 0.20, 0.22, 0.24 to 0.31, 0.33, 0.34, 0.36 to 0.39, 0.41, 0.45, 0.48, 0.49 -
     keeps the previous schema rather than publishing a copy of it. An older one stays where it is, so a spec pinned
     to it keeps validating.
+</p>
+
+<p>
+    In 0.50 a table or column name is held to being a name. Unquoted it is a letter or underscore followed by
+    letters, digits, underscore, <code>$</code> or <code>#</code>; anything else goes in double quotes, with an
+    interior quote doubled, so the column <code>a"b</code> is written <code>"a""b"</code>. A qualified name is
+    refused - a deployment says its catalog and schema in <code>target.properties</code>.
+    <br>
+    The reason is that a name is the one thing a spec contributes to a statement that is <em>not</em> bound as a
+    parameter: it is concatenated into the insert and into every lookup subquery. A routine name had been held to a
+    shape since 0.40 on exactly that argument, and the argument was true of tables and columns too the whole time.
 </p>
 
 <p>
@@ -286,7 +302,7 @@
 <p>In a JSON spec, as a member the reader does not recognise and therefore ignores:</p>
 
 <pre><code>{
-  "$schema": "https://ralfspoeth.github.io/xldr/schema/mapping-spec-0.47.json",
+  "$schema": "https://ralfspoeth.github.io/xldr/schema/mapping-spec-0.50.json",
   "input": {
     "mimeType": "text/csv",
     "properties": { "fieldSeparator": "," },
@@ -298,7 +314,7 @@
 <p>In an XML spec, as the schema location of a document that has no namespace of its own:</p>
 
 <pre><code>&lt;mappingSpec xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-             xsi:noNamespaceSchemaLocation="https://ralfspoeth.github.io/xldr/schema/mapping-spec-0.47.xsd"&gt;
+             xsi:noNamespaceSchemaLocation="https://ralfspoeth.github.io/xldr/schema/mapping-spec-0.50.xsd"&gt;
     &lt;input mimeType="text/xml"&gt;
         ...
     &lt;/input&gt;

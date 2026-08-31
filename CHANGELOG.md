@@ -6,6 +6,53 @@ ways that break existing code and existing specs; those changes are listed here 
 The versions are the git tags `xldr-<version>`; the published artifacts carry the same version under the group
 `io.github.ralfspoeth.xldr`.
 
+## Unreleased
+
+A release about the one thing a spec contributes to a statement that is not bound as a parameter.
+
+Values are bound, so they can be anything. Names are written into the text, so they cannot - and until now only half
+of that was enforced. A function name had been held to a shape since 0.40, on the stated grounds that it was "the
+only part of a value source that reaches the statement text". A table and a column reach it too: `SqlIdentifier`
+was concatenated into every insert and every lookup subquery with nothing but a blank check in front of it, and
+both published schemas would have validated the spec that said so.
+
+The mapping-spec format changes, so `mapping-spec-0.50` is published in both formats.
+
+### Breaking
+
+- **A table or column name is held to being a name.** Unquoted it is a letter or underscore followed by letters,
+  digits, underscore, `$` or `#`; anything else is written in double quotes, with an interior quote doubled. The
+  plain set is the union of what the targets accept unquoted rather than the intersection - `$` and `#` are
+  Oracle's, and a letter is any letter because PostgreSQL takes them - so a spec can still name any column that
+  exists. What it excludes is everything that could end one token and start another.
+
+  A **qualified** name is refused rather than folded through. It used to work by accident, which made the table name
+  and `target.properties` two ways to say where a table lives. Refusing is the reversible direction: allowing one
+  later breaks nothing, refusing one later would.
+
+  Every table and column in the tutorial, the fixtures and the tests was checked against the new rule before it went
+  in; none of them changes.
+
+- **The spec model is no longer `Serializable`.** Nothing serialized a spec, so it was a promise made to nobody -
+  and a promise that would have had to be kept from 1.0, including the part where adding a record component breaks
+  a stream written by an older release.
+
+### Fixed
+
+- **`SqlIdentifier.unquoted()` did not undo the doubling.** `"a""b"` is the single column `a"b`, and `xldr check`
+  compared `a""b` against what `DatabaseMetaData` reports - so a column with a quote in its name always read as
+  absent. Rare, and wrong in the way that looks like a missing column rather than like a bug.
+
+- **Two malformed names got through.** `""` passed the blank check, being two characters, and produced an empty
+  quoted identifier; `"abc` with one quote folded to `"ABC` and became a syntax error on the first load rather than
+  a complaint when the spec was read.
+
+### Added
+
+- **`mapping-spec-0.50`**, in both formats, carrying the same rule so that an editor refuses what the reader
+  refuses. The two files share one pattern, written out as XML's own `NameStartChar` and `NameChar` ranges plus `$`
+  and `#` rather than as `\p{L}`, so that the JSON and XML schemas cannot drift into two dialects of the same idea.
+
 ## 0.49
 
 A release about which types a caller is meant to name. A sealed interface can be public with its cases hidden or

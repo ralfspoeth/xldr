@@ -27,7 +27,7 @@ import static org.junit.jupiter.api.Assertions.*;
  */
 class XsdTest {
 
-    private static final Path SCHEMA = Path.of("..", "docs", "schema", "mapping-spec-0.47.xsd");
+    private static final Path SCHEMA = Path.of("..", "docs", "schema", "mapping-spec-0.50.xsd");
 
     /**
      * Every element and attribute the reader knows, in one document.
@@ -740,6 +740,64 @@ class XsdTest {
                     </input>
                 </mappingSpec>
                 """);
+    }
+
+    // ---- and the rule 0.50 was published for ----------------------------------
+
+    /**
+     * A table or a column is written into the statement rather than bound to it,
+     * so the schema holds it to being a name - which XSD 1.0 can say perfectly
+     * well, this being a lexical rule rather than one about which members go
+     * together.
+     */
+    @Test
+    void aTableAndAColumnAreHeldToBeingNames() {
+        assertRefusedByBoth("""
+                <mappingSpec>
+                    <input mimeType="text/csv"/>
+                    <mapping recordSelector="r" table="t where 1=1 --">
+                        <fieldMapping fieldSelector="a" column="b"/>
+                    </mapping>
+                </mappingSpec>
+                """);
+        assertRefusedByBoth("""
+                <mappingSpec>
+                    <input mimeType="text/csv"/>
+                    <mapping recordSelector="r" table="t">
+                        <fieldMapping fieldSelector="a" column="count(*)"/>
+                    </mapping>
+                </mappingSpec>
+                """);
+        assertRefusedByBoth("""
+                <mappingSpec>
+                    <input mimeType="text/csv"/>
+                    <mapping recordSelector="r" table="reporting.orders">
+                        <fieldMapping fieldSelector="a" column="b"/>
+                    </mapping>
+                </mappingSpec>
+                """);
+    }
+
+    /**
+     * The union of what the targets accept unquoted, so a spec can name a column
+     * that exists - and anything else in quotes, with an interior quote doubled.
+     */
+    @Test
+    void aNameMayBeAnythingTheTargetsCallAName() {
+        var xml = """
+                <mappingSpec>
+                    <input mimeType="text/csv"/>
+                    <mapping recordSelector="r" table="EMP$">
+                        <fieldMapping fieldSelector="a" column="x#y"/>
+                        <fieldMapping fieldSelector="b" column="größe"/>
+                        <fieldMapping fieldSelector="c" column="&quot;order id&quot;"/>
+                        <fieldMapping fieldSelector="d" column="&quot;a&quot;&quot;b&quot;"/>
+                    </mapping>
+                </mappingSpec>
+                """;
+        assertDoesNotThrow(() -> validate(xml));
+        assertDoesNotThrow(() -> new XmlMappingSpecReader().read(stream(xml)),
+                "and the reader takes exactly the same set");
     }
 
     /**

@@ -409,12 +409,12 @@ Both formats have a published schema, so an editor can check a spec before it ev
 only reports a broken spec in its log, by leaving the feed inactive. Point at the schema from the spec itself:
 
     {
-      "$schema": "https://ralfspoeth.github.io/xldr/schema/mapping-spec-0.47.json",
+      "$schema": "https://ralfspoeth.github.io/xldr/schema/mapping-spec-0.50.json",
       "input": { ... }
     }
 
     <mappingSpec xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-                 xsi:noNamespaceSchemaLocation="https://ralfspoeth.github.io/xldr/schema/mapping-spec-0.47.xsd">
+                 xsi:noNamespaceSchemaLocation="https://ralfspoeth.github.io/xldr/schema/mapping-spec-0.50.xsd">
 
 Both are ignored by the readers - `$schema` is just another unrecognised member, and `xsi:` attributes carry no
 meaning for a spec that has no namespace of its own. IntelliJ and VS Code both validate and autocomplete from them.
@@ -441,7 +441,9 @@ written for `fieldSelectors` costs a record every one of its fields, and no read
 unknown is exactly what it promises.
 
 A schema is published whenever the format changes, and is named after the release that changed it:
-`mapping-spec-0.46` describes the format from 0.46 onwards,
+`mapping-spec-0.50` describes the format from 0.50 onwards,
+`mapping-spec-0.47` that of 0.47 to 0.49,
+`mapping-spec-0.46` that of 0.46,
 `mapping-spec-0.44` that of 0.44 and 0.45,
 `mapping-spec-0.43` that of 0.43,
 `mapping-spec-0.42` that of 0.42,

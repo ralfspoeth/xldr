@@ -12,20 +12,20 @@ Both formats have a published schema, and pointing at it is the single most usef
 JSON, add `$schema` as the first member:
 
     {
-      "$schema": "https://ralfspoeth.github.io/xldr/schema/mapping-spec-0.47.json",
+      "$schema": "https://ralfspoeth.github.io/xldr/schema/mapping-spec-0.50.json",
       "input": { ... }
     }
 
 In XML, a schema location on the root element:
 
     <mappingSpec xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-                 xsi:noNamespaceSchemaLocation="https://ralfspoeth.github.io/xldr/schema/mapping-spec-0.47.xsd">
+                 xsi:noNamespaceSchemaLocation="https://ralfspoeth.github.io/xldr/schema/mapping-spec-0.50.xsd">
 
 IntelliJ and VS Code validate and autocomplete from these. Both are ignored by the readers - `$schema` is just a
 member nobody recognises, and `xsi:` attributes mean nothing to a document with no namespace of its own - so a
 spec carrying one loads exactly as it would without.
 
-A schema is named after the release that last changed the format, so `mapping-spec-0.47` is the current one and a
+A schema is named after the release that last changed the format, so `mapping-spec-0.50` is the current one and a
 release that changes nothing keeps the previous. The full list is on the [schema page](https://ralfspoeth.github.io/xldr/).
 
 What this catches is what a schema can: a misspelled member, a `type` that is not one of the five, a field mapping

@@ -35,7 +35,7 @@ import static org.junit.jupiter.api.Assertions.*;
  */
 class JsonSchemaTest {
 
-    private static final Path SCHEMA = Path.of("..", "docs", "schema", "mapping-spec-0.47.json");
+    private static final Path SCHEMA = Path.of("..", "docs", "schema", "mapping-spec-0.50.json");
 
     /**
      * Every member the reader knows, in one document - the JSON transliteration
@@ -658,6 +658,89 @@ class JsonSchemaTest {
                       { "regex": { "pattern": "([0-9]+)", "group": 1,
                                    "expr": "${xldr.rowsLoaded}" } } ] } ] }
                 """);
+    }
+
+    // ---- and the rule 0.50 was published for ----------------------------------
+
+    /**
+     * A table or a column is written into the statement rather than bound to it,
+     * so it is held to being a name - and the schema says so, which is the whole
+     * point of publishing one.
+     * <p>
+     * Until 0.50 the only rule was non-blank, in the reader and in both schemas,
+     * while {@code CallableName} held a routine name to a shape on the grounds
+     * that it was the only part of a value source reaching the statement text.
+     * That was never true of a table.
+     */
+    @Test
+    void aTableAndAColumnAreHeldToBeingNames() throws IOException {
+        assertRefusedByBoth("""
+                { "input": { "mimeType": "text/csv" },
+                  "mapping": [ { "recordSelector": "r", "table": "t where 1=1 --",
+                      "fieldMapping": [ { "fieldSelector": "a", "column": "b" } ] } ] }
+                """, "puts a fragment of SQL where a table name goes");
+        assertRefusedByBoth("""
+                { "input": { "mimeType": "text/csv" },
+                  "mapping": [ { "recordSelector": "r", "table": "t",
+                      "fieldMapping": [ { "fieldSelector": "a", "column": "count(*)" } ] } ] }
+                """, "puts an expression where a column name goes");
+        assertRefusedByBoth("""
+                { "input": { "mimeType": "text/csv" },
+                  "mapping": [ { "recordSelector": "r", "table": "t", "fieldMapping": [
+                      { "column": "x", "lookup": { "table": "rate", "column": "factor",
+                          "keyColumn": "a b", "var": "v" } } ] } ] }
+                """, "puts a space in a lookup's key column");
+    }
+
+    /**
+     * The set is the union of what the targets accept unquoted rather than the
+     * intersection, so a spec can name a column that exists: {@code $} and
+     * {@code #} are Oracle's, and a letter is any letter because PostgreSQL takes
+     * them unquoted.
+     */
+    @Test
+    void aNameMayBeAnythingTheTargetsCallAName() throws IOException {
+        assertValid("""
+                { "input": { "mimeType": "text/csv" },
+                  "mapping": [ { "recordSelector": "r", "table": "EMP$", "fieldMapping": [
+                      { "fieldSelector": "a", "column": "x#y" },
+                      { "fieldSelector": "b", "column": "größe" },
+                      { "fieldSelector": "c", "column": "_private" } ] } ] }
+                """);
+    }
+
+    /**
+     * And anything else is written in quotes, with an interior quote doubled -
+     * which is how SQL escapes one, and the form {@code unquoted()} undoes to
+     * match what {@code DatabaseMetaData} reports.
+     */
+    @Test
+    void aQuotedNameCarriesWhatAPlainOneCannot() throws IOException {
+        assertValid("""
+                { "input": { "mimeType": "text/csv" },
+                  "mapping": [ { "recordSelector": "r", "table": "t", "fieldMapping": [
+                      { "fieldSelector": "a", "column": "\\"order id\\"" },
+                      { "fieldSelector": "b", "column": "\\"a\\"\\"b\\"" } ] } ] }
+                """);
+        assertRefusedByBoth("""
+                { "input": { "mimeType": "text/csv" },
+                  "mapping": [ { "recordSelector": "r", "table": "t", "fieldMapping": [
+                      { "fieldSelector": "a", "column": "\\"unclosed" } ] } ] }
+                """, "leaves a quoted name open");
+    }
+
+    /**
+     * A qualified name is refused rather than folded through: it used to work by
+     * accident, which made the table name and {@code target.properties} two ways
+     * to say where a table lives.
+     */
+    @Test
+    void aQualifiedTableNameIsRefused() throws IOException {
+        assertRefusedByBoth("""
+                { "input": { "mimeType": "text/csv" },
+                  "mapping": [ { "recordSelector": "r", "table": "reporting.orders",
+                      "fieldMapping": [ { "fieldSelector": "a", "column": "b" } ] } ] }
+                """, "qualifies a table name");
     }
 
     /**
