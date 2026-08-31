@@ -407,7 +407,8 @@ public class Loader implements AutoCloseable {
      * {@code nextval(name[, start])} draws from an in-memory per-load sequence;
      * {@code format(value, pattern)} and {@code parse(text, pattern)} convert
      * between text and the date types; {@code coalesce(a, b, ...)} yields the
-     * first of its arguments that is not null.
+     * first of its arguments that is not null; {@code recode(subject, s, r, ...)}
+     * turns one code into another.
      */
     private Expression.Bindings bindings(Map<String, @Nullable Object> vars, @Nullable Row row) {
         return new Expression.Bindings() {
@@ -447,7 +448,17 @@ public class Loader implements AutoCloseable {
                     case "format" -> format(args);
                     case "parse" -> parseTemporal(args);
                     case "coalesce" -> coalesce(args);
-                    default -> throw new IllegalArgumentException("unknown function: " + name);
+                    case "recode" -> recode(args);
+                    // naming the set, because nothing looks at a template before
+                    // a load does and a typo would otherwise surface on the first
+                    // record of the first file with nothing to go on
+                    case "decode" -> throw new IllegalArgumentException("there is no decode(); the"
+                            + " equality switch here is recode(subject, search, result[, ...])."
+                            + " It is not Oracle's DECODE: a null subject takes the default rather"
+                            + " than matching a null search, there being no null literal to write");
+                    default -> throw new IllegalArgumentException("unknown function '" + name
+                            + "'; the built-ins are now(), nextval(), format(), parse(), coalesce()"
+                            + " and recode()");
                 };
             }
         };
@@ -550,6 +561,66 @@ public class Loader implements AutoCloseable {
     private DateTimeFormatter formatter(String pattern) {
         return formatters.computeIfAbsent(
                 pattern, p -> DateTimeFormatter.ofPattern(p).withZone(ZoneId.systemDefault()));
+    }
+
+    /**
+     * One code turned into another: {@code recode(subject, s1, r1, s2, r2, ...)},
+     * with an odd trailing argument as the value for a subject that matches
+     * nothing.
+     * <p>
+     * What it is for is the small fixed map that does not deserve a table -
+     * {@code ${recode(side, 'C', 'CREDIT', 'D', 'DEBIT', 'UNKNOWN')}}. A
+     * {@link ValueSource.Lookup} is the answer when the map is data, kept by
+     * someone, and liable to change; this is the answer when the map is three
+     * pairs written in the spec, where a reference table is machinery around a
+     * fact everybody already knows.
+     * <p>
+     * Named {@code recode} rather than {@code decode}, which is Oracle's spelling
+     * of roughly this. PostgreSQL has a {@code decode} of its own that converts
+     * base64 to bytes, and this toolkit ships a driver for it, so borrowing the
+     * name would hand half its users the wrong idea. This is also not Oracle's
+     * function: {@code DECODE} matches NULL to NULL, which cannot even be written
+     * here - an argument is a quoted string, a whole number, a name or a call, and
+     * there is no null literal.
+     *
+     * <h4>Two decisions worth knowing</h4>
+     *
+     * <strong>A null subject takes the default.</strong> Nothing matches it,
+     * because nothing can be written that would. That is {@code CASE} semantics
+     * rather than {@code DECODE}'s, and it is the only honest reading given the
+     * grammar.
+     * <p>
+     * <strong>Comparison is textual.</strong> {@code Objects.equals} would be the
+     * obvious choice and is a trap here: a field declared {@code INTEGRAL}
+     * arrives as a {@code Long}, an integer literal in a template is an
+     * {@code Integer}, and {@code Long.valueOf(1).equals(Integer.valueOf(1))} is
+     * false - so {@code recode(qty, 1, 'one')} would silently take the default on
+     * every row. Comparing the rendered forms makes {@code 1} match the long, the
+     * integer and the text, which is what an author writing it means. What it
+     * does not do is make {@code 1} match a {@code BigDecimal} of {@code 1.0},
+     * those rendering differently; a decimal code is a thing to quote.
+     */
+    private static @Nullable Object recode(List<@Nullable Object> args) {
+        if (args.size() < 3) {
+            throw new IllegalArgumentException("recode(subject, search, result[, ...][, otherwise])"
+                    + " needs a subject and at least one search-and-result pair, and was given "
+                    + args.size() + " argument(s)");
+        }
+        var subject = args.getFirst();
+        var pairs = args.subList(1, args.size());
+        // whatever is left over after the pairs is the value for no match; where
+        // the count is even there is none, and no match yields null
+        var otherwise = pairs.size() % 2 == 1 ? pairs.getLast() : null;
+        if (subject != null) {
+            var wanted = String.valueOf(subject);
+            for (int i = 0; i + 1 < pairs.size(); i += 2) {
+                var search = pairs.get(i);
+                if (search != null && wanted.equals(String.valueOf(search))) {
+                    return pairs.get(i + 1);
+                }
+            }
+        }
+        return otherwise;
     }
 
     /**

@@ -831,7 +831,23 @@ exactly the mappings that have a record in scope. The **functions** are:
   resolved. This costs nothing for the shape above, where the arguments are names; it bites only for a nested call,
   `${coalesce(a, parse(b, 'yyyyMMdd'))}`, where a *present but malformed* `b` ends the load even though its value
   was never going to be used. `parse` and `format` answer null for a null or empty input, so the ordinary case - `b`
-  simply absent - is safe. Put a risky call in a `var`, where it is named and evaluated once.
+  simply absent - is safe. Put a risky call in a `var`, where it is named and evaluated once;
+
+* `recode(subject, search, result[, search, result]...[, otherwise])` - one code turned into another.
+  `${recode(side, 'C', 'CREDIT', 'D', 'DEBIT', 'UNKNOWN')}`. An odd trailing argument is the value for a subject
+  that matched nothing; without one, no match is NULL. This is for the small fixed map that does not deserve a
+  table - use a `lookup` when the map is data somebody maintains, and this when it is three pairs everyone already
+  knows.
+
+  Two things it does deliberately. **A null subject takes the default**, matching nothing, because nothing that
+  would match it can be written - there is no null literal in the grammar. **Comparison is textual**: a field
+  declared `INTEGRAL` arrives as a `Long` and a whole number in a template is an `Integer`, and those are not
+  `equals`, so comparing the rendered forms is what makes `${recode(qty, 1, 'one')}` mean what it says. A decimal
+  code is a thing to quote, `1` and `1.0` rendering differently.
+
+  It is not Oracle's `DECODE`, and is not called that: PostgreSQL has a `decode` that converts base64 to bytes and
+  this toolkit ships a driver for it. `DECODE` also matches NULL to NULL, which this cannot express. Writing
+  `${decode(...)}` is refused with a message that says so.
 
 An argument may itself be a name or a call, so `${format(now(), 'yyyy-MM-dd')}` and `${format(birthdate, 'yyyy')}`
 both say what they look like; a name inside a call is resolved exactly as `${name}` would be, fields included. A null

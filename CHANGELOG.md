@@ -10,6 +10,28 @@ The versions are the git tags `xldr-<version>`; the published artifacts carry th
 
 ### Added
 
+- **`recode(subject, search, result, ...[, otherwise])` in an expression**, turning one code into another:
+  `${recode(side, 'C', 'CREDIT', 'D', 'DEBIT', 'UNKNOWN')}`. An odd trailing argument is the value for a subject
+  that matched nothing; without one, no match is NULL. This is for the small fixed map that does not deserve a
+  reference table - a `lookup` is still the answer when the map is data somebody maintains, and this is the answer
+  when it is three pairs everybody already knows.
+
+  **It is not called `decode`, and it is not Oracle's `DECODE`.** PostgreSQL has a `decode` that converts base64 to
+  bytes and this toolkit ships a driver for it, so borrowing the name would hand half its users the wrong idea.
+  Nor could the semantics be borrowed: `DECODE` matches NULL to NULL, and there is no null literal in the grammar
+  to write - an argument is a quoted string, a whole number, a name or a call. So **a null subject takes the
+  default**, which is `CASE` semantics and the only honest reading. Writing `${decode(...)}` is refused by name
+  with a message saying what to write instead, because nothing looks at a template until a load runs it and the
+  refusal is therefore the only thing that can teach.
+
+  **Comparison is textual**, which is a decision and not an oversight. A field declared `INTEGRAL` arrives as a
+  `Long` and a whole number in a template is an `Integer`, and those are never `equals` - so `Objects.equals` would
+  make `${recode(qty, 1, 'one')}` take the default on every row, silently. Comparing what they render to is what
+  makes the spec mean what it says. A decimal code is a thing to quote, `1` and `1.0` rendering differently.
+
+  The schema needed no change at all, which is the first dividend from `mapping-spec-0.53`: its description of
+  `expr` names no functions, so the set can grow without a published file going stale.
+
 - **`coalesce(a, b, ...)` in an expression**, yielding the first argument that is not null. Two arguments at least
   and as many as you like; all of them null is an ordinary answer and the column takes NULL, exactly as it does for
   a lookup that matched nothing. What it is for is a value that lives in more than one place - a field the feed

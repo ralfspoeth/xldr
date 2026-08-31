@@ -556,6 +556,174 @@ class LoaderTest {
     }
 
     /**
+     * The small fixed map that does not deserve a reference table: a match takes
+     * its result, a subject that matches nothing takes the odd trailing argument,
+     * and a subject that is null takes it too - nothing matches null, because no
+     * literal that would match it can be written.
+     */
+    @Test
+    void expressionRecodesACodeIntoAValue() throws Exception {
+        try (var conn = DriverManager.getConnection(jdbcUrl);
+             var stmt = conn.createStatement()) {
+            stmt.execute("drop table if exists recoded");
+            stmt.execute("create table recoded(id varchar(10), side varchar(10))");
+        }
+        var mapping = new RecordMappingSpec("rows", "recoded", List.of(
+                new FieldMappingSpec("id", new ValueSource.Field("id")),
+                new FieldMappingSpec("side",
+                        new ValueSource.Expr("${recode(side, 'C', 'CREDIT', 'D', 'DEBIT', 'UNKNOWN')}"))
+        ), null);
+        var spec = new MappingSpec(new InputSpec("text/csv", List.of(), List.of(), Map.of()), List.of(mapping));
+        var adapter = adapterFor(Map.of("rows", List.of(
+                Map.of("id", "a", "side", "C"),
+                Map.of("id", "b", "side", "D"),
+                Map.of("id", "c", "side", "X"),
+                Map.of("id", "d")   // no side at all
+        )));
+
+        try (var loader = createLoader(spec)) {
+            assertEquals(4, loader.loadInput(adapter, InputStream.nullInputStream(), mapping));
+        }
+
+        try (var conn = DriverManager.getConnection(jdbcUrl);
+             var stmt = conn.createStatement();
+             var rs = stmt.executeQuery("select side from recoded order by id")) {
+            var sides = new ArrayList<String>();
+            while (rs.next()) {
+                sides.add(rs.getString(1));
+            }
+            assertEquals(List.of("CREDIT", "DEBIT", "UNKNOWN", "UNKNOWN"), sides);
+        }
+    }
+
+    /**
+     * With no trailing default, a subject that matches nothing is NULL rather
+     * than the last result - the pairs being even is what says there is no
+     * default.
+     */
+    @Test
+    void recodeWithoutADefaultYieldsNull() throws Exception {
+        try (var conn = DriverManager.getConnection(jdbcUrl);
+             var stmt = conn.createStatement()) {
+            stmt.execute("drop table if exists recoded_nodefault");
+            stmt.execute("create table recoded_nodefault(id varchar(10), side varchar(10))");
+        }
+        var mapping = new RecordMappingSpec("rows", "recoded_nodefault", List.of(
+                new FieldMappingSpec("id", new ValueSource.Field("id")),
+                new FieldMappingSpec("side", new ValueSource.Expr("${recode(side, 'C', 'CREDIT')}"))
+        ), null);
+        var spec = new MappingSpec(new InputSpec("text/csv", List.of(), List.of(), Map.of()), List.of(mapping));
+        var adapter = adapterFor(Map.of("rows", List.of(Map.of("id", "a", "side", "X"))));
+
+        try (var loader = createLoader(spec)) {
+            assertEquals(1, loader.loadInput(adapter, InputStream.nullInputStream(), mapping));
+        }
+
+        try (var conn = DriverManager.getConnection(jdbcUrl);
+             var stmt = conn.createStatement();
+             var rs = stmt.executeQuery("select side from recoded_nodefault")) {
+            assertTrue(rs.next());
+            assertNull(rs.getString(1), "nothing matched and there was no default");
+        }
+    }
+
+    /**
+     * The comparison is textual, and this is the case that made it so: the field
+     * is declared {@code INTEGRAL} so the adapter hands over a {@code Long}, the
+     * literal in the template is an {@code Integer}, and those are never
+     * {@code equals}. Comparing what they render to is what makes the spec mean
+     * what it says instead of silently taking the default on every row.
+     */
+    @Test
+    void recodeComparesAcrossNumericTypes() throws Exception {
+        try (var conn = DriverManager.getConnection(jdbcUrl);
+             var stmt = conn.createStatement()) {
+            stmt.execute("drop table if exists recoded_typed");
+            stmt.execute("create table recoded_typed(id varchar(10), size varchar(10))");
+        }
+        var mapping = new RecordMappingSpec("rows", "recoded_typed", List.of(
+                new FieldMappingSpec("id", new ValueSource.Field("id")),
+                new FieldMappingSpec("size", new ValueSource.Expr("${recode(qty, 1, 'one', 2, 'two', 'many')}"))
+        ), null);
+        var spec = new MappingSpec(new InputSpec("text/csv", List.of(), List.of(), Map.of()), List.of(mapping));
+        // the stub adapter answers text, as a CSV would before a type is declared
+        var adapter = adapterFor(Map.of("rows", List.of(
+                Map.of("id", "a", "qty", "1"),
+                Map.of("id", "b", "qty", "7")
+        )));
+
+        try (var loader = createLoader(spec)) {
+            assertEquals(2, loader.loadInput(adapter, InputStream.nullInputStream(), mapping));
+        }
+
+        try (var conn = DriverManager.getConnection(jdbcUrl);
+             var stmt = conn.createStatement();
+             var rs = stmt.executeQuery("select size from recoded_typed order by id")) {
+            var sizes = new ArrayList<String>();
+            while (rs.next()) {
+                sizes.add(rs.getString(1));
+            }
+            assertEquals(List.of("one", "many"), sizes);
+        }
+    }
+
+    /**
+     * A subject and one pair at least. Fewer is a spec that cannot mean anything,
+     * and - since the pairs are positional - is most likely an argument dropped
+     * while editing.
+     */
+    @Test
+    void recodeNeedsASubjectAndAPair() throws Exception {
+        try (var conn = DriverManager.getConnection(jdbcUrl);
+             var stmt = conn.createStatement()) {
+            stmt.execute("drop table if exists recoded_short");
+            stmt.execute("create table recoded_short(id varchar(10), side varchar(10))");
+        }
+        var mapping = new RecordMappingSpec("rows", "recoded_short", List.of(
+                new FieldMappingSpec("id", new ValueSource.Field("id")),
+                new FieldMappingSpec("side", new ValueSource.Expr("${recode(side, 'C')}"))
+        ), null);
+        var spec = new MappingSpec(new InputSpec("text/csv", List.of(), List.of(), Map.of()), List.of(mapping));
+        var adapter = adapterFor(Map.of("rows", List.of(Map.of("id", "a", "side", "C"))));
+
+        var thrown = assertThrows(RuntimeException.class, () -> {
+            try (var loader = createLoader(spec)) {
+                loader.loadInput(adapter, InputStream.nullInputStream(), mapping);
+            }
+        });
+        assertTrue(thrown.getMessage().contains("at least one search-and-result pair"),
+                "the message does not say what is wanted: " + thrown.getMessage());
+    }
+
+    /**
+     * Someone arriving from Oracle will type {@code decode}, and nothing looks at
+     * a template until a load runs it - so the refusal has to be the thing that
+     * teaches, the way {@code DataType.named} does for the old {@code DATE}.
+     */
+    @Test
+    void decodeIsRefusedByName() throws Exception {
+        try (var conn = DriverManager.getConnection(jdbcUrl);
+             var stmt = conn.createStatement()) {
+            stmt.execute("drop table if exists decoded");
+            stmt.execute("create table decoded(id varchar(10), side varchar(10))");
+        }
+        var mapping = new RecordMappingSpec("rows", "decoded", List.of(
+                new FieldMappingSpec("id", new ValueSource.Field("id")),
+                new FieldMappingSpec("side", new ValueSource.Expr("${decode(side, 'C', 'CREDIT')}"))
+        ), null);
+        var spec = new MappingSpec(new InputSpec("text/csv", List.of(), List.of(), Map.of()), List.of(mapping));
+        var adapter = adapterFor(Map.of("rows", List.of(Map.of("id", "a", "side", "C"))));
+
+        var thrown = assertThrows(RuntimeException.class, () -> {
+            try (var loader = createLoader(spec)) {
+                loader.loadInput(adapter, InputStream.nullInputStream(), mapping);
+            }
+        });
+        assertTrue(thrown.getMessage().contains("recode("),
+                "the refusal should name what to write instead: " + thrown.getMessage());
+    }
+
+    /**
      * {@code format} renders a timestamp into a text column as the pattern says,
      * rather than however the driver would render one - the reason the function
      * exists. It takes a call as its argument, which the parser has to see
