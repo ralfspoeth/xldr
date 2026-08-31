@@ -76,7 +76,12 @@
         <th>XML</th>
     </tr>
     <tr>
-        <td>0.50 onwards (current)</td>
+        <td>0.53 onwards (current)</td>
+        <td><a href="schema/mapping-spec-0.53.json">mapping-spec-0.53.json</a></td>
+        <td><a href="schema/mapping-spec-0.53.xsd">mapping-spec-0.53.xsd</a></td>
+    </tr>
+    <tr>
+        <td>0.50 - 0.52</td>
         <td><a href="schema/mapping-spec-0.50.json">mapping-spec-0.50.json</a></td>
         <td><a href="schema/mapping-spec-0.50.xsd">mapping-spec-0.50.xsd</a></td>
     </tr>
@@ -158,6 +163,15 @@
     changes nothing about the format - 0.11, 0.12, 0.14 to 0.20, 0.22, 0.24 to 0.31, 0.33, 0.34, 0.36 to 0.39, 0.41, 0.45, 0.48, 0.49, 0.51, 0.52 -
     keeps the previous schema rather than publishing a copy of it. An older one stays where it is, so a spec pinned
     to it keeps validating.
+</p>
+
+<p>
+    <strong>0.53 is the exception that proves the rule.</strong> It publishes a pair without changing the format,
+    because a published schema is never edited in place and one of its <em>descriptions</em> was wrong: it had named
+    a subset of the expression functions since 0.10 while the set grew without it. The new pair says nothing about
+    the functions and points here instead, so the list cannot drift again. Every constraint is identical - a spec
+    valid under <code>mapping-spec-0.50</code> is valid under <code>mapping-spec-0.53</code>, and the only
+    differences between the two files are that sentence and the schema's own name.
 </p>
 
 <p>
@@ -302,7 +316,7 @@
 <p>In a JSON spec, as a member the reader does not recognise and therefore ignores:</p>
 
 <pre><code>{
-  "$schema": "https://ralfspoeth.github.io/xldr/schema/mapping-spec-0.50.json",
+  "$schema": "https://ralfspoeth.github.io/xldr/schema/mapping-spec-0.53.json",
   "input": {
     "mimeType": "text/csv",
     "properties": { "fieldSeparator": "," },
@@ -314,7 +328,7 @@
 <p>In an XML spec, as the schema location of a document that has no namespace of its own:</p>
 
 <pre><code>&lt;mappingSpec xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-             xsi:noNamespaceSchemaLocation="https://ralfspoeth.github.io/xldr/schema/mapping-spec-0.50.xsd"&gt;
+             xsi:noNamespaceSchemaLocation="https://ralfspoeth.github.io/xldr/schema/mapping-spec-0.53.xsd"&gt;
     &lt;input mimeType="text/xml"&gt;
         ...
     &lt;/input&gt;

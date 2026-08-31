@@ -8,6 +8,44 @@ The versions are the git tags `xldr-<version>`; the published artifacts carry th
 
 ## Unreleased
 
+### Added
+
+- **`coalesce(a, b, ...)` in an expression**, yielding the first argument that is not null. Two arguments at least
+  and as many as you like; all of them null is an ordinary answer and the column takes NULL, exactly as it does for
+  a lookup that matched nothing. What it is for is a value that lives in more than one place - a field the feed
+  renamed halfway through its life, `${coalesce(amount, amt)}`, or a rate from a reference table with a gap in it,
+  `${coalesce(rate, defaultRate)}`.
+
+  It is a built-in of the expression language rather than an eighth `ValueSource`, which is the whole reason it
+  costs so little: no new case in a sealed interface, so no exhaustive switch anywhere has to change, and a
+  template being opaque text to both schemas, no constraint moves either. A spec that loaded under 0.52 loads
+  under this one, unchanged.
+
+- **`mapping-spec-0.53`, in both formats, with the same constraints as `mapping-spec-0.50`.** The one exception
+  this project has made to publishing a pair only when the format changes, and it is worth saying why rather than
+  leaving a version number that appears to mean something it does not.
+
+  The JSON schema's `expr` member carried a *description* naming the expression functions, and it had named a
+  subset of them since 0.10. `format` and `parse` arrived in that release and were never added to it, so the pair
+  published beside them was already incomplete on the day it shipped, and **thirteen pairs from 0.10 to 0.50 carry
+  the identical sentence** - the two before that, 0.8 and 0.9, carry it correctly, the functions not yet existing.
+  Nothing validates against a description, so nothing ever failed; it simply misdescribed the language to every
+  editor that showed it, for forty-odd releases. Adding `coalesce` would have made it wrong by three.
+
+  A published schema is never edited in place, so correcting 0.50 was not available. The new pair instead **removes
+  the enumeration** and points at the project documentation, which fixes the class rather than the instance: a list
+  kept in two places is a list that drifts, and now there is one. The only differences between the two files are
+  that sentence and the schema's own `$id`. **A spec valid under `mapping-spec-0.50` is valid under
+  `mapping-spec-0.53`** - which is the invariant a reader actually depends on, and it holds.
+
+  Two things worth knowing. A literal argument may only be a quoted string or a whole number, so a non-integer
+  default wants a `var` holding a `const` - which reads better anyway, the default then having a name. And **every
+  argument is evaluated, including the ones after the winner**, because arguments reach a built-in already
+  resolved: this cannot short-circuit the way SQL's `COALESCE` does. That costs nothing for the shape above, where
+  the arguments are names, and bites only for a nested call - `${coalesce(a, parse(b, 'yyyyMMdd'))}` with a present
+  but malformed `b` ends the load though the value was never wanted. Uniformity is why it stays that way: the other
+  built-ins are eager, and one lazy function would mean an author has to know which is which.
+
 ### Changed
 
 - **The conformance kit says which version of itself to use, and what an upgrade may do.** Neither was a change to

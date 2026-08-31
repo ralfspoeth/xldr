@@ -406,7 +406,8 @@ public class Loader implements AutoCloseable {
      * if a record is in scope - the record's fields. {@code now()} yields an {@link Instant};
      * {@code nextval(name[, start])} draws from an in-memory per-load sequence;
      * {@code format(value, pattern)} and {@code parse(text, pattern)} convert
-     * between text and the date types.
+     * between text and the date types; {@code coalesce(a, b, ...)} yields the
+     * first of its arguments that is not null.
      */
     private Expression.Bindings bindings(Map<String, @Nullable Object> vars, @Nullable Row row) {
         return new Expression.Bindings() {
@@ -445,6 +446,7 @@ public class Loader implements AutoCloseable {
                     case "nextval" -> nextval(args);
                     case "format" -> format(args);
                     case "parse" -> parseTemporal(args);
+                    case "coalesce" -> coalesce(args);
                     default -> throw new IllegalArgumentException("unknown function: " + name);
                 };
             }
@@ -548,6 +550,53 @@ public class Loader implements AutoCloseable {
     private DateTimeFormatter formatter(String pattern) {
         return formatters.computeIfAbsent(
                 pattern, p -> DateTimeFormatter.ofPattern(p).withZone(ZoneId.systemDefault()));
+    }
+
+    /**
+     * The first argument that is not null, or null where none of them is.
+     * <p>
+     * What it is for is a value that lives in more than one place: a field the
+     * feed renamed halfway through its life, a rate from a reference table that
+     * has a gap in it, a default for a column the source leaves empty.
+     * {@code ${coalesce(rate, defaultRate)}} is the shape - names, not calls.
+     * <p>
+     * Two arguments at least. Zero means nothing, and one means whatever the one
+     * argument means, which is a thing to write on its own; an author writing
+     * {@code coalesce(a)} has more likely dropped an alternative while editing
+     * than said what they meant. All of them null is <em>not</em> refused: that
+     * is an ordinary answer and the column takes NULL, exactly as it does for a
+     * lookup that matched nothing.
+     * <p>
+     * <strong>Every argument is evaluated, including the ones after the winner.</strong>
+     * Arguments reach a built-in already resolved - the interface is
+     * {@code function(name, values)} and not a list of thunks - so this cannot
+     * short-circuit the way SQL's {@code COALESCE} does. It is a real difference
+     * and it is worth knowing where it bites: nowhere, for the shape above, names
+     * and literals having nothing to do when nobody wants them. It bites for a
+     * nested call, {@code ${coalesce(a, parse(b, 'yyyyMMdd'))}}, where a
+     * <em>present but malformed</em> {@code b} ends the load even though the
+     * value was never going to be used. {@link #parseTemporal} and
+     * {@link #format} answer null for a null or empty input, so the ordinary
+     * case - {@code b} simply absent - is safe.
+     * <p>
+     * Uniformity is why it stays this way. The other built-ins are eager, and
+     * one lazy function would mean an author has to know which is which; making
+     * it lazy would also cost either {@code Expression} knowing this name, when
+     * names are deliberately the loader's business, or every function taking
+     * thunks for the sake of this one. Put the risky call in a var instead,
+     * where it is named and evaluated once.
+     */
+    private static @Nullable Object coalesce(List<@Nullable Object> args) {
+        if (args.size() < 2) {
+            throw new IllegalArgumentException("coalesce(a, b, ...) needs at least two alternatives,"
+                    + " and was given " + args.size());
+        }
+        for (var arg : args) {
+            if (arg != null) {
+                return arg;
+            }
+        }
+        return null;
     }
 
     /**

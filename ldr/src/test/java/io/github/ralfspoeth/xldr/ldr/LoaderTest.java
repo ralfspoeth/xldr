@@ -434,6 +434,128 @@ class LoaderTest {
     }
 
     /**
+     * The first alternative that is there wins, and a value absent from all of
+     * them is NULL rather than a failure - the same answer a lookup that matched
+     * nothing already gives.
+     * <p>
+     * The last alternative is a var holding a constant, which is the idiom for a
+     * default: a literal argument may only be a quoted string or a whole number,
+     * so anything else wants naming, and a named default reads better than one
+     * buried in a template anyway. It also shows the type surviving - the var is
+     * an {@code Integer} and reaches an integer column as one, rather than being
+     * rendered to text on the way.
+     */
+    @Test
+    void expressionCoalescesToTheFirstAlternativeThatIsThere() throws Exception {
+        try (var conn = DriverManager.getConnection(jdbcUrl);
+             var stmt = conn.createStatement()) {
+            stmt.execute("drop table if exists coalesced");
+            stmt.execute("create table coalesced(id varchar(10), amount integer)");
+        }
+        var vars = List.of(new VarSpec("fallback", new ValueSource.Constant(99)));
+        var mapping = new RecordMappingSpec("rows", "coalesced", List.of(
+                new FieldMappingSpec("id", new ValueSource.Field("id")),
+                new FieldMappingSpec("amount", new ValueSource.Expr("${coalesce(amount, amt, fallback)}"))
+        ), null);
+        var spec = new MappingSpec(
+                new InputSpec("text/csv", List.of(), vars, Map.of()),
+                List.of(mapping));
+        // the feed renamed the column halfway through its life, so a row carries
+        // one spelling or the other, and the oldest rows carry neither
+        var adapter = adapterFor(Map.of("rows", List.of(
+                Map.of("id", "a", "amount", "1", "amt", "2"),
+                Map.of("id", "b", "amt", "2"),
+                Map.of("id", "c")
+        )));
+
+        try (var loader = createLoader(spec)) {
+            assertEquals(3, loader.loadInput(adapter, InputStream.nullInputStream(), mapping));
+        }
+
+        try (var conn = DriverManager.getConnection(jdbcUrl);
+             var stmt = conn.createStatement();
+             var rs = stmt.executeQuery("select id, amount from coalesced order by id")) {
+            var got = new ArrayList<List<String>>();
+            while (rs.next()) {
+                got.add(Arrays.asList(rs.getString(1), rs.getString(2)));
+            }
+            assertEquals(
+                    List.of(
+                            List.of("a", "1"),      // the first alternative
+                            List.of("b", "2"),      // the second
+                            List.of("c", "99")      // neither field, so the named default
+                    ),
+                    got);
+        }
+    }
+
+    /**
+     * All of them null is an answer rather than an error, and the column takes
+     * NULL - which is the case a default exists to avoid, and has to keep working
+     * for the specs that do not want one.
+     */
+    @Test
+    void coalesceOverNothingAtAllIsNull() throws Exception {
+        try (var conn = DriverManager.getConnection(jdbcUrl);
+             var stmt = conn.createStatement()) {
+            stmt.execute("drop table if exists coalesced_null");
+            stmt.execute("create table coalesced_null(id varchar(10), amount varchar(10))");
+        }
+        var mapping = new RecordMappingSpec("rows", "coalesced_null", List.of(
+                new FieldMappingSpec("id", new ValueSource.Field("id")),
+                new FieldMappingSpec("amount", new ValueSource.Expr("${coalesce(amount, amt)}"))
+        ), null);
+        var spec = new MappingSpec(new InputSpec("text/csv", List.of(), List.of(), Map.of()), List.of(mapping));
+        var adapter = adapterFor(Map.of("rows", List.of(Map.of("id", "a"))));
+
+        try (var loader = createLoader(spec)) {
+            assertEquals(1, loader.loadInput(adapter, InputStream.nullInputStream(), mapping));
+        }
+
+        try (var conn = DriverManager.getConnection(jdbcUrl);
+             var stmt = conn.createStatement();
+             var rs = stmt.executeQuery("select amount from coalesced_null")) {
+            assertTrue(rs.next());
+            assertNull(rs.getString(1), "every alternative was absent, so the column is NULL");
+        }
+    }
+
+    /**
+     * One alternative is refused. Zero means nothing and one means whatever the
+     * one argument means, which is a thing to write on its own - so an author who
+     * wrote {@code coalesce(a)} has more likely dropped an alternative while
+     * editing than said what they meant.
+     */
+    @Test
+    void coalesceNeedsTwoAlternatives() throws Exception {
+        try (var conn = DriverManager.getConnection(jdbcUrl);
+             var stmt = conn.createStatement()) {
+            stmt.execute("drop table if exists coalesced_one");
+            stmt.execute("create table coalesced_one(id varchar(10), amount varchar(10))");
+        }
+        var mapping = new RecordMappingSpec("rows", "coalesced_one", List.of(
+                new FieldMappingSpec("id", new ValueSource.Field("id")),
+                new FieldMappingSpec("amount", new ValueSource.Expr("${coalesce(amount)}"))
+        ), null);
+        var spec = new MappingSpec(new InputSpec("text/csv", List.of(), List.of(), Map.of()), List.of(mapping));
+        var adapter = adapterFor(Map.of("rows", List.of(Map.of("id", "a", "amount", "1"))));
+
+        // an evaluation-time failure like any other, so it arrives wrapped and
+        // saying which record it was - the arity is not knowable before then,
+        // the function set being the loader's business and not the parser's
+        var thrown = assertThrows(RuntimeException.class, () -> {
+            try (var loader = createLoader(spec)) {
+                loader.loadInput(adapter, InputStream.nullInputStream(), mapping);
+            }
+        });
+        assertAll(
+                () -> assertTrue(thrown.getMessage().contains("at least two"),
+                        "the message does not say what is wanted: " + thrown.getMessage()),
+                () -> assertTrue(thrown.getMessage().contains("record 1"),
+                        "and it should still name the record: " + thrown.getMessage()));
+    }
+
+    /**
      * {@code format} renders a timestamp into a text column as the pattern says,
      * rather than however the driver would render one - the reason the function
      * exists. It takes a call as its argument, which the parser has to see

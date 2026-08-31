@@ -467,12 +467,12 @@ Both formats have a published schema, so an editor can check a spec before it ev
 only reports a broken spec in its log, by leaving the feed inactive. Point at the schema from the spec itself:
 
     {
-      "$schema": "https://ralfspoeth.github.io/xldr/schema/mapping-spec-0.50.json",
+      "$schema": "https://ralfspoeth.github.io/xldr/schema/mapping-spec-0.53.json",
       "input": { ... }
     }
 
     <mappingSpec xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-                 xsi:noNamespaceSchemaLocation="https://ralfspoeth.github.io/xldr/schema/mapping-spec-0.50.xsd">
+                 xsi:noNamespaceSchemaLocation="https://ralfspoeth.github.io/xldr/schema/mapping-spec-0.53.xsd">
 
 Both are ignored by the readers - `$schema` is just another unrecognised member, and `xsi:` attributes carry no
 meaning for a spec that has no namespace of its own. IntelliJ and VS Code both validate and autocomplete from them.
@@ -499,7 +499,8 @@ written for `fieldSelectors` costs a record every one of its fields, and no read
 unknown is exactly what it promises.
 
 A schema is published whenever the format changes, and is named after the release that changed it:
-`mapping-spec-0.50` describes the format from 0.50 onwards,
+`mapping-spec-0.53` describes the format from 0.53 onwards,
+`mapping-spec-0.50` that of 0.50 to 0.52,
 `mapping-spec-0.47` that of 0.47 to 0.49,
 `mapping-spec-0.46` that of 0.46,
 `mapping-spec-0.44` that of 0.44 and 0.45,
@@ -513,6 +514,12 @@ A schema is published whenever the format changes, and is named after the releas
 `mapping-spec-0.13` that of 0.13 to 0.20,
 `mapping-spec-0.10` that of 0.10 to 0.12, and so on. An
 earlier one stays where it is, so a spec pinned to it keeps validating.
+
+`mapping-spec-0.53` is the one exception to "whenever the format changes": it publishes an identical set of
+constraints, because a published schema is never edited in place and one of its *descriptions* had been wrong since
+0.10 - it named a subset of the expression functions while the set grew without it. The new pair names none of them
+and points at this document instead, so the list has one home. A spec valid under `mapping-spec-0.50` is valid
+under `mapping-spec-0.53`.
 
 What a schema cannot see is whether the spec makes sense as a whole - whether a mapping names a record selector the
 input actually declares, or whether the adapter accepts the selectors. There was a `bin/xldr validate` for that,
@@ -809,7 +816,22 @@ exactly the mappings that have a record in scope. The **functions** are:
 * `parse(text, 'pattern')` - the reverse: a date or timestamp read from text in a notation no adapter recognises, for
   the one column that needs it rather than for the whole feed the way the `dateFormat` property does. What the
   pattern reads decides the type - a date and a time give a `LocalDateTime`, a date alone a `LocalDate`, a time alone
-  a `LocalTime`.
+  a `LocalTime`;
+* `coalesce(a, b, ...)` - the first argument that is not null, or null where none of them is. Two arguments at
+  least, and as many as you like. This is for a value that lives in more than one place: a field the feed renamed
+  halfway through its life, `${coalesce(amount, amt)}`; a rate from a reference table that has a gap in it,
+  `${coalesce(rate, defaultRate)}`; a default for a column the source leaves empty. All of them null is an ordinary
+  answer and the column takes NULL, exactly as it does for a lookup that matched nothing.
+
+  A literal argument is a quoted string or a whole number, so a non-integer default wants a `var` holding a
+  `const` - `${coalesce(rate, defaultRate)}` rather than `${coalesce(rate, 1.0)}`, which does not parse. Naming the
+  default is better anyway.
+
+  **Every argument is evaluated, including the ones after the winner**, because arguments reach a function already
+  resolved. This costs nothing for the shape above, where the arguments are names; it bites only for a nested call,
+  `${coalesce(a, parse(b, 'yyyyMMdd'))}`, where a *present but malformed* `b` ends the load even though its value
+  was never going to be used. `parse` and `format` answer null for a null or empty input, so the ordinary case - `b`
+  simply absent - is safe. Put a risky call in a `var`, where it is named and evaluated once.
 
 An argument may itself be a name or a call, so `${format(now(), 'yyyy-MM-dd')}` and `${format(birthdate, 'yyyy')}`
 both say what they look like; a name inside a call is resolved exactly as `${name}` would be, fields included. A null

@@ -25,7 +25,8 @@ import static java.util.Objects.requireNonNull;
  *       load and then bound as a parameter. See {@link VarSpec}.</li>
  *   <li>{@link Expr} - a {@code ${...}} template evaluated in the JVM to a value
  *       that is bound as a parameter. It interpolates variables and a small set
- *       of built-in functions ({@code nextval}, {@code now}); it never emits
+ *       of built-in functions ({@code nextval}, {@code now}, {@code coalesce});
+ *       it never emits
  *       SQL.</li>
  *   <li>{@link Regex} - part of another source's value, picked out by a regular
  *       expression. No match yields NULL; the pattern is compiled when the spec
@@ -156,7 +157,7 @@ public sealed interface ValueSource {
      * A {@code ${...}} template. Literal text is interleaved with holes, each a
      * variable reference ({@code ${xldr.filename}}, a var, or - in a field
      * mapping - a field) or a call to a built-in function ({@code ${nextval('s')}},
-     * {@code ${now()}}). A template that is a single hole yields that hole's
+     * {@code ${now()}}, {@code ${coalesce(a, b)}}). A template that is a single hole yields that hole's
      * value with its native type; anything else yields the pieces concatenated
      * as a string.
      *
