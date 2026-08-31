@@ -6,14 +6,23 @@ ways that break existing code and existing specs; those changes are listed here 
 The versions are the git tags `xldr-<version>`; the published artifacts carry the same version under the group
 `io.github.ralfspoeth.xldr`.
 
-## Unreleased
+## 0.51
 
-A release about what the input-adapter SPI actually promises, ahead of `1.0` freezing whatever it says.
+A release about what this project actually promises, ahead of `1.0` freezing whatever it says. Two surfaces were
+asked what they were for, and both turned out to be answering a question nobody had asked in a while.
 
 There were two answers to "what must an adapter do": ten obligations in `ia`'s package documentation, and six of
 them checked by the conformance kit. Two statements of one contract drift, and these had - the prose named an
 obligation as unchecked that the kit had been checking since the day it shipped. The kit is now the contract and
 the prose is its reasoning.
+
+The server exported twelve types, of which three are required by the MXBean framework, three are what an embedder
+holds, and six were nobody's. Two of those six were public *so that they could be tested*, on a reason that expired
+at 0.38.
+
+Both shrinkings were worth doing before 1.0 rather than after, and both were prompted by the same question: not
+"what does this do" but "who holds it". The mapping-spec format is unchanged, so `mapping-spec-0.50` remains its
+schema and a spec that loaded under 0.50 loads under 0.51.
 
 ### Breaking
 
