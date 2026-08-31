@@ -91,9 +91,11 @@ class XmlFileHandler implements InputAdapter {
         try {
             var document = parsers.newDocumentBuilder().parse(source);
             var nodes = record.records(document);
+            // counted from one, and counted here because this is the only place
+            // that knows: a Node carries no notion of which of the matched nodes
+            // it was, and a document has no line numbers by the time it is a tree
             var rows = IntStream.range(0, nodes.getLength())
-                    .mapToObj(nodes::item)
-                    .map(node -> (Row) new XmlRow(node, record));
+                    .mapToObj(i -> (Row) new XmlRow(nodes.item(i), record, i + 1));
             return new Result(
                     selected.stream().map(fs -> new Field(fs.name(), fs.dataType().clazz())).toList(),
                     rows);
@@ -118,11 +120,25 @@ class XmlFileHandler implements InputAdapter {
                 .toList();
     }
 
-    private record XmlRow(Node node, XmlRecordSelector record) implements Row {
+    /**
+     * @param position which of the matched nodes this is, counted from one, so
+     *                 that a value that will not convert says which record it was
+     *                 in. {@link XmlFieldSelector} already names the field and the
+     *                 expression; the record is the part only this class knows.
+     */
+    private record XmlRow(Node node, XmlRecordSelector record, int position) implements Row {
         @Override
         public @Nullable Object get(String name) {
             var selector = record.fieldSelectors().get(name);
-            return selector == null ? null : selector.evaluate(node);
+            if (selector == null) {
+                return null;
+            }
+            try {
+                return selector.evaluate(node);
+            } catch (RuntimeException e) {
+                throw new IllegalStateException("record " + position + " of '" + record.name()
+                        + "': " + e.getMessage(), e);
+            }
         }
     }
 

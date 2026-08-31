@@ -86,4 +86,18 @@ class FltConformanceIT extends InputAdapterContract {
                         """),
                 "amount"));
     }
+
+    /**
+     * A fixed-length file has no keys, no tags and nothing to quote back, so the
+     * line is the whole of what identifies a record in it.
+     */
+    @Override
+    protected @NonNull List<Breakage> breakages() {
+        return List.of(new Breakage("letters in the range the layout reads as a number",
+                bytes("""
+                        001Alice012.50
+                        XXXBob  098.00
+                        """),
+                "line 2"));
+    }
 }

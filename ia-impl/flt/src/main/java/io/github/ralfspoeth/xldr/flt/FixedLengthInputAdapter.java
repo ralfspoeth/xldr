@@ -121,10 +121,21 @@ class FixedLengthInputAdapter implements InputAdapter {
                         .map(e -> new Field(e.getKey(), e.getValue().type().clazz()))
                         .toList(),
                 records(source)
-                        .filter(layout::keeps)
-                        .map(text -> (Row) new FLRow(layout, text))
+                        .filter(located -> layout.keeps(located.text()))
+                        .map(located -> new FLRow(layout, located))
         );
     }
+
+    /**
+     * One record's text, and the line of the file it began on.
+     * <p>
+     * The line is carried alongside rather than worked out later, because by the
+     * time a value refuses to convert the lines have been joined and there is
+     * nothing left to count. It is what a complaint needs: a fixed-length file
+     * has no keys, no tags and no structure to quote back, so the line is the
+     * only thing that sends an operator to the right place in it.
+     */
+    private record Located(String text, long startedAt) {}
 
     /**
      * The records of the file, each the text of however many lines one takes.
@@ -132,7 +143,7 @@ class FixedLengthInputAdapter implements InputAdapter {
      * Every record selector reads the same records and keeps its own; the file is
      * read once per record mapping, by the loader, rather than once per kind.
      */
-    private Stream<String> records(InputStream source) {
+    private Stream<Located> records(InputStream source) {
         return new BufferedReader(new InputStreamReader(source, charset))
                 .lines()
                 .gather(Gatherer.ofSequential(
@@ -146,7 +157,9 @@ class FixedLengthInputAdapter implements InputAdapter {
                         },
                         (l, ds) -> {
                             if (l.count > 0 && !ds.isRejecting()) {
-                                throw new IllegalArgumentException("incomplete final record");
+                                throw new IllegalArgumentException("incomplete final record: the one"
+                                        + " starting on line " + l.startedAt + " has " + l.count
+                                        + " line(s) where a record takes " + linesPerRecord);
                             }
                         }
                 ));
@@ -155,11 +168,11 @@ class FixedLengthInputAdapter implements InputAdapter {
     private class FLRow implements Row {
 
         private final Layout layout;
-        private final String text;
+        private final Located located;
 
-        private FLRow(Layout layout, String text) {
+        private FLRow(Layout layout, Located located) {
             this.layout = layout;
-            this.text = text;
+            this.located = located;
         }
 
         @Override
@@ -168,21 +181,38 @@ class FixedLengthInputAdapter implements InputAdapter {
             if (bds == null) {
                 return null;
             }
-            return formats.parse(bds.type(), bds.of(text));
+            try {
+                return formats.parse(bds.type(), bds.of(located.text()));
+            } catch (RuntimeException e) {
+                // the bounds are the likeliest thing wrong rather than the value:
+                // a layout off by one reads the tail of one field and the head of
+                // the next, so the range is worth saying alongside what it caught
+                throw new IllegalStateException("cannot read field '" + name + "' of the record on"
+                        + " line " + located.startedAt() + " as " + bds.type() + ", from characters "
+                        + bds.left() + ":" + bds.right() + ": " + e.getMessage(), e);
+            }
         }
     }
 
     private class LineAccu {
         final StringBuilder bldr = new StringBuilder();
         int count = 0;
+        /** lines of the file read so far */
+        long read = 0;
+        /** the line the record in hand began on */
+        long startedAt = 0;
 
         boolean add(String s) {
+            read++;
+            if (count == 0) {
+                startedAt = read;
+            }
             bldr.append(s);
             return ++count == linesPerRecord;
         }
 
-        String getAndReset() {
-            var ret = bldr.toString();
+        Located getAndReset() {
+            var ret = new Located(bldr.toString(), startedAt);
             bldr.setLength(0);
             count = 0;
             return ret;

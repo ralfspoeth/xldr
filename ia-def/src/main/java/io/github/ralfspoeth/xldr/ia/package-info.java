@@ -83,7 +83,12 @@
  *
  *   <li><b>Say what is wrong with the record, not just that something is.</b> A
  *       failure mid-stream should name the record it happened at; the loader adds
- *       the record selector and the table.</li>
+ *       the record selector and the table. Say it in the terms your format has -
+ *       the shipped adapters use the line a record began on, the spreadsheet row
+ *       as its author numbers it, or the record's ordinal where a document is a
+ *       tree with no lines left to count. A message that only says something went
+ *       wrong sends a person to a file of a million rows with nothing to search
+ *       for.</li>
  *
  *   <li><b>Read the source once, lazily, and leave it to the caller to close.</b>
  *       {@link io.github.ralfspoeth.xldr.ia.Result#rows()} is a stream the caller

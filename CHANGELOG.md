@@ -63,15 +63,21 @@ schema and a spec that loaded under 0.50 loads under 0.51.
 
 - **Obligations 1, 6 and 7 are checked**, on the evidence the three new hooks supply, so all ten of the package
   documentation's obligations are now either run or explicitly declined. The five shipped adapters each state their
-  refusals - between two and six apiece - `csv`, `flt` and `xml` each supply a sample with a value missing, and
-  `csv` supplies one that cannot be read.
+  refusals - between two and six apiece - all five supply a sample that cannot be read, and `csv`, `flt` and `xml`
+  each supply one with a value missing.
 
-  The four adapters that supply no breakage skip that check, and the skip is the finding: only `csv` names the
-  record in a mid-stream failure today. `flt` says "incomplete final record" and the rest surface whatever the
-  underlying parser said, which is obligation 7 unkept. Recorded rather than fixed here, the fix being a change to
-  four adapters and not to the kit.
+  Two checks still skip and say so: `json` and `xlsx` supply no sample with a value missing, neither format having
+  a way to express one that is worth writing down.
 
 ### Fixed
+
+- **Four adapters failed without saying which record they failed on.** `flt`, `json` and `xlsx` let a value that
+  would not convert surface as whatever the parser threw - a `NumberFormatException` reading `For input string:
+  "see note"`, with nothing to search a file of a million rows for - and `xml` named the field and the expression
+  but not the record. Each now says where it was, in the terms its own format has: `flt` the line the record began
+  on, `xlsx` the sheet row as Excel numbers it, `json` and `xml` the record's ordinal, a tree having no lines left
+  to count by the time anything reads it. Obligation 7 was the one the kit could not check without a sample, and
+  three of the four turned out to be unkept the moment anyone looked.
 
 - **The CSV adapter accepted two record selectors of one name**, and loaded whichever came first - silently, for as
   long as the feed ran. The other four key their record selectors by name and refuse a repeat as a side effect of

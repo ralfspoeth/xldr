@@ -42,14 +42,39 @@ class XlsxConformanceIT extends InputAdapterContract {
     /** two data rows under a header, which is the layout the range describes */
     @Override
     protected byte @NonNull [] sample() {
+        return workbook(sheet -> {
+            row(sheet.createRow(1), 1d, "Alice", 12.5d);
+            row(sheet.createRow(2), 2d, "Bob", 98d);
+        });
+    }
+
+    /**
+     * A note or a total left in a numeric column is the commonest thing wrong
+     * with a spreadsheet, and the row as the author sees it in Excel - counted
+     * from one, not from POI's zero - is what sends them to it.
+     */
+    @Override
+    protected @NonNull List<Breakage> breakages() {
+        return List.of(new Breakage("text in the column the spec declared a decimal",
+                workbook(sheet -> {
+                    row(sheet.createRow(1), 1d, "Alice", 12.5d);
+                    var second = sheet.createRow(2);
+                    second.createCell(0).setCellValue(2d);
+                    second.createCell(1).setCellValue("Bob");
+                    second.createCell(2).setCellValue("see note");
+                }),
+                "row 3 of sheet 'data'"));
+    }
+
+    /** a workbook with the header row this spec's range sits under, and whatever else is asked for */
+    private static byte[] workbook(java.util.function.Consumer<org.apache.poi.ss.usermodel.Sheet> body) {
         try (var workbook = new XSSFWorkbook(); var out = new ByteArrayOutputStream()) {
             var sheet = workbook.createSheet("data");
             var header = sheet.createRow(0);
             header.createCell(0).setCellValue("id");
             header.createCell(1).setCellValue("name");
             header.createCell(2).setCellValue("amount");
-            row(sheet.createRow(1), 1d, "Alice", 12.5d);
-            row(sheet.createRow(2), 2d, "Bob", 98d);
+            body.accept(sheet);
             workbook.write(out);
             return out.toByteArray();
         } catch (IOException e) {

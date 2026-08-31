@@ -188,25 +188,37 @@ class JsonInputAdapter implements InputAdapter {
         var document = Greyson.readValue(new InputStreamReader(source, UTF_8))
                 .orElseThrow(() -> new IOException("empty JSON document"));
 
-        // the elements of the selected array are the records, in document order
+        // the elements of the selected array are the records, in document order,
+        // numbered as they come so that a value that will not convert can say
+        // which record it was in. A counter rather than an index: this stream is
+        // sequential, and the alternative is materialising the elements in order
+        // to enumerate them - which a document of a million orders would feel
+        var position = new int[1];
         Stream<Row> rows = record.path()
                 .select(all())
                 .apply(document)
-                .map(element -> row(element, record, selected));
+                .map(element -> row(element, record, selected, ++position[0]));
         return new Result(fields, rows);
     }
 
-    private Row row(JsonValue element, RecordDef record, List<String> selected) {
+    private Row row(JsonValue element, RecordDef record, List<String> selected, int position) {
         // only the values that are there: an absent member and one that holds
         // null are the same absent value, and Map::get answers null for both -
         // which keeps the map's values non-null and the Row's contract intact
         Map<String, Object> values = new HashMap<>();
         for (var name : selected) {
             var field = record.fields().get(name);
-            field.path()
-                    .apply(element)
-                    .map(v -> valueOf(v, field.type()))
-                    .ifPresent(v -> values.put(name, v));
+            try {
+                field.path()
+                        .apply(element)
+                        .map(v -> valueOf(v, field.type()))
+                        .ifPresent(v -> values.put(name, v));
+            } catch (RuntimeException e) {
+                // JSON has no line numbers to fall back on once it is a tree, so
+                // the ordinal is the whole of what identifies a record here
+                throw new IllegalStateException("record " + position + ": cannot read field '"
+                        + name + "' as " + field.type() + ": " + e.getMessage(), e);
+            }
         }
         return values::get;
     }

@@ -402,8 +402,7 @@ public abstract class InputAdapterContract {
                 "this adapter supplied no unreadable sample, so obligation 7 went unchecked");
         assertAll(breakages.stream().map(breakage -> () -> {
             var thrown = assertThrows(Exception.class,
-                    () -> drain(adapter(spec()).parse(new ByteArrayInputStream(breakage.sample()),
-                            recordSelector().name(), fieldNames())),
+                    () -> readThrough(breakage.sample()),
                     () -> "the broken sample was read without complaint: " + breakage.because());
             var message = thrown.getMessage();
             assertNotNull(message,
@@ -433,6 +432,23 @@ public abstract class InputAdapterContract {
         return recordSelector().fieldSelectors().stream()
                 .map(FieldSelectorSpec::name)
                 .collect(Collectors.toSet());
+    }
+
+    /**
+     * Reads a sample the way the loader does: every field of every record.
+     * <p>
+     * Draining the rows is not enough and the difference matters here. Several
+     * adapters convert a value in {@link Row#get}, so a record that cannot be
+     * read fails only when something asks for the value - and a check that walks
+     * the rows without reading them passes over a broken file in silence, which
+     * is the failure it was written to catch.
+     */
+    private void readThrough(byte[] bytes) throws IOException {
+        var result = adapter(spec()).parse(new ByteArrayInputStream(bytes),
+                recordSelector().name(), fieldNames());
+        try (var rows = result.rows()) {
+            rows.forEach(row -> result.fields().forEach(field -> row.get(field.name())));
+        }
     }
 
     private List<Row> rowsOf(InputAdapter adapter) throws IOException {

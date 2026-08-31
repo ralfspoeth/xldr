@@ -57,4 +57,21 @@ class JsonConformanceIT extends InputAdapterContract {
                         twice(mimeType(), records(Locator.at("rows"),
                                 field("id", "id", DataType.INTEGRAL)))));
     }
+
+    /**
+     * Once a document is a tree it has no line numbers, so the ordinal is the
+     * whole of what identifies a record here - which is why the adapter counts
+     * the elements as it hands them out rather than working it out afterwards.
+     */
+    @Override
+    protected @NonNull List<Breakage> breakages() {
+        return List.of(new Breakage("a string where the spec declared a decimal",
+                bytes("""
+                        { "rows": [
+                            { "id": 1, "name": "Alice", "amount": 12.50 },
+                            { "id": 2, "name": "Bob",   "amount": "not a number" }
+                        ] }
+                        """),
+                "record 2"));
+    }
 }

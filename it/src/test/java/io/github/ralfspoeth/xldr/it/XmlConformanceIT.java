@@ -83,4 +83,22 @@ class XmlConformanceIT extends InputAdapterContract {
                         """),
                 "amount"));
     }
+
+    /**
+     * The field and the expression were already in the complaint; which of the
+     * matched nodes it was is the part only the handler knows, a {@code Node}
+     * carrying no notion of its position in the node set it came from.
+     */
+    @Override
+    protected @NonNull List<Breakage> breakages() {
+        return List.of(new Breakage("an element holding text where the spec declared a decimal",
+                bytes("""
+                        <?xml version="1.0" encoding="UTF-8"?>
+                        <rows>
+                            <row id="1"><name>Alice</name><amount>12.50</amount></row>
+                            <row id="2"><name>Bob</name><amount>lots</amount></row>
+                        </rows>
+                        """),
+                "record 2"));
+    }
 }

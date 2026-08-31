@@ -109,8 +109,23 @@ class ExcelAdapter implements InputAdapter {
                 var values = new LinkedHashMap<String, @Nullable Object>();
                 var allNull = true;
                 for (var column : selected) {
-                    var value = valueOf(sheet, r, anchorColumn, column.ref(),
-                            column.field().type(), formatter, evaluator);
+                    // Named here rather than in valueOf, which knows the row as
+                    // an index and not as the row an author is looking at. A cell
+                    // that will not convert is the commonest thing wrong with a
+                    // spreadsheet - a stray heading, a total, a note in the
+                    // column - and a NumberFormatException reading "For input
+                    // string: total" sends someone to a sheet of 40,000 rows
+                    // with nothing to search for.
+                    Object value;
+                    try {
+                        value = valueOf(sheet, r, anchorColumn, column.ref(),
+                                column.field().type(), formatter, evaluator);
+                    } catch (RuntimeException e) {
+                        throw new IllegalStateException("cannot read field '"
+                                + column.field().name() + "' of row " + (r + 1) + " of sheet '"
+                                + sheet.getSheetName() + "' as "
+                                + column.field().type().getSimpleName() + ": " + e.getMessage(), e);
+                    }
                     values.put(column.field().name(), value);
                     allNull &= isEmpty(value);
                 }
