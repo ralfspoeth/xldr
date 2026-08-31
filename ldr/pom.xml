@@ -19,7 +19,7 @@
         </dependency>
         <dependency>
             <groupId>io.github.ralfspoeth.xldr</groupId>
-            <artifactId>ia-def</artifactId>
+            <artifactId>ia</artifactId>
             <version>${project.version}</version>
         </dependency>
         <dependency>

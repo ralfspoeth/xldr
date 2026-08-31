@@ -6,6 +6,39 @@ ways that break existing code and existing specs; those changes are listed here 
 The versions are the git tags `xldr-<version>`; the published artifacts carry the same version under the group
 `io.github.ralfspoeth.xldr`.
 
+## Unreleased
+
+### Breaking
+
+- **The SPI artifact is `ia` again, where 0.41 made it `ia-def`.** So the coordinate history now reads: `ia` up to
+  0.40, `ia-def` from 0.41 to 0.51, `ia` from here on. That is the strongest argument against doing this and it is
+  worth stating plainly, since nothing is ever removed from Central: a reader of the version list cannot reason
+  "the name changed at version X", because it changed twice. Anyone importing the `bom` has nothing to do; an
+  adapter author naming the artifact directly has one line to change, as they did at 0.41.
+
+  The 0.41 reason was that the definition and its implementations should read as a pair, `ia-def` beside
+  `ia-impl`. They do - in the reactor and in a directory listing, which are contributor-facing. They never read as
+  a pair in a dependency block, because `ia-impl` is a parent POM that an adapter author outside this repository
+  never names at all. So the symmetry was bought where it is seen by people editing this repo and paid for on the
+  one coordinate that exists to be depended on.
+
+  The cost was a second name for one module: the artifact `ia-def` against the Java module and package
+  `io.github.ralfspoeth.xldr.ia`, which 0.41 kept deliberately and correctly, every adapter in existence
+  `requires`-ing that name. A divergence documented in one place is cheap; this one had to be re-explained wherever
+  the name travelled, and by 0.51 the README was glossing it in three separate passages and a module diagram. Those
+  are now gone rather than corrected, which is the test this change was made to pass.
+
+  **The Java module and the package are unchanged**, as they were at 0.41 - still `io.github.ralfspoeth.xldr.ia`.
+  No adapter's `module-info.java` or imports change. `ia-impl` is unchanged too: with the SPI called `ia`, the pair
+  reads as the thing and its implementations, which is what the grouping was for.
+
+### Added
+
+- **A module dependency graph**, `docs/modules.svg`, and a README section for it. The picture is there for one fact
+  the module list could not show at a glance: the five input adapters appear in nobody's `requires`, being bound at
+  runtime by service binding, so what a deployment can read is decided by its module path and by nothing in any
+  source file.
+
 ## 0.51
 
 A release about what this project actually promises, ahead of `1.0` freezing whatever it says. Two surfaces were
