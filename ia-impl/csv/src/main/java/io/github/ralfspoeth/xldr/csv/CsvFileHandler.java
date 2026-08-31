@@ -68,6 +68,20 @@ class CsvFileHandler implements InputAdapter {
             Formats formats,
             InputSpec spec
     ) {
+        // The other four adapters key their record selectors by name and so
+        // refuse a repeat as a side effect of building the map. This one keeps
+        // the spec and looks a name up by scanning, which has no such moment -
+        // so a spec naming two record selectors 'records' loaded whichever came
+        // first, silently and for as long as the feed ran. Found by the
+        // conformance kit at 0.51, the first time anything asked all five
+        // adapters the same question.
+        var named = new HashSet<String>();
+        for (var rss : spec.recordSelectors()) {
+            if (!named.add(rss.name())) {
+                throw new IllegalArgumentException("two record selectors are named '" + rss.name()
+                        + "'; a mapping names one of them and could not say which");
+            }
+        }
         this.fieldSeparator = fieldSeparator;
         this.charset = charset;
         this.header = header;

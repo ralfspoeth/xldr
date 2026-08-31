@@ -34,7 +34,7 @@ import java.util.List;
  * guard in every method that loads instead of in the signature, and a guard that
  * only convention requires is one an IDE will eventually offer to remove.
  */
-public sealed interface Feed {
+sealed interface Feed {
 
     /**
      * Created below a feed directory when the feed is registered, whether or not

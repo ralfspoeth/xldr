@@ -24,16 +24,18 @@ import static java.lang.System.Logger.Level.WARNING;
  * Registration is best effort: a JMX server that will not take the bean is a
  * reason to log and carry on, never a reason for the server not to load files.
  * <p>
- * <strong>Public for the same reason {@link FeedRegistry} is:</strong> so that
- * it can be tested. What a monitor reports is worth a test of its own - a gauge
- * that quietly counts the wrong thing is believed for as long as nobody checks
- * it against the directory - and every type in its signature was public
- * already, {@link FeedStatus} and {@link FeedState} being what the MXBean
- * hands out.
+ * Package-private, and the interface it implements is not: a monitor asks
+ * {@link ServerMXBean} through the platform MBean server and never names the
+ * class that answers. This was public until 0.51, for the reason
+ * {@link FeedRegistry} was - so that it could be tested - which stopped being a
+ * reason at 0.38, when the tests moved into the modules they test. A test in
+ * this package reaches this class as it stands, and what a monitor reports is
+ * still worth a test of its own: a gauge that quietly counts the wrong thing is
+ * believed for as long as nobody checks it against the directory.
  */
-public final class ServerStatus implements ServerMXBean {
+final class ServerStatus implements ServerMXBean {
 
-    public static final String OBJECT_NAME = "io.github.ralfspoeth.xldr:type=Server";
+    static final String OBJECT_NAME = "io.github.ralfspoeth.xldr:type=Server";
 
     private static final System.Logger LOG = System.getLogger(ServerStatus.class.getName());
 
@@ -49,7 +51,7 @@ public final class ServerStatus implements ServerMXBean {
      *                        which lives in {@code ldr} and counts loads, while
      *                        sweeping is something only a watcher does
      */
-    public ServerStatus(FeedRegistry registry, Statistics statistics, LongSupplier reconciliations) {
+    ServerStatus(FeedRegistry registry, Statistics statistics, LongSupplier reconciliations) {
         this.registry = registry;
         this.statistics = statistics;
         this.reconciliations = reconciliations;
@@ -59,7 +61,7 @@ public final class ServerStatus implements ServerMXBean {
      * Registers the bean, returning what unregisters it again - or nothing at
      * all if it could not be registered.
      */
-    public static AutoCloseable register(FeedRegistry registry, Statistics statistics,
+    static AutoCloseable register(FeedRegistry registry, Statistics statistics,
                                          LongSupplier reconciliations) {
         try {
             var name = new ObjectName(OBJECT_NAME);

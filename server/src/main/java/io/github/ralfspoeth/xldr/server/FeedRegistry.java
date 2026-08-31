@@ -32,15 +32,19 @@ import static java.lang.System.Logger.Level.*;
  * an unparseable spec deactivates that one feed and is logged, it never
  * propagates to a sibling or to the watcher.
  * <p>
- * <strong>Public for the same reason {@link FreeName} is:</strong> so that it
- * can be tested. Nothing outside this module is expected to construct one - the
- * {@link Watcher} owns the registry of a running server - and the widening buys
- * a test for the transitions a feed goes through, which are the ones that
- * decide whether a deployment comes up at all. {@link Feed} deliberately stays
- * package-private, so a caller in another package can ask how many feeds are
- * active and which inbox belongs to one, and cannot take a feed apart.
+ * Package-private, along with {@link Feed} and everything either of them hands
+ * back. The {@link Watcher} owns the registry of a running server and nothing
+ * outside this module has a reason to construct a second one.
+ * <p>
+ * This was public until 0.51, on the stated grounds that it had to be in order
+ * to be tested - a reason that expired at 0.38, when the tests stopped being a
+ * module of their own and were patched into the modules they test.
+ * {@code FeedRegistryTest} sits in this package and reached it either way. The
+ * same sentence appeared on {@link ServerStatus}, and it had also gone on to
+ * claim that {@code Feed} stayed package-private, which it had not: the
+ * paragraph explaining the surface had drifted from the surface.
  */
-public class FeedRegistry {
+class FeedRegistry {
 
     private static final System.Logger LOG = System.getLogger(FeedRegistry.class.getName());
 
@@ -57,7 +61,7 @@ public class FeedRegistry {
      */
     private final Lock reconciliation = new ReentrantLock();
 
-    public FeedRegistry(DirectoryWatchService watchService) {
+    FeedRegistry(DirectoryWatchService watchService) {
         this.watchService = watchService;
     }
 
@@ -78,7 +82,7 @@ public class FeedRegistry {
      * consistent entry or none, and a watch event is never held up behind a
      * spec being parsed.
      */
-    public void reconcile(Path feedDir) {
+    void reconcile(Path feedDir) {
         reconciliation.lock();
         try {
             if (!Files.isDirectory(feedDir)) {
@@ -171,7 +175,7 @@ public class FeedRegistry {
     /**
      * Reconciles every directory directly below {@code root}.
      */
-    public void reconcileRoot(Path root) {
+    void reconcileRoot(Path root) {
         try (var children = Files.list(root)) {
             children.filter(Files::isDirectory).forEach(this::reconcile);
         } catch (IOException e) {
@@ -235,7 +239,7 @@ public class FeedRegistry {
      * A registered feed still waiting for its spec is deliberately absent, which
      * is what keeps it away from the loader.
      */
-    public Collection<Feed.Active> active() {
+    Collection<Feed.Active> active() {
         return feeds.values()
                 .stream()
                 .filter(Feed.Active.class::isInstance)
@@ -261,7 +265,7 @@ public class FeedRegistry {
      * relying on it from here would be the sort of implicit invariant that comes
      * apart when the other end changes.
      */
-    public Optional<Feed.Active> feedOfInbox(Path inbox) {
+    Optional<Feed.Active> feedOfInbox(Path inbox) {
         // a path may have no parent, and ConcurrentHashMap.get(null) throws
         var feedDir = inbox.getParent();
         if (feedDir == null) {
@@ -296,7 +300,7 @@ public class FeedRegistry {
      * gauges that is what is wanted; a caller needing one consistent set should
      * copy what it gets.
      */
-    public Collection<Feed> registered() {
+    Collection<Feed> registered() {
         return Collections.unmodifiableCollection(feeds.values());
     }
 }

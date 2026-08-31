@@ -28,6 +28,22 @@ the prose is its reasoning.
   supply a sample with a value missing and a sample that cannot be read, for the two obligations that were
   previously "yours to test": that an absent value is `null`, and that a failure names the record it happened at.
 
+- **`server` exports six types where it exported twelve.** `Feed`, `Sentinel`, `FreeName`, `ServerStatus`,
+  `FeedRegistry` and `Delivery` are package-private. What is left is what someone outside actually holds: an
+  embedder builds a `Config`, supplies a `ConnectionSource` and drives a `Watcher`, and a monitor reads
+  `ServerMXBean`, which hands out `FeedStatus` values carrying a `FeedState`. Those last three are public because
+  the MXBean framework requires it, not because this project chose it.
+
+  Two of the six were public *so that they could be tested*, and both said so. That was true until 0.38, when the
+  tests were a module of their own and widening was the only way in; the tests moved into the modules they test and
+  the reason expired, but the keyword stayed for thirteen releases. By 0.51 one of the two paragraphs was also
+  asserting that `Feed` was package-private, which it was not - the explanation of the surface had drifted from the
+  surface, in the file next to it. The package documentation now states the rule: a test that cannot reach what it
+  needs is in the wrong package.
+
+  `Delivery` is the one an outside caller did touch, for `Delivery.FILE`. `ServerIT` now writes
+  `"delivery.properties"`, which is what an operator types into a directory and what that test is about.
+
 - **`Header` is no longer part of the SPI.** It lived in `ia` because `xldr validate` reasoned about a header
   without ever building an adapter; that command was removed, and with it the rule and the only caller outside the
   CSV module. It is now package-private in `csv`, beside `EmptyLine`, which is the setting it has always described.
@@ -45,6 +61,13 @@ the prose is its reasoning.
   record in a mid-stream failure today. `flt` says "incomplete final record" and the rest surface whatever the
   underlying parser said, which is obligation 7 unkept. Recorded rather than fixed here, the fix being a change to
   four adapters and not to the kit.
+
+### Fixed
+
+- **The CSV adapter accepted two record selectors of one name**, and loaded whichever came first - silently, for as
+  long as the feed ran. The other four key their record selectors by name and refuse a repeat as a side effect of
+  building that map; this one keeps the spec and scans it, so there was no such moment. Found by the conformance
+  kit on its first run, which is the first time anything had asked all five adapters the same question.
 
 ## 0.50
 

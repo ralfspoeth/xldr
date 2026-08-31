@@ -33,22 +33,24 @@ import java.util.TreeSet;
  * finished delivery from one still being written - so "exactly one" is the shape
  * of this type and not a check somewhere else.
  *
- * <h2>Why the two are not visible from outside</h2>
+ * <h2>Why none of this is visible from outside</h2>
  *
- * They are package-private, so this interface is public and its cases are not.
- * A caller elsewhere reads a {@value #FILE} and asks {@link #claims}; which of
- * the two answered is this package's business, and there is nothing a caller
- * could usefully do with the distinction that {@code claims} does not already do
- * for them.
+ * The cases became package-private at 0.49, on the grounds that a caller
+ * elsewhere reads a {@value #FILE} and asks {@link #claims} - which of the two
+ * answered being this package's business. At 0.51 the interface followed them,
+ * because there turned out to be no such caller: the only use of this type from
+ * another module was {@code ServerIT} borrowing {@value #FILE} for a file name
+ * it can perfectly well write out, and a name a deployment types into a
+ * directory is not made safer by also being a Java constant.
  * <p>
  * That is the opposite of what {@code spec}'s sealed types do, deliberately.
  * {@code ValueSource} and {@code Locator} exist so that a caller can ask which
  * case it is - the loader and every adapter switch over them, and a new case
  * being a compile error everywhere is the point. This one answers a question
- * instead of describing a value, so the cases are an implementation detail and
- * hiding them keeps the surface this project has to keep promises about smaller.
+ * instead of describing a value, and the question is one only this package
+ * asks.
  */
-public sealed interface Delivery permits AtomicDelivery, SignalledDelivery {
+sealed interface Delivery permits AtomicDelivery, SignalledDelivery {
 
     /**
      * The file, beside the mapping spec in the feed directory. Its presence is

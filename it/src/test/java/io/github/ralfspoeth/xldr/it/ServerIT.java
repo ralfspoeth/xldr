@@ -46,6 +46,14 @@ class ServerIT {
 
     private Path root;
     private Path staging;
+    /**
+     * The file that makes a directory a feed, written out rather than borrowed
+     * from {@code server}: the name is part of what a deployment is promised,
+     * and this test is the one that reads the server from the file system the
+     * way an operator does.
+     */
+    private static final String DELIVERY = "delivery.properties";
+
     private Watcher watcher;
     /**
      * kept, because {@code recoverWork} runs once when a watcher starts: a test
@@ -87,7 +95,7 @@ class ServerIT {
     @Timeout(60)
     void loadsAFileDroppedIntoAnewFeed() throws Exception {
         var feed = Files.createDirectory(root.resolve("people"));
-        Files.writeString(feed.resolve(Delivery.FILE), "accepts = glob:*.csv\n");
+        Files.writeString(feed.resolve(DELIVERY), "accepts = glob:*.csv\n");
         Files.writeString(feed.resolve("spec.json"), SPEC);
 
         // in/ is created by the server once the spec is seen
@@ -116,7 +124,7 @@ class ServerIT {
     @Timeout(60)
     void sendsAfailingLoadToTheHospital() throws Exception {
         var feed = Files.createDirectory(root.resolve("broken"));
-        Files.writeString(feed.resolve(Delivery.FILE), "accepts = glob:*.csv\n");
+        Files.writeString(feed.resolve(DELIVERY), "accepts = glob:*.csv\n");
         // the spec maps onto a table that does not exist
         Files.writeString(feed.resolve("spec.json"), SPEC.replace("\"person\"", "\"no_such_table\""));
         await("in/ to be created", () -> Files.isDirectory(feed.resolve("in")));
@@ -144,7 +152,7 @@ class ServerIT {
     @Timeout(60)
     void deactivatesAfeedWhenTheSpecIsRemoved() throws Exception {
         var feed = Files.createDirectory(root.resolve("transient"));
-        Files.writeString(feed.resolve(Delivery.FILE), "accepts = glob:*.csv\n");
+        Files.writeString(feed.resolve(DELIVERY), "accepts = glob:*.csv\n");
         Files.writeString(feed.resolve("spec.json"), SPEC);
         await("in/ to be created", () -> Files.isDirectory(feed.resolve("in")));
 
@@ -170,7 +178,7 @@ class ServerIT {
     @Timeout(60)
     void waitsForTheSentinelBeforeLoading() throws Exception {
         var feed = Files.createDirectory(root.resolve("signalled"));
-        Files.writeString(feed.resolve(Delivery.FILE), "sentinel = glob:*.done\n");
+        Files.writeString(feed.resolve(DELIVERY), "sentinel = glob:*.done\n");
         Files.writeString(feed.resolve("spec.json"), SPEC);
         await("in/ to be created", () -> Files.isDirectory(feed.resolve("in")));
 
@@ -203,7 +211,7 @@ class ServerIT {
     @Timeout(60)
     void loadsAfixedLengthFeed() throws Exception {
         var feed = Files.createDirectory(root.resolve("fixed"));
-        Files.writeString(feed.resolve(Delivery.FILE), "accepts = glob:*.txt\n");
+        Files.writeString(feed.resolve(DELIVERY), "accepts = glob:*.txt\n");
         Files.writeString(feed.resolve("spec.json"), FIXED_LENGTH_SPEC);
         await("in/ to be created", () -> Files.isDirectory(feed.resolve("in")));
 
@@ -228,7 +236,7 @@ class ServerIT {
     @Timeout(60)
     void loadsAjsonFeed() throws Exception {
         var feed = Files.createDirectory(root.resolve("documents"));
-        Files.writeString(feed.resolve(Delivery.FILE), "accepts = glob:*.json\n");
+        Files.writeString(feed.resolve(DELIVERY), "accepts = glob:*.json\n");
         Files.writeString(feed.resolve("spec.json"), JSON_SPEC);
         await("in/ to be created", () -> Files.isDirectory(feed.resolve("in")));
 
@@ -253,7 +261,7 @@ class ServerIT {
     @Timeout(60)
     void loadsAspreadsheetFeed() throws Exception {
         var feed = Files.createDirectory(root.resolve("sheets"));
-        Files.writeString(feed.resolve(Delivery.FILE), "accepts = glob:*.xlsx\n");
+        Files.writeString(feed.resolve(DELIVERY), "accepts = glob:*.xlsx\n");
         Files.writeString(feed.resolve("spec.json"), XLSX_SPEC);
         await("in/ to be created", () -> Files.isDirectory(feed.resolve("in")));
 
@@ -293,7 +301,7 @@ class ServerIT {
         var status = JMX.newMXBeanProxy(mbeans, name, ServerMXBean.class);
 
         var feed = Files.createDirectory(root.resolve("counted"));
-        Files.writeString(feed.resolve(Delivery.FILE), "accepts = glob:*.csv\n");
+        Files.writeString(feed.resolve(DELIVERY), "accepts = glob:*.csv\n");
         Files.writeString(feed.resolve("spec.json"), SPEC);
         await("the feed to become active", () -> status.getActiveFeeds() == 1);
 
@@ -318,7 +326,7 @@ class ServerIT {
         // spec: rewriting one would race the registry's reload against the
         // delivery, and the load would fail or succeed by timing.
         var broken = Files.createDirectory(root.resolve("broken"));
-        Files.writeString(broken.resolve(Delivery.FILE), "accepts = glob:*.csv\n");
+        Files.writeString(broken.resolve(DELIVERY), "accepts = glob:*.csv\n");
         Files.writeString(broken.resolve("spec.json"), SPEC.replace("\"person\"", "\"no_such_table\""));
         await("the second feed to become active", () -> status.getActiveFeeds() == 2);
 
@@ -348,7 +356,7 @@ class ServerIT {
     void reportsFilesWaitingInAnInbox() throws Exception {
         var status = serverStatus();
         var feed = Files.createDirectory(root.resolve("waiting"));
-        Files.writeString(feed.resolve(Delivery.FILE), "sentinel = glob:*.done\n");
+        Files.writeString(feed.resolve(DELIVERY), "sentinel = glob:*.done\n");
         Files.writeString(feed.resolve("spec.json"), SPEC);
         await("the feed to become active", () -> Files.isDirectory(feed.resolve("in")));
         assertEquals(0, status.getFilesWaiting(), "nothing delivered yet");
@@ -377,7 +385,7 @@ class ServerIT {
         assertEquals("", status.getLastFailure(), "nothing has failed yet");
 
         var feed = Files.createDirectory(root.resolve("failing"));
-        Files.writeString(feed.resolve(Delivery.FILE), "accepts = glob:*.csv\n");
+        Files.writeString(feed.resolve(DELIVERY), "accepts = glob:*.csv\n");
         Files.writeString(feed.resolve("spec.json"), SPEC.replace("\"person\"", "\"no_such_table\""));
         await("the feed to become active", () -> Files.isDirectory(feed.resolve("in")));
 
@@ -403,10 +411,10 @@ class ServerIT {
         assertEquals(0, status.getLoadsInProgress(), "idle before anything is delivered");
 
         var good = Files.createDirectory(root.resolve("busy"));
-        Files.writeString(good.resolve(Delivery.FILE), "accepts = glob:*.csv\n");
+        Files.writeString(good.resolve(DELIVERY), "accepts = glob:*.csv\n");
         Files.writeString(good.resolve("spec.json"), SPEC);
         var bad = Files.createDirectory(root.resolve("busy-broken"));
-        Files.writeString(bad.resolve(Delivery.FILE), "accepts = glob:*.csv\n");
+        Files.writeString(bad.resolve(DELIVERY), "accepts = glob:*.csv\n");
         Files.writeString(bad.resolve("spec.json"), SPEC.replace("\"person\"", "\"no_such_table\""));
         await("both feeds to become active", () -> status.getActiveFeeds() == 2);
 
@@ -440,16 +448,16 @@ class ServerIT {
     @Timeout(60)
     void refusesAdeliveryFileItCannotRead() throws Exception {
         var neither = Files.createDirectory(root.resolve("neither"));
-        Files.writeString(neither.resolve(Delivery.FILE), "# nothing at all\n");
+        Files.writeString(neither.resolve(DELIVERY), "# nothing at all\n");
         Files.writeString(neither.resolve("spec.json"), SPEC);
 
         var both = Files.createDirectory(root.resolve("both"));
-        Files.writeString(both.resolve(Delivery.FILE),
+        Files.writeString(both.resolve(DELIVERY),
                 "accepts = glob:*.csv\nsentinel = glob:*.done\n");
         Files.writeString(both.resolve("spec.json"), SPEC);
 
         var typo = Files.createDirectory(root.resolve("typo"));
-        Files.writeString(typo.resolve(Delivery.FILE), "acccepts = glob:*.csv\n");
+        Files.writeString(typo.resolve(DELIVERY), "acccepts = glob:*.csv\n");
         Files.writeString(typo.resolve("spec.json"), SPEC);
 
         // two full sweeps: the watcher has tried all three twice and refused them
@@ -483,7 +491,7 @@ class ServerIT {
     @Timeout(60)
     void strandsAloadThatCommittedButCouldNotBeArchived() throws Exception {
         var feed = Files.createDirectory(root.resolve("unarchivable"));
-        Files.writeString(feed.resolve(Delivery.FILE), "accepts = glob:*.csv\n");
+        Files.writeString(feed.resolve(DELIVERY), "accepts = glob:*.csv\n");
         Files.writeString(feed.resolve("spec.json"), SPEC);
         await("in/ to be created", () -> Files.isDirectory(feed.resolve("in")));
 
@@ -583,7 +591,7 @@ class ServerIT {
     private Path staleClaim(String name, String input, String marker) throws Exception {
         watcher.close();
         var feed = Files.createDirectory(root.resolve(name));
-        Files.writeString(feed.resolve(Delivery.FILE), "accepts = glob:*.csv\n");
+        Files.writeString(feed.resolve(DELIVERY), "accepts = glob:*.csv\n");
         Files.writeString(feed.resolve("spec.json"), SPEC);
         Files.createDirectories(feed.resolve("work"));
         Files.writeString(feed.resolve("work").resolve(input), "id,name\n1,Alice\n");
@@ -656,7 +664,7 @@ class ServerIT {
     @Timeout(60)
     void readsDeploymentValuesFromEnvProperties() throws Exception {
         var feed = Files.createDirectory(root.resolve("labelled"));
-        Files.writeString(feed.resolve(Delivery.FILE), "accepts = glob:*.csv\n");
+        Files.writeString(feed.resolve(DELIVERY), "accepts = glob:*.csv\n");
         Files.writeString(feed.resolve("env.properties"), "label = from-test\n");
         // the name column comes from the deployment, not from the file
         Files.writeString(feed.resolve("spec.json"), SPEC.replace(
@@ -708,7 +716,7 @@ class ServerIT {
             }
         }
         var feed = Files.createDirectory(root.resolve("targeted"));
-        Files.writeString(feed.resolve(Delivery.FILE), "accepts = glob:*.csv\n");
+        Files.writeString(feed.resolve(DELIVERY), "accepts = glob:*.csv\n");
         Files.writeString(feed.resolve("target.properties"), "schema = staging\n");
         Files.writeString(feed.resolve("spec.json"), SPEC);
         await("in/ to be created", () -> Files.isDirectory(feed.resolve("in")));
@@ -760,7 +768,7 @@ class ServerIT {
     void refusesAcatalogTheDatabaseCannotTake() throws Exception {
         watcher.close();
         var feed = Files.createDirectory(root.resolve("catalogued"));
-        Files.writeString(feed.resolve(Delivery.FILE), "accepts = glob:*.csv\n");
+        Files.writeString(feed.resolve(DELIVERY), "accepts = glob:*.csv\n");
         Files.writeString(feed.resolve("target.properties"), "catalog = warehouse\n");
         Files.writeString(feed.resolve("spec.json"), SPEC);
         watcher = Watcher.watch(config, () -> withoutCatalogSupport(DriverManager.getConnection(JDBC_URL)));
@@ -823,7 +831,7 @@ class ServerIT {
     @Timeout(60)
     void hospitalisesAloadWhoseTargetSettingIsMisspelled() throws Exception {
         var feed = Files.createDirectory(root.resolve("mistyped-target"));
-        Files.writeString(feed.resolve(Delivery.FILE), "accepts = glob:*.csv\n");
+        Files.writeString(feed.resolve(DELIVERY), "accepts = glob:*.csv\n");
         Files.writeString(feed.resolve("target.properties"), "schmea = staging\n");
         Files.writeString(feed.resolve("spec.json"), SPEC);
         await("in/ to be created", () -> Files.isDirectory(feed.resolve("in")));
@@ -852,7 +860,7 @@ class ServerIT {
     @Timeout(60)
     void readsEnvPropertiesAsUtfEight() throws Exception {
         var feed = Files.createDirectory(root.resolve("accented"));
-        Files.writeString(feed.resolve(Delivery.FILE), "accepts = glob:*.csv\n");
+        Files.writeString(feed.resolve(DELIVERY), "accepts = glob:*.csv\n");
         // Files.writeString is UTF-8, which is what an editor would have written
         Files.writeString(feed.resolve("env.properties"), "label = Grüße\n");
         Files.writeString(feed.resolve("spec.json"), SPEC.replace(
@@ -879,7 +887,7 @@ class ServerIT {
     @Timeout(60)
     void hospitalisesAloadWhoseDeploymentValueIsMissing() throws Exception {
         var feed = Files.createDirectory(root.resolve("unconfigured"));
-        Files.writeString(feed.resolve(Delivery.FILE), "accepts = glob:*.csv\n");
+        Files.writeString(feed.resolve(DELIVERY), "accepts = glob:*.csv\n");
         Files.writeString(feed.resolve("spec.json"), SPEC.replace(
                 "{\"fieldSelector\": \"name\", \"column\": \"name\"}",
                 "{\"expr\": \"${env.label}\", \"column\": \"name\"}"));
@@ -934,7 +942,7 @@ class ServerIT {
             // nothing registered yet, so no in/ - and the directory is now watched
             assertTrue(Files.notExists(feed.resolve("in")), "the directory must not be a feed yet");
 
-            Files.writeString(feed.resolve(Delivery.FILE), "accepts = glob:*.csv\n");
+            Files.writeString(feed.resolve(DELIVERY), "accepts = glob:*.csv\n");
 
             await("the delivery file to be noticed without a scan",
                     () -> Files.isDirectory(feed.resolve("in")));
@@ -956,7 +964,7 @@ class ServerIT {
     @Timeout(60)
     void holdsWhatArrivesUntilAspecAppears() throws Exception {
         var feed = Files.createDirectory(root.resolve("awaited"));
-        Files.writeString(feed.resolve(Delivery.FILE), "accepts = glob:*.csv\n");
+        Files.writeString(feed.resolve(DELIVERY), "accepts = glob:*.csv\n");
 
         await("in/ to be created without a spec", () -> Files.isDirectory(feed.resolve("in")));
 

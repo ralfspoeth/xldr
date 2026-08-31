@@ -17,7 +17,7 @@ import java.util.Optional;
  * always the marker name with its last dotted suffix removed, so
  * {@code report.csv.done} loads {@code report.csv}.
  */
-public final class Sentinel {
+final class Sentinel {
 
     private final String spec;
     private final PathMatcher matcher;
@@ -33,7 +33,7 @@ public final class Sentinel {
      * @throws IllegalArgumentException if the pattern lacks a {@code glob:} or
      *                                  {@code regex:} prefix, or does not compile
      */
-    public static Sentinel parse(String spec) {
+    static Sentinel parse(String spec) {
         Objects.requireNonNull(spec, "sentinel");
         try {
             return new Sentinel(spec, FileSystems.getDefault().getPathMatcher(spec));
@@ -47,7 +47,7 @@ public final class Sentinel {
      * @param file a file that has arrived in {@code in/}
      * @return {@code true} iff a marker
      */
-    public boolean isMarker(Path file) {
+    boolean isMarker(Path file) {
         return matcher.matches(file.getFileName());
     }
 
@@ -58,7 +58,7 @@ public final class Sentinel {
      * @param marker a file for which {@link #isMarker} holds
      * @return the data file it names, or empty if the name has no suffix to strip
      */
-    public Optional<Path> dataFileOf(Path marker) {
+    Optional<Path> dataFileOf(Path marker) {
         var name = marker.getFileName().toString();
         var dot = name.lastIndexOf('.');
         return dot > 0

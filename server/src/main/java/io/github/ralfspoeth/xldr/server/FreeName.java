@@ -29,7 +29,7 @@ import java.nio.file.Path;
  * type avoids the exception, the move mode decides what happens if it comes
  * anyway.
  */
-public final class FreeName {
+final class FreeName {
 
     private FreeName() {
     }
@@ -43,7 +43,7 @@ public final class FreeName {
      * {@code data.<discriminator>.csv} and stays recognisably the same file to
      * whoever finds it.
      */
-    public static Path in(Path directory, String name, String discriminator) {
+    static Path in(Path directory, String name, String discriminator) {
         var candidate = directory.resolve(name);
         if (!Files.exists(candidate)) {
             return candidate;
