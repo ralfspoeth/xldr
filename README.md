@@ -287,6 +287,12 @@ it is shipped, and adds only what a *runner* decides: a command line, a connecti
 Each box is a Java module, a Maven artifact and a directory, all under the one name - the arrows are `requires`
 edges, and the coordinate is the same word with `io.github.ralfspoeth.xldr:` in front of it.
 
+`app` reaches past `server` to `ldr`, which is the one edge in the picture that is not "I am built on this". It is
+there so that `xldr check` can ask the loader what it would refuse - `Loader.refuseUnknownFunctions` and
+`refuseUnusableTarget` are both offered for a front end to ask once, when a spec is read, rather than once per
+load. `server` requires `ldr` too and deliberately not `transitive`: an embedder drives a `Watcher` and has no
+reason to name a `Loader`, so a module that does say so for itself.
+
 **The dashed arrow is the interesting one.** The five input adapters appear in nobody's `requires`. `ia` declares
 `uses InputAdapterFactory`, each adapter declares `provides ... with`, and JPMS service binding does the rest at
 runtime - so `server` and `xlet` each name only `ia` and `ldr` in their descriptors and still read spreadsheets. What

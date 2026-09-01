@@ -3,6 +3,7 @@ package io.github.ralfspoeth.xldr.app;
 import io.github.ralfspoeth.xldr.ia.InputAdapter;
 import io.github.ralfspoeth.xldr.ia.InputAdapterFactory;
 import io.github.ralfspoeth.xldr.ia.Row;
+import io.github.ralfspoeth.xldr.ldr.Loader;
 import io.github.ralfspoeth.xldr.spec.*;
 import io.github.ralfspoeth.xldr.spec.io.MappingSpecReader;
 import org.jspecify.annotations.Nullable;
@@ -143,6 +144,7 @@ public class Check implements Callable<Integer> {
                 spec.inputSpec().mimeType(), spec.inputSpec().recordSelectors().size());
 
         checkRecordSelectorsExist(spec, out);
+        checkFunctionsExist(spec, out);
         if (url != null) {
             checkColumnsExist(spec, out, err);
             checkRoutinesExist(spec, out, err);
@@ -174,12 +176,30 @@ public class Check implements Callable<Integer> {
     // ---- the spec against itself ---------------------------------------------
 
     /**
-     * A mapping names a record selector the input has to declare.
+     * Whether every function an expression calls exists.
      * <p>
-     * Nothing cross-checks this today. The name goes straight to
-     * {@code adapter.parse}, so a typo is refused - by the adapter, on the first
-     * file, with the feed already deployed and a producer already waiting.
+     * Asked of the loader rather than answered here, because the set of built-ins
+     * is the loader's and a second copy of it in this command would be a second
+     * copy to keep current. {@code Loader#refuseUnknownFunctions} is offered for
+     * exactly this, the way {@code refuseUnusableTarget} is: the load asks the
+     * same question while planning, and a front end may ask it once when a spec
+     * is read.
+     * <p>
+     * Needs no {@code --url} and no sample. It is provable from the document
+     * alone - no arrangement of the input, and no database, could make
+     * {@code ${coalese(a, b)}} work - which is the line this command draws
+     * between what it always checks and what it checks when given something to
+     * check against.
      */
+    private void checkFunctionsExist(MappingSpec spec, PrintWriter out) {
+        try {
+            Loader.refuseUnknownFunctions(spec);
+            out.println("  functions      ok");
+        } catch (RuntimeException e) {
+            findings.add(e.getMessage());
+        }
+    }
+
     private void checkRecordSelectorsExist(MappingSpec spec, PrintWriter out) {
         var declared = spec.inputSpec().recordSelectors().stream()
                 .map(RecordSelectorSpec::name)

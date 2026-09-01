@@ -109,6 +109,43 @@ class CheckIT {
             }
             """;
 
+    /**
+     * The same spec with one column computed by an expression, so that the
+     * function name can be got right or wrong. Takes the whole template.
+     */
+    private static final String SPEC_WITH_AN_EXPRESSION = """
+            {
+              "input": {
+                "mimeType": "text/csv",
+                "properties": {
+                  "dateFormat": "dd.MM.yyyy",
+                  "numberFormat": "#,##0.00",
+                  "locale": "de-DE"
+                },
+                "recordSelectors": [
+                  { "name": "customers",
+                    "fieldSelectors": [
+                      {"name": "id",      "selector": "id",      "type": "INTEGRAL"},
+                      {"name": "name",    "selector": "name"},
+                      {"name": "since",   "selector": "since",   "type": "TEMPORAL"},
+                      {"name": "balance", "selector": "balance", "type": "DECIMAL"}
+                    ]
+                  }
+                ]
+              },
+              "mapping": [
+                { "recordSelector": "customers", "table": "customer",
+                  "fieldMapping": [
+                    {"fieldSelector": "id",      "column": "id"},
+                    {"expr": "%s",               "column": "name"},
+                    {"fieldSelector": "since",   "column": "since"},
+                    {"fieldSelector": "balance", "column": "balance"}
+                  ]
+                }
+              ]
+            }
+            """;
+
     private record Run(int exitCode, String out, String err) {
         boolean reports(String text) {
             return out.contains(text) || err.contains(text);
@@ -145,6 +182,40 @@ class CheckIT {
                 () -> assertEquals(0, run.exitCode(), run.out() + run.err()),
                 () -> assertTrue(run.reports("no findings"), run.out()),
                 () -> assertTrue(run.reports("2 record(s) matched"), run.out()));
+    }
+
+    /**
+     * A misspelled function in an expression.
+     * <p>
+     * This is the finding this command existed to make and could not: until 0.53
+     * nothing looked at a template before evaluating it, so {@code coalese}
+     * passed the check, deployed, and failed on the first record of the first
+     * delivery. The command asks the loader rather than keeping its own list of
+     * built-ins, so the two cannot disagree.
+     * <p>
+     * No {@code --url} is needed for it either, though this run has one: the
+     * finding is provable from the spec alone.
+     */
+    @Test
+    void findsAmisspelledFunction(@TempDir Path dir) throws IOException {
+        var run = check(dir, SPEC_WITH_AN_EXPRESSION.formatted("${coalese(name, 'unknown')}"), SAMPLE);
+        assertAll(
+                () -> assertNotEquals(0, run.exitCode(), "should have found something"),
+                () -> assertTrue(run.reports("coalese"), run.out()),
+                // and says what does exist, which is the fix
+                () -> assertTrue(run.reports("coalesce()"), run.out()));
+    }
+
+    /**
+     * And the same spec spelled correctly passes, so the check is not simply
+     * refusing every expression it meets.
+     */
+    @Test
+    void afunctionSpelledRightIsNotAfinding(@TempDir Path dir) throws IOException {
+        var run = check(dir, SPEC_WITH_AN_EXPRESSION.formatted("${coalesce(name, 'unknown')}"), SAMPLE);
+        assertAll(
+                () -> assertEquals(0, run.exitCode(), run.out() + run.err()),
+                () -> assertTrue(run.reports("no findings"), run.out()));
     }
 
     /**

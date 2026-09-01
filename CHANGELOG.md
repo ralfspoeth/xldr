@@ -8,6 +8,37 @@ The versions are the git tags `xldr-<version>`; the published artifacts carry th
 
 ## Unreleased
 
+### Fixed
+
+- **A misspelled function in an expression is refused when the load is set up, not on its first record.** Nothing
+  had ever looked at a template before evaluating it, so `${coalese(a, b)}` compiled quietly, deployed, and failed
+  at four in the morning - the shape of mistake this project moves earlier everywhere else, and one that grew a
+  little more surface with every built-in added.
+
+  `Expression` gains a `functionNames()` to sit beside `variableNames()`, and the loader checks the names against
+  its own set when it compiles a template. The parser stays neutral about what a name means, which is the point of
+  the `Bindings` seam; the loader is what knows. Both places that compile a template go through the check, so a
+  var's template is refused before the first record and a field mapping's before the input is even opened -
+  planning happens ahead of `parse`, and there is a test that fails if an adapter is asked for anything.
+
+  The message names what was written and lists the six built-ins, and `decode` still gets its own sentence.
+
+- **`xldr check` reports a misspelled function**, which is where the finding is worth most: before a deployment
+  rather than during one. `Loader.refuseUnknownFunctions(MappingSpec)` is offered for a front end to ask once when
+  a spec is read - the shape `refuseUnusableTarget` already established, and for the reason its documentation
+  gives, that a misconfiguration which can never work should be found when the thing is configured. It walks the
+  whole spec, vars and transforms included, and recursively: a template can hide as a lookup's condition or as an
+  argument to a call, exactly as a field can, which is the shape `RowIndependence` already walks.
+
+  The command asks the loader instead of keeping its own list of built-ins, so the two cannot disagree, and it
+  needs neither `--url` nor a sample - the finding is provable from the document alone, which is the line this
+  command draws between what it always checks and what it checks when given something to check against.
+
+  **`app` now `requires io.github.ralfspoeth.xldr.ldr`**, which is a new edge in the module graph and the first
+  change `docs/modules.svg` has needed since it was drawn. The Maven dependency was already there; only the module
+  descriptor did not say so. `server` keeps its own non-transitive `requires` of `ldr`, deliberately: an embedder
+  drives a `Watcher` and has no reason to name a `Loader`, so a module that wants one says so for itself.
+
 ### Added
 
 - **`recode(subject, search, result, ...[, otherwise])` in an expression**, turning one code into another:
@@ -21,8 +52,8 @@ The versions are the git tags `xldr-<version>`; the published artifacts carry th
   Nor could the semantics be borrowed: `DECODE` matches NULL to NULL, and there is no null literal in the grammar
   to write - an argument is a quoted string, a whole number, a name or a call. So **a null subject takes the
   default**, which is `CASE` semantics and the only honest reading. Writing `${decode(...)}` is refused by name
-  with a message saying what to write instead, because nothing looks at a template until a load runs it and the
-  refusal is therefore the only thing that can teach.
+  with a message saying what to write instead - the courtesy `DataType.named` extends to a spec still saying
+  `DATE`.
 
   **Comparison is textual**, which is a decision and not an oversight. A field declared `INTEGRAL` arrives as a
   `Long` and a whole number in a template is an `Integer`, and those are never `equals` - so `Objects.equals` would

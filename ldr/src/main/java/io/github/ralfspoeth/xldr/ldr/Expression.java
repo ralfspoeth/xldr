@@ -74,6 +74,29 @@ final class Expression {
         }
     }
 
+    /**
+     * The functions this template calls, nested ones included.
+     * <p>
+     * The counterpart of {@link #variableNames()} and here for the same reason:
+     * a caller that knows what the names mean can then say so before anything is
+     * read, while this class stays neutral about which of them mean anything.
+     * Until 0.53 nothing asked, so a misspelled function compiled quietly and
+     * failed on the first record of the first file - the shape of mistake this
+     * project spends its effort moving earlier.
+     */
+    Set<String> functionNames() {
+        var names = new LinkedHashSet<String>();
+        segments.forEach(s -> collectFunctions(s, names));
+        return names;
+    }
+
+    private static void collectFunctions(Object o, Set<String> names) {
+        if (o instanceof Call(String function, List<Object> args)) {
+            names.add(function);
+            args.forEach(a -> collectFunctions(a, names));
+        }
+    }
+
     @Nullable Object eval(Bindings bindings) {
         if (segments.size() == 1 && !(segments.getFirst() instanceof Literal)) {
             return valueOf(segments.getFirst(), bindings);

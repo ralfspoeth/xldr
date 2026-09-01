@@ -556,6 +556,130 @@ class LoaderTest {
     }
 
     /**
+     * A misspelled function is refused before the input is opened.
+     * <p>
+     * The adapter here fails the test if it is asked for anything, which is the
+     * whole point: planning happens before {@code parse}, so the name is checked
+     * with no file read and nothing bound. Until 0.53 nothing looked at a
+     * template until it was evaluated, so {@code ${coalese(a, b)}} passed
+     * {@code xldr check}, deployed, and failed on the first record of the first
+     * delivery.
+     */
+    @Test
+    void aMisspelledFunctionIsRefusedBeforeTheInputIsRead() throws Exception {
+        try (var conn = DriverManager.getConnection(jdbcUrl);
+             var stmt = conn.createStatement()) {
+            stmt.execute("drop table if exists typo");
+            stmt.execute("create table typo(v varchar(10))");
+        }
+        var mapping = new RecordMappingSpec("rows", "typo", List.of(
+                new FieldMappingSpec("v", new ValueSource.Expr("${coalese(a, b)}"))
+        ), null);
+        var spec = new MappingSpec(new InputSpec("text/csv", List.of(), List.of(), Map.of()), List.of(mapping));
+        InputAdapter neverAsked = (source, recordSelector, fieldSelectors) -> {
+            throw new AssertionError("the input was read, so the template had not been checked first");
+        };
+
+        var thrown = assertThrows(IllegalArgumentException.class, () -> {
+            try (var loader = createLoader(spec)) {
+                loader.loadInput(neverAsked, InputStream.nullInputStream(), mapping);
+            }
+        });
+        assertAll(
+                () -> assertTrue(thrown.getMessage().contains("coalese"),
+                        "should quote what was written: " + thrown.getMessage()),
+                () -> assertTrue(thrown.getMessage().contains("coalesce()"),
+                        "and list what exists: " + thrown.getMessage()),
+                () -> assertFalse(thrown.getMessage().contains("record "),
+                        "and name no record, no record having been read: " + thrown.getMessage()));
+    }
+
+    /**
+     * Every built-in the dispatch knows is also in the set the compiler checks
+     * against.
+     * <p>
+     * The two are separate lists in one file and could drift, which would refuse
+     * a spec that is perfectly good. This is the guard: the sample yields no
+     * records, so the names are checked and nothing is evaluated, and a function
+     * missing from the set fails here rather than in somebody's deployment.
+     */
+    @Test
+    void namesEveryBuiltIn() throws Exception {
+        try (var conn = DriverManager.getConnection(jdbcUrl);
+             var stmt = conn.createStatement()) {
+            stmt.execute("drop table if exists builtins");
+            stmt.execute("create table builtins(a varchar(40), b varchar(40), c varchar(40),"
+                    + " d varchar(40), e varchar(40), f varchar(40))");
+        }
+        var mapping = new RecordMappingSpec("rows", "builtins", List.of(
+                new FieldMappingSpec("a", new ValueSource.Expr("${now()}")),
+                new FieldMappingSpec("b", new ValueSource.Expr("${nextval('s')}")),
+                new FieldMappingSpec("c", new ValueSource.Expr("${format(now(), 'yyyy')}")),
+                new FieldMappingSpec("d", new ValueSource.Expr("${parse(x, 'yyyy')}")),
+                new FieldMappingSpec("e", new ValueSource.Expr("${coalesce(x, y)}")),
+                new FieldMappingSpec("f", new ValueSource.Expr("${recode(x, 'p', 'q')}"))
+        ), null);
+        var spec = new MappingSpec(new InputSpec("text/csv", List.of(), List.of(), Map.of()), List.of(mapping));
+        var noRecords = adapterFor(Map.of("rows", List.of()));
+
+        assertDoesNotThrow(() -> {
+            try (var loader = createLoader(spec)) {
+                loader.loadInput(noRecords, InputStream.nullInputStream(), mapping);
+            }
+        }, "a built-in the dispatch knows is missing from the set the compiler checks against");
+    }
+
+    /**
+     * Every alternative is evaluated, including the ones after the winner, and
+     * this pins it because it is the surprising half of the design rather than an
+     * accident.
+     * <p>
+     * Arguments reach a built-in already resolved, so {@code coalesce} cannot
+     * short-circuit the way SQL's {@code COALESCE} does. The sequence is what
+     * makes that visible: the first row's value comes from the field, and the
+     * draw in the alternative happens anyway, so the second row - which has no
+     * field and does reach the alternative - sees 2 rather than 1.
+     * <p>
+     * Someone will one day read the helper and think it wants fixing. It does
+     * not, for the reason the helper's own documentation gives: the other
+     * built-ins are eager and one lazy function would mean an author has to know
+     * which is which. If that is ever reconsidered, this test is where the
+     * decision is recorded and this is the assertion that has to change with it.
+     */
+    @Test
+    void coalesceEvaluatesEveryAlternativeEvenAfterTheWinner() throws Exception {
+        try (var conn = DriverManager.getConnection(jdbcUrl);
+             var stmt = conn.createStatement()) {
+            stmt.execute("drop table if exists coalesced_eager");
+            stmt.execute("create table coalesced_eager(id varchar(10), v varchar(10))");
+        }
+        var mapping = new RecordMappingSpec("rows", "coalesced_eager", List.of(
+                new FieldMappingSpec("id", new ValueSource.Field("id")),
+                new FieldMappingSpec("v", new ValueSource.Expr("${coalesce(given, nextval('s'))}"))
+        ), null);
+        var spec = new MappingSpec(new InputSpec("text/csv", List.of(), List.of(), Map.of()), List.of(mapping));
+        var adapter = adapterFor(Map.of("rows", List.of(
+                Map.of("id", "a", "given", "x"),   // the field wins - and the draw happens regardless
+                Map.of("id", "b")                  // nothing given, so the alternative is the value
+        )));
+
+        try (var loader = createLoader(spec)) {
+            assertEquals(2, loader.loadInput(adapter, InputStream.nullInputStream(), mapping));
+        }
+
+        try (var conn = DriverManager.getConnection(jdbcUrl);
+             var stmt = conn.createStatement();
+             var rs = stmt.executeQuery("select v from coalesced_eager order by id")) {
+            var vs = new ArrayList<String>();
+            while (rs.next()) {
+                vs.add(rs.getString(1));
+            }
+            assertEquals(List.of("x", "2"), vs,
+                    "the second row draws 2, the first row's unused alternative having drawn 1");
+        }
+    }
+
+    /**
      * The small fixed map that does not deserve a reference table: a match takes
      * its result, a subject that matches nothing takes the odd trailing argument,
      * and a subject that is null takes it too - nothing matches null, because no
@@ -696,9 +820,11 @@ class LoaderTest {
     }
 
     /**
-     * Someone arriving from Oracle will type {@code decode}, and nothing looks at
-     * a template until a load runs it - so the refusal has to be the thing that
-     * teaches, the way {@code DataType.named} does for the old {@code DATE}.
+     * Someone arriving from Oracle will type {@code decode}, so the refusal is
+     * the thing that has to teach, the way {@code DataType.named} does for a spec
+     * still saying {@code DATE}. Since 0.53 it teaches at the right moment too -
+     * the name is checked when the template is compiled, so this arrives while
+     * the load is being set up rather than on its first record.
      */
     @Test
     void decodeIsRefusedByName() throws Exception {

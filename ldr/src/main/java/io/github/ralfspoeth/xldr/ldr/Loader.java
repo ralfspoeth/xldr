@@ -336,7 +336,7 @@ public class Loader implements AutoCloseable {
             // that: the requireNonNull that used to be here made that branch
             // unreachable
             case ValueSource.Lookup lk -> lookup(lk, resolved);
-            case ValueSource.Expr e -> Expression.compile(e.template()).eval(bindings(resolved, null));
+            case ValueSource.Expr e -> compiled(e.template()).eval(bindings(resolved, null));
             case ValueSource.Regex rx -> extract(rx, evaluate(rx.subject(), resolved));
             case ValueSource.FunctionCall fc -> call(fc, resolved);
             // unreachable, and kept because the switch has to be exhaustive:
@@ -449,16 +449,12 @@ public class Loader implements AutoCloseable {
                     case "parse" -> parseTemporal(args);
                     case "coalesce" -> coalesce(args);
                     case "recode" -> recode(args);
-                    // naming the set, because nothing looks at a template before
-                    // a load does and a typo would otherwise surface on the first
-                    // record of the first file with nothing to go on
-                    case "decode" -> throw new IllegalArgumentException("there is no decode(); the"
-                            + " equality switch here is recode(subject, search, result[, ...])."
-                            + " It is not Oracle's DECODE: a null subject takes the default rather"
-                            + " than matching a null search, there being no null literal to write");
-                    default -> throw new IllegalArgumentException("unknown function '" + name
-                            + "'; the built-ins are now(), nextval(), format(), parse(), coalesce()"
-                            + " and recode()");
+                    // unreachable in practice: compiled() refuses an unknown name
+                    // when the template is compiled, before anything is read. Kept
+                    // because this switch is the only place that actually decides
+                    // what a name means, and a set that disagreed with it should
+                    // fail here rather than dispatch to nothing
+                    default -> throw new IllegalArgumentException(unknownFunction(name));
                 };
             }
         };
@@ -564,6 +560,107 @@ public class Loader implements AutoCloseable {
     }
 
     /**
+     * The built-in functions, in one place so that a template can be refused
+     * before it is run.
+     * <p>
+     * Named here as well as dispatched in {@code bindings}, which is a list in
+     * two places and therefore a thing that can drift - the reason this is
+     * declared immediately beside the switch it must agree with, and the reason
+     * {@code namesEveryBuiltIn} in the tests writes every one of them into a
+     * template. The alternative was for {@code Expression} to hold the set, which
+     * would make the parser non-neutral about what a name means; that is the
+     * loader's business and this keeps it there.
+     */
+    private static final Set<String> FUNCTIONS =
+            Set.of("now", "nextval", "format", "parse", "coalesce", "recode");
+
+    /**
+     * Throws where any template in {@code spec} calls a function that does not
+     * exist, and does nothing otherwise.
+     * <p>
+     * The same question every load asks while planning, offered separately so
+     * that a front end can ask it once when a spec is read rather than once per
+     * load - which is what {@code xldr check} does with it, and the reason the
+     * command can now say that {@code ${coalese(a, b)}} is a typo instead of
+     * passing it and leaving the first delivery to find out. {@link
+     * #refuseUnusableTarget} exists for the same reason and reads the same way:
+     * a misconfiguration that can never work should be found when the thing is
+     * configured.
+     * <p>
+     * Provable from the document alone, which is the test this project applies
+     * to what belongs in a check: no arrangement of the input could make such a
+     * spec work.
+     *
+     * @throws IllegalArgumentException naming the function and listing what does
+     *                                  exist
+     */
+    public static void refuseUnknownFunctions(MappingSpec spec) {
+        spec.inputSpec().vars().forEach(v -> refuseUnknownFunctions(v.source()));
+        spec.recordMappingSpecs().forEach(mapping ->
+                mapping.fieldMappings().forEach(fm -> refuseUnknownFunctions(fm.source())));
+        spec.transforms().forEach(t -> t.arguments().forEach(Loader::refuseUnknownFunctions));
+    }
+
+    /**
+     * Recursive, because a template can hide a level down - as a lookup's
+     * condition, or as an argument to a call - exactly as a field can, and for
+     * the same reason {@code RowIndependence} walks the same shape.
+     */
+    private static void refuseUnknownFunctions(ValueSource source) {
+        switch (source) {
+            case ValueSource.Expr(var template) -> compiled(template);
+            case ValueSource.Lookup(_, _, var conditions) ->
+                    conditions.values().forEach(Loader::refuseUnknownFunctions);
+            case ValueSource.FunctionCall(_, _, var arguments) ->
+                    arguments.forEach(Loader::refuseUnknownFunctions);
+            case ValueSource.Regex(var over, _, _) -> refuseUnknownFunctions(over);
+            case ValueSource.Constant _, ValueSource.Var _, ValueSource.Field _ -> {
+                // nothing that could hold a template
+            }
+        }
+    }
+
+    /**
+     * A compiled template whose functions all exist.
+     * <p>
+     * Both places that compile one go through here - a var's template, evaluated
+     * once before any record, and a field mapping's, planned once per mapping -
+     * so a misspelled function is refused when the load is being set up rather
+     * than on the first record of the first file. Until 0.53 nothing looked:
+     * {@code ${coalese(a, b)}} passed {@code xldr check} and failed at four in
+     * the morning, which is precisely the trade this project makes everywhere
+     * else in the other direction.
+     */
+    private static Expression compiled(String template) {
+        var expr = Expression.compile(template);
+        for (var name : expr.functionNames()) {
+            if (!FUNCTIONS.contains(name)) {
+                throw new IllegalArgumentException(unknownFunction(name) + ", in: " + template);
+            }
+        }
+        return expr;
+    }
+
+    /**
+     * Why a name is not a function, saying what to write where that is knowable.
+     * <p>
+     * {@code decode} gets its own sentence because someone arriving from Oracle
+     * will type it, and a bare "unknown function" would leave them to guess that
+     * the thing exists under another name - the courtesy {@code DataType.named}
+     * extends to a spec still saying {@code DATE}.
+     */
+    private static String unknownFunction(String name) {
+        if ("decode".equals(name)) {
+            return "there is no decode(); the equality switch here is"
+                    + " recode(subject, search, result[, ...]). It is not Oracle's DECODE either:"
+                    + " a null subject takes the default rather than matching a null search,"
+                    + " there being no null literal to write";
+        }
+        return "unknown function '" + name + "'; the built-ins are "
+                + new TreeSet<>(FUNCTIONS).stream().map(f -> f + "()").collect(joining(", "));
+    }
+
+    /**
      * One code turned into another: {@code recode(subject, s1, r1, s2, r2, ...)},
      * with an odd trailing argument as the value for a subject that matches
      * nothing.
@@ -662,12 +759,7 @@ public class Loader implements AutoCloseable {
             throw new IllegalArgumentException("coalesce(a, b, ...) needs at least two alternatives,"
                     + " and was given " + args.size());
         }
-        for (var arg : args) {
-            if (arg != null) {
-                return arg;
-            }
-        }
-        return null;
+        return args.stream().filter(Objects::nonNull).findFirst().orElse(null);
     }
 
     /**
@@ -984,7 +1076,10 @@ public class Loader implements AutoCloseable {
                 yield "?";
             }
             case ValueSource.Expr e -> {
-                var expr = Expression.compile(e.template());
+                // compiled() and not Expression.compile(): planning runs before
+                // the adapter is asked for anything, so this is the moment a
+                // function that does not exist can still be refused cheaply
+                var expr = compiled(e.template());
                 // a name that is neither ambient nor a var is a field, so the
                 // adapter has to be asked to resolve it
                 for (var name : expr.variableNames()) {

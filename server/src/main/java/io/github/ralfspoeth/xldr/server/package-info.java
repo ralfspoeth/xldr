@@ -11,8 +11,11 @@
  * io.github.ralfspoeth.xldr.server.Config}, supplies a {@link
  * io.github.ralfspoeth.xldr.server.ConnectionSource}, and drives a {@link
  * io.github.ralfspoeth.xldr.server.Watcher}. That is the whole of running this
- * server from other code, and {@code app} - the shipped runner - uses those
- * three and nothing else.
+ * server from other code, and {@code app} - the shipped runner - takes those
+ * three and nothing else from here. It does reach past this module to
+ * {@code ldr} since 0.53, for the two questions a {@code Loader} answers about
+ * a spec without loading anything, which is {@code xldr check}'s business and
+ * not the server's.
  * <p>
  * A <strong>monitor</strong> reads {@link
  * io.github.ralfspoeth.xldr.server.ServerMXBean} over JMX, which hands out

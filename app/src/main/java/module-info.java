@@ -18,6 +18,13 @@ module io.github.ralfspoeth.xldr.app {
     // which the server does for itself and never on this module's behalf.
     // ia requires spec transitively, so the spec types come with it
     requires io.github.ralfspoeth.xldr.ia;
+    // and it asks the loader what it would refuse, without loading anything:
+    // Loader.refuseUnknownFunctions and refuseUnusableTarget are both offered
+    // for a front end to ask once, when a spec is read, rather than once per
+    // load. server requires ldr too but not transitively, and rightly - an
+    // embedder drives a Watcher and never names a Loader - so this module says
+    // so for itself
+    requires io.github.ralfspoeth.xldr.ldr;
     requires java.sql;
     requires java.logging;
     requires com.zaxxer.hikari;
