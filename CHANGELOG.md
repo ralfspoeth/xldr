@@ -6,7 +6,19 @@ ways that break existing code and existing specs; those changes are listed here 
 The versions are the git tags `xldr-<version>`; the published artifacts carry the same version under the group
 `io.github.ralfspoeth.xldr`.
 
-## Unreleased
+## 0.53
+
+A release about expressions: two new functions, and the discovery that nothing had ever checked the name of one.
+
+`coalesce` and `recode` are what a mapping author reaches for when a value lives in more than one place or a code
+has to become a word - and neither needed a new `ValueSource`, so neither cost a case in a sealed interface.
+Writing them turned up the older problem: a misspelled function compiled quietly and failed on the first record of
+the first delivery, and `xldr check` passed it. Both now say so when the spec is read.
+
+`mapping-spec-0.53` is published in both formats and **the format is unchanged** - the one exception this project
+has made to publishing only when it changes, because a description in the JSON schema had been wrong since 0.10 and
+a published schema is never edited in place. A spec valid under `mapping-spec-0.50` is valid under
+`mapping-spec-0.53`; the reasoning is under *Added* below.
 
 ### Fixed
 
