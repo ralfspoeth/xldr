@@ -86,14 +86,13 @@ interface SpecNode {
         if (text.isPresent() && nth.isPresent()) {
             throw new IllegalArgumentException(what + " has both a selector and an nth,"
                     + " which are two answers to one question: " + shown());
-        }
-        if (text.isPresent()) {
+        } else if (text.isPresent()) {
             return Selector.text(text.get());
-        }
-        if (nth.isPresent()) {
+        } else if (nth.isPresent()) {
             return Selector.nth(nth.get());
+        } else {
+            throw new IllegalArgumentException(what + " needs a selector or an nth: " + shown());
         }
-        throw new IllegalArgumentException(what + " needs a selector or an nth: " + shown());
     }
 
     /**
@@ -122,14 +121,13 @@ interface SpecNode {
             throw new IllegalArgumentException(what + " has both a selector and a discriminator: '"
                     + selector.get() + "' says where the records are, " + discriminator + " says"
                     + " which records are of this kind, and no input is read both ways: " + shown());
-        }
-        if (selector.isPresent()) {
+        } else if (selector.isPresent()) {
             return Locator.at(selector.get());
-        }
-        if (discriminator != null) {
+        } else if (discriminator != null) {
             return Locator.where(discriminator);
+        } else {
+            return Locator.every();
         }
-        return Locator.every();
     }
 
     /**
@@ -145,15 +143,14 @@ interface SpecNode {
         if (literal.isPresent() && regex.isPresent()) {
             throw new IllegalArgumentException(
                     "a discriminator tests equals or matches, not both: " + shown());
-        }
-        if (literal.isPresent()) {
+        } else if (literal.isPresent()) {
             return new Discriminator.Equals(where, literal.get());
-        }
-        if (regex.isPresent()) {
+        } else if (regex.isPresent()) {
             return Discriminator.matching(where, regex.get());
+        } else {
+            throw new IllegalArgumentException("a discriminator needs equals or matches; " + where
+                    + " on its own says where to look and not what for: " + shown());
         }
-        throw new IllegalArgumentException("a discriminator needs equals or matches; " + where
-                + " on its own says where to look and not what for: " + shown());
     }
 
     /**
@@ -172,17 +169,15 @@ interface SpecNode {
         if (present != 1) {
             throw new IllegalArgumentException(
                     "needs exactly one of fieldSelector, constant, var, expr: " + shown());
-        }
-        if (field.isPresent()) {
+        } else if (field.isPresent()) {
             return new ValueSource.Field(field.get());
-        }
-        if (varRef.isPresent()) {
+        } else if (varRef.isPresent()) {
             return new ValueSource.Var(varRef.get());
-        }
-        if (expr.isPresent()) {
+        } else if (expr.isPresent()) {
             return new ValueSource.Expr(expr.get());
+        } else {
+            return constant.orElseThrow();
         }
-        return constant.orElseThrow();
     }
 
     /**
