@@ -14,7 +14,7 @@
     <dependencies>
         <dependency>
             <groupId>io.github.ralfspoeth</groupId>
-            <artifactId>json</artifactId>
+            <artifactId>greyson</artifactId>
         </dependency>
     </dependencies>
 
