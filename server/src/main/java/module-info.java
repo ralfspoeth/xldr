@@ -1,4 +1,7 @@
+import io.github.ralfspoeth.log.api.LogAll;
 import org.jspecify.annotations.NullMarked;
+
+import java.lang.reflect.Modifier;
 
 /**
  * The server as a library: watches the configured roots and loads the files that
@@ -16,6 +19,7 @@ import org.jspecify.annotations.NullMarked;
  * code here.
  */
 @NullMarked
+@LogAll(modifiers = Modifier.PUBLIC, level = System.Logger.Level.DEBUG)
 module io.github.ralfspoeth.xldr.server {
     exports io.github.ralfspoeth.xldr.server;
 
@@ -25,6 +29,8 @@ module io.github.ralfspoeth.xldr.server {
     requires io.github.ralfspoeth.xldr.ia;
     requires io.github.ralfspoeth.xldr.ldr;
     requires io.github.ralfspoeth.filews;
+    requires io.github.ralfspoeth.log.api;
+    // compile time only: nullness
     requires static org.jspecify;
 
     uses io.github.ralfspoeth.xldr.ia.InputAdapterFactory;

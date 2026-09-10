@@ -6,6 +6,42 @@ ways that break existing code and existing specs; those changes are listed here 
 The versions are the git tags `xldr-<version>`; the published artifacts carry the same version under the group
 `io.github.ralfspoeth.xldr`.
 
+## 0.54
+
+A release about logging, and the first in which some of what ships was not written by hand.
+
+The mapping-spec format is unchanged, so `mapping-spec-0.53` remains its schema and a spec that loaded under 0.53
+loads under 0.54.
+
+### Changed
+
+- **`server` is woven for entry logging, and therefore carries `log-api`.** Its `module-info` declares
+  `@LogAll(modifiers = Modifier.PUBLIC, level = DEBUG)`, and `log-weaver-maven-plugin` rewrites the classes during
+  `process-classes`, so every public method of the module logs its entry at DEBUG without a line of it appearing in
+  the source. `log-weaver-bom` is imported at 0.13 and the plugin takes its version from there, so the weaver and
+  the annotations cannot drift apart.
+
+  **What a consumer sees.** `io.github.ralfspoeth:log-api` becomes a dependency of the published `server` artifact -
+  the first addition to what embedding the watcher costs since `filews`, and a departure from the standing rule that
+  application code logs through `System.Logger` with slf4j present only as HikariCP's bridge. The annotations are
+  all `log-api` contributes; the logging itself still goes to `System.Logger`, so a deployment's
+  `logging.properties` governs the woven records exactly as it governs the hand-written ones, and nothing here
+  changes what `app` configures at startup.
+
+  **What it does not replace.** The domain events - a feed going pending, a file hospitalised, a load committing -
+  stay hand-written, because they say what happened rather than what was called, and no annotation can generate
+  them. This is entry tracing added underneath them, at a level a deployment can switch off, not a substitute for
+  them.
+
+  Requires log-weaver 0.13, whose scoped `@LogAll` learned to skip interfaces, records and hidden cases of sealed
+  types. Against 0.12 the same annotation produced unloadable class files for `Delivery` and `Feed` -
+  `ClassFormatError: Illegal field modifiers ... 0x101A`, a logger field carrying the modifiers that are legal in a
+  class and forbidden in an interface.
+
+- **Greyson is `io.github.ralfspoeth:greyson` at 2.0.0**, where it was `io.github.ralfspoeth:json`. The artifact now
+  matches the JPMS module `io.github.ralfspoeth.greyson` it has always published, so `spec`'s POM and its
+  `module-info` finally say the same word. Nothing in xldr changes but the coordinate.
+
 ## 0.53
 
 A release about expressions: two new functions, and the discovery that nothing had ever checked the name of one.

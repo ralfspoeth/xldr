@@ -138,7 +138,7 @@ fix their versions in one place:
             <dependency>
                 <groupId>io.github.ralfspoeth.xldr</groupId>
                 <artifactId>bom</artifactId>
-                <version>0.53</version>
+                <version>0.54</version>
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>
@@ -1645,6 +1645,20 @@ process; no second logging framework is involved.
 The binding belongs to the *distribution*, not to any library module. A binding is a deployment's choice, so no
 published module requires one - a consumer taking `xlsx` from Maven Central gets POI and no opinion about where its
 log records go.
+
+`server` is the one module that asks a consumer for anything logging-shaped, and it is worth saying what and what
+not. Its `module-info` carries `@LogAll(modifiers = Modifier.PUBLIC, level = DEBUG)`, and
+[log-weaver](https://github.com/ralfspoeth/log-weaver) rewrites the classes at build time so that every public
+method logs its entry - which is why `io.github.ralfspoeth:log-api` appears in the dependencies of the published
+artifact, and why the classes in it are not literally what javac emitted. What that does **not** do is choose a
+logging framework: `log-api` is two annotations, the woven calls go to `System.Logger` like every hand-written one,
+and a deployment's `logging.properties` governs them identically. The paragraph above still holds - no published
+module requires a binding.
+
+The tracing is added *underneath* the log lines this project already had, not in place of them. A woven record says
+which method was called; the hand-written ones say a feed went pending, a file was hospitalised, a load committed -
+statements about the domain that no annotation could generate. The first is at DEBUG and a deployment that does not
+want it turns it off in the file it already has.
 
 `server` goes the same way for the JDK's own logging: it writes through `System.Logger`, which is in `java.base`, and
 does not `requires java.logging`. Requiring it would pick JUL, because the default `LoggerFinder` routes there when
