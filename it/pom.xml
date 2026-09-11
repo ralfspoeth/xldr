@@ -16,7 +16,7 @@
             xlet compiles against - hence the ee11 artifacts and a 12.1 line.
             Pairing 6.1 with Jetty's ee10 modules would not resolve.
         -->
-        <jetty.version>12.1.12</jetty.version>
+        <jetty.version>12.1.13</jetty.version>
     </properties>
 
     <build>
