@@ -6,6 +6,26 @@ ways that break existing code and existing specs; those changes are listed here 
 The versions are the git tags `xldr-<version>`; the published artifacts carry the same version under the group
 `io.github.ralfspoeth.xldr`.
 
+## 0.55
+
+A release with no code in it: the dependencies moved and xldr moved with them.
+
+The mapping-spec format is unchanged, so `mapping-spec-0.53` remains its schema and a spec that loaded under 0.53
+loads under 0.55.
+
+### Changed
+
+- **`xmls` is at 1.0.0 and `filews` at 1.0.0**, where they were 0.11.0 and 0.4. Both libraries declared their APIs
+  finished rather than gaining anything, so the number is the news. `xmls` 1.0.0 does carry three breaking renames -
+  `parseNameSpaced` became `parseNS`, `text` became `stringContent`, and `attribute` yields a nullable `Attr` instead
+  of an `Optional<Attr>` so that a navigator composes with a converter - but xldr calls only `attributeValue` and
+  `elements`, neither of which changed, so nothing here had to be rewritten to follow.
+
+- **`h2` 2.4.240 to 2.5.250, `slf4j` 2.0.18 to 2.0.19, and Jetty 12.1.12 to 12.1.13 in `it`.** All three are used by
+  tests and the distribution rather than by the published API. H2 is what the integration tests load into and one of
+  the two drivers in `drivers/`, so a consumer running the distribution against H2 gets the newer engine; the Jetty
+  line still has to be a 12.1 one, for the reason `it/pom.xml` gives.
+
 ## 0.54
 
 A release about logging, and the first in which some of what ships was not written by hand.
