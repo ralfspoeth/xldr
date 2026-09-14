@@ -21,7 +21,7 @@ set "HERE=%~dp0.."
 
 if not exist "%HERE%\lib" (
     echo xldr: no lib\ in %HERE% - is the distribution complete? 1>&2
-    echo xldr: https://github.com/ralfspoeth/xldr/issues if this did not help 1>&2
+    echo xldr: unpack it again; if a published archive comes out this way, that is ours: https://github.com/ralfspoeth/xldr/issues 1>&2
     exit /b 1
 )
 
@@ -32,7 +32,6 @@ if defined JAVA_HOME (
 )
 if defined JAVA_HOME if not exist "%JAVA_HOME%\bin\java.exe" (
     echo xldr: JAVA_HOME is set to %JAVA_HOME%, but %JAVA_HOME%\bin\java.exe does not exist 1>&2
-    echo xldr: https://github.com/ralfspoeth/xldr/issues if this did not help 1>&2
     exit /b 1
 )
 

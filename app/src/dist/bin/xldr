@@ -20,11 +20,16 @@
 #   JAVA_OPTS=-Xmx512m bin/xldr
 set -eu
 
-# Every message this script can end on names something to fix. When one does not,
-# that is worth hearing about, so the second line goes out with all of them.
+# A second argument is a line about where to report it, and only two of the
+# failures below pass one. The others - JAVA_HOME wrong, no java, too old a java
+# - are about this machine and say so completely, naming the variable, its value
+# and what is wrong with it; there is nothing left for an issue to be about, and
+# inviting one anyway wastes the time of whoever accepts the invitation. The two
+# that do pass it are the two where the reader cannot tell whether the fault is
+# theirs or ours.
 fail() {
     echo "xldr: $1" >&2
-    echo "xldr: https://github.com/ralfspoeth/xldr/issues if this did not help" >&2
+    if [ $# -gt 1 ]; then echo "xldr: $2" >&2; fi
     exit 1
 }
 
@@ -39,9 +44,16 @@ while [ -L "$self" ]; do
         *) self=$(dirname "$self")/$link ;;
     esac
 done
-here=$(cd "$(dirname "$self")/.." && pwd) || fail "cannot determine the installation directory"
+# Reaching either of these means the loop above met a layout it does not handle,
+# or the archive is not what it should be - neither of which is anything the
+# reader can act on, so both say where to send it.
+here=$(cd "$(dirname "$self")/.." && pwd) || fail \
+    "cannot determine the installation directory" \
+    "that is this script's own doing, so please report it: https://github.com/ralfspoeth/xldr/issues"
 
-[ -d "$here/lib" ] || fail "no lib/ in $here - is the distribution complete?"
+[ -d "$here/lib" ] || fail \
+    "no lib/ in $here - is the distribution complete?" \
+    "unpack it again; if a published archive comes out this way, that is ours: https://github.com/ralfspoeth/xldr/issues"
 
 if [ -n "${JAVA_HOME:-}" ]; then
     java=$JAVA_HOME/bin/java

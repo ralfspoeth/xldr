@@ -44,11 +44,18 @@ loads under 0.56.
 
   It is placed where a problem is actually met rather than only where a reader would look for it: `drivers/README.txt`
   ends with it, since a missing driver lands someone there and not in a 1700-line README; the sample
-  `xldr.properties` says a key that does not behave as documented is a defect either way round; tutorial page 12,
-  which is the one about things going wrong, closes with it; and both launchers print the tracker's URL beside any
-  message they fail on. That last one is deliberate rather than decorative - every `fail()` in the launcher names
-  something to fix, so the case worth hearing about is the one where the message did not, and inviting that report
-  costs one line on a path that only runs when something is already wrong.
+  `xldr.properties` says a key that does not behave as documented is a defect either way round; and tutorial page 12,
+  the one about things going wrong, closes with it.
+
+  **The launchers are the interesting case, because most of their failures should not invite a report.** Of the five
+  ways `bin/xldr` can give up, three - `JAVA_HOME` pointing at no executable, no `java` at all, a JVM below 25 - are
+  about the machine it was run on, and each already names the variable, its value and what is wrong with it. There
+  is nothing left for an issue to be about, so pointing at the tracker there would only cost the reader the trouble
+  of being told to fix their own path. The other two are the ones where they cannot tell whose fault it is: a
+  missing `lib/` is usually a half-finished unpack and occasionally the release workflow having repacked wrong, and
+  those look identical from where they are standing; a failure to resolve the installation directory is this
+  script's own symlink handling. `fail()` therefore takes an optional second line, and only those two pass one.
+  `xldr.cmd` follows the same split.
 
   What the section asks for reflects what we cannot find out ourselves: the database product and version, and which
   driver jar is present. The build's tests run against H2 and the toolkit is used against Oracle, so anything else
