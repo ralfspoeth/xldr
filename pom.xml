@@ -79,6 +79,20 @@
                 <artifactId>h2</artifactId>
                 <version>2.5.250</version>
             </dependency>
+            <!--
+                Test scope only, and only in `it`. 0.56 took this driver out of the
+                distribution and that stands: what a deployment installs and what
+                the build runs its tests against are different questions. PostgreSQL
+                is the product whose answers differ most from H2's - no catalogs in
+                DML, identifiers folding down rather than up - so it is the one worth
+                proving the loader against, and PostgresIT does that when CI hands it
+                a URL.
+            -->
+            <dependency>
+                <groupId>org.postgresql</groupId>
+                <artifactId>postgresql</artifactId>
+                <version>42.7.13</version>
+            </dependency>
             <dependency>
                 <groupId>org.slf4j</groupId>
                 <artifactId>slf4j-api</artifactId>

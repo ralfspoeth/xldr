@@ -136,6 +136,19 @@
             <artifactId>h2</artifactId>
             <scope>test</scope>
         </dependency>
+        <!--
+            PostgresIT only, and test scope only - this does not put the driver back
+            into the distribution, which 0.56 took it out of on purpose. It is here
+            because PostgreSQL answers two metadata questions differently from every
+            other target we run against, and those answers are the ones the loader
+            branches on. Without a URL the test skips, so a build without a database
+            is unaffected.
+        -->
+        <dependency>
+            <groupId>org.postgresql</groupId>
+            <artifactId>postgresql</artifactId>
+            <scope>test</scope>
+        </dependency>
         <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter-api</artifactId>

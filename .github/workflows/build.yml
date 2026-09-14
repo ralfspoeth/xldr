@@ -11,6 +11,31 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+
+    # PostgresIT talks to this, and skips when XLDR_PG_URL is unset - which is
+    # every local build, so nobody has to install a database to run the suite.
+    # It is here rather than in a profile because the point is that it runs
+    # without being asked for: PostgreSQL is the target whose metadata answers
+    # the loader branches on, and those answers should be re-checked on every
+    # push rather than when somebody remembers to.
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_USER: xldr
+          POSTGRES_PASSWORD: xldr
+          POSTGRES_DB: xldr
+        ports:
+          - 5432:5432
+        # without this the job can reach the container before the server inside
+        # it is accepting connections, which fails as a connection refused and
+        # reads like a broken test
+        options: >-
+          --health-cmd "pg_isready -U xldr"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
     steps:
       - uses: actions/checkout@v4
 
@@ -25,6 +50,13 @@ jobs:
       # profile, so no key or passphrase is needed here
       - name: Build and test
         run: mvn -B -ntp verify
+        env:
+          # what turns PostgresIT on; the service above is published on the
+          # runner's own localhost, so this is an ordinary URL and no container
+          # networking is involved
+          XLDR_PG_URL: jdbc:postgresql://localhost:5432/xldr
+          XLDR_PG_USER: xldr
+          XLDR_PG_PASSWORD: xldr
 
       - name: Publish test results
         if: always()

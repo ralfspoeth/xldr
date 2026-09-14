@@ -6,6 +6,32 @@ ways that break existing code and existing specs; those changes are listed here 
 The versions are the git tags `xldr-<version>`; the published artifacts carry the same version under the group
 `io.github.ralfspoeth.xldr`.
 
+## Unreleased
+
+The mapping-spec format is unchanged, so `mapping-spec-0.53` remains its schema.
+
+### Added
+
+- **The build runs against a real PostgreSQL.** `PostgresIT` in `it` exercises the three things that can only be
+  learned from the product itself, and the build workflow supplies one as a service container, so nothing has to be
+  installed anywhere: the test reads `XLDR_PG_URL` and skips when it is absent, which is every local build.
+
+  **What it covers, and why it is only three tests.** PostgreSQL is not interesting because it is popular; it is
+  interesting because it is the only target we run against whose `DatabaseMetaData` answers differ from H2's in ways
+  the loader branches on. `supportsCatalogsInDataManipulation` is false, so a `catalog` in a deployment's target can
+  never load and is refused before the first record. `storesLowerCaseIdentifiers` is true, where Oracle and H2 fold
+  up, so an unquoted name in a spec has to survive being folded one way by us and the other way by the server. The
+  third test loads a file end to end into a lower-case table, which is where those two meet.
+
+  **Why the existing tests were not enough, given both paths already had them.** `QualifyingTest` and `LoaderTest`
+  drive exactly these branches through `AnsweringConnection`, a stub that answers the way we *believe* PostgreSQL
+  answers. That tests the branching and cannot test the belief - a wrong belief makes the stub wrong the same way,
+  and the test then agrees with the bug. `PostgresIT` therefore asserts the two metadata answers directly, so that
+  if the assumption behind the stub is ever false, the failure says so rather than showing up as a puzzling load.
+
+  `org.postgresql:postgresql` returns as a **test-scoped** dependency of `it` only. This does not undo 0.56: what a
+  deployment installs and what the build tests against are separate questions, and `drivers/` still ships H2 alone.
+
 ## 0.56
 
 The mapping-spec format is unchanged, so `mapping-spec-0.53` remains its schema and a spec that loaded under 0.53
