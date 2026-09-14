@@ -179,4 +179,9 @@ The rest is reference, in the [README](../../README.md): the properties of each 
 fixed-length inputs, the server's configuration, how files are delivered, and how to embed the loader in an
 application rather than running the server at all.
 
+And when a failure on this page's subject does not tell you what to fix - a refusal you think is wrong, a message
+that needed a debugger, a database that behaves unlike the ones described here - please
+[open an issue](https://github.com/ralfspoeth/xldr/issues). This whole page exists because messages are the
+interface too, so one that fails to explain itself is a defect worth reporting.
+
 [← types and notation](11-types.md) · [index](README.md) · [next: drafting one with an assistant →](13-with-an-assistant.md)

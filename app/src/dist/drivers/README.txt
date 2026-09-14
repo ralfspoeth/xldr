@@ -29,3 +29,10 @@ from Maven Central or from oracle.com. Any other database is the same operation
 with a different jar. Then point jdbc.url at it in conf/xldr.properties and the
 server will find it; if it does not, the driver is the wrong one for the URL
 rather than in the wrong place.
+
+If that is not it, or the failure did not say which of the two it was, please
+open an issue: https://github.com/ralfspoeth/xldr/issues. Say which database and
+version, which driver jar is in here, and what the URL scheme is. The build's
+tests run against H2 and the toolkit is used against Oracle, so a report from
+anything else is telling us something we had no way to find out ourselves. The
+README.md beside this directory says what else is worth putting in.

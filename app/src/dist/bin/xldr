@@ -20,8 +20,11 @@
 #   JAVA_OPTS=-Xmx512m bin/xldr
 set -eu
 
+# Every message this script can end on names something to fix. When one does not,
+# that is worth hearing about, so the second line goes out with all of them.
 fail() {
     echo "xldr: $1" >&2
+    echo "xldr: https://github.com/ralfspoeth/xldr/issues if this did not help" >&2
     exit 1
 }
 

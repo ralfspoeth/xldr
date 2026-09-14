@@ -372,7 +372,7 @@ unpacks to, and changes nothing else about it. Unpacked, it is
         xl/                      the Excel adapter and Apache POI
         drivers/                 the JDBC drivers - H2 only, plus a note on adding others
         conf/                    sample xldr.properties and logging.properties
-        README.md
+        README.md                this file - the reference, and where to report a problem
 
 and runs with
 
@@ -1676,6 +1676,39 @@ A default `logging.properties` is bundled and applied at startup unless the depl
 configuration of its own:
 
     java -Djava.util.logging.config.file=/etc/xldr/logging.properties -p <module-path> -m io.github.ralfspoeth.xldr.app --dir /etc/xldr
+
+## Problems and Questions
+
+Please open an issue: <https://github.com/ralfspoeth/xldr/issues>. A defect, a spec the reader refuses that you
+believe it should accept, a message that did not tell you what was wrong, a passage here that says something the
+code does not do - all of them are worth filing, and the last two as much as the first. A failure you needed a
+debugger to understand is a defect in the message as well as in whatever caused it, and this project has changed
+more messages than behaviour on that reasoning.
+
+**Two checks settle most of it before you write anything.** For anything to do with a mapping spec, run
+`xldr check spec.json --sample <file> --url <jdbc-url>`: it validates the document, resolves the target, looks up
+every table, column, function and procedure the spec names, and reports what it cannot find. That is usually the
+answer, and when it is not, its output is the thing to paste into the issue.
+[Tutorial page 12](docs/tutorial/12-when-it-goes-wrong.md) walks through it.
+
+For anything to do with connecting to a database, the question is nearly always whether the driver jar is in
+`drivers/` - only H2 ships, so every other database needs one copied in - and whether it is the driver for the
+scheme in your URL. `drivers/README.txt` in the distribution says how, and a driver that is present but wrong for
+the URL fails the same way as one that is missing.
+
+**What makes an issue answerable**, roughly in the order each is the piece we turn out to need:
+
+    the version         the tag, or the name the archive unpacked to
+    java -version       the JDK, since this is a modular build and JPMS failures read strangely
+    what you ran        bin/xldr, xldr check, or the modules embedded in your own application
+    the failure         the message and stack trace, or the log lines either side of it
+    the spec            cut down to the smallest one that still misbehaves, where a spec is involved
+    the database        the product and version, and which driver jar is in drivers/
+
+The last one is the most often omitted and the most often decisive. The build's tests run against H2 and the
+toolkit is used in anger against Oracle, so a report from anything else is telling us something we had no way to
+know - the SQL this generates is deliberately plain, but "deliberately plain" is a claim about databases we have
+not tried.
 
 ## License
 

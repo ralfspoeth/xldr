@@ -35,6 +35,25 @@ loads under 0.56.
   Oracle's exclusion at 0.40 was a licence question and remains one. This is a different question with the same
   answer, and the two should not be confused: what came out here is a driver we were perfectly entitled to publish.
 
+### Added
+
+- **Somewhere to report a problem, and it travels with the distribution.** The README gains a *Problems and
+  Questions* section - the issue tracker, the two checks that settle most of it before writing anything
+  (`xldr check` for a spec, the contents of `drivers/` for a connection), and what a report needs to be answerable.
+  Since the assembly already copies the README into the archive root, the offline copy comes for free.
+
+  It is placed where a problem is actually met rather than only where a reader would look for it: `drivers/README.txt`
+  ends with it, since a missing driver lands someone there and not in a 1700-line README; the sample
+  `xldr.properties` says a key that does not behave as documented is a defect either way round; tutorial page 12,
+  which is the one about things going wrong, closes with it; and both launchers print the tracker's URL beside any
+  message they fail on. That last one is deliberate rather than decorative - every `fail()` in the launcher names
+  something to fix, so the case worth hearing about is the one where the message did not, and inviting that report
+  costs one line on a path that only runs when something is already wrong.
+
+  What the section asks for reflects what we cannot find out ourselves: the database product and version, and which
+  driver jar is present. The build's tests run against H2 and the toolkit is used against Oracle, so anything else
+  is a report we have no way to generate.
+
 ### Fixed
 
 - **`conf/xldr.properties` said a driver must be in `lib/`.** It is `drivers/` everywhere else, including in the
