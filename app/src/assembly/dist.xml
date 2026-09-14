@@ -87,18 +87,19 @@
              the directory on the module path beside lib/, where java.sql finds
              a Driver by service binding as it does any other provider.
 
-             Two, and both freely redistributable. A driver that is not - the
-             Oracle one, which this shipped until 0.40 - makes the project a
-             redistributor of somebody else's licence, and there is nothing here
-             that needs it: a driver is found by service binding, so installing
-             one is copying a jar into this directory. src/dist/drivers/README.txt
-             says so, and is copied in beside them. -->
+             One, and it is here because the tutorial runs on it: without H2 the
+             documented first five minutes need a database provisioned first. No
+             other driver earns a place by that rule, which is the rule since 0.56
+             - PostgreSQL shipped until 0.55 on a licence argument that did not
+             survive checking, Oracle until 0.40 on a licence we should not have
+             taken on. Installing any of them is copying a jar into this directory,
+             since java.sql finds a Driver by service binding wherever it comes
+             from. src/dist/drivers/README.txt says so, and is copied in beside it. -->
         <dependencySet>
             <outputDirectory>drivers</outputDirectory>
             <useProjectArtifact>false</useProjectArtifact>
             <scope>provided</scope>
             <includes>
-                <include>org.postgresql:postgresql</include>
                 <include>com.h2database:h2</include>
             </includes>
         </dependencySet>

@@ -674,8 +674,9 @@ public class Loader implements AutoCloseable {
      * <p>
      * Named {@code recode} rather than {@code decode}, which is Oracle's spelling
      * of roughly this. PostgreSQL has a {@code decode} of its own that converts
-     * base64 to bytes, and this toolkit ships a driver for it, so borrowing the
-     * name would hand half its users the wrong idea. This is also not Oracle's
+     * base64 to bytes, and a spec is written against whatever database it loads
+     * into, so borrowing the name would hand that half of its readers the wrong
+     * idea about what the line does. This is also not Oracle's
      * function: {@code DECODE} matches NULL to NULL, which cannot even be written
      * here - an argument is a quoted string, a whole number, a name or a call, and
      * there is no null literal.

@@ -41,15 +41,15 @@ Java 25 or later is required.
 ### Running the server
 
 Download the distribution from the [latest release](https://github.com/ralfspoeth/xldr/releases/latest) and unpack
-it. Java 25 or later is the only requirement - the archive carries the toolkit, the adapters, and JDBC drivers for
-H2 and PostgreSQL:
+it. Java 25 or later is the only requirement - the archive carries the toolkit, the adapters, and a JDBC driver for
+H2:
 
     tar xzf xldr-<version>-dist.tar.gz        # or unzip xldr-<version>-dist.zip
     cd xldr-<version>
 
-For any other database, drop its driver jar into `drivers/` - `ojdbc17` for Oracle, and so on. The two that ship
-are the two that are ours to ship; a driver is found by service binding rather than named anywhere, so installing
-one is copying a file. There is a note in `drivers/` saying as much.
+H2 is the only driver that ships, because the tutorial runs on it. For any other database - PostgreSQL, Oracle's
+`ojdbc17`, and so on - drop its jar into `drivers/`; a driver is found by service binding rather than named
+anywhere, so installing one is copying a file. There is a note in `drivers/` saying as much.
 
 Or build it from a checkout, which produces the same archive, named after the module that assembled it:
 
@@ -138,7 +138,7 @@ fix their versions in one place:
             <dependency>
                 <groupId>io.github.ralfspoeth.xldr</groupId>
                 <artifactId>bom</artifactId>
-                <version>0.55</version>
+                <version>0.56</version>
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>
@@ -370,7 +370,7 @@ unpacks to, and changes nothing else about it. Unpacked, it is
         lib/                     the application and the toolkit
         modules/                 the input adapters
         xl/                      the Excel adapter and Apache POI
-        drivers/                 the JDBC drivers - H2 and PostgreSQL, plus a note on adding others
+        drivers/                 the JDBC drivers - H2 only, plus a note on adding others
         conf/                    sample xldr.properties and logging.properties
         README.md
 
@@ -387,11 +387,17 @@ the input adapters (via the `uses`/`provides` of `InputAdapterFactory`) and the 
 change. Each of the three may be empty, or absent altogether - choosing none of something is a choice, and a server
 with no adapters starts and then refuses to activate any feed, which is loud in the right place.
 
-**Installing your own driver is copying its jar into `drivers/`.** Removing the ones you do not target is the same
-operation in reverse. The two that ship are the two that are freely redistributable, which is the whole rule: a
-driver that is not - Oracle's, which was in here until 0.40 - is one line of licence taken on in exchange for
-saving somebody a download, and it is not a trade worth making for a jar that service binding finds wherever it
-comes from.
+**Installing your own driver is copying its jar into `drivers/`.** Removing one you do not target is the same
+operation in reverse. Only H2 ships, and the rule that puts it there is that the tutorial runs on it: the
+distribution carries the driver its own quickstart needs, and a jar that service binding finds wherever it comes
+from is not worth shipping for any weaker reason than that.
+
+That rule replaced a licence one at 0.56, and the correction is worth stating rather than quietly making. The
+previous rule was "the two that ship are the two that are freely redistributable", which was not true - mssql-jdbc
+is MIT, xerial's SQLite driver Apache-2.0, MariaDB Connector/J LGPL-2.1 - so it described a preference rather than
+a limit, and PostgreSQL was in here because it is a database this project's author uses. Oracle's, gone at 0.40,
+really was a licence question and stays one. What shipping a driver costs is being the distributor of a jar that
+never gets patched after the tag, and what it implies is a ranking of databases the toolkit does not have.
 
 **`xl/` is Excel, kept apart for weight.** Apache POI brings xmlbeans, curvesapi, several commons libraries and
 log4j-api, which together were most of the distribution and made it hard to see what the toolkit is actually made of.
@@ -1327,9 +1333,9 @@ file of your own still overrides the lot.
     jdbc.user     = dbuser
     jdbc.password = secret
 
-The JDBC drivers are `provided` dependencies: the deployment supplies the one matching its target database. H2 and
-PostgreSQL are in the distribution because they are ours to ship; anything else, Oracle included, is a jar dropped
-into `drivers/`.
+The JDBC drivers are `provided` dependencies: the deployment supplies the one matching its target database. H2 is
+in the distribution because the tutorial runs on it; everything else, PostgreSQL and Oracle included, is a jar
+dropped into `drivers/`.
 
 ### Feed configuration
 
@@ -1678,7 +1684,8 @@ libraries it is built on are permissive too: Greyson, filews and SLF4J are MIT, 
 
 The JDBC drivers are not xldr's to license, and none is pulled in transitively - they are `provided` dependencies, so
 a consumer of the libraries supplies the driver for the database it feeds and accepts that driver's own terms. The
-[distribution](#distribution) bundles two of them into `drivers/` for convenience, and those two only because both
-are freely redistributable: H2 under MPL-2.0 or EPL-1.0, the PostgreSQL driver under BSD-2-Clause.
+[distribution](#distribution) bundles one of them into `drivers/`: H2, under MPL-2.0 or EPL-1.0, because the
+tutorial runs on it. That is a quickstart decision rather than a licence one - several drivers this does not ship
+are permissive too - and it is the smallest set the documentation can work with.
 A proprietary driver is not bundled at any version, so a distribution passed on to anyone else needs nothing taken
 out of it first.

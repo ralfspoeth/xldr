@@ -63,8 +63,8 @@
 <p>
     To run it: the
     <a href="https://github.com/ralfspoeth/xldr/releases/latest">latest release</a> carries the server, the adapters
-    and JDBC drivers for H2 and PostgreSQL. Unpack it and run <code>bin/xldr</code>; Java 25 or later is the only
-    requirement, and any other driver is a jar dropped into <code>drivers/</code>. The library modules are on Maven Central under <code>io.github.ralfspoeth.xldr</code>.
+    and a JDBC driver for H2, the one the tutorial runs on. Unpack it and run <code>bin/xldr</code>; Java 25 or later
+    is the only requirement, and any other driver is a jar dropped into <code>drivers/</code>. The library modules are on Maven Central under <code>io.github.ralfspoeth.xldr</code>.
 </p>
 
 <h2>Schemas</h2>
@@ -160,7 +160,7 @@
 <p>
     A schema is published whenever the format changes, and named after the release that changed it: the format is
     still settling before 1.0, and a spec should be validated against the schema its release reads. A release that
-    changes nothing about the format - 0.11, 0.12, 0.14 to 0.20, 0.22, 0.24 to 0.31, 0.33, 0.34, 0.36 to 0.39, 0.41, 0.45, 0.48, 0.49, 0.51, 0.52, 0.54, 0.55 -
+    changes nothing about the format - 0.11, 0.12, 0.14 to 0.20, 0.22, 0.24 to 0.31, 0.33, 0.34, 0.36 to 0.39, 0.41, 0.45, 0.48, 0.49, 0.51, 0.52, 0.54 to 0.56 -
     keeps the previous schema rather than publishing a copy of it. An older one stays where it is, so a spec pinned
     to it keeps validating.
 </p>

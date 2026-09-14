@@ -25,11 +25,10 @@
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-jdk14</artifactId>
         </dependency>
-        <dependency>
-            <groupId>org.postgresql</groupId>
-            <artifactId>postgresql</artifactId>
-            <scope>provided</scope>
-        </dependency>
+        <!-- provided, and bundled into drivers/ by the assembly: the tutorial and
+             the getting-started path run against H2, so the distribution has to
+             carry it for the documented first five minutes to work. It is the only
+             driver here for that reason; see src/dist/drivers/README.txt. -->
         <dependency>
             <groupId>com.h2database</groupId>
             <artifactId>h2</artifactId>
@@ -105,11 +104,6 @@
 
     <dependencyManagement>
         <dependencies>
-            <dependency>
-                <groupId>org.postgresql</groupId>
-                <artifactId>postgresql</artifactId>
-                <version>42.7.13</version>
-            </dependency>
             <dependency>
                 <groupId>com.zaxxer</groupId>
                 <artifactId>HikariCP</artifactId>

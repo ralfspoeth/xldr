@@ -58,10 +58,21 @@ jobs:
           root="xldr-$version"
           test -d "$root/drivers" || { echo "::error::no $root/drivers in the archive"; exit 1; }
 
-          # the licence gate, so that a driver added to the assembly by accident
-          # is caught here rather than by whoever receives the archive
+          # the driver gate, so that a driver added to the assembly by accident is
+          # caught here rather than by whoever receives the archive. Since 0.56 it
+          # can be exact: H2 ships because the tutorial runs on it, nothing else
+          # ships at all, so the archive holds one jar and we can say which.
           if ls "$root"/drivers/ojdbc*.jar >/dev/null 2>&1; then
             echo "::error::an Oracle driver is in the archive; it is not ours to publish"
+            exit 1
+          fi
+          ls "$root"/drivers/h2-*.jar >/dev/null 2>&1 || {
+            echo "::error::no H2 driver in the archive; the tutorial cannot be followed without it"
+            exit 1
+          }
+          strays=$(find "$root/drivers" -name '*.jar' ! -name 'h2-*.jar' -printf '%f ')
+          if [ -n "$strays" ]; then
+            echo "::error::only the H2 driver ships, but the archive also holds: $strays"
             exit 1
           fi
 
@@ -83,8 +94,8 @@ jobs:
           gh release create "$GITHUB_REF_NAME" dist/* \
             --title "XLDR $version" \
             --notes "Unpack either archive and run \`bin/xldr\` - Java 25 or later, no build required.
-          Carries JDBC drivers for H2 and PostgreSQL; any other database is its driver jar dropped into
-          \`drivers/\` (see the README in that directory).
+          Carries a JDBC driver for H2, the one the tutorial runs on; any other database is its driver jar
+          dropped into \`drivers/\` (see the README in that directory).
           See [the changelog](https://github.com/ralfspoeth/xldr/blob/$GITHUB_REF_NAME/CHANGELOG.md) for what
           changed in $version, and [the tutorial](https://github.com/ralfspoeth/xldr/blob/$GITHUB_REF_NAME/docs/tutorial/README.md)
           for writing the mapping spec that does the work.

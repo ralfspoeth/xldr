@@ -6,6 +6,51 @@ ways that break existing code and existing specs; those changes are listed here 
 The versions are the git tags `xldr-<version>`; the published artifacts carry the same version under the group
 `io.github.ralfspoeth.xldr`.
 
+## 0.56
+
+The mapping-spec format is unchanged, so `mapping-spec-0.53` remains its schema and a spec that loaded under 0.53
+loads under 0.56.
+
+### Breaking
+
+- **The PostgreSQL driver is no longer in the distribution.** `drivers/` now holds H2 and nothing else. A deployment
+  that fed PostgreSQL out of the archive needs `org.postgresql:postgresql` from Maven Central copied into that
+  directory before it will connect - the same operation Oracle has needed since 0.40, and the only one, since a
+  driver is found by service binding rather than named anywhere. Nothing in the library modules changed: the drivers
+  were always `provided`, so a consumer of `ldr` never got one from us in the first place.
+
+  **Why, since the driver was ours to ship.** The rule this file and the README stated was that the two shipped
+  drivers were the two that are freely redistributable. That was not true, and it is worth saying so plainly rather
+  than quietly restating it: Microsoft's `mssql-jdbc` is MIT, xerial's SQLite driver Apache-2.0, MariaDB
+  Connector/J LGPL-2.1. Any of them could have shipped on that reasoning. What actually decided the list was which
+  databases this project's author uses at work, which is not a rule anyone else can apply, and it left the archive
+  implying a ranking of databases the toolkit does not have.
+
+  The rule that replaces it is one the project can hold to: **the distribution carries the driver its own
+  quickstart needs, and nothing else.** H2 earns that - the tutorial runs against it, so without the jar the
+  documented first five minutes need a database provisioned before they can start. PostgreSQL never did. It also
+  drops an obligation that was quietly accruing, since a jar inside a tagged archive is one nobody patches
+  afterwards, and pgjdbc has had CVEs.
+
+  Oracle's exclusion at 0.40 was a licence question and remains one. This is a different question with the same
+  answer, and the two should not be confused: what came out here is a driver we were perfectly entitled to publish.
+
+### Fixed
+
+- **`conf/xldr.properties` said a driver must be in `lib/`.** It is `drivers/` everywhere else, including in the
+  launcher that builds the module path. The sample `jdbc.url` still names PostgreSQL, since a realistic target says
+  more than an H2 file URL would, and the comment beside it now says that this is a driver to copy in.
+
+- **The release workflow's driver gate is exact.** It refused an `ojdbc*.jar` in the archive and let anything else
+  through, while its comment claimed to catch "a driver added to the assembly by accident". With one driver shipping
+  it can check what it says: the archive must hold an `h2-*.jar` and no other, so both a stray addition and a
+  missing H2 fail the release rather than reaching whoever downloads it.
+
+- **A stated reason in `Loader`'s `recode` javadoc was about to expire.** It explained the name by noting that
+  PostgreSQL has a `decode` of its own "and this toolkit ships a driver for it". The first half is the reason and
+  still holds; the second half stops being true in this release. A spec is written against whatever database it
+  loads into, whoever supplied the driver, which is the durable form of the same argument.
+
 ## 0.55
 
 A release with no code in it: the dependencies moved and xldr moved with them.
