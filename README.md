@@ -145,7 +145,7 @@ fix their versions in one place:
             <dependency>
                 <groupId>io.github.ralfspoeth.xldr</groupId>
                 <artifactId>bom</artifactId>
-                <version>0.56</version>
+                <version>1.0.0</version>
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>
@@ -486,12 +486,12 @@ Both formats have a published schema, so an editor can check a spec before it ev
 only reports a broken spec in its log, by leaving the feed inactive. Point at the schema from the spec itself:
 
     {
-      "$schema": "https://ralfspoeth.github.io/xldr/schema/mapping-spec-0.53.json",
+      "$schema": "https://ralfspoeth.github.io/xldr/schema/mapping-spec-1.0.json",
       "input": { ... }
     }
 
     <mappingSpec xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-                 xsi:noNamespaceSchemaLocation="https://ralfspoeth.github.io/xldr/schema/mapping-spec-0.53.xsd">
+                 xsi:noNamespaceSchemaLocation="https://ralfspoeth.github.io/xldr/schema/mapping-spec-1.0.xsd">
 
 Both are ignored by the readers - `$schema` is just another unrecognised member, and `xsi:` attributes carry no
 meaning for a spec that has no namespace of its own. IntelliJ and VS Code both validate and autocomplete from them.
@@ -517,8 +517,11 @@ rest - because further down a spec an unknown name is far more often a misspelli
 written for `fieldSelectors` costs a record every one of its fields, and no reader will say so: ignoring the
 unknown is exactly what it promises.
 
-A schema is published whenever the format changes, and is named after the release that changed it:
-`mapping-spec-0.53` describes the format from 0.53 onwards,
+A schema is published whenever the format gains something, and is named for the version of the *format* rather than
+of the release - `major.minor`, since a patch release cannot change the format and a third component would only
+invite a file identical to the one before it:
+`mapping-spec-1.0` describes the format from 1.0 onwards,
+`mapping-spec-0.53` that of 0.53 to 0.56,
 `mapping-spec-0.50` that of 0.50 to 0.52,
 `mapping-spec-0.47` that of 0.47 to 0.49,
 `mapping-spec-0.46` that of 0.46,
@@ -534,11 +537,15 @@ A schema is published whenever the format changes, and is named after the releas
 `mapping-spec-0.10` that of 0.10 to 0.12, and so on. An
 earlier one stays where it is, so a spec pinned to it keeps validating.
 
-`mapping-spec-0.53` is the one exception to "whenever the format changes": it publishes an identical set of
-constraints, because a published schema is never edited in place and one of its *descriptions* had been wrong since
-0.10 - it named a subset of the expression functions while the set grew without it. The new pair names none of them
-and points at this document instead, so the list has one home. A spec valid under `mapping-spec-0.50` is valid
-under `mapping-spec-0.53`.
+Two pairs publish an identical set of constraints rather than a changed one, for different reasons.
+`mapping-spec-0.53` exists because a published schema is never edited in place and one of its *descriptions* had
+been wrong since 0.10 - it named a subset of the expression functions while the set grew without it, so the new
+pair names none of them and points at this document instead. And `mapping-spec-1.0` is byte-for-byte
+`mapping-spec-0.53` but for its own URL: nothing about the format changed at 1.0, what changed is that it stopped
+being allowed to change, and a promise of that kind wants a file to attach to. "Every later `1.x` schema is a
+superset of `mapping-spec-1.0`" is a sentence the build can check; the same sentence pointing at a pair named for a
+pre-1.0 release would read as an accident. A spec valid under `mapping-spec-0.50` is valid under `mapping-spec-0.53`
+is valid under `mapping-spec-1.0`.
 
 What a schema cannot see is whether the spec makes sense as a whole - whether a mapping names a record selector the
 input actually declares, or whether the adapter accepts the selectors. There was a `bin/xldr validate` for that,

@@ -7,9 +7,29 @@ listed under **Added**; anything incompatible waits for a `2.0` and is listed un
 The versions are the git tags `xldr-<version>`; the published artifacts carry the same version under the group
 `io.github.ralfspoeth.xldr`.
 
-## Unreleased
+## 1.0.0
 
-The mapping-spec format is unchanged, so `mapping-spec-0.53` remains its schema.
+The format is frozen and the API is settled. Nothing here changes what a spec means or what a caller compiles
+against - 1.0.0 is a promise about the future rather than a change to the present, and a spec that loaded under
+0.56 loads under it untouched.
+
+### Changed
+
+- **`mapping-spec-1.0` is published, and is byte-for-byte `mapping-spec-0.53` but for its own URL.** Nothing about
+  the format changed; what changed is that it stopped being allowed to change, and a promise of that kind wants a
+  file to attach to. "Every later `1.x` schema is a superset of `mapping-spec-1.0`" is a sentence the build can
+  check, where the same sentence pointing at a pair named for a pre-1.0 release would have read as an accident of
+  history. `mapping-spec-0.53` stays exactly where it is and keeps validating whatever it validated before.
+
+- **Schemas are now named for the version of the format, not of the release.** `major.minor`, because a patch
+  release cannot change the format at all, so a third component would only invite a file identical to the one
+  before it. The list of releases that changed nothing, which ran to three lines by 0.56, goes with it: from here a
+  schema's name says which formats it covers without needing a table of exceptions beside it.
+
+- **Versions have three components.** The tag is `xldr-1.0.0` where it was `xldr-0.56`, and the artifacts follow.
+  Two components were fine while the minor was doing the work of a major; from here the third is what a release
+  that fixes something without adding anything is allowed to increment, which is the distinction the stability
+  promise is written in terms of.
 
 ### Added
 
