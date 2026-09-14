@@ -29,6 +29,15 @@ The mapping-spec format is unchanged, so `mapping-spec-0.53` remains its schema.
   and the test then agrees with the bug. `PostgresIT` therefore asserts the two metadata answers directly, so that
   if the assumption behind the stub is ever false, the failure says so rather than showing up as a puzzling load.
 
+  **A fourth test guards the other three, and it is the one that makes them worth having.** The three skip when
+  `XLDR_PG_URL` is absent, and a skipped test reports the same green as a passing one - so a service container that
+  failed to start, a variable renamed on one side only, or an `env:` block the forked JVM never saw would each leave
+  a build that passes while testing nothing, with a report indistinguishable from a good one. `ciSuppliesADatabase`
+  is therefore guarded the other way round, on `GITHUB_ACTIONS` rather than on having a database, so CI without a
+  database fails and names the missing part of the wiring. This is the hole `ReleaseReadinessTest` grew its own
+  always-running fourth test to close at 0.45, for the same reason and with the same shape; the lesson had to be
+  learned twice, which is an argument for writing the guard at the same time as the guarded test rather than after.
+
   `org.postgresql:postgresql` returns as a **test-scoped** dependency of `it` only. This does not undo 0.56: what a
   deployment installs and what the build tests against are separate questions, and `drivers/` still ships H2 alone.
 

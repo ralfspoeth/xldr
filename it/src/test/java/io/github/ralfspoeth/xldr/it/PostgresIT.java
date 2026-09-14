@@ -7,7 +7,6 @@ import io.github.ralfspoeth.xldr.ldr.Target;
 import io.github.ralfspoeth.xldr.spec.InputSpec;
 import io.github.ralfspoeth.xldr.spec.MappingSpec;
 import io.github.ralfspoeth.xldr.spec.io.JsonMappingSpecReader;
-import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 
@@ -44,14 +43,27 @@ import static org.junit.jupiter.api.Assertions.*;
  * same way, and the tests agree with the bug. This class is the one that asks
  * the database.
  * <p>
- * It runs only when {@code XLDR_PG_URL} is set, which CI does by way of a
- * service container; without it the test skips and a build with no PostgreSQL
- * anywhere is unaffected. That is also why nothing here is in the default
- * {@code mvn clean verify} a contributor runs locally.
+ * The three run only when {@code XLDR_PG_URL} is set, which CI does by way of a
+ * service container; without it they skip, so a build with no PostgreSQL
+ * anywhere is unaffected and nobody has to install one to run the suite.
+ * <p>
+ * <strong>{@link #ciSuppliesADatabase()} is why that guard is safe.</strong> A
+ * test that skips silently reports the same green as a test that passed, so a
+ * broken service container, a misspelled variable or an env block that never
+ * reached the forked JVM would all read as success and the other three would
+ * simply stop running. That fourth test is guarded the other way round - on
+ * being in CI rather than on having a database - so CI without a database fails
+ * the build and says which part of the wiring is missing. This is the same hole
+ * {@code ReleaseReadinessTest} grew a fourth always-running test to close at
+ * 0.45, for the same reason: skips are indistinguishable from passes, and a
+ * suite you cannot tell apart from an empty one is not evidence.
  */
-@EnabledIfEnvironmentVariable(named = "XLDR_PG_URL", matches = ".+",
-        disabledReason = "no PostgreSQL to talk to; CI supplies XLDR_PG_URL")
 class PostgresIT {
+
+    /** on the three that need a database; the fourth is guarded the other way */
+    private static final String NEEDS_DB = "XLDR_PG_URL";
+
+    private static final String NO_DB = "no PostgreSQL to talk to; CI supplies " + NEEDS_DB;
 
     private static final String URL = System.getenv("XLDR_PG_URL");
     private static final String USER = envOr("XLDR_PG_USER", "xldr");
@@ -92,14 +104,28 @@ class PostgresIT {
             }
             """;
 
-    @BeforeAll
-    static void sayWhereWeAre() throws Exception {
+    // ---- the test that makes the other three trustworthy -----------------------
+
+    /**
+     * Guarded on being in CI rather than on having a database, which is the whole
+     * point of it: the other three skip when {@code XLDR_PG_URL} is absent, and a
+     * skip is reported as green. Without this, a service container that failed to
+     * start, a variable renamed on one side only, or an {@code env:} block placed
+     * where the forked JVM never sees it would each leave a build that passes
+     * while testing nothing, and the report would look exactly like a good one.
+     * <p>
+     * {@code GITHUB_ACTIONS} is set by the runner itself, so this cannot be
+     * satisfied by accident and cannot fire on a developer's machine.
+     */
+    @Test
+    @EnabledIfEnvironmentVariable(named = "GITHUB_ACTIONS", matches = "true",
+            disabledReason = "only CI promises a database; locally there is nothing to hold it to")
+    void ciSuppliesADatabase() throws Exception {
+        assertNotNull(URL, "the workflow's postgres service did not reach this JVM as " + NEEDS_DB
+                + "; the other tests in this class are skipping and proving nothing");
         try (var conn = connect()) {
-            var meta = conn.getMetaData();
-            // if this is ever not PostgreSQL, every assertion below is testing
-            // something other than what it says it is
-            assertEquals("PostgreSQL", meta.getDatabaseProductName(),
-                    "XLDR_PG_URL points at " + meta.getDatabaseProductName());
+            assertEquals("PostgreSQL", conn.getMetaData().getDatabaseProductName(),
+                    NEEDS_DB + " points somewhere, but not at PostgreSQL");
         }
     }
 
@@ -112,10 +138,15 @@ class PostgresIT {
      * than a failing load.
      */
     @Test
+    @EnabledIfEnvironmentVariable(named = NEEDS_DB, matches = ".+", disabledReason = NO_DB)
     void theMetadataAnswersAreWhatWeBuiltOn() throws Exception {
         try (var conn = connect()) {
             var meta = conn.getMetaData();
             assertAll(
+                    // if this is ever not PostgreSQL, the two below are testing
+                    // something other than what they say they are
+                    () -> assertEquals("PostgreSQL", meta.getDatabaseProductName(),
+                            NEEDS_DB + " points at " + meta.getDatabaseProductName()),
                     () -> assertFalse(meta.supportsCatalogsInDataManipulation(),
                             "PostgreSQL cannot qualify across databases; the loader's refusal depends on this"),
                     () -> assertTrue(meta.storesLowerCaseIdentifiers(),
@@ -130,6 +161,7 @@ class PostgresIT {
      * catalog, the product, and PostgreSQL's own word for the thing.
      */
     @Test
+    @EnabledIfEnvironmentVariable(named = NEEDS_DB, matches = ".+", disabledReason = NO_DB)
     void aCatalogIsRefusedAndTheMessageSaysWhy() throws Exception {
         try (var conn = connect()) {
             var thrown = assertThrows(SQLException.class,
@@ -149,6 +181,7 @@ class PostgresIT {
      * "relation does not exist", which is the failure a user would get.
      */
     @Test
+    @EnabledIfEnvironmentVariable(named = NEEDS_DB, matches = ".+", disabledReason = NO_DB)
     void anUnquotedNameReachesTheLowerCaseTable() throws Exception {
         schema();
         load();
