@@ -29,10 +29,17 @@ allowed near it. That step is where the format knowledge goes to hide. Here it i
 The adapters are JPMS modules bound by the service framework, so the set of formats a deployment understands is the
 set of modules on its module path.
 
-> **Pre-1.0.** The API and the mapping-spec format are still settling and may change in any release before `1.0`,
-> including in ways that break existing code and existing specs. Such changes are listed in the
-> [changelog](CHANGELOG.md) under *Breaking*, but no deprecation period is kept. From `1.0` on, breaking changes will
-> be confined to major releases.
+> **Stability.** From `1.0` the API and the mapping-spec format are settled: within `1.x`, nothing that existing
+> code compiles against and nothing an existing spec relies on changes incompatibly. The format may still gain
+> optional members - each published as a new `mapping-spec-<version>` pair and listed in the
+> [changelog](CHANGELOG.md) under *Added* - but a spec valid under one `1.x` schema is valid under every later one.
+> Anything incompatible waits for a `2.0`, and none is planned.
+>
+> **That is a promise about compatibility, not a claim about every database.** The build's tests run against H2, and
+> against PostgreSQL on every push for the behaviour that differs there - identifier folding and the catalog
+> refusal; the toolkit is exercised against Oracle in production. Other products are expected to work, since nothing
+> branches on the database's name and every dialect decision is taken from JDBC metadata at runtime. Where one does
+> not, that is a defect to [report](#problems-and-questions) and fix in a `1.x`, not a change to the promise above.
 
 ## Getting Started
 

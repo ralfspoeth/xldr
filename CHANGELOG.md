@@ -1,7 +1,8 @@
 # Changelog
 
-Notable changes per release. Until `1.0` the API and the mapping-spec format may change in any release, including in
-ways that break existing code and existing specs; those changes are listed here under **Breaking**.
+Notable changes per release. From `1.0` the API and the mapping-spec format are settled: within `1.x`, nothing that
+existing code compiles against or that an existing spec relies on changes incompatibly. Additions to the format are
+listed under **Added**; anything incompatible waits for a `2.0` and is listed under **Breaking**.
 
 The versions are the git tags `xldr-<version>`; the published artifacts carry the same version under the group
 `io.github.ralfspoeth.xldr`.
