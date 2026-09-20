@@ -24,6 +24,7 @@
             <plugin>
                 <groupId>io.github.ralfspoeth</groupId>
                 <artifactId>log-weaver-maven-plugin</artifactId>
+                <version>${log.weaver.version}</version>
                 <executions>
                     <execution>
                         <goals>
@@ -75,7 +76,7 @@
             <dependency>
                 <groupId>io.github.ralfspoeth</groupId>
                 <artifactId>log-weaver-bom</artifactId>
-                <version>0.13</version>
+                <version>${log.weaver.version}</version>
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>
