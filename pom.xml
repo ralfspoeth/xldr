@@ -5,7 +5,7 @@
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <log.weaver.version>1.0</log.weaver.version>
-        <revision>1.0.1-SNAPSHOT</revision>
+        <revision>1.0.1</revision>
     </properties>
 
     <parent>
@@ -63,7 +63,7 @@
     <scm>
         <url>scm:git:https://github.com/ralfspoeth/xldr</url>
         <developerConnection>scm:git:https://github.com/ralfspoeth/xldr.git</developerConnection>
-        <tag>HEAD</tag>
+        <tag>xldr-1.0.1</tag>
     </scm>
 
     <dependencyManagement>
