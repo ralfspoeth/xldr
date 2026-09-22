@@ -7,7 +7,12 @@ listed under **Added**; anything incompatible waits for a `2.0` and is listed un
 The versions are the git tags `xldr-<version>`; the published artifacts carry the same version under the group
 `io.github.ralfspoeth.xldr`.
 
-## Unreleased
+## 1.0.1
+
+A patch release, and the first release under the promise 1.0.0 made: nothing here changes what a spec means or what
+a caller compiles against, so `mapping-spec-1.0` remains the schema and a spec that loaded under 1.0.0 loads under
+this unchanged. What it adds is a convenience in `xldr check`, and what it changes is one exit code that was too
+forgiving.
 
 ### Added
 
@@ -45,6 +50,12 @@ The versions are the git tags `xldr-<version>`; the published artifacts carry th
   a connection. A spec is often checked on a laptop against a configuration copied from a host, and refusing to
   check it because that host's feed roots are not present locally would be refusing for a reason the reader can do
   nothing about.
+
+- **`log-weaver` 0.13 to 1.0, and `greyson` 2.0.2 to 2.0.3.** The weaver's version is now a
+  `log.weaver.version` property in the root pom, so the BOM import and the plugin that reads it cannot drift apart
+  - they are two declarations of one decision, and they were previously free to disagree. Neither bump changes
+  anything a consumer sees: the weaving still produces DEBUG entry records in `server` through `System.Logger`, and
+  greyson's own 2.0.x promise is the same shape as this project's.
 
 ## 1.0.0
 
