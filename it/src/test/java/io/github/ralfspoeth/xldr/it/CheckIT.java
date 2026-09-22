@@ -174,6 +174,147 @@ class CheckIT {
         return new Run(exit, out.toString(), err.toString());
     }
 
+    /**
+     * The same, without {@code --url}, so that what the command connects to - if
+     * anything - is whatever {@code --dir} turns up.
+     */
+    private static Run checkWithoutUrl(Path dir, String spec, String sample, String... extra)
+            throws IOException {
+        var specFile = dir.resolve("spec.json");
+        Files.writeString(specFile, spec);
+        var sampleFile = dir.resolve("data.csv");
+        Files.writeString(sampleFile, sample);
+
+        var out = new StringWriter();
+        var err = new StringWriter();
+        var args = new ArrayList<>(List.of(
+                "check", specFile.toString(),
+                "--sample", sampleFile.toString(),
+                "--dir", dir.toString()));
+        args.addAll(List.of(extra));
+
+        var exit = new CommandLine(new App())
+                .setOut(new PrintWriter(out, true))
+                .setErr(new PrintWriter(err, true))
+                .execute(args.toArray(String[]::new));
+        return new Run(exit, out.toString(), err.toString());
+    }
+
+    /**
+     * An {@code xldr.properties} as a deployment would have it, including the
+     * {@code xldr.roots} that a server needs and this command must not.
+     */
+    private static void writeConfig(Path dir, String jdbcUrl) throws IOException {
+        Files.writeString(dir.resolve("xldr.properties"), """
+                xldr.roots = %s
+                xldr.scanInterval = 30
+                jdbc.url = %s
+                """.formatted(dir.resolve("feeds-that-are-not-here"), jdbcUrl));
+    }
+
+    // ---- where the database comes from ----------------------------------------
+
+    /**
+     * Without {@code --url}, the {@code jdbc.url} of the deployment's own
+     * configuration, so that the database a spec is checked against is the one
+     * the server would load it into rather than one retyped at the prompt.
+     * <p>
+     * The output says which file it came from. An inferred connection that did
+     * not announce itself would leave a reader unable to tell which database
+     * answered, and the commonest use of this command is on a laptop with more
+     * than one to hand.
+     */
+    @Test
+    void theUrlIsTakenFromTheConfigurationWhenNoneIsGiven(@TempDir Path dir) throws IOException {
+        writeConfig(dir, JDBC_URL);
+        var run = checkWithoutUrl(dir, SPEC.formatted("customers", "balance"), SAMPLE);
+        assertAll(
+                () -> assertEquals(0, run.exitCode(), run.out() + run.err()),
+                () -> assertTrue(run.reports("no findings"), run.out()),
+                () -> assertTrue(run.reports("columns        checked against"), run.out()),
+                () -> assertTrue(run.reports("xldr.properties"),
+                        "the output should say where the URL came from: " + run.out()));
+    }
+
+    /**
+     * And the reason this does not go through {@code Config}: the configuration
+     * above names feed roots that do not exist here, as one copied from a server
+     * always will. A server may refuse to start on that; a command that only
+     * wants a connection may not refuse to run on it.
+     */
+    @Test
+    void feedRootsThatAreNotThereDoNotStopTheCheck(@TempDir Path dir) throws IOException {
+        writeConfig(dir, JDBC_URL);
+        var run = checkWithoutUrl(dir, SPEC.formatted("customers", "balance"), SAMPLE);
+        assertAll(
+                () -> assertEquals(0, run.exitCode(), run.out() + run.err()),
+                () -> assertFalse(run.reports("xldr.roots"),
+                        "the roots are none of this command's business: " + run.out() + run.err()));
+    }
+
+    /**
+     * A configuration naming a database that cannot be reached leaves the command
+     * where it would have been without one: the database is not checked, it says
+     * so and says which file named it, and the spec's own findings still decide
+     * the exit code.
+     * <p>
+     * This is the half of the rule that keeps the convenience from being a
+     * liability. Omitting {@code --url} has never made this command fail for a
+     * database's sake, and inferring one must not quietly change that - otherwise
+     * checking a spec on a train would start failing for having once been
+     * configured.
+     */
+    @Test
+    void anInferredDatabaseThatCannotBeReachedIsNotAfinding(@TempDir Path dir) throws IOException {
+        writeConfig(dir, "jdbc:nosuchproduct://nowhere:1/db");
+        var run = checkWithoutUrl(dir, SPEC.formatted("customers", "balance"), SAMPLE);
+        assertAll(
+                () -> assertEquals(0, run.exitCode(),
+                        "an inferred URL that fails is not the spec's fault: " + run.out() + run.err()),
+                () -> assertTrue(run.reports("could not reach the database named in"),
+                        run.out() + run.err()),
+                () -> assertTrue(run.reports("xldr.properties"), run.out() + run.err()));
+    }
+
+    /**
+     * And the other half: a {@code --url} that cannot be reached is a finding, so
+     * the command exits non-zero rather than printing "no findings" over a
+     * database it never saw. The difference is that this one was asked for.
+     */
+    @Test
+    void anExplicitDatabaseThatCannotBeReachedIsAfinding(@TempDir Path dir) throws IOException {
+        var specFile = dir.resolve("spec.json");
+        Files.writeString(specFile, SPEC.formatted("customers", "balance"));
+
+        var out = new StringWriter();
+        var err = new StringWriter();
+        var exit = new CommandLine(new App())
+                .setOut(new PrintWriter(out, true))
+                .setErr(new PrintWriter(err, true))
+                .execute("check", specFile.toString(), "--url", "jdbc:nosuchproduct://nowhere:1/db");
+        var run = new Run(exit, out.toString(), err.toString());
+        assertAll(
+                () -> assertNotEquals(0, run.exitCode(),
+                        "a database that was asked for and not reached is a finding: "
+                                + run.out() + run.err()),
+                () -> assertTrue(run.reports("--url names a database that could not be reached"),
+                        run.out() + run.err()),
+                () -> assertFalse(run.reports("no findings"), run.out()));
+    }
+
+    /** no flag and no file: what the command did before any of this */
+    @Test
+    void withNoUrlAndNoConfigurationTheDatabaseIsSimplyNotChecked(@TempDir Path dir) throws IOException {
+        var run = checkWithoutUrl(dir, SPEC.formatted("customers", "balance"), SAMPLE);
+        assertAll(
+                () -> assertEquals(0, run.exitCode(), run.out() + run.err()),
+                () -> assertTrue(run.reports("columns        not checked"), run.out()),
+                () -> assertTrue(run.reports("jdbc.url"),
+                        "it should name what it looked for: " + run.out()),
+                () -> assertTrue(run.reports("2 record(s) matched"),
+                        "the sample is still read: " + run.out()));
+    }
+
     /** the spec as the tutorial writes it, which has nothing wrong with it */
     @Test
     void acorrectSpecHasNoFindings(@TempDir Path dir) throws IOException {

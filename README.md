@@ -576,8 +576,23 @@ the third, but only once a file is being loaded and a transaction is open. So wh
 - a record selector that is well formed and matches nothing in a file you call representative, which nothing
   refuses at all - the load succeeds and inserts no rows.
 
-Each argument is optional except the spec: without `--url` the database is not consulted, without `--sample` the
-file is not read, and a check with neither still cross-checks the spec against itself.
+Each argument is optional except the spec: without `--sample` the file is not read, and a check with neither a file
+nor a database still cross-checks the spec against itself.
+
+**Without `--url`, the `jdbc.url` of an `xldr.properties` is used** - the one in the working directory, or in the
+directory `--dir` names. A deployment already says which database it feeds, so retyping it into every check is both
+tedious and a chance to check the wrong one. `--user` and `--password` override what the file says; where they are
+absent the file supplies those too, since a URL from one place and credentials from another is a pairing nobody
+means. The output names the file it read, so which database answered is never a guess.
+
+The two ways that can fail are deliberately not the same. A `--url` that cannot be reached is a **finding**: you
+asked for the database, it was not consulted, and printing "no findings" over it would be the quiet kind of wrong.
+An inferred URL that cannot be reached is a **note on stderr** naming the file, and the check carries on without
+the database - because omitting `--url` has never made this command fail for a database's sake, and a convenience
+should not be the thing that changes that. Checking a spec on a train still works.
+
+Only `jdbc.url` is read this way. `--schema` and `--catalog` correspond to a *feed's* `target.properties`, and
+which feed is not something `check` can know, so those stay flags.
 
 It reads only. The connection is opened to ask `DatabaseMetaData` what the table holds, and the sample is parsed in
 memory, so it is safe to point at production if that is the only place the table exists.

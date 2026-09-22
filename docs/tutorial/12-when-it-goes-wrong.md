@@ -69,8 +69,14 @@ A finding names the thing and what would have been right:
 Nothing is written. The connection is opened to ask the database what the table holds, and your file is parsed in
 memory, so it is safe against whatever database has the table - including the only one that does.
 
-Every argument but the spec is optional. Without `--url` the database is not consulted; without `--sample` the file
-is not read; with neither, the spec is still checked against itself.
+Every argument but the spec is optional. Without `--sample` the file is not read; with neither a file nor a
+database, the spec is still checked against itself.
+
+Without `--url`, `check` looks for an `xldr.properties` - in the working directory, or in the one `--dir` names -
+and uses its `jdbc.url`. On a deployed server that means `xldr check spec.json --sample orders.csv` consults the
+right database without your retyping it. The output says which file it read. If that database cannot be reached the
+check carries on without it and says so; only a `--url` you typed yourself turns an unreachable database into a
+finding, on the grounds that you asked for it.
 
 **Read the values, not just the last line.** The two rows above are the reason to run this rather than a reason to
 skim it. The file said `01.03.2026` and `1.234,56`; the output says the first of March and one thousand two hundred

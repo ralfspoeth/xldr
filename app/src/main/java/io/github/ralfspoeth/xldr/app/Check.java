@@ -4,6 +4,8 @@ import io.github.ralfspoeth.xldr.ia.InputAdapter;
 import io.github.ralfspoeth.xldr.ia.InputAdapterFactory;
 import io.github.ralfspoeth.xldr.ia.Row;
 import io.github.ralfspoeth.xldr.ldr.Loader;
+import io.github.ralfspoeth.xldr.server.Config;
+import io.github.ralfspoeth.xldr.server.Jdbc;
 import io.github.ralfspoeth.xldr.spec.*;
 import io.github.ralfspoeth.xldr.spec.io.MappingSpecReader;
 import org.jspecify.annotations.Nullable;
@@ -78,9 +80,16 @@ public class Check implements Callable<Integer> {
     private Path sample;
 
     @Option(names = {"-u", "--url"}, paramLabel = "JDBC_URL",
-            description = "the target database; without one only the spec and the sample are compared")
+            description = "the target database; without one the jdbc.url in " + App.CONFIG_FILE
+                    + " is used, and without that only the spec and the sample are compared")
     @Nullable
     private String url;
+
+    @Option(names = {"-d", "--dir"}, paramLabel = "DIR", defaultValue = ".",
+            description = "where to look for " + App.CONFIG_FILE + " when --url is not given; "
+                    + "the working directory by default")
+    @Nullable
+    private Path directory;
 
     @Option(names = "--user", paramLabel = "NAME", description = "database user")
     @Nullable
@@ -120,6 +129,29 @@ public class Check implements Callable<Integer> {
      */
     private final List<String> findings = new ArrayList<>();
 
+    /**
+     * Where to connect, once {@link #resolveDatabase} has worked it out, and null
+     * where there is nowhere.
+     */
+    @Nullable
+    private Jdbc jdbc;
+
+    /**
+     * The file {@link #jdbc} came out of, or null when it came from {@code --url}.
+     * <p>
+     * This is the difference between the two failure modes and not only something
+     * to print. A {@code --url} that cannot be reached is a finding, because the
+     * database was asked for and not consulted; an inferred one that cannot be
+     * reached is a line on stderr, because omitting {@code --url} has never made
+     * this command fail for a database's sake and a convenience should not be the
+     * thing that changes that.
+     */
+    @Nullable
+    private String jdbcFrom;
+
+    /** so that two checks failing on one unreachable database say so once */
+    private boolean unreachableReported;
+
     @Override
     public Integer call() throws Exception {
         assert specFile != null && commandSpec != null;
@@ -145,12 +177,14 @@ public class Check implements Callable<Integer> {
 
         checkRecordSelectorsExist(spec, out);
         checkFunctionsExist(spec, out);
-        if (url != null) {
+        resolveDatabase(err);
+        if (jdbc != null) {
             checkColumnsExist(spec, out, err);
             checkRoutinesExist(spec, out, err);
         } else {
-            out.println("  columns        not checked, no --url given");
-            out.println("  routines       not checked, no --url given");
+            var why = "no --url given and no " + Jdbc.URL_KEY + " in " + configFile();
+            out.println("  columns        not checked, " + why);
+            out.println("  routines       not checked, " + why);
         }
         if (sameAs != null) {
             compareWith(spec, out, err);
@@ -422,9 +456,13 @@ public class Check implements Callable<Integer> {
             for (var var : spec.inputSpec().vars()) {
                 checkLookups(conn, var.source(), lower);
             }
-            out.printf("  columns        checked against %s%n", conn.getMetaData().getURL());
+            // our own URL rather than the driver's: this one may have come out of
+            // a file the reader never opened, and some drivers hand back a URL
+            // with the password still in the query string
+            assert jdbc != null;
+            out.printf("  columns        checked against %s%s%n", jdbc.displayUrl(), provenance());
         } catch (SQLException e) {
-            err.println("  columns        not checked: " + e.getMessage());
+            databaseUnreachable("columns", e, err);
         }
     }
 
@@ -494,7 +532,7 @@ public class Check implements Callable<Integer> {
                                 + "                 and the metadata cannot say which%n", qualified);
             }
         } catch (SQLException e) {
-            err.println("  routines       not checked: " + e.getMessage());
+            databaseUnreachable("routines", e, err);
         }
     }
 
@@ -568,10 +606,90 @@ public class Check implements Callable<Integer> {
     }
 
     private Connection connect() throws SQLException {
-        assert url != null;
-        return user == null
-                ? DriverManager.getConnection(url)
-                : DriverManager.getConnection(url, user, password);
+        assert jdbc != null;
+        return jdbc.user() == null
+                ? DriverManager.getConnection(jdbc.url())
+                : DriverManager.getConnection(jdbc.url(), jdbc.user(), jdbc.password());
+    }
+
+    /**
+     * Where to connect: {@code --url} if it was given, otherwise the
+     * {@code jdbc.url} in the {@code xldr.properties} of {@code --dir}.
+     * <p>
+     * The point of the second is that a deployment already says which database
+     * it feeds, and retyping it into every {@code check} is both tedious and a
+     * chance to check the wrong one. {@code --user} and {@code --password}
+     * override whatever the file says, but where they are absent the file
+     * supplies those too: a URL from one place and credentials from another is a
+     * combination nobody means, and the commonest way to arrive at it by accident
+     * is to have the file supply only some of the three.
+     * <p>
+     * {@link Config#load} is deliberately not used. It insists on
+     * {@code xldr.roots}, which is right for a server about to watch those
+     * directories and wrong here - a spec is often checked on a laptop against a
+     * configuration copied from a host, and failing because that host's feed
+     * roots are not present locally would be failing for a reason the reader
+     * cannot act on and does not care about.
+     */
+    private void resolveDatabase(PrintWriter err) {
+        if (url != null) {
+            if (url.isBlank()) {
+                // Jdbc's own complaint names jdbc.url, which is the right name
+                // for the file and the wrong one for somebody who typed a flag
+                err.println("  --url is empty; give a JDBC URL or leave the option out");
+                return;
+            }
+            jdbc = new Jdbc(url, user, password);
+            return;
+        }
+        var file = configFile();
+        try {
+            Jdbc.in(file).ifPresent(found -> {
+                jdbc = new Jdbc(found.url(),
+                        user != null ? user : found.user(),
+                        password != null ? password : found.password());
+                jdbcFrom = file.toString();
+            });
+        } catch (IOException | IllegalArgumentException e) {
+            // the file is there and unreadable, or there and malformed. Not a
+            // finding - the spec is not what is wrong - but not silent either,
+            // since the reader is about to be told the database was not checked
+            // and would otherwise have to guess why
+            err.println("  " + file + " could not be read: " + e.getMessage());
+        }
+    }
+
+    private Path configFile() {
+        assert directory != null;
+        return directory.resolve(App.CONFIG_FILE);
+    }
+
+    /** {@code " (from ./xldr.properties)"}, or nothing when {@code --url} said it */
+    private String provenance() {
+        return jdbcFrom == null ? "" : " (from " + jdbcFrom + ")";
+    }
+
+    /**
+     * A database that was named and could not be reached, reported once however
+     * many of the checks needed it.
+     * <p>
+     * Which way it is reported is the whole of {@link #jdbcFrom}'s purpose. An
+     * explicit {@code --url} is a request, and a request that could not be
+     * carried out is a finding, so the command exits non-zero rather than
+     * printing "no findings" over a database it never saw. An inferred URL is a
+     * convenience, and a convenience that fails leaves the command exactly where
+     * it was before there was one: not checking the database, and saying so.
+     */
+    private void databaseUnreachable(String what, SQLException e, PrintWriter err) {
+        if (jdbcFrom == null) {
+            if (!unreachableReported) {
+                findings.add("--url names a database that could not be reached: " + e.getMessage());
+                unreachableReported = true;
+            }
+        } else {
+            err.printf("  %-14s not checked, could not reach the database named in %s: %s%n",
+                    what, jdbcFrom, e.getMessage());
+        }
     }
 
     /**

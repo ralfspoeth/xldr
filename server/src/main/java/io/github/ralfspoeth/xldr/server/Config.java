@@ -62,9 +62,6 @@ public record Config(
     private static final String MAX_POOL_SIZE = "maximumPoolSize";
     private static final long DEFAULT_SCAN_INTERVAL = 30L;
     private static final int DEFAULT_MAX_CONCURRENT_LOADS = 4;
-    private static final String URL_KEY = "jdbc.url";
-    private static final String USER_KEY = "jdbc.user";
-    private static final String PASSWORD_KEY = "jdbc.password";
 
     public Config {
         roots = List.copyOf(roots);
@@ -114,10 +111,19 @@ public record Config(
             throw new IllegalArgumentException(CONCURRENCY_KEY + " must be at least 1");
         }
 
+        // the three jdbc.* names live on Jdbc, which xldr check reads too; a
+        // server that cannot say which database it feeds is not startable, so
+        // what is optional there is required here
+        var jdbc = Jdbc.in(props).orElseThrow(() ->
+                new IllegalArgumentException(Jdbc.URL_KEY + " is required"));
         var pool = new Properties();
-        pool.setProperty("jdbcUrl", require(props, URL_KEY));
-        copyIfPresent(props, USER_KEY, pool, "username");
-        copyIfPresent(props, PASSWORD_KEY, pool, "password");
+        pool.setProperty("jdbcUrl", jdbc.url());
+        if (jdbc.user() != null) {
+            pool.setProperty("username", jdbc.user());
+        }
+        if (jdbc.password() != null) {
+            pool.setProperty("password", jdbc.password());
+        }
         for (var name : props.stringPropertyNames()) {
             if (name.startsWith(POOL_PREFIX)) {
                 pool.setProperty(name.substring(POOL_PREFIX.length()), props.getProperty(name));
@@ -131,13 +137,6 @@ public record Config(
         // wins, for a database that will not have that many sessions.
         pool.putIfAbsent(MAX_POOL_SIZE, String.valueOf(maxConcurrentLoads));
         return new Config(roots, scanInterval, maxConcurrentLoads, pool);
-    }
-
-    private static void copyIfPresent(Properties from, String key, Properties to, String targetKey) {
-        var value = from.getProperty(key);
-        if (value != null) {
-            to.setProperty(targetKey, value);
-        }
     }
 
     private static String require(Properties props, String key) {

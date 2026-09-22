@@ -72,8 +72,9 @@ public class App implements Callable<Integer> {
 
     /**
      * the configuration a deployment writes, looked for in the working directory
+     * package-private: {@link Check} looks for the same file, for the jdbc.* in it
      */
-    private static final String CONFIG_FILE = "xldr.properties";
+    static final String CONFIG_FILE = "xldr.properties";
 
     /**
      * optional beside it, and shipped in {@code conf/} as the fallback

@@ -7,6 +7,45 @@ listed under **Added**; anything incompatible waits for a `2.0` and is listed un
 The versions are the git tags `xldr-<version>`; the published artifacts carry the same version under the group
 `io.github.ralfspoeth.xldr`.
 
+## Unreleased
+
+### Added
+
+- **`xldr check` finds the database in `xldr.properties` when `--url` is not given.** The working directory, or the
+  one `--dir` names. A deployment already says which database it feeds, so retyping that URL into every check was
+  both tedious and a chance to check the wrong one - and on a server the right answer was always sitting in the
+  directory the command was being run from. `--user` and `--password` still override, but where they are absent the
+  file supplies those too: a URL from one place and credentials from another is a pairing nobody means, and letting
+  the file supply only some of the three is the commonest way to arrive at it.
+
+  **The output names the file it read.** An inferred connection that did not announce itself would leave a reader
+  unable to say which database answered, and this command is most often run on a laptop with several to hand.
+
+  Only `jdbc.url` is taken this way. `--schema` and `--catalog` describe a *feed's* `target.properties`, and which
+  feed is not a thing `check` can know, so inferring those would be a different feature rather than more of this one.
+
+### Changed
+
+- **A `--url` that cannot be reached is now a finding.** It used to print `columns not checked: <message>` on
+  stderr and let the command exit zero, so a mistyped URL produced "no findings" over a database nothing had
+  looked at - the quiet kind of wrong this project keeps trying to remove. Asking for a database and not getting
+  one is now counted.
+
+  An *inferred* URL that cannot be reached is deliberately not: it prints a note naming the file and the check
+  carries on. The rule is that an explicit request fails hard and an inferred convenience degrades loudly, and the
+  reason for the second half is that omitting `--url` has never made this command fail for a database's sake.
+  Convenience that can newly fail a check run on a train is not convenience.
+
+- **The `jdbc.*` key names live on one type.** A new `Jdbc` record in `server` holds the url, user and password and
+  reads them out of a `Properties`; `Config` builds the pool from it instead of naming the three keys itself. Two
+  readers of one file with two copies of the spelling is how the spelling drifts.
+
+  `check` does not go through `Config.load`, and the reason is worth recording: `Config` requires `xldr.roots` and
+  the directories it names, which is right for a server about to watch them and wrong for a command that only wants
+  a connection. A spec is often checked on a laptop against a configuration copied from a host, and refusing to
+  check it because that host's feed roots are not present locally would be refusing for a reason the reader can do
+  nothing about.
+
 ## 1.0.0
 
 The format is frozen and the API is settled. Nothing here changes what a spec means or what a caller compiles
