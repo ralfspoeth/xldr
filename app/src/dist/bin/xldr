@@ -18,6 +18,11 @@
 # java is taken from JAVA_HOME when that is set, and from PATH otherwise.
 # JAVA_OPTS may carry extra VM options, e.g.
 #   JAVA_OPTS=-Xmx512m bin/xldr
+#
+# An AOT cache, if aot/xldr.aot is there, is used for every run. Writing one is
+#   bin/xldr training check spec.json --sample orders.csv --url jdbc:...
+# which runs exactly that command and records the classes it loads on the way.
+# See aot/README.txt for when it has to be written again.
 set -eu
 
 # A second argument is a line about where to report it, and only two of the
@@ -83,5 +88,35 @@ modulepath=$here/lib
 [ -d "$here/xl" ] && modulepath=$modulepath:$here/xl
 [ -d "$here/drivers" ] && modulepath=$modulepath:$here/drivers
 
-exec "$java" ${JAVA_OPTS:-} -Dxldr.home="$here" -p "$modulepath" \
+# The AOT cache. -XX:AOTCacheOutput has to be on the command line that starts the
+# JVM, so `training` cannot be a subcommand - nothing inside the application can
+# set a flag for its own process. It is a prefix instead, stripped here, and what
+# follows runs as it normally would: the training run *is* a real run, so the
+# classes recorded are the classes that command loads and there is no synthetic
+# workload to drift out of step with the real one.
+#
+# XLDR_AOT_CACHE names the file where an installation is read-only to whoever
+# runs it, which /opt/xldr usually is.
+aot_cache=${XLDR_AOT_CACHE:-$here/aot/xldr.aot}
+aot=""
+if [ "${1:-}" = training ]; then
+    shift
+    [ $# -gt 0 ] || fail "training needs a command to train on, e.g." \
+        "bin/xldr training check spec.json --sample orders.csv --url jdbc:h2:./db"
+    aot_dir=$(dirname "$aot_cache")
+    mkdir -p "$aot_dir" 2>/dev/null || true
+    [ -w "$aot_dir" ] || fail "cannot write $aot_cache" \
+        "the installation is read-only here; name a writable file in XLDR_AOT_CACHE"
+    aot="-XX:AOTCacheOutput=$aot_cache"
+    echo "xldr: training, and writing $aot_cache when this run finishes" >&2
+elif [ -f "$aot_cache" ]; then
+    # A cache that no longer matches this JVM or this module path is a warning
+    # and not a failure - the default AOTMode=auto falls back to loading classes
+    # the ordinary way. That is what makes this safe to leave switched on: adding
+    # a driver invalidates the cache, and the next run is merely as slow as it
+    # was before rather than broken.
+    aot="-XX:AOTCache=$aot_cache"
+fi
+
+exec "$java" ${JAVA_OPTS:-} $aot -Dxldr.home="$here" -p "$modulepath" \
     -m io.github.ralfspoeth.xldr.app/io.github.ralfspoeth.xldr.app.App "$@"

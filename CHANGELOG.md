@@ -7,6 +7,37 @@ listed under **Added**; anything incompatible waits for a `2.0` and is listed un
 The versions are the git tags `xldr-<version>`; the published artifacts carry the same version under the group
 `io.github.ralfspoeth.xldr`.
 
+## Unreleased
+
+### Added
+
+- **An AOT cache, written by `xldr training <any command>` and used by every run afterwards.** JDK 25's one-step
+  form: the prefix puts `-XX:AOTCacheOutput` on the JVM's command line, runs the command that follows exactly as it
+  would have run anyway, and writes `aot/xldr.aot` when it finishes. Later runs are given `-XX:AOTCache` and skip
+  loading and linking those classes again.
+
+  **Why a prefix and not a subcommand**, which is where this started. `-XX:AOTCacheOutput` is a JVM flag, so it has
+  to be on the command line that *starts* the JVM; nothing inside `App` can set one for its own process, and a
+  `training` subcommand would have had to re-exec a child JVM to mean anything. Handling the word in the launcher is
+  simpler, and it turns out to be the better design rather than the cheaper one: the training run is then a real
+  run, so the classes recorded are the ones the command actually loads. A synthetic training workload would have
+  needed fixtures the distribution does not ship and would have been free to drift out of step with the real thing.
+
+  **It is for `check`, and the changelog should say so rather than let a reader assume otherwise.** AOT class
+  loading is a startup optimisation. `check` is run from a prompt, repeatedly, while somebody works on a spec, and
+  pays the module graph, the service binding and picocli's reflection every single time. The server starts once and
+  watches files for months, so the same saving is spread until it vanishes - and training it would mean stopping it
+  again, a cache being written on a normal exit. The server is not in scope here and the documentation says which
+  command this is for.
+
+  **`aot/` ships empty, like `drivers/` ships nearly so.** A cache is tied to the JVM that wrote it and to the
+  module path it saw, and the module path is precisely what a deployment chooses by moving jars around - so one
+  built here could not match anybody's, and writing one is a step taken after the jars have settled. Upgrading Java
+  or changing `modules/`, `xl/` or `drivers/` invalidates it. Nothing breaks when that happens: `AOTMode` defaults
+  to `auto`, so a cache that does not match is a warning and a run that loads its classes the ordinary way, which
+  is the speed you had before rather than a failure. `XLDR_AOT_CACHE` names the file where the installation is
+  read-only to whoever runs it, which `/opt/xldr` usually is.
+
 ## 1.0.1
 
 A patch release, and the first release under the promise 1.0.0 made: nothing here changes what a spec means or what

@@ -378,6 +378,7 @@ unpacks to, and changes nothing else about it. Unpacked, it is
         modules/                 the input adapters
         xl/                      the Excel adapter and Apache POI
         drivers/                 the JDBC drivers - H2 only, plus a note on adding others
+        aot/                     empty; where `xldr training` writes its AOT cache
         conf/                    sample xldr.properties and logging.properties
         README.md                this file - the reference, and where to report a problem
 
@@ -405,6 +406,25 @@ is MIT, xerial's SQLite driver Apache-2.0, MariaDB Connector/J LGPL-2.1 - so it 
 a limit, and PostgreSQL was in here because it is a database this project's author uses. Oracle's, gone at 0.40,
 really was a licence question and stays one. What shipping a driver costs is being the distributor of a jar that
 never gets patched after the tag, and what it implies is a ranking of databases the toolkit does not have.
+
+**`aot/` is empty, and holds the cache you write rather than one we ship.** Putting `training` in front of any
+command runs that command and records the classes it loads:
+
+    bin/xldr training check spec.json --sample orders.csv --url jdbc:h2:./db
+
+Afterwards every run is given the cache and skips loading and linking those classes again. The prefix is a
+launcher matter rather than a subcommand because `-XX:AOTCacheOutput` has to be on the command line that *starts*
+the JVM, and nothing inside the application can set a flag for its own process - which turns out to be the better
+design anyway, since the training run is then a real run and the classes recorded are the ones your command truly
+loads rather than a synthetic workload's guess at them.
+
+**It is for `check`.** That is the command run from a prompt over and over while somebody works on a spec, paying
+the module graph, the service binding and picocli's reflection every time. The server starts once and watches
+files for months, so the same saving disappears into the run; training it would also mean stopping it, and a cache
+is written on a normal exit. A cache is tied to the JVM that wrote it and to the module path it saw, so upgrading
+Java or moving a jar in or out of `modules/`, `xl/` or `drivers/` invalidates it - harmlessly, since a mismatch is
+a warning and a run that loads classes the ordinary way. `XLDR_AOT_CACHE` names the file where the installation is
+read-only. `aot/README.txt` says all of this where somebody standing in the directory will find it.
 
 **`xl/` is Excel, kept apart for weight.** Apache POI brings xmlbeans, curvesapi, several commons libraries and
 log4j-api, which together were most of the distribution and made it hard to see what the toolkit is actually made of.

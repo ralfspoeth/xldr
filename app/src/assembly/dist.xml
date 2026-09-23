@@ -121,6 +121,19 @@
             <outputDirectory>drivers</outputDirectory>
             <fileMode>0644</fileMode>
         </fileSet>
+        <!--
+            Empty but for its README, and that is the point: an AOT cache is tied
+            to the JVM that wrote it and to the module path it saw, and the module
+            path is the thing a deployment chooses. One built here could not match
+            anybody's, so the directory ships as somewhere to put the one you
+            write with `xldr training`, the way drivers/ ships as somewhere to put
+            a driver.
+        -->
+        <fileSet>
+            <directory>${project.basedir}/src/dist/aot</directory>
+            <outputDirectory>aot</outputDirectory>
+            <fileMode>0644</fileMode>
+        </fileSet>
     </fileSets>
 
     <files>
