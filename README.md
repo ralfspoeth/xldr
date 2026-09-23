@@ -145,7 +145,7 @@ fix their versions in one place:
             <dependency>
                 <groupId>io.github.ralfspoeth.xldr</groupId>
                 <artifactId>bom</artifactId>
-                <version>1.0.1</version>
+                <version>1.1.0</version>
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>
@@ -620,7 +620,7 @@ memory, so it is safe to point at production if that is the only place the table
 **Every record is read, not only the ones printed.** `--rows N` says how many to *show*; the sample is read right
 through regardless, because several adapters convert a value inside `Row.get`, so a record nobody asks for is a
 record nobody checked. A value that will not convert to its declared type is a finding wherever in the file it
-sits - one per mapping, however many records are bad, with the first quoted. Before 1.0.2 only the printed
+sits - one per mapping, however many records are bad, with the first quoted. Before 1.1.0 only the printed
 records' values were ever asked for, so an unparseable date at record forty thousand passed, and `--rows 0` read
 nothing at all.
 

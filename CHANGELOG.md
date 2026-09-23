@@ -7,7 +7,15 @@ listed under **Added**; anything incompatible waits for a `2.0` and is listed un
 The versions are the git tags `xldr-<version>`; the published artifacts carry the same version under the group
 `io.github.ralfspoeth.xldr`.
 
-## Unreleased
+## 1.1.0
+
+A minor rather than a patch, because it adds: `Rows` in `ia`, `Loader.ambientNames`, the AOT cache and two things
+`xldr check` now reads. 1.0.0 said the third component is for a release that fixes something *without* adding
+anything, and this is the first release to test that sentence against a real case.
+
+The mapping-spec format is untouched, so `mapping-spec-1.0` remains its schema and now covers 1.0 and 1.1 alike -
+which is the first time the naming rule from 1.0.0 has had to mean something. A spec that loaded under 1.0.1 loads
+under this unchanged.
 
 ### Fixed
 

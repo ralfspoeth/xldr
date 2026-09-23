@@ -320,7 +320,7 @@ class CheckIT {
     /**
      * A value that will not convert, placed past the records `--rows` prints.
      * <p>
-     * Until 1.0.2 this passed. `check` asked for the values of the first three
+     * Until 1.1.0 this passed. `check` asked for the values of the first three
      * records because it printed them, and several adapters convert inside
      * {@code Row.get}, so a bad date at record forty thousand was never looked at
      * - by the command whose whole purpose is to find that before a deployment.

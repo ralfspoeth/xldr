@@ -122,13 +122,6 @@ public class Check implements Callable<Integer> {
     private Path sameAs;
 
     /**
-     * Everything wrong with the spec, in one run.
-     * <p>
-     * Collected rather than thrown at the first, because a draft usually has
-     * several and fixing them one build at a time is the slow way. The exit code
-     * is the count, capped, so a script can branch on it.
-     */
-    /**
      * The feed's own file of deployment values, beside the spec. Named here
      * rather than borrowed from {@code server}'s {@code LoadJob}, which is
      * package-private - it is a name a deployment types into a directory, and
@@ -139,6 +132,13 @@ public class Check implements Callable<Integer> {
     /** the prefix expressions address those values by, as {@code ${env.clientNumber}} */
     private static final String ENV_PREFIX = "env.";
 
+    /**
+     * Everything wrong with the spec, in one run.
+     * <p>
+     * Collected rather than thrown at the first, because a draft usually has
+     * several and fixing them one build at a time is the slow way. The exit code
+     * is the count, capped, so a script can branch on it.
+     */
     private final List<String> findings = new ArrayList<>();
 
     /**
@@ -643,8 +643,6 @@ public class Check implements Callable<Integer> {
      * configuration copied from a host, and failing because that host's feed
      * roots are not present locally would be failing for a reason the reader
      * cannot act on and does not care about.
-     */
-    /**
      * The {@code env.} names a spec reads, against the {@code env.properties}
      * beside it.
      * <p>
@@ -892,7 +890,7 @@ public class Check implements Callable<Integer> {
                 var counter = new long[1];
                 stream.forEach(row -> {
                     var at = ++counter[0];
-                    // Every record, not only the printed ones. Until 1.0.2 the
+                    // Every record, not only the printed ones. Until 1.1.0 the
                     // values of rows past --rows were never asked for, and
                     // several adapters convert inside Row.get - so a file whose
                     // forty thousandth record held an unparseable date passed
@@ -941,7 +939,7 @@ public class Check implements Callable<Integer> {
             try {
                 value = row.get(name);
             } catch (RuntimeException e) {
-                // Rendered *and* recorded. Until 1.0.2 it was only rendered, so a
+                // Rendered *and* recorded. Until 1.1.0 it was only rendered, so a
                 // spec whose very first record held a value that would not
                 // convert printed <DateTimeParseException> in the middle of the
                 // output and then said "no findings" and exited zero - a report
