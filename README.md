@@ -617,6 +617,19 @@ which feed is not something `check` can know, so those stay flags.
 It reads only. The connection is opened to ask `DatabaseMetaData` what the table holds, and the sample is parsed in
 memory, so it is safe to point at production if that is the only place the table exists.
 
+**Every record is read, not only the ones printed.** `--rows N` says how many to *show*; the sample is read right
+through regardless, because several adapters convert a value inside `Row.get`, so a record nobody asks for is a
+record nobody checked. A value that will not convert to its declared type is a finding wherever in the file it
+sits - one per mapping, however many records are bad, with the first quoted. Before 1.0.2 only the printed
+records' values were ever asked for, so an unparseable date at record forty thousand passed, and `--rows 0` read
+nothing at all.
+
+**`env.properties` beside the spec is read too.** A spec saying `${env.clientNumber}` is checked against the file
+that has to supply it, and a name nothing supplies is a finding rather than a surprise on the first record of the
+first delivery. That file is the deployment's half of the arrangement - a client number, a source-system code, what
+differs between test and production - so it and the spec are edited by different people at different times, which
+is what makes the mismatch worth catching here.
+
 `--rows N` prints the first N parsed records of each record selector with their Java types, and this is the half no
 check can do for you:
 

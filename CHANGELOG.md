@@ -9,7 +9,41 @@ The versions are the git tags `xldr-<version>`; the published artifacts carry th
 
 ## Unreleased
 
+### Fixed
+
+- **`xldr check` read only the records it printed.** `--rows N` was the number shown *and*, silently, the number
+  whose values were ever asked for - so with several adapters converting inside `Row.get`, a sample whose forty
+  thousandth record held an unparseable date went through the command whose entire purpose is to find that before a
+  deployment. `--rows 0` was worse: it read nothing at all and still said "no findings". Reading is now
+  verification rather than a step on the way to printing, and `--rows` controls display only.
+
+- **A value that would not convert was shown and not counted.** `describe` caught the exception, rendered
+  `since=<DateTimeParseException>` in the middle of the output, and let the command exit zero - a report that
+  displayed the problem and denied it in the same breath. It is a finding now, one per mapping however many
+  records are bad, with the first quoted in full: a file with a systematically wrong date format has every record
+  bad, and forty thousand findings would bury the other four.
+
+  Both of these change exit codes for specs that pass today. That is the point of them.
+
+- **`env.properties` was ignored.** A spec reading `${env.clientNumber}` was never checked against the file that
+  supplies it, so the mismatch surfaced as `unknown ambient variable` on the first record of the first delivery -
+  feed deployed, producer waiting, which is the moment this command exists to come before. `check` now reads the
+  `env.properties` beside the spec and reports every `env.` name the spec uses that the file does not supply. The
+  two are edited by different people at different times, by design: the spec describes the file being read and
+  travels from test to production unchanged, so what differs between them lives next door. That is exactly the
+  arrangement in which one of the pair gets forgotten.
+
 ### Added
+
+- **`Rows` in `ia`: reading a parsed record the way a load reads it.** Two methods, and one rule - walking the rows
+  is not reading them, because several adapters convert inside `Row.get`. The conformance kit had this as a private
+  helper, written at 0.51 after its own obligation-7 check turned out to drain rows without asking for values and
+  therefore could not fail whatever an adapter did. `check` needed the same discipline and had the same bug, so it
+  moved to `ia`, beside the SPI whose obligation it honours, rather than being copied into a second reader.
+
+  `readThrough` counts with `forEach` rather than `peek(...).count()`, which since Java 9 may skip the pipeline
+  when it can determine the size without running it - returning the right number having read no field of any row,
+  which would have been this class's own bug inside this class.
 
 - **An AOT cache, written by `xldr training <any command>` and used by every run afterwards.** JDK 25's one-step
   form: the prefix puts `-XX:AOTCacheOutput` on the JVM's command line, runs the command that follows exactly as it

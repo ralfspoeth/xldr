@@ -78,6 +78,12 @@ right database without your retyping it. The output says which file it read. If 
 check carries on without it and says so; only a `--url` you typed yourself turns an unreachable database into a
 finding, on the grounds that you asked for it.
 
+Two things happen here that the output does not show. The whole sample is read, not just the records printed —
+`--rows` controls how many you see, not how many are checked — so a value that will not convert is a finding
+wherever in the file it sits. And the `env.properties` beside your spec is read, so a spec saying
+`${env.clientNumber}` is checked against the file that has to supply it rather than failing on the first record
+after you deploy.
+
 **Read the values, not just the last line.** The two rows above are the reason to run this rather than a reason to
 skim it. The file said `01.03.2026` and `1.234,56`; the output says the first of March and one thousand two hundred
 and thirty-four. If `dateFormat` were `MM.dd.yyyy` that first date would read as the third of January - a real

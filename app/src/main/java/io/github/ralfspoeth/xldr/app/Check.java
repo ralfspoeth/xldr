@@ -17,6 +17,7 @@ import picocli.CommandLine.Spec;
 
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.Connection;
@@ -127,6 +128,17 @@ public class Check implements Callable<Integer> {
      * several and fixing them one build at a time is the slow way. The exit code
      * is the count, capped, so a script can branch on it.
      */
+    /**
+     * The feed's own file of deployment values, beside the spec. Named here
+     * rather than borrowed from {@code server}'s {@code LoadJob}, which is
+     * package-private - it is a name a deployment types into a directory, and
+     * both places document it.
+     */
+    private static final String ENV_FILE = "env.properties";
+
+    /** the prefix expressions address those values by, as {@code ${env.clientNumber}} */
+    private static final String ENV_PREFIX = "env.";
+
     private final List<String> findings = new ArrayList<>();
 
     /**
@@ -177,6 +189,7 @@ public class Check implements Callable<Integer> {
 
         checkRecordSelectorsExist(spec, out);
         checkFunctionsExist(spec, out);
+        checkAmbientNamesAreSupplied(spec, out, err);
         resolveDatabase(err);
         if (jdbc != null) {
             checkColumnsExist(spec, out, err);
@@ -631,6 +644,78 @@ public class Check implements Callable<Integer> {
      * roots are not present locally would be failing for a reason the reader
      * cannot act on and does not care about.
      */
+    /**
+     * The {@code env.} names a spec reads, against the {@code env.properties}
+     * beside it.
+     * <p>
+     * That file holds what differs between deployments - a client number, a
+     * source-system code - and lives next to the spec precisely so the spec can
+     * travel from test to production unchanged. Which means the spec and the file
+     * are edited by different people at different times, and the failure this
+     * catches is the ordinary one: a spec gains {@code ${env.clientNumber}} and
+     * the deployment it is promoted into never gained the key.
+     * <p>
+     * Until now nothing noticed. The loader throws {@code unknown ambient
+     * variable} when it evaluates the template - on the first record of the first
+     * file, with the feed deployed and a producer waiting - which is exactly the
+     * moment this command exists to come before. It is the same finding as a
+     * misspelled function and is made by walking the same spec.
+     * <p>
+     * {@code xldr.} names are the loader's own - {@code xldr.filename},
+     * {@code xldr.rowsLoaded} - so they are supplied by definition and not
+     * looked for here.
+     */
+    private void checkAmbientNamesAreSupplied(MappingSpec spec, PrintWriter out, PrintWriter err) {
+        var wanted = Loader.ambientNames(spec).stream().filter(n -> n.startsWith(ENV_PREFIX)).toList();
+        if (wanted.isEmpty()) {
+            out.println("  env            not used by this spec");
+            return;
+        }
+        assert specFile != null;
+        var envFile = specFile.toAbsolutePath().getParent().resolve(ENV_FILE);
+        Set<String> supplied;
+        try {
+            supplied = environment(envFile);
+        } catch (IOException e) {
+            // there and unreadable is a finding: the spec needs it, so a load
+            // would fail on exactly this
+            findings.add("cannot read " + envFile + ": " + e.getMessage());
+            return;
+        }
+        var missing = wanted.stream().filter(n -> !supplied.contains(n)).toList();
+        if (missing.isEmpty()) {
+            out.printf("  env            %d name(s), all supplied by %s%n",
+                    wanted.size(), envFile.getFileName());
+        } else {
+            for (var name : missing) {
+                findings.add("the spec reads ${" + name + "} and "
+                        + (Files.isRegularFile(envFile)
+                        ? envFile.getFileName() + " does not supply it"
+                        : "there is no " + ENV_FILE + " beside the spec to supply it")
+                        + "; the load would fail on the first record");
+            }
+        }
+    }
+
+    /**
+     * @return the keys of the feed's {@code env.properties}, each under the
+     * {@code env.} prefix that expressions address it by - the same move
+     * {@code LoadJob} makes, and read as UTF-8 for the same reason: these are
+     * written by hand and reach a database column verbatim
+     */
+    private static Set<String> environment(Path envFile) throws IOException {
+        if (!Files.isRegularFile(envFile)) {
+            return Set.of();
+        }
+        var props = new Properties();
+        try (var in = Files.newBufferedReader(envFile, StandardCharsets.UTF_8)) {
+            props.load(in);
+        }
+        return props.stringPropertyNames().stream()
+                .map(name -> ENV_PREFIX + name)
+                .collect(Collectors.toSet());
+    }
+
     private void resolveDatabase(PrintWriter err) {
         if (url != null) {
             if (url.isBlank()) {
@@ -801,16 +886,28 @@ public class Check implements Callable<Integer> {
         try (var source = Files.newInputStream(sample)) {
             var result = adapter.parse(source, mapping.recordSelector(), Set.copyOf(fieldNames));
             var shown = new ArrayList<List<String>>();
+            var unreadable = new ArrayList<String>();
             long matched;
             try (var stream = result.rows()) {
                 var counter = new long[1];
                 stream.forEach(row -> {
-                    if (counter[0]++ < rows) {
-                        shown.add(describe(row, fieldNames));
+                    var at = ++counter[0];
+                    // Every record, not only the printed ones. Until 1.0.2 the
+                    // values of rows past --rows were never asked for, and
+                    // several adapters convert inside Row.get - so a file whose
+                    // forty thousandth record held an unparseable date passed
+                    // this command silently. Reading is verification here, not a
+                    // step on the way to printing, which is why it happens
+                    // whether or not the row will be shown.
+                    if (at <= rows) {
+                        shown.add(describe(row, fieldNames, at, unreadable));
+                    } else {
+                        readQuietly(row, fieldNames, at, unreadable);
                     }
                 });
                 matched = counter[0];
             }
+            reportUnreadable(mapping, unreadable);
             out.printf("  '%s'%s -> %s: %d record(s) matched%n",
                     mapping.recordSelector(),
                     " ".repeat(Math.max(1, 12 - mapping.recordSelector().length())),
@@ -836,14 +933,21 @@ public class Check implements Callable<Integer> {
      * {@code 03.04.2026} is visible at a glance, and it is the failure this
      * whole command is least able to catch any other way.
      */
-    private static List<String> describe(Row row, Set<String> fieldNames) {
+    private static List<String> describe(Row row, Set<String> fieldNames, long at,
+                                         List<String> unreadable) {
         var described = new ArrayList<String>(fieldNames.size());
         for (var name : fieldNames) {
             Object value;
             try {
                 value = row.get(name);
             } catch (RuntimeException e) {
+                // Rendered *and* recorded. Until 1.0.2 it was only rendered, so a
+                // spec whose very first record held a value that would not
+                // convert printed <DateTimeParseException> in the middle of the
+                // output and then said "no findings" and exited zero - a report
+                // that showed the problem and denied it in the same breath.
                 described.add(name + "=<" + e.getClass().getSimpleName() + ">");
+                unreadable.add(describeFailure(name, at, e));
                 continue;
             }
             described.add(name + "=" + (value == null
@@ -851,6 +955,42 @@ public class Check implements Callable<Integer> {
                     : value + " (" + value.getClass().getSimpleName() + ")"));
         }
         return described;
+    }
+
+    /**
+     * The same read, for a record that will not be printed: the values are asked
+     * for and thrown away, because asking is the point.
+     */
+    private static void readQuietly(Row row, Set<String> fieldNames, long at,
+                                    List<String> unreadable) {
+        for (var name : fieldNames) {
+            try {
+                row.get(name);
+            } catch (RuntimeException e) {
+                unreadable.add(describeFailure(name, at, e));
+            }
+        }
+    }
+
+    private static String describeFailure(String field, long at, RuntimeException e) {
+        return "field '" + field + "' at record " + at + ": " + e.getClass().getSimpleName()
+                + (e.getMessage() == null ? "" : " - " + e.getMessage());
+    }
+
+    /**
+     * One finding per mapping however many records are bad, because a file with a
+     * systematically wrong date format has every record bad and forty thousand
+     * findings would bury the other four. The first is quoted in full, since it
+     * is the one somebody will go and look at.
+     */
+    private void reportUnreadable(RecordMappingSpec mapping, List<String> unreadable) {
+        if (unreadable.isEmpty()) {
+            return;
+        }
+        var first = unreadable.getFirst();
+        findings.add("'" + mapping.recordSelector() + "': " + unreadable.size()
+                + " value(s) in the sample will not convert to their declared type, the first being "
+                + first + ". The load would send this file to the hospital");
     }
 
     /**

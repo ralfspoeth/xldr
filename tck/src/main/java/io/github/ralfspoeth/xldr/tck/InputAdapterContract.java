@@ -475,18 +475,17 @@ public abstract class InputAdapterContract {
     /**
      * Reads a sample the way the loader does: every field of every record.
      * <p>
-     * Draining the rows is not enough and the difference matters here. Several
-     * adapters convert a value in {@link Row#get}, so a record that cannot be
-     * read fails only when something asks for the value - and a check that walks
-     * the rows without reading them passes over a broken file in silence, which
-     * is the failure it was written to catch.
+     * The discipline this depends on - that walking the rows is not reading them,
+     * because several adapters convert inside {@code Row.get} - moved to
+     * {@link Rows} once {@code xldr check} turned out to need it too. It belongs
+     * beside the SPI rather than in one of its readers: it is how obligation 7 is
+     * honoured, and a copy per reader is a copy that can be got wrong per reader,
+     * which is how this check came to pass over three adapters' broken samples
+     * when it was first written.
      */
     private void readThrough(byte[] bytes) throws IOException {
-        var result = adapter(spec()).parse(new ByteArrayInputStream(bytes),
-                recordSelector().name(), fieldNames());
-        try (var rows = result.rows()) {
-            rows.forEach(row -> result.fields().forEach(field -> row.get(field.name())));
-        }
+        Rows.readThrough(adapter(spec()).parse(new ByteArrayInputStream(bytes),
+                recordSelector().name(), fieldNames()));
     }
 
     private List<Row> rowsOf(InputAdapter adapter) throws IOException {

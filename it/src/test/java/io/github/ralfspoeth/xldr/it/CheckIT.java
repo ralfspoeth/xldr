@@ -315,6 +315,119 @@ class CheckIT {
                         "the sample is still read: " + run.out()));
     }
 
+    // ---- reading is verification, not a step towards printing --------------------
+
+    /**
+     * A value that will not convert, placed past the records `--rows` prints.
+     * <p>
+     * Until 1.0.2 this passed. `check` asked for the values of the first three
+     * records because it printed them, and several adapters convert inside
+     * {@code Row.get}, so a bad date at record forty thousand was never looked at
+     * - by the command whose whole purpose is to find that before a deployment.
+     * {@code --rows 0} was worse still: it read nothing at all.
+     */
+    @Test
+    void abadValuePastThePrintedRowsIsStillAfinding(@TempDir Path dir) throws IOException {
+        var sample = """
+                id,name,since,balance
+                1,Alice,01.03.2026,"1.234,56"
+                2,Bob,15.03.2026,"98,00"
+                3,Carol,31.03.2026,"5,00"
+                4,Dave,NOT-A-DATE,"7,00"
+                """;
+        var run = checkWithoutUrl(dir, SPEC.formatted("customers", "balance"), sample, "--rows", "2");
+        assertAll(
+                () -> assertNotEquals(0, run.exitCode(),
+                        "a value that cannot convert is a finding wherever it sits: "
+                                + run.out() + run.err()),
+                () -> assertTrue(run.reports("will not convert"), run.out() + run.err()),
+                () -> assertTrue(run.reports("record 4"),
+                        "the finding should say which record: " + run.out() + run.err()),
+                () -> assertFalse(run.reports("no findings"), run.out()));
+    }
+
+    /** and the same with nothing printed at all, which used to read nothing at all */
+    @Test
+    void rowsZeroStillReadsTheSample(@TempDir Path dir) throws IOException {
+        var sample = """
+                id,name,since,balance
+                1,Alice,NOT-A-DATE,"1,00"
+                """;
+        var run = checkWithoutUrl(dir, SPEC.formatted("customers", "balance"), sample, "--rows", "0");
+        assertAll(
+                () -> assertNotEquals(0, run.exitCode(), run.out() + run.err()),
+                () -> assertTrue(run.reports("will not convert"), run.out() + run.err()));
+    }
+
+    /**
+     * One finding for a systematically broken file, not one per record. Every
+     * date here is wrong; four findings would bury whatever else the check found.
+     */
+    @Test
+    void asystematicallyBrokenFileIsOneFinding(@TempDir Path dir) throws IOException {
+        var sample = """
+                id,name,since,balance
+                1,Alice,2026-03-01,"1,00"
+                2,Bob,2026-03-02,"2,00"
+                3,Carol,2026-03-03,"3,00"
+                """;
+        var run = checkWithoutUrl(dir, SPEC.formatted("customers", "balance"), sample);
+        var findings = run.out().lines().filter(l -> l.contains("will not convert")).count();
+        assertAll(
+                () -> assertNotEquals(0, run.exitCode(), run.out() + run.err()),
+                () -> assertEquals(1, findings,
+                        "one finding per mapping, however many records are bad: " + run.out()),
+                () -> assertTrue(run.reports("3 value(s)"),
+                        "and it should say how many: " + run.out()));
+    }
+
+    // ---- env.properties ----------------------------------------------------------
+
+    /**
+     * A spec reading ${env.something} that the deployment beside it does not
+     * supply. The loader throws `unknown ambient variable` on the first record of
+     * the first file, which is exactly the moment this command comes before.
+     */
+    @Test
+    void anEnvNameNothingSuppliesIsAfinding(@TempDir Path dir) throws IOException {
+        var run = checkWithoutUrl(dir, specReadingEnv(), SAMPLE);
+        assertAll(
+                () -> assertNotEquals(0, run.exitCode(), run.out() + run.err()),
+                () -> assertTrue(run.reports("env.clientNumber"), run.out() + run.err()),
+                () -> assertTrue(run.reports("no env.properties"),
+                        "it should say the file is absent, not merely the key: "
+                                + run.out() + run.err()));
+    }
+
+    /** and supplied, beside the spec, is no finding */
+    @Test
+    void anEnvNameTheFileSuppliesIsFine(@TempDir Path dir) throws IOException {
+        Files.writeString(dir.resolve("env.properties"), "clientNumber = 4711\n");
+        var run = checkWithoutUrl(dir, specReadingEnv(), SAMPLE);
+        assertAll(
+                () -> assertEquals(0, run.exitCode(), run.out() + run.err()),
+                () -> assertTrue(run.reports("all supplied by env.properties"), run.out()));
+    }
+
+    /** a spec using none says so, rather than saying nothing */
+    @Test
+    void aspecUsingNoEnvNamesSaysSo(@TempDir Path dir) throws IOException {
+        var run = checkWithoutUrl(dir, SPEC.formatted("customers", "balance"), SAMPLE);
+        assertTrue(run.reports("env            not used by this spec"), run.out());
+    }
+
+    /**
+     * The tutorial spec with one extra column fed from a deployment value. The
+     * anchor is the `fieldMapping` opening, which occurs once and carries no
+     * alignment spacing to get wrong.
+     */
+    private static String specReadingEnv() {
+        var spec = SPEC.formatted("customers", "balance");
+        assertTrue(spec.contains("\"fieldMapping\": ["), "the anchor moved; this helper needs updating");
+        return spec.replace("\"fieldMapping\": [",
+                "\"fieldMapping\": [\n            {\"expr\": \"${env.clientNumber}\", \"column\": \"source_cd\"},");
+    }
+
     /** the spec as the tutorial writes it, which has nothing wrong with it */
     @Test
     void acorrectSpecHasNoFindings(@TempDir Path dir) throws IOException {

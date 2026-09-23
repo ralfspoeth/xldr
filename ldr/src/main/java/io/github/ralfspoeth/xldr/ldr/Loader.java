@@ -602,6 +602,55 @@ public class Loader implements AutoCloseable {
     }
 
     /**
+     * Every ambient name the spec's expressions read - the ones under a reserved
+     * prefix, {@code xldr.} or {@code env.}.
+     * <p>
+     * For {@code xldr check}, which can then say that a spec reads
+     * {@code ${env.clientNumber}} while the feed's {@code env.properties} supplies
+     * no such key. Nothing refuses that today until a file arrives and the
+     * expression is evaluated, by which time the feed is deployed and a producer
+     * is waiting - the same shape of finding as a misspelled function, and
+     * discovered in the same walk of the same spec.
+     * <p>
+     * Public here rather than on {@link Expression} because {@code Expression} is
+     * this package's own and the walk over a whole spec is what a caller wants;
+     * {@link #refuseUnknownFunctions} is public for the same reason and reaches
+     * the same shape by the same route.
+     *
+     * @param spec the spec to walk
+     * @return the ambient names it reads, prefix included, in encounter order
+     */
+    public static Set<String> ambientNames(MappingSpec spec) {
+        var names = new LinkedHashSet<String>();
+        spec.inputSpec().vars().forEach(v -> ambientNames(v.source(), names));
+        spec.recordMappingSpecs().forEach(mapping ->
+                mapping.fieldMappings().forEach(fm -> ambientNames(fm.source(), names)));
+        spec.transforms().forEach(t -> t.arguments().forEach(a -> ambientNames(a, names)));
+        return names;
+    }
+
+    /** the same recursion {@link #refuseUnknownFunctions(ValueSource)} makes, for the same reason */
+    private static void ambientNames(ValueSource source, Set<String> names) {
+        switch (source) {
+            case ValueSource.Expr(var template) -> {
+                for (var name : Expression.compile(template).variableNames()) {
+                    if (AMBIENT_PREFIXES.stream().anyMatch(name::startsWith)) {
+                        names.add(name);
+                    }
+                }
+            }
+            case ValueSource.Lookup(_, _, var conditions) ->
+                    conditions.values().forEach(s -> ambientNames(s, names));
+            case ValueSource.FunctionCall(_, _, var arguments) ->
+                    arguments.forEach(a -> ambientNames(a, names));
+            case ValueSource.Regex(var over, _, _) -> ambientNames(over, names);
+            case ValueSource.Constant _, ValueSource.Var _, ValueSource.Field _ -> {
+                // nothing that could hold a template
+            }
+        }
+    }
+
+    /**
      * Recursive, because a template can hide a level down - as a lookup's
      * condition, or as an argument to a call - exactly as a field can, and for
      * the same reason {@code RowIndependence} walks the same shape.
