@@ -36,6 +36,19 @@ The versions are the git tags `xldr-<version>`; the published artifacts carry th
 
 ### Fixed
 
+- **A relative `xldr.roots` resolved against the working directory, not against the file that names it.**
+  `Config.of` did `Path::of` then `toAbsolutePath`, which means `user.dir`, and `Config.load` read the file while
+  discarding where it was. So `xldr.roots = feeds` in `/etc/xldr/xldr.properties` meant `$PWD/feeds`. The server
+  never showed it, being started by `cd`-ing to its configuration or with the absolute root the shipped sample
+  uses; `xldr check --dir` points at a configuration elsewhere by design, and unmasked it immediately. A path in a
+  configuration file now means a path relative to that file. Absolute roots are untouched, which is every root in
+  a deployment that copied the sample.
+
+- **A sweep over a root that is not there reported success.** `FeedSpec` logs an unreadable root and carries on -
+  right for a server with several - so `check` found no feeds, said it found none, and exited zero having examined
+  nothing. "The roots are empty" and "the roots are not there" are different facts and only the first is all
+  right; the second now names the missing directories and the setting they came from, and fails.
+
 - **`Jdbc`'s javadoc claimed `Config` requires the feed roots to exist.** It does not - `Config.of` requires
   `xldr.roots` to be present and to name something, and `Watcher.validate` is what checks the directories are
   there, at startup, which is where that belongs. The reason `check` keeps away from `Config` is the weaker one:

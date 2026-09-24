@@ -443,6 +443,53 @@ class CheckIT {
                 () -> assertTrue(run.reports("need a SPEC"), run.out() + run.err()));
     }
 
+    /**
+     * A relative root means relative to the file that names it, not to whoever
+     * ran the command. Before this, `xldr check --dir somewhere-else` resolved
+     * `xldr.roots = feeds` against the caller's own working directory, found
+     * nothing there, and said so while exiting zero.
+     */
+    @Test
+    void arelativeRootIsRelativeToTheConfigurationFile(@TempDir Path dir) throws IOException {
+        var root = Files.createDirectories(dir.resolve("feeds"));
+        feed(root, "orders", SPEC.formatted("customers", "balance"), "2026/09/08", SAMPLE);
+        // the root is written relative, and the command is run from somewhere
+        // that has no 'feeds' directory of its own
+        Files.writeString(dir.resolve("xldr.properties"), """
+                xldr.roots = feeds
+                jdbc.url = %s
+                """.formatted(JDBC_URL));
+
+        var run = sweep(dir);
+        assertAll(
+                () -> assertEquals(0, run.exitCode(), run.out() + run.err()),
+                () -> assertTrue(run.reports("checking 1 feed(s)"),
+                        "the root should resolve beside xldr.properties: " + run.out() + run.err()),
+                () -> assertTrue(run.reports("orders"), run.out()));
+    }
+
+    /**
+     * And a root that genuinely is not there fails loudly. Finding no feeds
+     * because a path is wrong must not read the same as finding no feeds because
+     * a deployment has none - the first is a check that examined nothing.
+     */
+    @Test
+    void arootThatIsNotThereIsNotAcleanSweep(@TempDir Path dir) throws IOException {
+        Files.writeString(dir.resolve("xldr.properties"), """
+                xldr.roots = %s
+                jdbc.url = %s
+                """.formatted(dir.resolve("nowhere"), JDBC_URL));
+
+        var run = sweep(dir);
+        assertAll(
+                () -> assertNotEquals(0, run.exitCode(),
+                        "a sweep over a root that is not there examined nothing: "
+                                + run.out() + run.err()),
+                () -> assertTrue(run.reports("cannot sweep"), run.out() + run.err()),
+                () -> assertTrue(run.reports("xldr.roots"), run.out() + run.err()),
+                () -> assertFalse(run.reports("no findings"), run.out()));
+    }
+
     /** and with neither a spec nor a configuration, it says which two things are missing */
     @Test
     void noSpecAndNoConfigurationSaysSo(@TempDir Path dir) {

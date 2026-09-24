@@ -794,6 +794,18 @@ public class Check implements Callable<Integer> {
             err.println("cannot read " + configFile + ": " + e.getMessage());
             return 2;
         }
+        // A root that is not there and a root that is empty are different facts,
+        // and only the second is all right. FeedSpec logs the first and carries
+        // on, which is right for a server sweeping every root it has - and wrong
+        // here, where it would leave this command finding no feeds, printing that
+        // it found none, and exiting zero over a deployment it never looked at.
+        var missing = config.roots().stream().filter(r -> !Files.isDirectory(r)).toList();
+        if (!missing.isEmpty()) {
+            err.printf("cannot sweep: %s, named by %s in %s, %s not there%n",
+                    missing, Config.ROOTS_KEY, configFile(), missing.size() == 1 ? "is" : "are");
+            err.println("a relative root is relative to that file, so read the path from its own directory");
+            return 2;
+        }
         var feeds = FeedSpec.under(config.roots());
         if (feeds.isEmpty()) {
             out.println("no feed below " + config.roots() + " holds a spec.json or spec.xml");

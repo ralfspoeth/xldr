@@ -56,7 +56,14 @@ public record Config(
 ) {
 
     private static final String POOL_PREFIX = "pool.";
-    private static final String ROOTS_KEY = "xldr.roots";
+    /**
+     * Public for the same reason {@link Jdbc#URL_KEY} is: it is the documented
+     * spelling of a configuration file rather than an implementation detail, and
+     * {@code xldr check} names it when a deployment's roots are not where the
+     * file says. A message that spelled it independently would be free to spell
+     * it wrong.
+     */
+    public static final String ROOTS_KEY = "xldr.roots";
     private static final String SCAN_KEY = "xldr.scanInterval";
     private static final String CONCURRENCY_KEY = "xldr.maxConcurrentLoads";
     private static final String MAX_POOL_SIZE = "maximumPoolSize";
@@ -68,6 +75,18 @@ public record Config(
     }
 
     /**
+     * Reads the file, resolving any relative {@code xldr.roots} against the
+     * directory the file is in.
+     * <p>
+     * A path written in a configuration file means a path relative to that file.
+     * It used to mean relative to whatever directory the process happened to be
+     * started from, which agreed with the above whenever a server was started by
+     * {@code cd}-ing to its configuration - and disagreed silently the moment
+     * anything pointed at a configuration somewhere else. {@code xldr check
+     * --dir /etc/xldr} is exactly that, and would look for a relative root under
+     * the caller's own directory instead. An absolute root is unaffected, which
+     * is every root in a deployment that copied the shipped sample.
+     *
      * @param propertiesFile the server configuration file
      * @return the configuration it describes
      * @throws IOException              if the file cannot be read
@@ -79,20 +98,37 @@ public record Config(
         try (var in = Files.newBufferedReader(propertiesFile)) {
             props.load(in);
         }
-        return of(props);
+        var parent = propertiesFile.toAbsolutePath().getParent();
+        return of(props, parent == null ? Path.of("") : parent);
     }
 
     /**
      * @param props the server settings, as they would be read from the file
-     * @return the configuration they describe
+     * @return the configuration they describe, with relative roots resolved
+     * against the working directory - there being no file to resolve against
      * @throws IllegalArgumentException if a required setting is missing or a
      *                                  value does not make sense
      */
     public static Config of(Properties props) {
+        return of(props, Path.of(""));
+    }
+
+    /**
+     * @param props the server settings
+     * @param base  what a relative {@code xldr.roots} entry is relative to,
+     *              normally the directory holding the file they were read from
+     * @return the configuration they describe
+     * @throws IllegalArgumentException if a required setting is missing or a
+     *                                  value does not make sense
+     */
+    public static Config of(Properties props, Path base) {
         var roots = Stream.of(require(props, ROOTS_KEY).split(Pattern.quote(File.pathSeparator)))
                 .map(String::strip)
                 .filter(s -> !s.isEmpty())
                 .map(Path::of)
+                // resolve leaves an absolute path alone, so this is the relative
+                // case only
+                .map(base::resolve)
                 .map(Path::toAbsolutePath)
                 .map(Path::normalize)
                 .toList();
