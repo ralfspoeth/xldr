@@ -36,6 +36,22 @@ The versions are the git tags `xldr-<version>`; the published artifacts carry th
 
 ### Fixed
 
+- **`check` opened two connections per spec, and so eighty for a sweep of forty feeds.** `checkColumnsExist` and
+  `checkRoutinesExist` each opened their own; one now serves the whole run. Waste against any database, and
+  something worse against a URL that does work on connect: H2's `INIT=RUNSCRIPT` would have run its script eighty
+  times, and the second run of a `CREATE TABLE` fails - so every feed after the first would have reported a
+  database error belonging to the URL rather than to its spec.
+
+- **The "reads only, safe against production" promise is qualified.** It describes what this command does, and a
+  JDBC URL can do work of its own when a connection opens - H2's `INIT=RUNSCRIPT` being the obvious case. Against
+  such a URL, connecting is a write, and `check` connects. Nothing can be done about it here, the URL being the
+  driver's to interpret, so the javadoc and the README say so instead of promising something they cannot.
+
+  `conf/xldr.properties` gains the related warning, beside the sample URL where somebody about to write an `INIT`
+  clause will be looking: a path inside a JDBC URL is resolved by the driver against the process's working
+  directory, so make it absolute. Java has no `chdir`, so xldr cannot help - and the contrast is worth stating,
+  since a relative `xldr.roots` in the same file *is* resolved against the file, that one being ours to resolve.
+
 - **A relative `xldr.roots` resolved against the working directory, not against the file that names it.**
   `Config.of` did `Path::of` then `toAbsolutePath`, which means `user.dir`, and `Config.load` read the file while
   discarding where it was. So `xldr.roots = feeds` in `/etc/xldr/xldr.properties` meant `$PWD/feeds`. The server

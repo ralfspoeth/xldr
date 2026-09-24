@@ -53,8 +53,17 @@ import java.util.stream.Collectors;
  *
  * <h2>What it will not do</h2>
  * Insert anything. It opens a connection to read {@code DatabaseMetaData} and
- * parses the sample in memory; nothing is written, so it is safe to point at
+ * parses the sample in memory; nothing here writes, so it is safe to point at
  * production if that is the only place the table exists.
+ * <p>
+ * <strong>With one caveat that is not ours to remove.</strong> That promise is
+ * about what this command does, and some JDBC URLs do work of their own the
+ * moment a connection opens - H2's {@code INIT=RUNSCRIPT} runs a script, and
+ * other drivers have their own. Against such a URL, connecting <em>is</em> a
+ * write, and this command connects. Nothing can be done about it from here: the
+ * URL is the driver's to interpret and reading it to find out would mean knowing
+ * every driver's syntax. Worth knowing before pointing a URL with an
+ * {@code INIT} clause at anything that matters.
  * <p>
  * It also cannot tell you that a value is <em>wrong</em>, only that it parsed.
  * That is what {@code --rows} is for: no static check can know whether
@@ -183,13 +192,29 @@ public class Check implements Callable<Integer> {
     @Nullable
     private Path currentSample;
 
+    /** opened at most once per run by {@link #database}, closed in {@link #call} */
+    @Nullable
+    private Connection connection;
+
     @Override
     public Integer call() throws Exception {
         assert commandSpec != null;
         var out = commandSpec.commandLine().getOut();
         var err = commandSpec.commandLine().getErr();
         resolveDatabase(err);
-        return specFile == null ? sweep(out, err) : one(out, err);
+        try {
+            return specFile == null ? sweep(out, err) : one(out, err);
+        } finally {
+            // one connection for the whole run, so closing it is this method's
+            // job rather than any individual check's
+            if (connection != null) {
+                try {
+                    connection.close();
+                } catch (SQLException e) {
+                    err.println("could not close the connection: " + e.getMessage());
+                }
+            }
+        }
     }
 
     /** the named spec, with the flags as given: what this command has always done */
@@ -236,8 +261,15 @@ public class Check implements Callable<Integer> {
         checkFunctionsExist(spec, out);
         checkAmbientNamesAreSupplied(spec, out, err);
         if (jdbc != null) {
-            checkColumnsExist(spec, out, err);
-            checkRoutinesExist(spec, out, err);
+            // One connection for both, and for every feed of a sweep: see
+            // #database(). Opening one per question cost forty feeds eighty
+            // handshakes, and re-ran anything the URL does on connect eighty
+            // times with it.
+            var conn = database(err);
+            if (conn != null) {
+                checkColumnsExist(spec, conn, out, err);
+                checkRoutinesExist(spec, conn, out, err);
+            }
         } else {
             var why = "no --url given and no " + Jdbc.URL_KEY + " in " + configFile();
             out.println("  columns        not checked, " + why);
@@ -488,8 +520,8 @@ public class Check implements Callable<Integer> {
      * gap rather than a mistake, its lookup pages having passed without their
      * reference tables being examined at all.
      */
-    private void checkColumnsExist(MappingSpec spec, PrintWriter out, PrintWriter err) {
-        try (var conn = connect()) {
+    private void checkColumnsExist(MappingSpec spec, Connection conn, PrintWriter out, PrintWriter err) {
+        try {
             var lower = conn.getMetaData().storesLowerCaseIdentifiers();
             for (var mapping : spec.recordMappingSpecs()) {
                 var actual = columnsOf(conn, normalize(mapping.table(), lower));
@@ -545,7 +577,7 @@ public class Check implements Callable<Integer> {
      * an alias among the procedures whatever it is called with - and this is
      * asking whether the thing is there, not what kind of thing it is.
      */
-    private void checkRoutinesExist(MappingSpec spec, PrintWriter out, PrintWriter err) {
+    private void checkRoutinesExist(MappingSpec spec, Connection conn, PrintWriter out, PrintWriter err) {
         var called = new TreeSet<String>();
         for (var v : spec.inputSpec().vars()) {
             collectCalls(v.source(), called);
@@ -562,7 +594,7 @@ public class Check implements Callable<Integer> {
         if (called.isEmpty()) {
             return;
         }
-        try (var conn = connect()) {
+        try {
             var meta = conn.getMetaData();
             var lower = meta.storesLowerCaseIdentifiers();
             var known = routineNames(meta, lower);
@@ -654,6 +686,35 @@ public class Check implements Callable<Integer> {
             findings.add("table '" + table + "' has no column '" + column
                     + "'; it has " + new TreeSet<>(actual));
         }
+    }
+
+    /**
+     * The one connection this command uses, opened when first wanted and kept
+     * until it exits.
+     * <p>
+     * Opened once rather than per question, and - the reason it is a field -
+     * once for a whole sweep rather than per feed. Forty feeds asking two
+     * questions each used to mean eighty connections, which is waste against any
+     * database and something worse against a URL that does work on connect: an
+     * H2 {@code INIT=RUNSCRIPT} would have run its script eighty times, and the
+     * second run of a {@code CREATE TABLE} fails, so every feed after the first
+     * would have reported a database error belonging to the URL rather than to
+     * its spec.
+     * <p>
+     * Null is returned where the database could not be reached, {@link
+     * #databaseUnreachable} having already said so in whichever of the two ways
+     * that call for.
+     */
+    private @Nullable Connection database(PrintWriter err) {
+        if (connection == null) {
+            try {
+                connection = connect();
+            } catch (SQLException e) {
+                databaseUnreachable("columns", e, err);
+                return null;
+            }
+        }
+        return connection;
     }
 
     private Connection connect() throws SQLException {
@@ -851,7 +912,7 @@ public class Check implements Callable<Integer> {
         }
         out.printf("%d finding(s) across %d feed(s)%s.%n", findings.size(), feeds.size(),
                 unreadable == 0 ? "" : ", and " + unreadable + " spec(s) that could not be read");
-        return Math.min(Math.max(findings.size(), unreadable), 100);
+        return Math.clamp(findings.size(), unreadable, 100);
     }
 
     private void resolveDatabase(PrintWriter err) {

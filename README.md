@@ -628,7 +628,13 @@ Only `jdbc.url` is read this way. `--schema` and `--catalog` correspond to a *fe
 which feed is not something `check` can know, so those stay flags.
 
 It reads only. The connection is opened to ask `DatabaseMetaData` what the table holds, and the sample is parsed in
-memory, so it is safe to point at production if that is the only place the table exists.
+memory, so it is safe to point at production if that is the only place the table exists. One connection serves the
+whole run — a sweep of forty feeds opens one, not eighty.
+
+That promise is about what `check` does, and a JDBC URL can do work of its own: H2's `INIT=RUNSCRIPT` executes a
+script when the connection opens, and other drivers have their equivalents. Against such a URL, connecting *is* a
+write. Nothing can be done about that from here — the URL belongs to the driver, and reading it to find out would
+mean knowing every driver's syntax — so it is worth knowing before pointing one at something that matters.
 
 **Every record is read, not only the ones printed.** `--rows N` says how many to *show*; the sample is read right
 through regardless, because several adapters convert a value inside `Row.get`, so a record nobody asks for is a
