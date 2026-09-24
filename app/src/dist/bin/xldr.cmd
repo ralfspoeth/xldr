@@ -42,10 +42,30 @@ if defined JAVA_HOME if not exist "%JAVA_HOME%\bin\java.exe" (
 
 rem modules\, xl\ and drivers\ may each be absent, or empty, and all of that is
 rem fine: choosing none of something is a choice. Only lib\ has to be there.
-set "MODULEPATH=%HERE%\lib"
-if exist "%HERE%\modules" set "MODULEPATH=%MODULEPATH%;%HERE%\modules"
-if exist "%HERE%\xl" set "MODULEPATH=%MODULEPATH%;%HERE%\xl"
-if exist "%HERE%\drivers" set "MODULEPATH=%MODULEPATH%;%HERE%\drivers"
+rem
+rem The jars themselves, not the directories. Both work for JPMS; the difference
+rem shows up under -XX:AOTCacheOutput, which needs the full module graph and
+rem refuses a module path entry that is a directory holding anything but jars.
+rem drivers\README.txt is exactly that, and is there on purpose.
+rem Delayed expansion is needed to append inside the loop and is turned off again
+rem immediately: left on, it would eat an exclamation mark in any path the rest
+rem of this script touches. `endlocal & set` carries the one result out.
+setlocal enabledelayedexpansion
+set "MODULEPATH="
+for %%D in (lib modules xl drivers) do (
+    if exist "%HERE%\%%D" (
+        for %%J in ("%HERE%\%%D\*.jar") do (
+            if "!MODULEPATH!"=="" (set "MODULEPATH=%%~fJ") else (set "MODULEPATH=!MODULEPATH!;%%~fJ")
+        )
+    )
+)
+endlocal & set "MODULEPATH=%MODULEPATH%"
+
+if "%MODULEPATH%"=="" (
+    echo xldr: no jars in %HERE%\lib - is the distribution complete? 1>&2
+    echo xldr: unpack it again; if a published archive comes out this way, that is ours: https://github.com/ralfspoeth/xldr/issues 1>&2
+    exit /b 1
+)
 
 rem The AOT cache. -XX:AOTCacheOutput has to be on the command line that starts
 rem the JVM, so `training` cannot be a subcommand - nothing inside the

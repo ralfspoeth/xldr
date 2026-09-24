@@ -41,6 +41,44 @@ container being the usual reason, the same prefix applies and the caveat is the
 exit.
 
 
+WHEN TRAINING WILL NOT WRITE ONE
+
+The command itself runs normally and exits zero when this happens - only the
+cache is missing - which is why the launcher says so afterwards rather than
+letting the VM's output be the last word. The reason is in the [aot] lines it
+prints. Two are worth recognising.
+
+    module path contains sub-directories or non-JAR files
+        Assembling a cache needs the full module graph, and that refuses a module
+        path entry which is a directory holding anything but jars. The launcher
+        therefore lists the jars rather than the four directories, so a stray
+        file cannot cause this - drivers/README.txt did, until 1.1.1, being a
+        note deliberately placed where somebody with a connection problem would
+        find it. If you see this anyway, something jar-shaped in lib/, modules/,
+        xl/ or drivers/ is not a jar.
+
+    critical class java.lang.ClassLoader has been excluded
+        A java agent is rewriting classes. The VM treats a transformed class as
+        modified and leaves it out, and it will not write an archive without
+        java.lang.ClassLoader. Look in _JAVA_OPTIONS and JAVA_OPTS.
+
+        Do not look in JAVA_TOOL_OPTIONS on the strength of the "Picked up
+        JAVA_TOOL_OPTIONS" line above: the JDK sets that itself, to hand this
+        command line to the child process that assembles the cache, so it appears
+        on every training run and means nothing by itself. Check the variable in
+        your own shell instead.
+
+        There is a VM flag, -XX:+AllowArchivingWithJavaAgent, that lets the dump
+        proceed anyway. Do not reach for it. The JDK documents it as a diagnostic
+        for testing, because the archive then holds classes as the agent rewrote
+        them - so the cache would carry somebody's instrumentation into every
+        later run of this server. Train without the agent instead.
+
+    JAVA_OPTS=-Xlog:aot bin/xldr training ...
+
+gives the whole story in either case.
+
+
 WHEN IT HAS TO BE WRITTEN AGAIN
 
 Two things invalidate a cache, and both are ordinary:

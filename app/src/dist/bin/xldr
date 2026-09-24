@@ -9,7 +9,7 @@
 # lib/ holds the application and the toolkit - what has to be there. The other
 # three hold what a deployment chooses: modules/ the input adapters, xl/ the
 # Excel adapter with the Apache POI libraries it needs, drivers/ the JDBC
-# drivers. All four go on the module path, and JPMS service binding resolves the
+# drivers. The jars in all four go on the module path, and service binding resolves the
 # adapters (uses/provides InputAdapterFactory) and the driver (java.sql uses
 # Driver) from there, so no --add-modules is needed. Add and remove by moving
 # jars: your own driver into drivers/, a format out of modules/, xl/ deleted
@@ -83,10 +83,30 @@ fi
 # is a choice. Only lib/ has to be there, which is checked above. A server with
 # no adapters starts and refuses to activate any feed, which is loud in the right
 # place.
-modulepath=$here/lib
-[ -d "$here/modules" ] && modulepath=$modulepath:$here/modules
-[ -d "$here/xl" ] && modulepath=$modulepath:$here/xl
-[ -d "$here/drivers" ] && modulepath=$modulepath:$here/drivers
+# The jars themselves, not the directories holding them. Both work for JPMS, and
+# the difference only shows up under -XX:AOTCacheOutput: assembling an AOT cache
+# needs the full module graph, and that refuses a module path entry which is a
+# directory containing anything but jars. drivers/README.txt is exactly such a
+# thing, put there on purpose so that somebody whose database will not connect
+# finds the answer where they are standing - and it made training impossible with
+#   module path contains sub-directories or non-JAR files
+# Listing the jars keeps the note where it belongs and takes a whole class of
+# problem out of the path with it: a zip nobody extracted, an editor's backup
+# file, a second README, none of them can confuse the module path now.
+#
+# The loop is what handles the empty case. An unmatched *.jar glob expands to
+# itself in sh, so a drivers/ with no jar in it would otherwise put the literal
+# string drivers/*.jar on the path.
+modulepath=""
+for dir in lib modules xl drivers; do
+    [ -d "$here/$dir" ] || continue
+    for jar in "$here/$dir"/*.jar; do
+        [ -f "$jar" ] || continue
+        modulepath=${modulepath:+$modulepath:}$jar
+    done
+done
+[ -n "$modulepath" ] || fail "no jars in $here/lib - is the distribution complete?" \
+    "unpack it again; if a published archive comes out this way, that is ours: https://github.com/ralfspoeth/xldr/issues"
 
 # The AOT cache. -XX:AOTCacheOutput has to be on the command line that starts the
 # JVM, so `training` cannot be a subcommand - nothing inside the application can
@@ -99,6 +119,7 @@ modulepath=$here/lib
 # runs it, which /opt/xldr usually is.
 aot_cache=${XLDR_AOT_CACHE:-$here/aot/xldr.aot}
 aot=""
+training=""
 if [ "${1:-}" = training ]; then
     shift
     [ $# -gt 0 ] || fail "training needs a command to train on, e.g." \
@@ -108,6 +129,7 @@ if [ "${1:-}" = training ]; then
     [ -w "$aot_dir" ] || fail "cannot write $aot_cache" \
         "the installation is read-only here; name a writable file in XLDR_AOT_CACHE"
     aot="-XX:AOTCacheOutput=$aot_cache"
+    training=yes
     echo "xldr: training, and writing $aot_cache when this run finishes" >&2
 elif [ -f "$aot_cache" ]; then
     # A cache that no longer matches this JVM or this module path is a warning
@@ -118,5 +140,50 @@ elif [ -f "$aot_cache" ]; then
     aot="-XX:AOTCache=$aot_cache"
 fi
 
-exec "$java" ${JAVA_OPTS:-} $aot -Dxldr.home="$here" -p "$modulepath" \
+if [ -z "$training" ]; then
+    exec "$java" ${JAVA_OPTS:-} $aot -Dxldr.home="$here" -p "$modulepath" \
+        -m io.github.ralfspoeth.xldr.app/io.github.ralfspoeth.xldr.app.App "$@"
+fi
+
+# Training does not exec, because there is something to say afterwards. Writing
+# the cache is the JVM's business and happens after the application has exited,
+# so it can fail on its own - with the command you asked for having succeeded,
+# and an exit status of zero. Left alone, a failed training run looks exactly
+# like a successful one plus a paragraph of VM output nobody asked to read.
+# Any existing cache is moved aside rather than compared against afterwards.
+# The question is whether *this* run wrote one, and timestamps cannot answer it:
+# a stamp file and a cache written moments later can share an mtime, and -newer
+# is strictly greater, so a quick run would report a failure it did not have.
+# Moving is exact - either the file is back or it is not - and it keeps the old
+# cache, which a failed training run has no business destroying. If the process
+# is killed mid-run the previous cache is left beside its name as .prev.
+previous=$aot_cache.prev
+rm -f "$previous"
+[ -f "$aot_cache" ] && mv "$aot_cache" "$previous"
+
+set +e
+"$java" ${JAVA_OPTS:-} $aot -Dxldr.home="$here" -p "$modulepath" \
     -m io.github.ralfspoeth.xldr.app/io.github.ralfspoeth.xldr.app.App "$@"
+status=$?
+set -e
+
+if [ -f "$aot_cache" ]; then
+    rm -f "$previous"
+    echo "xldr: wrote $aot_cache" >&2
+else
+    [ -f "$previous" ] && mv "$previous" "$aot_cache" \
+        && echo "xldr: the cache from a previous training run is left as it was" >&2
+    echo "xldr: no cache was written - the command above ran, but $aot_cache is unchanged" >&2
+    echo "xldr: the VM's own reason is in the [aot] lines above. Two are worth knowing:" >&2
+    echo "xldr:   'module path contains sub-directories or non-JAR files' - something that" >&2
+    echo "xldr:   is not a jar has appeared in lib/, modules/, xl/ or drivers/. This script" >&2
+    echo "xldr:   lists the jars rather than the directories so that cannot happen, so a" >&2
+    echo "xldr:   deployment seeing it has a jar-shaped thing that is not a jar." >&2
+    echo "xldr:   'critical class ... has been excluded' - a java agent is rewriting classes," >&2
+    echo "xldr:   which the VM treats as modified and leaves out. Look in _JAVA_OPTIONS and" >&2
+    echo "xldr:   JAVA_OPTS; note that the 'Picked up JAVA_TOOL_OPTIONS' line above is the" >&2
+    echo "xldr:   JDK's own, how it hands this command line to the child that builds the" >&2
+    echo "xldr:   cache, and appears on every training run rather than meaning anything." >&2
+    echo "xldr: JAVA_OPTS=-Xlog:aot bin/xldr training ... gives the whole story." >&2
+fi
+exit $status

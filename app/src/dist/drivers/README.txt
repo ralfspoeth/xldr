@@ -1,7 +1,9 @@
 The JDBC drivers. What is in this directory is what the server can connect to -
 installing one is copying its jar in here, and removing one is deleting it.
 Nothing names them in code; java.sql finds a Driver by service binding, and the
-launcher puts this directory on the module path.
+launcher puts the jars it finds here on the module path. The jars, not the
+directory - which is why this note can sit beside them without the JVM taking it
+for a module. Anything that is not a .jar is ignored.
 
 Only H2 is here, and the reason is the tutorial: it runs against H2, so without
 this jar the documented first five minutes would need a database provisioned

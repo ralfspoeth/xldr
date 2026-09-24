@@ -7,6 +7,28 @@ listed under **Added**; anything incompatible waits for a `2.0` and is listed un
 The versions are the git tags `xldr-<version>`; the published artifacts carry the same version under the group
 `io.github.ralfspoeth.xldr`.
 
+## Unreleased
+
+### Fixed
+
+- **The launcher puts the jars on the module path, not the four directories holding them.** Both work for JPMS, and
+  the difference only showed up under `-XX:AOTCacheOutput`: assembling a cache needs the full module graph, which
+  refuses a module path entry that is a directory containing anything but jars. `drivers/README.txt` is exactly
+  such a thing - the note put there at 0.56 so that somebody whose database will not connect finds the answer where
+  they are standing - so 1.1.0's training prefix could not write a cache at all in the distribution as shipped.
+
+  Listing the jars keeps that note where it belongs and retires the whole category: an unextracted zip, an editor's
+  backup, a second README, none of them can reach the module path now. The empty case is handled by iterating
+  rather than globbing, since an unmatched `*.jar` expands to itself in `sh` and would otherwise land on the path
+  literally.
+
+- **The launcher's diagnosis of a failed training run was wrong.** 1.1.0 blamed a java agent and told the reader to
+  check `JAVA_TOOL_OPTIONS`. That advice is worse than useless here: the one-step AOT mode *itself* sets
+  `JAVA_TOOL_OPTIONS` to hand the command line to the child process that assembles the cache, so the "Picked up
+  JAVA_TOOL_OPTIONS" line appears on every training run, successful or not, and the message pointed straight at it.
+  Both this and `aot/README.txt` now describe the two failures that actually occur, and say that this particular
+  line is the JDK's own.
+
 ## 1.1.0
 
 A minor rather than a patch, because it adds: `Rows` in `ia`, `Loader.ambientNames`, the AOT cache and two things
@@ -52,6 +74,20 @@ under this unchanged.
   `readThrough` counts with `forEach` rather than `peek(...).count()`, which since Java 9 may skip the pipeline
   when it can determine the size without running it - returning the right number having read no field of any row,
   which would have been this class's own bug inside this class.
+
+- **A failed training run says so.** Writing the cache is the JVM's own business and happens after the application
+  has exited, so it can fail on its own - with the command you asked for having succeeded and the exit status
+  zero. Left alone that looks exactly like success plus a paragraph of VM output nobody asked to read. The launcher
+  now reports whether a cache was actually written, and when none was, names the usual cause: a java agent
+  transforms classes, the JVM treats them as modified and excludes them, and it will not write an archive without
+  `java.lang.ClassLoader`. `JAVA_TOOL_OPTIONS` is where such an agent usually hides, being set nowhere visible from
+  the prompt.
+
+  The training path no longer `exec`s, because there is something to say afterwards, and any existing cache is
+  moved aside rather than compared by timestamp - a stamp file and a cache written moments later can share an
+  mtime, so a quick run would have reported a failure it did not have. A failed run leaves the previous cache
+  where it was, which is the behaviour a deployment wants from a step it might run while something is already
+  working.
 
 - **An AOT cache, written by `xldr training <any command>` and used by every run afterwards.** JDK 25's one-step
   form: the prefix puts `-XX:AOTCacheOutput` on the JVM's command line, runs the command that follows exactly as it
