@@ -315,6 +315,144 @@ class CheckIT {
                         "the sample is still read: " + run.out()));
     }
 
+    // ---- the sweep: no SPEC, every feed below the roots --------------------------
+
+    /**
+     * Builds a feed the way a server would find one: a directory exactly one
+     * level below a root, holding a spec, with its archive partitioned
+     * year/month/day as {@code FileProcessor} writes it.
+     */
+    private static Path feed(Path root, String name, String spec, String... archived)
+            throws IOException {
+        var dir = Files.createDirectories(root.resolve(name));
+        Files.writeString(dir.resolve("spec.json"), spec);
+        Files.writeString(dir.resolve("delivery.properties"), "accepts = *.csv\n");
+        for (var i = 0; i < archived.length; i += 2) {
+            var day = Files.createDirectories(dir.resolve("archive").resolve(archived[i]));
+            Files.writeString(day.resolve("delivered.csv"), archived[i + 1]);
+        }
+        return dir;
+    }
+
+    /** an xldr.properties naming the root, as a deployment's would */
+    private static Path deployment(Path dir, Path root) throws IOException {
+        Files.writeString(dir.resolve("xldr.properties"), """
+                xldr.roots = %s
+                jdbc.url = %s
+                """.formatted(root, JDBC_URL));
+        return dir;
+    }
+
+    private static Run sweep(Path dir, String... extra) {
+        var out = new StringWriter();
+        var err = new StringWriter();
+        var args = new ArrayList<>(List.of("check", "--dir", dir.toString()));
+        args.addAll(List.of(extra));
+        var exit = new CommandLine(new App())
+                .setOut(new PrintWriter(out, true))
+                .setErr(new PrintWriter(err, true))
+                .execute(args.toArray(String[]::new));
+        return new Run(exit, out.toString(), err.toString());
+    }
+
+    /**
+     * Two feeds, one sound and one naming a column the table has not got. The
+     * clean one costs a line; the broken one shows its working.
+     */
+    @Test
+    void sweepsEveryFeedBelowTheRoots(@TempDir Path dir) throws IOException {
+        var root = Files.createDirectories(dir.resolve("feeds"));
+        feed(root, "good", SPEC.formatted("customers", "balance"), "2026/09/08", SAMPLE);
+        feed(root, "bad", SPEC.formatted("customers", "blance"), "2026/09/08", SAMPLE);
+        deployment(dir, root);
+
+        var run = sweep(dir);
+        assertAll(
+                () -> assertNotEquals(0, run.exitCode(), run.out() + run.err()),
+                () -> assertTrue(run.reports("checking 2 feed(s)"), run.out()),
+                () -> assertTrue(run.reports("good"), run.out()),
+                () -> assertTrue(run.reports("bad"), run.out()),
+                () -> assertTrue(run.reports("has no column 'blance'"), run.out()),
+                () -> assertTrue(run.reports("across 2 feed(s)"), run.out()));
+    }
+
+    /**
+     * The sample is the newest archived file, and newest is decided by the
+     * partition names - September after August, on zero-padded components. The
+     * older delivery would parse; the newer one would not, so taking the newer is
+     * what produces the finding.
+     */
+    @Test
+    void takesTheNewestArchivedFileAsTheSample(@TempDir Path dir) throws IOException {
+        var root = Files.createDirectories(dir.resolve("feeds"));
+        feed(root, "orders", SPEC.formatted("customers", "balance"),
+                "2026/08/07", SAMPLE,
+                "2026/09/08", """
+                        id,name,since,balance
+                        1,Alice,NOT-A-DATE,"1,00"
+                        """);
+        deployment(dir, root);
+
+        var run = sweep(dir);
+        assertAll(
+                () -> assertNotEquals(0, run.exitCode(),
+                        "the September file is the newer and will not parse: " + run.out()),
+                () -> assertTrue(run.reports("will not convert"), run.out()));
+    }
+
+    /** a feed that has loaded nothing yet is checked, and says what it could not do */
+    @Test
+    void afeedWithAnEmptyArchiveIsStillChecked(@TempDir Path dir) throws IOException {
+        var root = Files.createDirectories(dir.resolve("feeds"));
+        feed(root, "new-feed", SPEC.formatted("customers", "balance"));
+        deployment(dir, root);
+
+        var run = sweep(dir);
+        assertAll(
+                () -> assertEquals(0, run.exitCode(), run.out() + run.err()),
+                () -> assertTrue(run.reports("nothing archived yet"), run.out()));
+    }
+
+    /**
+     * A spec two levels below a root is not a feed - {@code FeedRegistry} lists a
+     * root's immediate children and no deeper - so the sweep must not report on
+     * one, either as healthy or as broken.
+     */
+    @Test
+    void aspecDeeperThanOneLevelIsNotAfeed(@TempDir Path dir) throws IOException {
+        var root = Files.createDirectories(dir.resolve("feeds"));
+        feed(root.resolve("group"), "nested", SPEC.formatted("customers", "blance"));
+        deployment(dir, root);
+
+        var run = sweep(dir);
+        assertAll(
+                () -> assertEquals(0, run.exitCode(),
+                        "a spec the server would never register is not this sweep's business: "
+                                + run.out() + run.err()),
+                () -> assertFalse(run.reports("blance"), run.out()));
+    }
+
+    /** the options that name one spec's file are refused rather than ignored */
+    @Test
+    void sampleAndSameAsAreRefusedWithoutAspec(@TempDir Path dir) throws IOException {
+        var root = Files.createDirectories(dir.resolve("feeds"));
+        deployment(dir, root);
+        var run = sweep(dir, "--sample", dir.resolve("whatever.csv").toString());
+        assertAll(
+                () -> assertNotEquals(0, run.exitCode(), run.out() + run.err()),
+                () -> assertTrue(run.reports("need a SPEC"), run.out() + run.err()));
+    }
+
+    /** and with neither a spec nor a configuration, it says which two things are missing */
+    @Test
+    void noSpecAndNoConfigurationSaysSo(@TempDir Path dir) {
+        var run = sweep(dir);
+        assertAll(
+                () -> assertNotEquals(0, run.exitCode(), run.out() + run.err()),
+                () -> assertTrue(run.reports("no SPEC given and no"), run.out() + run.err()),
+                () -> assertTrue(run.reports("xldr.properties"), run.out() + run.err()));
+    }
+
     // ---- reading is verification, not a step towards printing --------------------
 
     /**

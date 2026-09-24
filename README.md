@@ -599,6 +599,19 @@ the third, but only once a file is being loaded and a transaction is open. So wh
 Each argument is optional except the spec: without `--sample` the file is not read, and a check with neither a file
 nor a database still cross-checks the spec against itself.
 
+**Without a SPEC at all, it sweeps the deployment.** `xldr check` on its own reads `xldr.properties` — the working
+directory's, or `--dir`'s — takes `xldr.roots` from it, and checks every feed one level below a root: the same
+place the server looks, so a spec deeper down is left alone rather than reported on as a feed that does not exist.
+Each is checked against the newest file that feed has already archived, which is the truest sample available, being
+a real delivery that really loaded. `in/` is empty on a healthy server and `hospital/` holds the file that broke,
+so neither would do.
+
+    xldr check                      # every feed, from the configuration in .
+    xldr check --dir /etc/xldr      # every feed, from a configuration elsewhere
+
+A clean feed costs one line and a feed with findings shows its working, so forty healthy feeds do not bury the
+forty-first. `--sample` and `--same-as` name one spec's file and are refused here rather than quietly ignored.
+
 **Without `--url`, the `jdbc.url` of an `xldr.properties` is used** - the one in the working directory, or in the
 directory `--dir` names. A deployment already says which database it feeds, so retyping it into every check is both
 tedious and a chance to check the wrong one. `--user` and `--password` override what the file says; where they are

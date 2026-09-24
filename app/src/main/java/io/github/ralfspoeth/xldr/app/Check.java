@@ -5,6 +5,7 @@ import io.github.ralfspoeth.xldr.ia.InputAdapterFactory;
 import io.github.ralfspoeth.xldr.ia.Row;
 import io.github.ralfspoeth.xldr.ldr.Loader;
 import io.github.ralfspoeth.xldr.server.Config;
+import io.github.ralfspoeth.xldr.server.FeedSpec;
 import io.github.ralfspoeth.xldr.server.Jdbc;
 import io.github.ralfspoeth.xldr.spec.*;
 import io.github.ralfspoeth.xldr.spec.io.MappingSpecReader;
@@ -17,6 +18,7 @@ import picocli.CommandLine.Spec;
 
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -71,7 +73,10 @@ public class Check implements Callable<Integer> {
     @Nullable
     private CommandSpec commandSpec;
 
-    @Parameters(index = "0", paramLabel = "SPEC", description = "the spec.json or spec.xml to check")
+    @Parameters(index = "0", arity = "0..1", paramLabel = "SPEC",
+            description = "the spec.json or spec.xml to check; without one, every feed below the "
+                    + "xldr.roots of " + App.CONFIG_FILE + " is swept, each against the newest file "
+                    + "it has archived")
     @Nullable
     private Path specFile;
 
@@ -164,33 +169,72 @@ public class Check implements Callable<Integer> {
     /** so that two checks failing on one unreachable database say so once */
     private boolean unreachableReported;
 
+    /**
+     * The spec being checked at this moment, and the sample to check it against.
+     * <p>
+     * Separate from the {@code --sample} option and the {@code SPEC} argument
+     * because a sweep supplies both per feed. The options say what a single run
+     * was asked for; these say what is being looked at now, and only the second
+     * question has an answer when there are forty feeds.
+     */
+    @Nullable
+    private Path currentSpec;
+
+    @Nullable
+    private Path currentSample;
+
     @Override
     public Integer call() throws Exception {
-        assert specFile != null && commandSpec != null;
+        assert commandSpec != null;
         var out = commandSpec.commandLine().getOut();
         var err = commandSpec.commandLine().getErr();
+        resolveDatabase(err);
+        return specFile == null ? sweep(out, err) : one(out, err);
+    }
 
-        if (!Files.isRegularFile(specFile)) {
-            err.println("no such spec: " + specFile);
+    /** the named spec, with the flags as given: what this command has always done */
+    private int one(PrintWriter out, PrintWriter err) {
+        assert specFile != null;
+        currentSpec = specFile;
+        currentSample = sample;
+        if (checkCurrent(out, err) == null) {
             return 2;
+        }
+        out.println();
+        if (findings.isEmpty()) {
+            out.println("no findings.");
+            return 0;
+        }
+        out.println(findings.size() + " finding(s):");
+        findings.forEach(f -> out.println("  - " + f));
+        return Math.min(findings.size(), 100);
+    }
+
+    /**
+     * One spec, into {@code out}. Returns null where the spec could not be read
+     * at all, there being nothing to cross-check against and the reader having
+     * already said what is wrong with it.
+     */
+    private @Nullable MappingSpec checkCurrent(PrintWriter out, PrintWriter err) {
+        assert currentSpec != null;
+        if (!Files.isRegularFile(currentSpec)) {
+            err.println("no such spec: " + currentSpec);
+            return null;
         }
         MappingSpec spec;
         try {
-            spec = MappingSpecReader.readSpec(specFile);
+            spec = MappingSpecReader.readSpec(currentSpec);
         } catch (IOException | RuntimeException e) {
-            // the spec did not even parse, so there is nothing to cross-check
-            // against and the reader has already said what is wrong with it
-            err.println("cannot read " + specFile + ": " + e.getMessage());
-            return 2;
+            err.println("cannot read " + currentSpec + ": " + e.getMessage());
+            return null;
         }
-        out.println("checking " + specFile);
+        out.println("checking " + currentSpec);
         out.printf("  input          %s, %d record selector(s)%n",
                 spec.inputSpec().mimeType(), spec.inputSpec().recordSelectors().size());
 
         checkRecordSelectorsExist(spec, out);
         checkFunctionsExist(spec, out);
         checkAmbientNamesAreSupplied(spec, out, err);
-        resolveDatabase(err);
         if (jdbc != null) {
             checkColumnsExist(spec, out, err);
             checkRoutinesExist(spec, out, err);
@@ -202,22 +246,16 @@ public class Check implements Callable<Integer> {
         if (sameAs != null) {
             compareWith(spec, out, err);
         }
-        if (sample != null) {
+        if (currentSample != null) {
             checkAgainstTheSample(spec, out, err);
         } else {
-            out.println("  sample         not checked, no --sample given");
+            out.println("  sample         not checked, " + (specFile == null
+                    ? "this feed has archived nothing to check against"
+                    : "no --sample given"));
         }
 
         printPlan(spec, out);
-
-        out.println();
-        if (findings.isEmpty()) {
-            out.println("no findings.");
-            return 0;
-        }
-        out.println(findings.size() + " finding(s):");
-        findings.forEach(f -> out.println("  - " + f));
-        return Math.min(findings.size(), 100);
+        return spec;
     }
 
     // ---- the spec against itself ---------------------------------------------
@@ -669,8 +707,8 @@ public class Check implements Callable<Integer> {
             out.println("  env            not used by this spec");
             return;
         }
-        assert specFile != null;
-        var envFile = specFile.toAbsolutePath().getParent().resolve(ENV_FILE);
+        assert currentSpec != null;
+        var envFile = currentSpec.toAbsolutePath().getParent().resolve(ENV_FILE);
         Set<String> supplied;
         try {
             supplied = environment(envFile);
@@ -712,6 +750,96 @@ public class Check implements Callable<Integer> {
         return props.stringPropertyNames().stream()
                 .map(name -> ENV_PREFIX + name)
                 .collect(Collectors.toSet());
+    }
+
+    /**
+     * Every feed a deployment would register, checked against the newest file it
+     * has already loaded.
+     * <p>
+     * This is the preflight the single-spec form cannot be: a deployment has
+     * forty feeds and nobody checks forty specs by hand, so the ones that rot are
+     * the ones nobody has touched lately - a column dropped from a table, an
+     * {@code env.} name removed, a producer that changed its date format two
+     * months ago and whose feed has been hospitalising files since.
+     * <p>
+     * <strong>Why this one does go through {@link Config}</strong>, where the
+     * single-spec form deliberately does not. {@code Config} insists on
+     * {@code xldr.roots}, which the single-spec form has no use for and should
+     * not demand - and which is the whole input here, there being nothing to
+     * sweep without it. Two modes, two requirements, and a missing
+     * {@code xldr.roots} now fails the one that actually needed it.
+     * <p>
+     * The sample is the newest archived file rather than anything in {@code in/}:
+     * an inbox is empty on a healthy server, the watcher having taken everything,
+     * and what is in {@code hospital/} is by definition the file that broke. What
+     * loaded most recently is the truest sample there is - a real file from the
+     * real producer that really went in.
+     */
+    private int sweep(PrintWriter out, PrintWriter err) {
+        if (sample != null || sameAs != null) {
+            err.println("--sample and --same-as name one spec's file, so they need a SPEC;"
+                    + " without one every feed brings its own");
+            return 2;
+        }
+        var configFile = configFile();
+        if (!Files.isRegularFile(configFile)) {
+            err.println("no SPEC given and no " + configFile + " to sweep from - name a spec,"
+                    + " or run where the server's configuration is, or point --dir at it");
+            return 2;
+        }
+        Config config;
+        try {
+            config = Config.load(configFile);
+        } catch (IOException | RuntimeException e) {
+            err.println("cannot read " + configFile + ": " + e.getMessage());
+            return 2;
+        }
+        var feeds = FeedSpec.under(config.roots());
+        if (feeds.isEmpty()) {
+            out.println("no feed below " + config.roots() + " holds a spec.json or spec.xml");
+            return 0;
+        }
+        out.printf("checking %d feed(s) below %s%n%n", feeds.size(), config.roots());
+
+        var unreadable = 0;
+        for (var feed : feeds) {
+            var before = findings.size();
+            currentSpec = feed.specFile();
+            currentSample = feed.newestArchived().orElse(null);
+            // buffered, so that a feed with nothing wrong costs one line and a
+            // feed with something wrong still shows the whole story. Forty clean
+            // feeds printed in full is a screenful nobody reads, which is how a
+            // finding in the fortieth gets missed
+            var buffer = new StringWriter();
+            MappingSpec read;
+            try (var into = new PrintWriter(buffer, true)) {
+                read = checkCurrent(into, err);
+            }
+            if (read == null) {
+                unreadable++;
+                out.printf("  %-24s could not be read - see above%n", feed.name());
+                continue;
+            }
+            var mine = findings.subList(before, findings.size());
+            if (mine.isEmpty()) {
+                out.printf("  %-24s ok%s%n", feed.name(), feed.newestArchived().isPresent()
+                        ? "" : "  (nothing archived yet, so the spec was not read against a file)");
+            } else {
+                out.printf("  %-24s %d finding(s)%n", feed.name(), mine.size());
+                buffer.toString().lines().forEach(l -> out.println("    " + l));
+                mine.forEach(f -> out.println("    - " + f));
+                out.println();
+            }
+        }
+
+        out.println();
+        if (findings.isEmpty() && unreadable == 0) {
+            out.println("no findings.");
+            return 0;
+        }
+        out.printf("%d finding(s) across %d feed(s)%s.%n", findings.size(), feeds.size(),
+                unreadable == 0 ? "" : ", and " + unreadable + " spec(s) that could not be read");
+        return Math.min(Math.max(findings.size(), unreadable), 100);
     }
 
     private void resolveDatabase(PrintWriter err) {
@@ -844,9 +972,9 @@ public class Check implements Callable<Integer> {
      * representative.
      */
     private void checkAgainstTheSample(MappingSpec spec, PrintWriter out, PrintWriter err) {
-        assert sample != null;
-        if (!Files.isRegularFile(sample)) {
-            err.println("  sample         no such file: " + sample);
+        assert currentSample != null;
+        if (!Files.isRegularFile(currentSample)) {
+            err.println("  sample         no such file: " + currentSample);
             return;
         }
         var factory = InputAdapterFactory.of(spec.inputSpec()).orElse(null);
@@ -861,7 +989,7 @@ public class Check implements Callable<Integer> {
             findings.add("the adapter refuses this input spec: " + e.getMessage());
             return;
         }
-        out.printf("  sample         %s (%d bytes)%n", sample.getFileName(), sizeOf(sample));
+        out.printf("  sample         %s (%d bytes)%n", currentSample.getFileName(), sizeOf(currentSample));
 
         for (var mapping : spec.recordMappingSpecs()) {
             readOne(adapter, mapping, out, err);
@@ -877,11 +1005,11 @@ public class Check implements Callable<Integer> {
      */
     private void readOne(InputAdapter adapter, RecordMappingSpec mapping,
                          PrintWriter out, PrintWriter err) {
-        assert sample != null;
+        assert currentSample != null;
         var fieldNames = new LinkedHashSet<String>();
         collectFieldNames(mapping, fieldNames);
 
-        try (var source = Files.newInputStream(sample)) {
+        try (var source = Files.newInputStream(currentSample)) {
             var result = adapter.parse(source, mapping.recordSelector(), Set.copyOf(fieldNames));
             var shown = new ArrayList<List<String>>();
             var unreadable = new ArrayList<String>();
@@ -912,7 +1040,7 @@ public class Check implements Callable<Integer> {
                     mapping.table(), matched);
             if (matched == 0) {
                 findings.add("record selector '" + mapping.recordSelector()
-                        + "' matches nothing in " + sample.getFileName()
+                        + "' matches nothing in " + currentSample.getFileName()
                         + ", so this mapping would load no rows");
             }
             shown.forEach(row -> out.println("      " + String.join("  ", row)));

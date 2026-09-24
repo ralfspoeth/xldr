@@ -108,6 +108,20 @@ forty columns spreads them over a hundred lines, each source nested inside its o
 the wrong one validates, loads, and is wrong in every row. Reading the plan against the table you meant to fill is
 about ten seconds and catches that.
 
+## On a deployed server: checking everything at once
+
+Once feeds exist, `check` with no spec at all sweeps them:
+
+    xldr check                    # or --dir /etc/xldr
+
+It reads the server's own `xldr.properties`, finds every feed below `xldr.roots`, and checks each one's spec
+against the newest file that feed has already loaded — a real delivery from the real producer, which is a better
+sample than anything you would have written. A clean feed costs one line, a feed with findings shows its working.
+
+This is the check worth running after something changes elsewhere: a column dropped from a table, a reference table
+renamed, a producer that altered its date format. Nothing tells you that a feed which has been quiet for a month is
+about to start hospitalising files — except this.
+
 ## Checking a spec against its other self
 
 [Page 3](03-in-xml.md) wrote the same spec twice, once in each format. If you keep both - or convert one to the

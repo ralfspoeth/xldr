@@ -9,7 +9,39 @@ The versions are the git tags `xldr-<version>`; the published artifacts carry th
 
 ## Unreleased
 
+### Added
+
+- **`xldr check` with no SPEC sweeps every feed the deployment would register.** It reads `xldr.properties` from
+  the working directory or `--dir`, takes `xldr.roots` from it, and checks the `spec.json` or `spec.xml` of every
+  directory one level below a root - each against the newest file that feed has already archived. One line per
+  clean feed, the whole block only where there are findings, and the exit code the capped total.
+
+  That sample choice is the point of the feature. A deployment has forty feeds and nobody checks forty specs by
+  hand, so the ones that rot are the ones nobody has touched: a column dropped from a table, an `env.` name
+  removed, a producer whose date format changed two months ago. The newest archived file is the truest sample there
+  is - a real file from the real producer that really loaded - where `in/` is empty on a healthy server and
+  `hospital/` holds by definition the file that broke.
+
+  **One level below a root, matching the server.** `FeedRegistry.reconcileRoot` lists a root's immediate children
+  and no deeper, so a spec further down is one the server will never register; reporting it healthy would describe
+  a feed that does not exist, and reporting it broken would send somebody fixing something that is not running.
+
+  **One new type crosses the module boundary**, `FeedSpec`, and it answers the question rather than exposing the
+  parts: the spec names, the `archive/` layout and the depth rule all stay inside `server`, as do `Feed`,
+  `Delivery`, `FeedRegistry` and `MappingSpecs`. `app` learns no directory names. The archive is descended by name
+  rather than walked - `FileProcessor` zero-pads the `year/month/day` partitions, so lexicographic order is
+  chronological order and a feed with a year of history costs three listings instead of three hundred.
+
+  `--sample` and `--same-as` name one spec's file and are refused in this mode rather than ignored.
+
 ### Fixed
+
+- **`Jdbc`'s javadoc claimed `Config` requires the feed roots to exist.** It does not - `Config.of` requires
+  `xldr.roots` to be present and to name something, and `Watcher.validate` is what checks the directories are
+  there, at startup, which is where that belongs. The reason `check` keeps away from `Config` is the weaker one:
+  the smallest useful file for checking a spec is two lines of `jdbc.*`, and demanding a feed-root setting it will
+  never read would be demanding it for nothing. Found while giving the sweep the opposite justification, which
+  needed the claim to be true and turned out not to need it.
 
 - **The launcher puts the jars on the module path, not the four directories holding them.** Both work for JPMS, and
   the difference only showed up under `-XX:AOTCacheOutput`: assembling a cache needs the full module graph, which

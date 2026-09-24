@@ -25,12 +25,17 @@ import java.util.Properties;
  * would be the kind of drift this project has been bitten by before.
  * <p>
  * <strong>Why {@code check} does not simply call {@link Config#load}.</strong>
- * {@code Config} requires {@code xldr.roots}, and requires the directories it
- * names to be meaningful on this machine. That is right for a server about to
- * watch them and wrong for a command that only wants a connection: a spec is
- * often checked on a laptop against a configuration copied from a host whose
- * feed roots are nowhere to be found locally, and refusing to check it for that
- * reason would be refusing for a reason the user cannot act on.
+ * {@code Config} requires {@code xldr.roots} to be present and to name
+ * something. That is right for a server about to watch those directories and
+ * beside the point for a command that only wants a connection: the smallest
+ * useful file for checking a spec is two lines of {@code jdbc.*}, and demanding
+ * a feed-root setting the command will never look at would be demanding it for
+ * nothing.
+ * <p>
+ * This note used to say {@code Config} also requires those directories to
+ * <em>exist</em>. It does not - {@code Watcher.validate} checks that, at
+ * startup, which is where it belongs. The weaker claim above is the true one,
+ * and it is still enough: a laptop checking a spec need not own a feed tree.
  *
  * @param url      the JDBC URL; the one setting without which there is nothing
  * @param user     the user, where the file names one
