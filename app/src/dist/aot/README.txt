@@ -52,7 +52,7 @@ prints. Two are worth recognising.
         Assembling a cache needs the full module graph, and that refuses a module
         path entry which is a directory holding anything but jars. The launcher
         therefore lists the jars rather than the four directories, so a stray
-        file cannot cause this - drivers/README.txt did, until 1.1.1, being a
+        file cannot cause this - drivers/README.txt did, until 1.2.0, being a
         note deliberately placed where somebody with a connection problem would
         find it. If you see this anyway, something jar-shaped in lib/, modules/,
         xl/ or drivers/ is not a jar.

@@ -7,7 +7,19 @@ listed under **Added**; anything incompatible waits for a `2.0` and is listed un
 The versions are the git tags `xldr-<version>`; the published artifacts carry the same version under the group
 `io.github.ralfspoeth.xldr`.
 
-## Unreleased
+## 1.2.0
+
+A minor again, and for the same reason 1.1.0 was: it adds. `xldr check` gains a mode, `server` gains `FeedSpec`,
+`Config` gains `ROOTS_KEY` and an `of` overload. The rest is repair, and one piece of it matters enough to say
+here: **1.1.0's AOT training prefix could not write a cache at all.** The distribution's module path was the four
+directories, one of which holds `drivers/README.txt`, and assembling a cache refuses a module path entry that is a
+directory containing anything but jars. The feature shipped broken and is fixed below.
+
+That defect was in `bin/xldr`, which only the distribution archive carries, so the 1.1.0 artifacts on Maven Central
+are unaffected - the library modules are exactly what they claim to be, and a consumer of the BOM had nothing to
+notice.
+
+The mapping-spec format is untouched, so `mapping-spec-1.0` remains its schema and now covers 1.0 through 1.2.
 
 ### Added
 
