@@ -76,7 +76,7 @@ One jar and one `web.xml`. The jar is on Maven Central with the rest; import the
             <dependency>
                 <groupId>io.github.ralfspoeth.xldr</groupId>
                 <artifactId>bom</artifactId>
-                <version>1.2.0</version>
+                <version>1.3.0</version>
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>

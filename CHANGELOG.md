@@ -7,7 +7,13 @@ listed under **Added**; anything incompatible waits for a `2.0` and is listed un
 The versions are the git tags `xldr-<version>`; the published artifacts carry the same version under the group
 `io.github.ralfspoeth.xldr`.
 
-## Unreleased
+## 1.3.0
+
+A minor, because it adds: the `specs` parameter and three sample modules. The release is about `xlet` and where it
+can be deployed. A war deployment of it could never have worked before this - the adapters were invisible on a
+classpath - and an executable jar could not be attempted at all.
+
+The mapping-spec format is untouched, so `mapping-spec-1.0` remains its schema and now covers 1.0 through 1.3.
 
 ### Fixed
 
