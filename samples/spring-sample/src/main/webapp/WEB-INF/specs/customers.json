@@ -1,0 +1,30 @@
+{
+  "$schema": "https://ralfspoeth.github.io/xldr/schema/mapping-spec-1.0.json",
+  "input": {
+    "mimeType": "text/csv",
+    "properties": {
+      "fieldSeparator": ",",
+      "header": true
+    },
+    "recordSelectors": [
+      {
+        "name": "customers",
+        "fieldSelectors": [
+          {"name": "id",   "selector": "id",   "type": "INTEGRAL"},
+          {"name": "name", "selector": "name"}
+        ]
+      }
+    ]
+  },
+  "mapping": [
+    {
+      "recordSelector": "customers",
+      "table": "customer",
+      "fieldMapping": [
+        {"fieldSelector": "id",   "column": "id"},
+        {"fieldSelector": "name", "column": "name"},
+        {"expr": "${env.source}", "column": "source"}
+      ]
+    }
+  ]
+}

@@ -43,6 +43,24 @@ The versions are the git tags `xldr-<version>`; the published artifacts carry th
   They are in the reactor deliberately, so `mvn clean verify` builds them: a sample nobody builds goes stale
   between one release and the next, and these exist to be copied.
 
+- **`samples/spring-sample`, the same webapp under Spring Boot.** It exists for the one thing the Jetty sample
+  cannot show: a `DataSource` that did not come from JNDI. `XldrServlet.dataSource()` is `protected` for exactly
+  that, and its javadoc names Spring as the case, so the whole of the integration is a four-line subclass and the
+  application never switches JNDI on inside its embedded container. The servlet is registered with a
+  `ServletRegistrationBean` rather than a `web.xml`, and does not know the difference.
+
+  `war` packaging, like the other one and for the same unavoidable reason: specs are read through
+  `ServletContext.getResourcePaths("/WEB-INF/specs/")`, which an executable jar has no equivalent of. A Spring Boot
+  war still runs from one command.
+
+  The spec file is byte-for-byte the Jetty sample's, and would work unchanged as a feed's `spec.json` under the
+  file server. That is what two samples demonstrate that one could not: what a deployment chooses is where the
+  input arrives from and where the database comes from, never the mapping.
+
+  No Quarkus sample, and the reason is the one settled when `xlet`'s deployment boundary was written down: a
+  Quarkus application has no `/WEB-INF/`, so the servlet would come up carrying no specs at all. That needs a
+  second source for specs before it needs a sample.
+
   It also does something the tests could not. `AdapterRegistrationIT` checks that the two registrations agree;
   this webapp is the thing that actually loads a file through an adapter found on a *classpath*, in a container,
   which is the deployment that was broken until the service files landed. The `security-constraint` is

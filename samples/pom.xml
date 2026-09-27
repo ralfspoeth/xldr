@@ -29,8 +29,15 @@
       that differs; what they have in common is xlet, the adapters, and a spec
       that would work unchanged under the file server.
     -->
+    <!--
+      Each is named for the part that differs. The spec is the same file in all
+      of them, and would work unchanged as a feed's spec.json under the file
+      server: what a deployment chooses is where the input arrives from and
+      where the database comes from, never the mapping.
+    -->
     <modules>
         <module>jetty-sample</module>
+        <module>spring-sample</module>
     </modules>
 
     <build>
