@@ -53,11 +53,19 @@ tables.
 
 ## What is where
 
-    pom.xml                                    jar packaging, xlet, csv, quarkus-undertow
+    pom.xml                                      jar packaging, xlet, csv, quarkus-undertow
     src/main/java/.../QuarkusLoaderServlet.java  @WebServlet, the DataSource, the specs param
-    src/main/resources/application.properties  the datasource Quarkus builds
-    specs/customers.json                       outside the artifact, on purpose
-    src/test/resources/customers.csv           something to POST
+    src/main/java/.../Schema.java                the table, created at startup
+    src/main/resources/application.properties    the datasource Quarkus builds
+    specs/customers.json                         outside the artifact, on purpose
+    src/test/resources/customers.csv             something to POST
+
+`Schema.java` is the one file here a real deployment deletes: the table comes from a
+migration tool or from whoever owns the schema. It is a startup observer rather than
+an `INIT` clause on the JDBC URL — which is how `jetty-sample` does it, in a file that
+was already Jetty-specific XML. Here the URL lives in `application.properties`, where
+a comma inside a value is ambiguous to config parsing, and DDL buried in a connection
+string is DDL nobody reading the code will find.
 
 `quarkus-undertow` is what makes a `jakarta.servlet.http.HttpServlet` deployable here
 at all; Quarkus's own world is Quarkus REST and does not include Servlet support by
