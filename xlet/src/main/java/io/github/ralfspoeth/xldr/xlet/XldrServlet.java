@@ -81,7 +81,9 @@ public class XldrServlet extends HttpServlet {
 
     @Override
     public void init() throws ServletException {
-        specs = SpecRegistry.read(getServletContext());
+        // 'specs' names a directory for a deployment with no /WEB-INF/ to read
+        // from; absent, which is the usual case, the war's own are used
+        specs = SpecRegistry.read(getServletContext(), inherited("specs"));
         dataSource = dataSource();
         environment = environment();
         target = target();

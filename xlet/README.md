@@ -26,23 +26,29 @@ So `xlet` is not a port of `server`. It is the other half of it - and most of wh
 
 ### What shape the deployment has to be
 
-**A war, exploded or packaged, in a servlet container.** Tomcat, Jetty, WildFly, or
-Spring Boot built as a war - a real choice of container, and the reason this is a
-servlet at all: security, enterprise integration and everything else in that
-neighbourhood is then the container's and not ours to reimplement.
+**A war, exploded or packaged, in a servlet container** is the default shape. Tomcat,
+Jetty, WildFly, or Spring Boot built as a war - a real choice of container, and the
+reason this is a servlet at all: security, enterprise integration and everything else
+in that neighbourhood is then the container's and not ours to reimplement. The specs
+come from `/WEB-INF/specs/` and nothing needs configuring.
 
-**Not an executable fat jar.** Quarkus, Micronaut, Helidon SE and a Spring Boot `jar`
-are out of scope, and the reason is one line of this module: the specs are read with
-`ServletContext.getResourcePaths("/WEB-INF/specs/")`. A fat jar has no `/WEB-INF/`, so
-the servlet would start carrying no specs at all and answer `404` to every request -
-failing in a way that looks like a missing spec rather than a wrong packaging.
+**An executable jar works too, and must say where its specs are.** Quarkus, Micronaut,
+Helidon and a Spring Boot `jar` have no `/WEB-INF/` for
+`ServletContext.getResourcePaths` to answer with, so such a deployment sets the
+`specs` parameter to a directory and the servlet reads them from there instead.
 
-That path is a choice rather than an accident: under `/WEB-INF/` the container's own
-access control already covers the specs, and nothing can fetch one over a socket. A
-directory named by an init-param would work everywhere and would hand that question
-back to the deployer. It is not obviously wrong - it is the same delegation the
-`DataSource` already makes - but it has not been done, and until it is, this is the
-boundary.
+That difference is not cosmetic, and the trade is worth understanding before taking
+it. Table and column names from a spec are concatenated into the SQL rather than
+bound, so installing a spec is as privileged as editing the application's
+configuration. Under `/WEB-INF/` the container's own access control covers that, and
+nothing can fetch a spec over a socket. **A directory outside the war has no such
+cover: whatever can write there decides what SQL this servlet runs.** Put it where
+the application's own configuration lives, own it as tightly, and do not put it
+anywhere a deployment pipeline or another process can drop files.
+
+It is the same delegation the `DataSource` already makes - the container's guarantee
+exchanged for the deployer's - and it is available for the same reason: so that the
+choice of framework is yours rather than ours.
 
 ### The dependencies
 
@@ -296,6 +302,7 @@ under `/WEB-INF/`, where the container's own access control covers them.
 | where                                       | what                                                      |
 |---------------------------------------------|-----------------------------------------------------------|
 | `/WEB-INF/specs/*.{json,xml}`               | one file per feed; the base name is the feed name         |
+| init- or context-param `specs`              | a directory to read them from instead, where there is no `/WEB-INF/` |
 | `java:comp/env/jdbc/...`                    | the `DataSource`, named by an init-param                  |
 | init- and context-params `env.*`            | what a spec's `${env.…}` expressions resolve against      |
 | init- or context-params `schema`, `catalog` | where the rows go, if the connection does not already say |

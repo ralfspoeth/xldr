@@ -57,9 +57,17 @@ The versions are the git tags `xldr-<version>`; the published artifacts carry th
   file server. That is what two samples demonstrate that one could not: what a deployment chooses is where the
   input arrives from and where the database comes from, never the mapping.
 
-  No Quarkus sample, and the reason is the one settled when `xlet`'s deployment boundary was written down: a
-  Quarkus application has no `/WEB-INF/`, so the servlet would come up carrying no specs at all. That needs a
-  second source for specs before it needs a sample.
+- **`samples/quarkus-sample`, the same webapp as an executable jar.** The one that needed the `specs` parameter:
+  a Quarkus application has no `/WEB-INF/`, so its specs live in a directory beside the project rather than inside
+  the artifact, and `@WebInitParam(name = "specs", …)` says where.
+
+  It also uses the `dataSource()` seam a second time, with `@Inject` where Spring had a constructor — Quarkus has
+  no JNDI either. One `protected` method now covers three containers that resolve a database three different ways,
+  which is a better argument for that seam existing than the one test that first used it.
+
+  Three samples, one spec file: byte-for-byte identical across all of them and unchanged as a feed's `spec.json`
+  under the file server. What a deployment chooses is where the input arrives from, where the database comes from,
+  and now where the specs are read. Never the mapping.
 
   It also does something the tests could not. `AdapterRegistrationIT` checks that the two registrations agree;
   this webapp is the thing that actually loads a file through an adapter found on a *classpath*, in a container,
@@ -69,12 +77,23 @@ The versions are the git tags `xldr-<version>`; the published artifacts carry th
 
 ### Changed
 
-- **`xlet`'s README says what shape a deployment has to be.** A war, exploded or packaged, in a container -
-  Spring Boot included when built as a war. Not an executable fat jar: the specs are read through
-  `ServletContext.getResourcePaths("/WEB-INF/specs/")`, which a Quarkus or Boot jar has no equivalent of, so the
-  servlet would start with no specs and answer `404` to everything - a failure that looks like a missing spec
-  rather than wrong packaging. The boundary was always there; now it is stated rather than discovered. A sample
-  `pom.xml` goes with it.
+- **A `specs` parameter: the directory to read mapping specs from, where there is no `/WEB-INF/` to read them
+  from.** An init- or context-param, absent by default, and absent is the war behaviour unchanged.
+
+  It exists because `ServletContext.getResourcePaths("/WEB-INF/specs/")` needs a war. An application packaged as
+  an executable jar - Quarkus, Micronaut, Helidon, a Spring Boot `jar` - has no such path, so until now the
+  servlet came up carrying nothing and answered `404` to everything, and `xlet`'s README said those deployments
+  were out of scope. They are in scope now, and the README says what they must supply instead.
+
+  **The trade is real and the documentation states it.** Table and column names from a spec are concatenated into
+  the SQL rather than bound, so installing a spec is as privileged as editing the application's configuration.
+  Under `/WEB-INF/` the container's access control covers that; a directory outside the war does not, and whatever
+  can write there decides what SQL the servlet runs. It is the same delegation the `DataSource` already makes -
+  the container's guarantee exchanged for the deployer's - and it is available for the same reason, so that the
+  choice of framework belongs to the deployment.
+
+  Four tests cover the new branch, because every other test of spec loading goes through the container and this
+  path exists precisely for the deployments none of them exercise.
 
 ## 1.2.0
 

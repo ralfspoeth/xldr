@@ -7,9 +7,12 @@ import jakarta.servlet.http.HttpServletRequest;
 import org.jspecify.annotations.NonNull;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 import javax.sql.DataSource;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.util.ArrayList;
@@ -118,13 +121,68 @@ class XldrServletTest {
         return servlet;
     }
 
-    // ---- what stops it starting ---------------------------------------------
+    // ---- specs from a directory, for a deployment with no /WEB-INF/ ------------
 
     /**
-     * Everything is refused at initialisation or not at all. A servlet that came up
-     * half-configured would report the same problem as a 500 on the first request
-     * needing the broken part - at the worst moment, and to the wrong person.
+     * The {@code specs} parameter, which exists because
+     * {@code getResourcePaths("/WEB-INF/specs/")} needs a war and an application
+     * packaged as an executable jar has no {@code /WEB-INF/} to answer with. This
+     * branch is the one no other test touches: every case above goes through the
+     * container, which is exactly the deployment shape the parameter is for
+     * deployments that cannot use.
      */
+    @Test
+    void readsSpecsFromAdirectoryWhenOneIsNamed(@TempDir Path dir) throws Exception {
+        Files.writeString(dir.resolve("people.json"), PEOPLE_SPEC);
+        var counting = Proxies.dataSource(JDBC_URL);
+        var servlet = new Testable(counting.dataSource());
+
+        // no resource paths at all, as a fat jar's container would offer none
+        servlet.init(configWith(Map.of(), Map.of("specs", dir.toString())));
+
+        // and it is not merely registered: a POST names it and loads through it
+        var response = new Proxies.Recorded();
+        servlet.post(Proxies.post("text/csv", Map.of("spec", "people"),
+                "id,name\n1,Alice\n".getBytes(UTF_8)), response);
+        assertEquals(200, response.status(), response.body());
+    }
+
+    /** a directory that is not there is a deployment failure, not an empty registry */
+    @Test
+    void refusesAspecsDirectoryThatIsNotThere(@TempDir Path dir) {
+        var missing = dir.resolve("nowhere");
+        var servlet = new Testable(Proxies.dataSource(null).dataSource());
+        var thrown = assertThrows(ServletException.class, () -> servlet.init(
+                configWith(Map.of(), Map.of("specs", missing.toString()))));
+        assertAll(
+                () -> assertTrue(thrown.getMessage().contains("specs"), thrown.getMessage()),
+                () -> assertTrue(thrown.getMessage().contains(missing.toString()), thrown.getMessage()));
+    }
+
+    /** an empty one likewise: nothing to load with is nothing to start with */
+    @Test
+    void refusesAnEmptySpecsDirectory(@TempDir Path dir) {
+        var servlet = new Testable(Proxies.dataSource(null).dataSource());
+        var thrown = assertThrows(ServletException.class, () -> servlet.init(
+                configWith(Map.of(), Map.of("specs", dir.toString()))));
+        assertTrue(thrown.getMessage().contains(dir.toString()), thrown.getMessage());
+    }
+
+    /**
+     * And the same collision rule as the war path: the base name is the name, so
+     * people.json and people.xml claim one name twice. A rule that held in one
+     * source and not the other would be the worse kind of difference.
+     */
+    @Test
+    void refusesTwoSpecsOfTheSameNameInAdirectory(@TempDir Path dir) throws Exception {
+        Files.writeString(dir.resolve("people.json"), PEOPLE_SPEC);
+        Files.writeString(dir.resolve("people.xml"), PEOPLE_SPEC_XML);
+        var servlet = new Testable(Proxies.dataSource(null).dataSource());
+        var thrown = assertThrows(ServletException.class, () -> servlet.init(
+                configWith(Map.of(), Map.of("specs", dir.toString()))));
+        assertTrue(thrown.getMessage().contains("people"), thrown.getMessage());
+    }
+
     @Test
     void refusesToStartWithoutSpecs() {
         var servlet = new Testable(Proxies.dataSource(null).dataSource());

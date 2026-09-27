@@ -38,6 +38,7 @@
     <modules>
         <module>jetty-sample</module>
         <module>spring-sample</module>
+        <module>quarkus-sample</module>
     </modules>
 
     <build>

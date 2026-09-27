@@ -10,12 +10,13 @@
     <artifactId>spring-sample</artifactId>
     <name>a Spring Boot application deploying xlet</name>
     <!--
-        war, not jar, and this is the one constraint that is not negotiable.
-        xlet reads its specs through ServletContext.getResourcePaths("/WEB-INF/
-        specs/"), which an executable jar has no equivalent of: the application
-        would start carrying no specs and answer 404 to everything. A Spring Boot
-        war still runs from one command and still deploys to a container, so
-        nothing is lost by it.
+        war, not jar, and here that is a choice rather than a requirement.
+        xlet reads its specs from /WEB-INF/specs/ through the ServletContext,
+        which an executable jar has no equivalent of - such a deployment names a
+        directory in the 'specs' parameter instead, as quarkus-sample does. A
+        Spring Boot war costs nothing: it still runs from one command and also
+        deploys to a standalone container, so this sample takes the simpler of
+        the two and leaves the other one to be shown where it is unavoidable.
     -->
     <packaging>war</packaging>
 

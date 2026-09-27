@@ -30,11 +30,12 @@ database comes from, and never the mapping.
 
 ## What it still has to obey
 
-**`war` packaging.** xlet reads specs through
-`ServletContext.getResourcePaths("/WEB-INF/specs/")`, which an executable jar has no
-equivalent of - the application would start with no specs and answer `404` to
-everything. A Spring Boot war runs from one command anyway and also deploys to a
-standalone container, so this costs nothing but the one line in the pom.
+**`war` packaging** - by choice here, not by necessity. Specs come from
+`/WEB-INF/specs/` through the `ServletContext`, which an executable jar has no
+equivalent of; such a deployment sets the `specs` parameter to a directory instead,
+which is what [`quarkus-sample`](../quarkus-sample) shows. A Spring Boot war runs from
+one command anyway and also deploys to a standalone container, so this sample takes
+the simpler of the two roads and leaves the other where it cannot be avoided.
 
 **A `security-constraint`, which this sample omits.** As in the Jetty one, and for the
 same reason: so that a plain `curl` works. Anyone who can POST here can write to your
