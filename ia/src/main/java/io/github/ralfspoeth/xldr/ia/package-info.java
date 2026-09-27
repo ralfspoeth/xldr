@@ -6,7 +6,13 @@
  *
  * A format module provides one {@link
  * io.github.ralfspoeth.xldr.ia.InputAdapterFactory} through {@code
- * ServiceLoader}, declared in its {@code module-info.java}. The factory is asked
+ * ServiceLoader}, declared twice: {@code provides} in its
+ * {@code module-info.java}, and a line naming the factory in
+ * {@code META-INF/services/io.github.ralfspoeth.xldr.ia.InputAdapterFactory}.
+ * Both, because {@code ServiceLoader} reads the directive only from a resolved
+ * named module - on a classpath, which is where a war or a framework puts its
+ * jars, only the service file is consulted, and an adapter declared once is an
+ * adapter that silently does not exist there. The factory is asked
  * {@link io.github.ralfspoeth.xldr.ia.InputAdapterFactory#reads(String) whether
  * it reads} a MIME type, and if so builds an {@link
  * io.github.ralfspoeth.xldr.ia.InputAdapter} from the {@link

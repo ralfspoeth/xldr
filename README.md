@@ -218,9 +218,21 @@ finds no providers and reports nothing at all.
 ### Writing an adapter
 
 A format xldr does not ship is a module of its own: implement `InputAdapterFactory` and `InputAdapter`, declare
-`provides io.github.ralfspoeth.xldr.ia.InputAdapterFactory with YourFactory` in its `module-info.java`, and put it
-on the module path. Nothing else registers it - the jars carry `provides` and no `META-INF/services`, so a module
-the graph has not resolved is a module no lookup will find.
+`provides io.github.ralfspoeth.xldr.ia.InputAdapterFactory with YourFactory` in its `module-info.java`, and **say
+the same thing again** in `META-INF/services/io.github.ralfspoeth.xldr.ia.InputAdapterFactory`, one line naming the
+factory. Nothing else registers it.
+
+Twice, because `ServiceLoader` reads a `provides` directive only from a resolved named module. A jar carrying
+`module-info` on a *classpath* sits in the unnamed module, where the directive is ignored and only
+`META-INF/services` is read — so an adapter declared once works under `bin/xldr`, which launches with `-p`, and is
+invisible in a war, in Quarkus or in Spring Boot, with no symptom beyond "no adapter reads that mimeType" for a
+spec that is perfectly correct. On the module path the descriptor wins and the file is ignored, so there is no
+double registration and nothing to keep in step at run time. This is how a JDBC driver has always shipped, which
+is why the same driver jar works in `drivers/` and on any classpath.
+
+The two declarations can drift, and only one of them is compiler-checked: rename a factory and `module-info` stops
+compiling while the service file goes on naming a class that is gone. `AdapterRegistrationIT` compares the two
+sets for exactly that reason.
 
 The full contract is the package documentation of `io.github.ralfspoeth.xldr.ia`: ten obligations, each with the
 reason it exists. Two are worth naming here because they are the ones an implementation gets wrong quietly. A field

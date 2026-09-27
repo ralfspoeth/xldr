@@ -179,11 +179,13 @@ else
     echo "xldr:   is not a jar has appeared in lib/, modules/, xl/ or drivers/. This script" >&2
     echo "xldr:   lists the jars rather than the directories so that cannot happen, so a" >&2
     echo "xldr:   deployment seeing it has a jar-shaped thing that is not a jar." >&2
-    echo "xldr:   'critical class ... has been excluded' - a java agent is rewriting classes," >&2
-    echo "xldr:   which the VM treats as modified and leaves out. Look in _JAVA_OPTIONS and" >&2
-    echo "xldr:   JAVA_OPTS; note that the 'Picked up JAVA_TOOL_OPTIONS' line above is the" >&2
-    echo "xldr:   JDK's own, how it hands this command line to the child that builds the" >&2
-    echo "xldr:   cache, and appears on every training run rather than meaning anything." >&2
+    echo "xldr:   'critical class ... has been excluded' - an agent is rewriting classes," >&2
+    echo "xldr:   which the VM treats as modified and leaves out. Look in _JAVA_OPTIONS," >&2
+    echo "xldr:   JDK_JAVA_OPTIONS and JAVA_OPTS, for -agentpath and -agentlib as well as" >&2
+    echo "xldr:   -javaagent: the hook is JVMTI, so the agent is often a native library." >&2
+    echo "xldr:   Note that the 'Picked up JAVA_TOOL_OPTIONS' line above is the JDK's own," >&2
+    echo "xldr:   how it hands this command line to the child that builds the cache, and" >&2
+    echo "xldr:   appears on every training run rather than meaning anything." >&2
     echo "xldr: JAVA_OPTS=-Xlog:aot bin/xldr training ... gives the whole story." >&2
 fi
 exit $status

@@ -7,6 +7,36 @@ listed under **Added**; anything incompatible waits for a `2.0` and is listed un
 The versions are the git tags `xldr-<version>`; the published artifacts carry the same version under the group
 `io.github.ralfspoeth.xldr`.
 
+## Unreleased
+
+### Fixed
+
+- **An adapter was invisible in a war.** Every adapter declared itself only with `provides` in its `module-info`,
+  and `ServiceLoader` reads that directive only from a resolved named module. A jar carrying `module-info` on a
+  *classpath* - which is what `WEB-INF/lib` is - sits in the unnamed module, where the directive is ignored and
+  only `META-INF/services` is consulted. So `xlet`, whose own README documents a `web.xml` deployment, came up in a
+  container finding no adapters at all and answered "no adapter reads that mimeType" for specs that were perfectly
+  correct. The five adapters now ship the service file too.
+
+  Nothing changes on the module path: for a named module the descriptor wins and the file is ignored, so
+  `bin/xldr` behaves exactly as before and there is no double registration. This is how a JDBC driver has always
+  shipped, which is why the same driver jar works in `drivers/` and on any classpath - the adapters were shipping
+  half of it.
+
+  `AdapterRegistrationIT` compares the two sets, because only one of them is compiler-checked: rename a factory and
+  `module-info` stops compiling while the service file goes on naming a class that no longer exists, and nothing
+  would say so until somebody deployed to a container. The README passage that presented the absence of
+  `META-INF/services` as deliberate is rewritten, as is `ia`'s package documentation.
+
+### Changed
+
+- **`xlet`'s README says what shape a deployment has to be.** A war, exploded or packaged, in a container -
+  Spring Boot included when built as a war. Not an executable fat jar: the specs are read through
+  `ServletContext.getResourcePaths("/WEB-INF/specs/")`, which a Quarkus or Boot jar has no equivalent of, so the
+  servlet would start with no specs and answer `404` to everything - a failure that looks like a missing spec
+  rather than wrong packaging. The boundary was always there; now it is stated rather than discovered. A sample
+  `pom.xml` goes with it.
+
 ## 1.2.0
 
 A minor again, and for the same reason 1.1.0 was: it adds. `xldr check` gains a mode, `server` gains `FeedSpec`,

@@ -24,24 +24,103 @@ So `xlet` is not a port of `server`. It is the other half of it - and most of wh
 
 ## Deploying it
 
+### What shape the deployment has to be
+
+**A war, exploded or packaged, in a servlet container.** Tomcat, Jetty, WildFly, or
+Spring Boot built as a war - a real choice of container, and the reason this is a
+servlet at all: security, enterprise integration and everything else in that
+neighbourhood is then the container's and not ours to reimplement.
+
+**Not an executable fat jar.** Quarkus, Micronaut, Helidon SE and a Spring Boot `jar`
+are out of scope, and the reason is one line of this module: the specs are read with
+`ServletContext.getResourcePaths("/WEB-INF/specs/")`. A fat jar has no `/WEB-INF/`, so
+the servlet would start carrying no specs at all and answer `404` to every request -
+failing in a way that looks like a missing spec rather than a wrong packaging.
+
+That path is a choice rather than an accident: under `/WEB-INF/` the container's own
+access control already covers the specs, and nothing can fetch one over a socket. A
+directory named by an init-param would work everywhere and would hand that question
+back to the deployer. It is not obviously wrong - it is the same delegation the
+`DataSource` already makes - but it has not been done, and until it is, this is the
+boundary.
+
+### The dependencies
+
 One jar and one `web.xml`. The jar is on Maven Central with the rest; import the
 [bom](../bom) to have its version follow the others:
 
-    <dependency>
-        <groupId>io.github.ralfspoeth.xldr</groupId>
-        <artifactId>xlet</artifactId>
-    </dependency>
+```xml
+<project xmlns="http://maven.apache.org/POM/4.0.0">
+    <modelVersion>4.0.0</modelVersion>
 
-    <!-- and the adapters this deployment reads, one per format -->
-    <dependency>
-        <groupId>io.github.ralfspoeth.xldr</groupId>
-        <artifactId>csv</artifactId>
-    </dependency>
+    <groupId>com.example</groupId>
+    <artifactId>loader-webapp</artifactId>
+    <version>1.0-SNAPSHOT</version>
+    <!-- a war, for the reason above -->
+    <packaging>war</packaging>
 
-`jakarta.servlet-api` is `provided`, the container having its own. Which adapters you
-add is what decides which `mimeType` a spec may name: they are found through
-`ServiceLoader`, so an adapter that is on the path can be used and one that is not
-cannot, with nothing to configure either way.
+    <properties>
+        <maven.compiler.release>25</maven.compiler.release>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    </properties>
+
+    <dependencyManagement>
+        <dependencies>
+            <!-- one version for xlet and every adapter -->
+            <dependency>
+                <groupId>io.github.ralfspoeth.xldr</groupId>
+                <artifactId>bom</artifactId>
+                <version>1.2.0</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
+    <dependencies>
+        <dependency>
+            <groupId>io.github.ralfspoeth.xldr</groupId>
+            <artifactId>xlet</artifactId>
+        </dependency>
+
+        <!-- the adapters this deployment reads, one per format. Adding one is the
+             whole of enabling a mimeType; leaving one out is the whole of
+             disabling it -->
+        <dependency>
+            <groupId>io.github.ralfspoeth.xldr</groupId>
+            <artifactId>csv</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.github.ralfspoeth.xldr</groupId>
+            <artifactId>xml</artifactId>
+        </dependency>
+
+        <!-- the container has its own, so this must not be packaged -->
+        <dependency>
+            <groupId>jakarta.servlet</groupId>
+            <artifactId>jakarta.servlet-api</artifactId>
+            <version>6.1.0</version>
+            <scope>provided</scope>
+        </dependency>
+
+        <!-- no JDBC driver here either: the DataSource is the container's, and
+             so is the driver behind it -->
+    </dependencies>
+</project>
+```
+
+and the specs beside them:
+
+    src/main/webapp/WEB-INF/web.xml
+    src/main/webapp/WEB-INF/specs/statements.json
+    src/main/webapp/WEB-INF/specs/orders.xml
+
+Which adapters you add is what decides which `mimeType` a spec may name: they are
+found through `ServiceLoader`, so an adapter that is on the path can be used and one
+that is not cannot, with nothing to configure either way. Each adapter jar declares
+itself twice - `provides` in its `module-info` and a line in `META-INF/services` - for
+exactly this deployment, since on a classpath the descriptor is ignored and only the
+service file is read.
 
 There is no ready-made `.war`, deliberately. A war has to choose a URL and would ship
 without the thing that belongs in front of it, and this endpoint writes to your

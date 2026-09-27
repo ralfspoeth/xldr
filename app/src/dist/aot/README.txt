@@ -33,12 +33,17 @@ somebody works on a spec. It pays the whole cost of resolving the module graph,
 binding the adapters as services and reflecting over the command line every
 time, and that is what a cache removes.
 
-Not the server. It starts once and watches files for months, so the saving is
-spread over so long a run that it disappears - and training it would mean
-starting it and stopping it again, which writes a cache only if the JVM exits
-normally. If a restart ever does become the thing you are waiting for, a
-container being the usual reason, the same prefix applies and the caveat is the
-exit.
+Not usually the server, though it can be trained. It starts once and watches
+files for months, so the saving is spread over so long a run that it
+disappears. Where a restart is the thing you wait for - a container being the
+usual reason - the same prefix works:
+
+    bin/xldr training --dir /etc/xldr
+
+let it settle, then stop it. The cache is written on the way out, Ctrl-C and
+SIGTERM included: the server shuts down through a hook and returns from main
+rather than being killed, so the JVM exits normally and the writer runs. This
+was an open question when the prefix was written and is no longer one.
 
 
 WHEN TRAINING WILL NOT WRITE ONE
@@ -58,9 +63,30 @@ prints. Two are worth recognising.
         xl/ or drivers/ is not a jar.
 
     critical class java.lang.ClassLoader has been excluded
-        A java agent is rewriting classes. The VM treats a transformed class as
+        An agent is rewriting classes. The VM treats a transformed class as
         modified and leaves it out, and it will not write an archive without
-        java.lang.ClassLoader. Look in _JAVA_OPTIONS and JAVA_OPTS.
+        java.lang.ClassLoader. Run with -Xlog:aot and look for lines reading
+
+            skipping java/io/FileOutputStream: From ClassFileHook
+
+        ClassFileHook is the VM's name for the JVMTI ClassFileLoadHook, which is
+        how an agent gets to rewrite a class, so such a line names both the
+        symptom and the cause.
+
+        Look in _JAVA_OPTIONS, JDK_JAVA_OPTIONS and JAVA_OPTS - the second is
+        read by the java launcher itself and is the one people forget. The agent
+        may be native, -agentpath: or -agentlib: pointing at a library, rather
+        than a -javaagent jar, so searching only for the last of the three will
+        miss it.
+
+        On a managed machine this is often security or monitoring tooling, set
+        for every JVM on the host and not yours to turn off - a product watching
+        file writes will transform java.io.FileOutputStream, which is exactly the
+        line above. Then there is no AOT cache to be had there, and nothing to be
+        done about it: training elsewhere and copying the file over does not work
+        either, a cache being tied to the module path it saw as well as to the
+        JVM that wrote it. Nothing breaks. Without a cache the launcher adds no
+        flag and the JVM starts as it always did; the saving is what is lost.
 
         Do not look in JAVA_TOOL_OPTIONS on the strength of the "Picked up
         JAVA_TOOL_OPTIONS" line above: the JDK sets that itself, to hand this
