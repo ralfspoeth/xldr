@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE Configure PUBLIC "-//Jetty//Configure//EN" "https://jetty.org/configure_10_0.dtd">
+
+<!--
+    The DataSource, which in a real deployment is the container's and is why
+    xlet asks for one by JNDI name rather than taking a URL: the pool, the
+    credentials and the lifecycle belong to whoever runs the application.
+
+    This is the Jetty spelling of it. Tomcat says the same thing as a <Resource>
+    in context.xml, WildFly as a datasource in its configuration, and Spring Boot
+    as a bean - the servlet does not know or care which, it looks up
+    java:comp/env/jdbc/xldr and finds whatever the container bound there.
+
+    An in-memory H2, created on first connection and gone when the JVM stops,
+    with the table the sample spec loads into. DB_CLOSE_DELAY=-1 is what keeps it
+    alive between connections; without it the pool's first close would take the
+    database with it.
+-->
+<Configure id="sample" class="org.eclipse.jetty.ee11.webapp.WebAppContext">
+
+    <New id="xldrDataSource" class="org.eclipse.jetty.plus.jndi.Resource">
+        <Arg><Ref refid="sample"/></Arg>
+        <Arg>jdbc/xldr</Arg>
+        <Arg>
+            <New class="org.h2.jdbcx.JdbcDataSource">
+                <Set name="URL">
+                    jdbc:h2:mem:sample;DB_CLOSE_DELAY=-1;INIT=CREATE TABLE IF NOT EXISTS customer(id INTEGER, name VARCHAR(50), source VARCHAR(20))
+                </Set>
+                <Set name="user">sa</Set>
+                <Set name="password"></Set>
+            </New>
+        </Arg>
+    </New>
+
+</Configure>

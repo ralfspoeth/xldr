@@ -28,6 +28,27 @@ The versions are the git tags `xldr-<version>`; the published artifacts carry th
   would say so until somebody deployed to a container. The README passage that presented the absence of
   `META-INF/services` as deliberate is rewritten, as is `ia`'s package documentation.
 
+### Added
+
+- **`samples/`, and the first of them: `jetty-sample`, a webapp deploying `xlet` and runnable with nothing
+  installed.** `mvn -pl samples/jetty-sample jetty:run` and a `curl` loads a file. The `jetty-ee11-maven-plugin`
+  is what makes it cheap - no container to download, no war to deploy by hand - and an in-memory H2 declared in
+  `jetty-env.xml` stands in for the `DataSource` a real deployment's container would provide.
+
+  A parent of their own, as `ia-impl` is for the adapters and for the same reason: a deployment has choices this
+  build cannot make for it - which container, which framework, where the `DataSource` comes from - and each is a
+  sample rather than a paragraph, because a paragraph cannot be compiled and a reader cannot tell a stale one from
+  a current one. Publishing is skipped once there for all of them.
+
+  They are in the reactor deliberately, so `mvn clean verify` builds them: a sample nobody builds goes stale
+  between one release and the next, and these exist to be copied.
+
+  It also does something the tests could not. `AdapterRegistrationIT` checks that the two registrations agree;
+  this webapp is the thing that actually loads a file through an adapter found on a *classpath*, in a container,
+  which is the deployment that was broken until the service files landed. The `security-constraint` is
+  deliberately absent so a plain `curl` works, and both `web.xml` and the module's README say so where the block
+  would have gone.
+
 ### Changed
 
 - **`xlet`'s README says what shape a deployment has to be.** A war, exploded or packaged, in a container -

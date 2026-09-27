@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>io.github.ralfspoeth.xldr</groupId>
+        <artifactId>xldr</artifactId>
+        <version>${revision}</version>
+    </parent>
+
+    <artifactId>samples</artifactId>
+    <packaging>pom</packaging>
+    <name>xldr samples</name>
+    <description>Runnable examples of deploying xldr, one module per way of doing it.</description>
+
+    <!--
+      Examples that run, gathered because the alternative is examples in prose.
+      A deployment has choices this build cannot make for it - which container,
+      which framework, where the DataSource comes from - and each of those is a
+      sample rather than a paragraph, because a paragraph cannot be compiled and
+      a reader cannot tell a stale one from a current one.
+
+      They are in the reactor for exactly that reason: `mvn clean verify` builds
+      them, so a sample that stopped matching the code is a broken build rather
+      than a surprise for whoever copies it next. Nothing here is published -
+      these are things to read and to copy, not to depend on - so publishing is
+      skipped here once for all of them.
+
+      Each keeps its own container and its own database, since that is the part
+      that differs; what they have in common is xlet, the adapters, and a spec
+      that would work unchanged under the file server.
+    -->
+    <modules>
+        <module>jetty-sample</module>
+    </modules>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.sonatype.central</groupId>
+                <artifactId>central-publishing-maven-plugin</artifactId>
+                <configuration>
+                    <skipPublishing>true</skipPublishing>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+
+</project>

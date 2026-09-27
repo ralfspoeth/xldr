@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <parent>
+        <artifactId>samples</artifactId>
+        <groupId>io.github.ralfspoeth.xldr</groupId>
+        <version>${revision}</version>
+    </parent>
+    <modelVersion>4.0.0</modelVersion>
+
+    <artifactId>jetty-sample</artifactId>
+    <name>a webapp deploying xlet, run with Jetty</name>
+    <packaging>war</packaging>
+
+    <!--
+        A runnable example of the deployment xlet/README.md describes, in the
+        reactor so that `mvn clean verify` compiles it: a sample nobody builds is
+        a sample that goes stale between one release and the next, and this one
+        exists to be copied.
+
+        Copying it means changing two things. The parent above becomes nothing -
+        your webapp has its own or none - and ${project.version} below becomes
+        the release you are using. Everything else transfers as it stands.
+    -->
+
+    <build>
+        <plugins>
+            <!-- publishing is skipped in the samples parent, for all of them -->
+            <!--
+                `mvn -pl samples/jetty-sample jetty:run` and the webapp is up on
+                http://localhost:8080/ with no container to install. The plugin
+                is repackaged per Jakarta EE version since Jetty 12, hence the
+                ee11 in both coordinates - the same EE level xlet compiles
+                against, and the reason it/pom.xml pins a 12.1 line.
+            -->
+            <plugin>
+                <groupId>org.eclipse.jetty.ee11</groupId>
+                <artifactId>jetty-ee11-maven-plugin</artifactId>
+                <version>${jetty.version}</version>
+                <configuration>
+                    <jettyXmls>${project.basedir}/src/main/jetty/jetty-env.xml</jettyXmls>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+
+    <properties>
+        <!-- the same line it/ uses, for the same reason: Servlet 6.1 is ee11 -->
+        <jetty.version>12.1.13</jetty.version>
+    </properties>
+
+    <dependencies>
+        <dependency>
+            <groupId>io.github.ralfspoeth.xldr</groupId>
+            <artifactId>xlet</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+
+        <!--
+            The adapters this deployment reads, one per format. Adding one is the
+            whole of enabling a mimeType and leaving one out is the whole of
+            disabling it: they are found through ServiceLoader, from the
+            META-INF/services each carries, which is what makes them visible on a
+            classpath as well as on a module path.
+        -->
+        <dependency>
+            <groupId>io.github.ralfspoeth.xldr</groupId>
+            <artifactId>csv</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>io.github.ralfspoeth.xldr</groupId>
+            <artifactId>xml</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+
+        <!-- the container has its own -->
+        <dependency>
+            <groupId>jakarta.servlet</groupId>
+            <artifactId>jakarta.servlet-api</artifactId>
+            <version>6.1.0</version>
+            <scope>provided</scope>
+        </dependency>
+
+        <!--
+            The database behind the DataSource that jetty-env.xml declares. In a
+            real deployment this is the container's to provide and would not
+            appear here at all; an in-memory H2 is what lets this sample run with
+            nothing installed.
+        -->
+        <dependency>
+            <groupId>com.h2database</groupId>
+            <artifactId>h2</artifactId>
+        </dependency>
+    </dependencies>
+</project>

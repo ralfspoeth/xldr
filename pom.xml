@@ -36,6 +36,10 @@
         <module>app</module>
         <module>xlet</module>
         <module>it</module>
+        <!-- runnable examples of deploying xldr, here so that `mvn clean verify`
+             builds them: a sample nobody builds goes stale between one release
+             and the next, and these exist to be copied -->
+        <module>samples</module>
     </modules>
     <artifactId>xldr</artifactId>
 
