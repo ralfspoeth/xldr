@@ -7,6 +7,33 @@ listed under **Added**; anything incompatible waits for a `2.0` and is listed un
 The versions are the git tags `xldr-<version>`; the published artifacts carry the same version under the group
 `io.github.ralfspoeth.xldr`.
 
+## 1.3.1
+
+A maintenance release, and it is worth being plain about that: no source file in `xldr` changed. What moved is four
+dependency versions, of which exactly one reaches a published artifact. `mapping-spec-1.0` remains the schema, a spec
+that loaded under 1.3.0 loads under this unchanged, and nothing a caller compiles against is different.
+
+It is a patch rather than a minor although `greyson` went up by a minor of its own, and the distinction is the one
+this project keeps: the version describes what *this* artifact does, not what its dependencies did. `greyson` is
+`requires` and not `requires transitive` in both modules that use it, so whatever 2.1.0 added is not reachable
+through `xldr` and there is nothing here for anyone to start calling.
+
+### Changed
+
+- **`greyson` 2.0.3 to 2.1.0.** The only one of these a user receives: `spec` reads mapping specs with it and the
+  `json` adapter reads inputs with it, so it arrives transitively with either. The floor moves with it - a
+  deployment that pins `greyson` 2.0.x and takes this release has a version conflict to resolve, and resolving it
+  downwards is the wrong answer, since the build that verified this one verified it against 2.1.0.
+
+- **`plumbum` 3.0.3 to 3.0.4**, the build parent, which is not published and reaches nobody's classpath. It is
+  nonetheless the reason this release exists: 3.0.4 requires `central-publishing-maven-plugin` 0.12.0, without
+  which publishing does not work under Maven 3.10. A release that fixes the ability to release is a thin thing to
+  announce, and announcing it is better than leaving the next reader to wonder what 1.3.1 was for.
+
+- **`jetty` 12.1.13 to 12.1.14 in `jetty-sample`, `quarkus` 3.39.4 to 3.39.5 in `quarkus-sample`.** Neither sample
+  is published. They are in the reactor so that `mvn clean verify` builds them and they do not quietly stop
+  matching the code, and keeping their platform versions current is part of that.
+
 ## 1.3.0
 
 A minor, because it adds: the `specs` parameter and three sample modules. The release is about `xlet` and where it
