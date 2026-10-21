@@ -45,7 +45,7 @@
 
     <properties>
         <!-- the same line it/ uses, for the same reason: Servlet 6.1 is ee11 -->
-        <jetty.version>12.1.13</jetty.version>
+        <jetty.version>12.1.14</jetty.version>
     </properties>
 
     <dependencies>
