@@ -37,7 +37,7 @@ set of modules on its module path.
 >
 > **That is a promise about compatibility, not a claim about every database.** The build's tests run against H2, and
 > against PostgreSQL on every push for the behaviour that differs there - identifier folding and the catalog
-> refusal; the toolkit is exercised against Oracle in production. Other products are expected to work, since nothing
+> refusal. Other products are expected to work, since nothing
 > branches on the database's name and every dialect decision is taken from JDBC metadata at runtime. Where one does
 > not, that is a defect to [report](#problems-and-questions) and fix in a `1.x`, not a change to the promise above.
 
@@ -415,7 +415,7 @@ from is not worth shipping for any weaker reason than that.
 That rule replaced a licence one at 0.56, and the correction is worth stating rather than quietly making. The
 previous rule was "the two that ship are the two that are freely redistributable", which was not true - mssql-jdbc
 is MIT, xerial's SQLite driver Apache-2.0, MariaDB Connector/J LGPL-2.1 - so it described a preference rather than
-a limit, and PostgreSQL was in here because it is a database this project's author uses. Oracle's, gone at 0.40,
+a limit, and PostgreSQL was in here for no stronger reason than familiarity. The driver that went at 0.40
 really was a licence question and stays one. What shipping a driver costs is being the distributor of a jar that
 never gets patched after the tag, and what it implies is a ranking of databases the toolkit does not have.
 
@@ -1798,10 +1798,45 @@ the URL fails the same way as one that is missing.
     the spec            cut down to the smallest one that still misbehaves, where a spec is involved
     the database        the product and version, and which driver jar is in drivers/
 
-The last one is the most often omitted and the most often decisive. The build's tests run against H2 and the
-toolkit is used in anger against Oracle, so a report from anything else is telling us something we had no way to
-know - the SQL this generates is deliberately plain, but "deliberately plain" is a claim about databases we have
+The last one is the most often omitted and the most often decisive. The build's tests run against H2, and against
+PostgreSQL in CI for the behaviour that differs there, so a report from anything else is telling us something we
+had no way to know - the SQL this generates is deliberately plain, but "deliberately plain" is a claim about databases we have
 not tried.
+
+## Forking and stewardship
+
+One person writes this. That is worth saying plainly rather than leaving to be discovered, because
+it is the thing a reader deciding whether to depend on xldr most needs to weigh, and the honest
+answer is not "don't worry about it".
+
+**A fork is anticipated and welcome, and needs nothing from the author.** The MIT licence already
+grants it; what has been missing is anyone saying out loud that it is wanted. So: if this project
+becomes useful to you and goes quiet, fork it, publish it under your own namespace, and do not
+wait for permission or a blessing that may not come. The intention here is to get out of the way,
+and an intention that only works while its holder is available is not much of a plan - hence this
+section, which keeps working either way.
+
+If a fork becomes the maintained line, a link to it will be added here. If that link is missing
+and the commits have stopped, read the absence as the answer.
+
+**What a fork inherits.** [RELEASING.md](RELEASING.md) is the whole release procedure, written for
+someone who has never cut one. [CHANGELOG.md](CHANGELOG.md) carries the reasoning rather than a
+list of changes, so it doubles as the design journal - if a decision here looks arbitrary, it is
+usually explained in the release that made it. The [TCK](tck) is the best place to start: an
+adapter can be written and verified against it without understanding the loader, which makes it
+the one part of this codebase you can be productive in on day one.
+
+**What it does not inherit.** Publishing to `io.github.ralfspoeth.xldr` on Maven Central depends on
+a namespace verified through a personal GitHub account and on a signing key, neither of which
+travels with a clone. A fork publishes under its own coordinates, which means a groupId change in
+the poms and in the snippets above, and - unavoidably - an edit to every consumer's dependency
+declaration. That discontinuity is the real cost of this arrangement, and it is a deliberate trade
+against the alternative of standing up governance for a successor who may never arrive.
+
+**What a fork should feel free to discard.** The opinions in here are earned rather than decorative
+- most refusals in the code name a specific mistake somebody actually made. A
+constraint that looks obvious may have been obvious somewhere else. The changelog will usually say
+which.
 
 ## License
 
