@@ -37,9 +37,9 @@ set of modules on its module path.
 >
 > **That is a promise about compatibility, not a claim about every database.** The build's tests run against H2, and
 > against PostgreSQL on every push for the behaviour that differs there - identifier folding and the catalog
-> refusal. Other products are expected to work, since nothing
-> branches on the database's name and every dialect decision is taken from JDBC metadata at runtime. Where one does
-> not, that is a defect to [report](#problems-and-questions) and fix in a `1.x`, not a change to the promise above.
+> refusal. Other products are expected to work, since nothing branches on the database's name and every dialect
+> decision is taken from JDBC metadata at runtime. Where one does not, that is a defect to
+> [report](#problems-and-questions) and fix in a `1.x`, not a change to the promise above.
 
 ## Getting Started
 
@@ -415,9 +415,9 @@ from is not worth shipping for any weaker reason than that.
 That rule replaced a licence one at 0.56, and the correction is worth stating rather than quietly making. The
 previous rule was "the two that ship are the two that are freely redistributable", which was not true - mssql-jdbc
 is MIT, xerial's SQLite driver Apache-2.0, MariaDB Connector/J LGPL-2.1 - so it described a preference rather than
-a limit, and PostgreSQL was in here for no stronger reason than familiarity. The driver that went at 0.40
-really was a licence question and stays one. What shipping a driver costs is being the distributor of a jar that
-never gets patched after the tag, and what it implies is a ranking of databases the toolkit does not have.
+a limit, and PostgreSQL was in here for no stronger reason than familiarity. The driver that went at 0.40 really
+was a licence question and stays one. What shipping a driver costs is being the distributor of a jar that never
+gets patched after the tag, and what it implies is a ranking of databases the toolkit does not have.
 
 **`aot/` is empty, and holds the cache you write rather than one we ship.** Putting `training` in front of any
 command runs that command and records the classes it loads:
@@ -1800,8 +1800,8 @@ the URL fails the same way as one that is missing.
 
 The last one is the most often omitted and the most often decisive. The build's tests run against H2, and against
 PostgreSQL in CI for the behaviour that differs there, so a report from anything else is telling us something we
-had no way to know - the SQL this generates is deliberately plain, but "deliberately plain" is a claim about databases we have
-not tried.
+had no way to know - the SQL this generates is deliberately plain, but "deliberately plain" is a claim about
+databases we have not tried.
 
 ## Forking and stewardship
 
@@ -1834,9 +1834,10 @@ declaration. That discontinuity is the real cost of this arrangement, and it is 
 against the alternative of standing up governance for a successor who may never arrive.
 
 **What a fork should feel free to discard.** The opinions in here are earned rather than decorative
-- most refusals in the code name a specific mistake somebody actually made. A
-constraint that looks obvious may have been obvious somewhere else. The changelog will usually say
-which.
+- most refusals in the code name a specific mistake somebody actually made, and the changelog will
+usually say which. But a mistake worth guarding against in one setting need not be one in yours,
+and an opinion that has never been questioned is not thereby right. Read them as evidence rather
+than as rules.
 
 ## License
 
