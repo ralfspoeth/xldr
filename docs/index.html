@@ -4,6 +4,9 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>XLDR schemas</title>
+    <!-- same file as the mark beside the heading; an SVG favicon is fine
+         everywhere this page is worth reading, and needs no second asset -->
+    <link rel="icon" href="logo.svg" type="image/svg+xml">
     <style>
         body {
             max-width: 46rem;
@@ -13,6 +16,11 @@
             color: #1a1a1a;
         }
         h1 { font-size: 1.6rem; margin-bottom: .2rem; }
+        /* the mark and the heading as one lockup: the h1 gives up its margin to
+           the header so that .sub still sits tight underneath */
+        .title { display: flex; align-items: center; gap: .75rem; margin-bottom: .2rem; }
+        .title h1 { margin: 0; }
+        .title img { flex: none; }
         h2 { font-size: 1.15rem; margin-top: 2.4rem; }
         h3 { font-size: 1rem; margin-top: 1.8rem; }
         h3 code { font-weight: 400; color: #555; font-size: .85rem; }
@@ -35,7 +43,10 @@
 </head>
 <body>
 
-<h1>XLDR schemas</h1>
+<header class="title">
+    <img src="logo.svg" alt="" width="44" height="44">
+    <h1>XLDR schemas</h1>
+</header>
 <p class="sub">
     Schemas and adapter settings for the mapping specification of
     <a href="https://github.com/ralfspoeth/xldr">XLDR</a>, a modular toolkit that loads CSV, XML, JSON,

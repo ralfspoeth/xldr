@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" width="96" height="96"
+     role="img" aria-label="xldr: lines of a file resolving into the columns of a table, with one line dashed for the format not added yet">
+  <title>xldr</title>
+
+  <!--
+    The thing the project does, in one picture: lines arrive loose on the left
+    and leave as the rows of a table on the right. The same strokes run the
+    whole width - they are not two drawings - because the file is not
+    transformed into something else, it is read into place.
+
+    The fifth line is dashed, and that is the x: extensible. The set of formats
+    is open, a format being a module on the path, so the mark shows one that is
+    not there yet arriving on the same terms as the four that are. It is the
+    only part of this drawing that means anything beyond the obvious, which is
+    why it is at the bottom where it reads as an invitation rather than as a
+    fault.
+
+    The ruled half is half, and that is the one proportion that matters. A
+    narrower one crowds the verticals until they read as hatching rather than
+    as cells.
+
+    Two colours only, both chosen to hold up on a white README and a dark one,
+    since GitHub serves the same file to both and an SVG that assumes a
+    background disappears on half its viewers. No text: the heading beside it
+    already says the name, and a wordmark would depend on a font the renderer
+    may not have.
+  -->
+
+  <g fill="none" stroke-linecap="round">
+    <!-- the formats it reads: four lines, ragged on the left as text is -->
+    <g stroke="#8b949e" stroke-width="5">
+      <path d="M6 20 H90"/>
+      <path d="M15 36 H90"/>
+      <path d="M6 52 H90"/>
+      <path d="M19 68 H90"/>
+    </g>
+
+    <!-- and the one you add: same terms, not there yet -->
+    <path d="M6 84 H90" stroke="#8b949e" stroke-width="5" stroke-dasharray="2 11" opacity="0.75"/>
+
+    <!-- the table: the right half of those same lines, ruled into columns -->
+    <g stroke="#2f81f7" stroke-width="5" stroke-linecap="square">
+      <path d="M42 11 V93"/>
+      <path d="M66 11 V93"/>
+      <path d="M90 11 V93"/>
+    </g>
+  </g>
+</svg>

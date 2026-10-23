@@ -1,4 +1,10 @@
+<img src="docs/logo.svg" alt="" width="72" height="72">
+
 # XLDR
+
+**Said “ex-loader”.** `x` for extensible, `ldr` for the loader - which is also the name of the module that does
+the loading. The formats it reads are modules on the path rather than a list in the code, so the set of them is
+open: that is the extensible part, and the dashed line in the mark above is the format you add.
 
 ## Project Description
 
