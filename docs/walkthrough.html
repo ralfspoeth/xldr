@@ -1,0 +1,598 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>XLDR — an interactive walkthrough</title>
+<link rel="icon" href="logo.svg" type="image/svg+xml">
+<!--
+    The file this page is about is the one xldr was written for: no header row,
+    two kinds of record interleaved, a column near the front saying which is
+    which. Five acts build the spec that reads it, one idea at a time.
+
+    Nothing on this page is written out by hand. The splitting, the
+    discriminators, the field selectors, the type conversion and the rows are
+    re-implemented in the script below, so every value shown is computed from
+    the file and the spec as they currently stand - change a control and the
+    rows change with it. That is the whole reason for the page to exist rather
+    than be a document: a spec you can get wrong, and see be wrong.
+
+    It is an illustration of the mapping spec, not an implementation of xldr.
+    It loads nothing, it has no database, and where the two could disagree the
+    toolkit is right. Self-contained on purpose: no fetches, no fonts, no
+    libraries, so it works offline and from a file:// URL.
+-->
+<style>
+    :root {
+        --ink: #1a1a1a;
+        --soft: #555;
+        --faint: #888;
+        --rule: #e5e5e5;
+        --accent: #0b5fff;
+        --mark: #2f81f7;
+        --grey: #8b949e;
+        --good: #216e39;
+        --good-bg: #e9f5ec;
+        --bad: #a4302a;
+        --bad-bg: #fcecea;
+        --code-bg: #f5f5f5;
+        --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    }
+    * { box-sizing: border-box; }
+    body {
+        max-width: 68rem;
+        margin: 2.5rem auto;
+        padding: 0 1rem 5rem;
+        font: 16px/1.6 system-ui, -apple-system, "Segoe UI", Helvetica, Arial, sans-serif;
+        color: var(--ink);
+    }
+    a { color: var(--accent); }
+    code { font-family: var(--mono); font-size: .85em; background: var(--code-bg); padding: 1px 4px; border-radius: 3px; }
+
+    .title { display: flex; align-items: center; gap: .75rem; margin-bottom: .2rem; }
+    .title h1 { font-size: 1.6rem; margin: 0; }
+    .title img { flex: none; }
+    .sub { color: var(--soft); margin-top: 0; }
+
+    nav.acts { display: flex; flex-wrap: wrap; gap: .4rem; margin: 1.6rem 0 1.4rem; }
+    nav.acts button {
+        font: inherit; font-size: .875rem; cursor: pointer;
+        background: #fff; color: var(--soft);
+        border: 1px solid var(--rule); border-radius: 999px;
+        padding: .35rem .85rem; display: inline-flex; gap: .5rem; align-items: baseline;
+    }
+    nav.acts button:hover { border-color: var(--accent); color: var(--ink); }
+    nav.acts button[aria-current="true"] { background: var(--accent); border-color: var(--accent); color: #fff; }
+    nav.acts .n { font-family: var(--mono); font-size: .72rem; opacity: .7; }
+
+    .layout { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); gap: 1.8rem; align-items: start; }
+    @media (max-width: 62rem) {
+        .layout { grid-template-columns: 1fr; }
+        .layout > aside { order: -1; }
+    }
+
+    .act { display: none; }
+    .act.on { display: block; }
+    .act h2 { font-size: 1.2rem; margin: 0 0 .15rem; }
+    .act .kicker { font-family: var(--mono); font-size: .78rem; color: var(--faint); margin: 0 0 1rem; }
+    .act p { margin: 0 0 .8rem; }
+    .act p.note { color: var(--soft); font-size: .9rem; border-left: 2px solid var(--rule); padding-left: .85rem; }
+
+    .panel { border: 1px solid var(--rule); border-radius: 8px; padding: .9rem 1rem; margin: 0 0 1rem; background: #fff; }
+    .panel h3 { font-size: .78rem; text-transform: uppercase; letter-spacing: .06em; color: var(--faint);
+                margin: 0 0 .6rem; font-weight: 600; }
+
+    .file { font-family: var(--mono); font-size: .82rem; line-height: 1.9; }
+    .file .ln { display: block; padding: 0 .3rem; border-radius: 3px; white-space: pre; }
+    .file .ln.dim { opacity: .3; }
+    .file .ln.pick-a { background: #e7f0ff; box-shadow: inset 2px 0 0 var(--mark); }
+    .file .ln.pick-b { background: #fff4e0; box-shadow: inset 2px 0 0 #d99100; }
+    .file .ln.bad { background: var(--bad-bg); box-shadow: inset 2px 0 0 var(--bad); }
+    .file .c { padding: 1px 0; }
+    .file .c.hit { background: #fde68a; border-radius: 2px; }
+    .file .idx { color: var(--faint); user-select: none; display: inline-block; width: 1.6em; }
+
+    /* the panel scrolls rather than the values wrapping: a timestamp broken
+       across two lines is harder to read than one that runs off the edge */
+    .panel .scroll { overflow-x: auto; }
+    table.rows { border-collapse: collapse; width: 100%; font-size: .82rem; font-family: var(--mono); }
+    table.rows th, table.rows td { text-align: left; padding: .25rem .5rem; border-bottom: 1px solid var(--rule);
+                                   white-space: nowrap; }
+    table.rows th { font-weight: 600; color: var(--faint); font-size: .72rem; text-transform: uppercase;
+                    letter-spacing: .04em; }
+    table.rows td.null { color: var(--faint); font-style: italic; }
+    .tablename { font-family: var(--mono); font-size: .78rem; color: var(--soft); margin: .9rem 0 .25rem; }
+    .tablename:first-of-type { margin-top: 0; }
+
+    .ctl { display: flex; flex-wrap: wrap; gap: .5rem 1rem; align-items: center; font-size: .85rem;
+           margin: 0 0 .9rem; }
+    .ctl label { display: inline-flex; gap: .35rem; align-items: center; color: var(--soft); }
+    .ctl input[type=text], .ctl input[type=number], .ctl select {
+        font: inherit; font-family: var(--mono); font-size: .8rem;
+        border: 1px solid var(--rule); border-radius: 4px; padding: .2rem .4rem; background: #fff; color: var(--ink);
+    }
+    .ctl input[type=number] { width: 3.6rem; }
+    .ctl input[type=text] { width: 6rem; }
+    button.plain {
+        font: inherit; font-size: .82rem; cursor: pointer; background: #fff; color: var(--ink);
+        border: 1px solid var(--rule); border-radius: 5px; padding: .25rem .7rem;
+    }
+    button.plain:hover { border-color: var(--accent); }
+    button.plain[aria-pressed="true"] { background: var(--bad-bg); border-color: var(--bad); color: var(--bad); }
+
+    pre.spec { background: var(--code-bg); border-left: 3px solid #ccc; padding: .7rem .9rem; overflow-x: auto;
+               font-size: .78rem; font-family: var(--mono); margin: 0 0 1rem; line-height: 1.55; }
+    pre.spec .add { background: #d8f0e0; }
+
+    .verdict { font-size: .85rem; border-radius: 6px; padding: .5rem .8rem; margin: 0 0 1rem; }
+    .verdict.ok { background: var(--good-bg); color: var(--good); }
+    .verdict.no { background: var(--bad-bg); color: var(--bad); }
+    .verdict code { background: rgba(255,255,255,.6); }
+
+    .pager { display: flex; gap: .5rem; margin-top: 1.6rem; }
+    footer { margin-top: 3rem; padding-top: 1rem; border-top: 1px solid var(--rule); color: var(--soft);
+             font-size: .88rem; }
+</style>
+</head>
+<body>
+
+<header class="title">
+    <img src="logo.svg" alt="" width="44" height="44">
+    <h1>XLDR — an interactive walkthrough</h1>
+</header>
+<p class="sub">
+    Five steps through the file this toolkit was written for: no header row, two kinds of record interleaved,
+    and a column near the front saying which is which. Every value below is computed from the file and the
+    spec as they currently stand — change a control and watch the rows change.
+</p>
+
+<nav class="acts" id="nav"></nav>
+
+<div class="layout">
+    <main>
+        <section class="act" data-act="0">
+            <h2>A file that names nothing</h2>
+            <p class="kicker">five lines, two kinds, no header</p>
+            <p>
+                Here is the whole input. There is no header row, so no field has a name to be referred to by;
+                fields are addressed by <strong>position</strong>, counting from one. And it is not one shape:
+                an order line and an order carry different things in different places.
+            </p>
+            <p>
+                The first component says which kind a line is — <code>O</code> for an order, <code>L</code> for
+                one of its lines. Nothing in the file says that; it is knowledge you bring.
+            </p>
+            <p class="note">
+                The usual answer to a file like this is a hand-written step that splits it by record type before
+                anything general-purpose is allowed near it. That step is where the format knowledge goes to
+                hide. The next four acts put it in a spec instead.
+            </p>
+            <div class="ctl">
+                <label><input type="checkbox" id="showIdx"> number the components</label>
+            </div>
+        </section>
+
+        <section class="act" data-act="1">
+            <h2>Which lines are of a kind</h2>
+            <p class="kicker">discriminator — nth, and equals or matches</p>
+            <p>
+                A <strong>record selector</strong> says which lines are its own. In a flat file every line is a
+                candidate, so the question is which to keep, and a <code>discriminator</code> answers it: where
+                to look, and what to look for.
+            </p>
+            <div class="ctl">
+                <label>orders: component
+                    <input type="number" id="d1n" min="1" max="4" value="1"></label>
+                <label><select id="d1op"><option value="equals">equals</option><option value="matches">matches</option></select>
+                    <input type="text" id="d1v" value="O"></label>
+            </div>
+            <div class="ctl">
+                <label>lines: component
+                    <input type="number" id="d2n" min="1" max="4" value="1"></label>
+                <label><select id="d2op"><option value="equals">equals</option><option value="matches">matches</option></select>
+                    <input type="text" id="d2v" value="L"></label>
+            </div>
+            <div id="a1verdict"></div>
+            <p class="note">
+                Counting stays absolute within the line, so component 1 is the discriminator itself and a kind's
+                payload starts at 2. A selector with no discriminator keeps every line. And
+                <code>matches</code> matches the value <em>whole</em> — try <code>O.*</code>, then try
+                <code>.</code> and watch both selectors claim everything.
+            </p>
+        </section>
+
+        <section class="act" data-act="2">
+            <h2>Where a value sits</h2>
+            <p class="kicker">fieldSelector — nth, counting from one</p>
+            <p>
+                Each record selector declares the fields it reads. With no header there is nothing to name, so
+                each says which component it takes. Change one and watch the column fill with something else.
+            </p>
+            <div class="ctl" id="a2orders"></div>
+            <div class="ctl" id="a2lines"></div>
+            <div id="a2verdict"></div>
+            <p class="note">
+                A component the line does not have is <code>null</code>, not a failure — one short line should
+                not cost you the other ninety thousand. Point <code>qty</code> at component 5 to see it.
+            </p>
+        </section>
+
+        <section class="act" data-act="3">
+            <h2>What the text means</h2>
+            <p class="kicker">type — TEXT, INTEGRAL, DECIMAL, TEMPORAL</p>
+            <p>
+                A field selector may declare a <strong>type</strong>, and the shared conversion turns the text
+                into it before it is bound. Declaring none leaves the value as text.
+            </p>
+            <div class="ctl" id="a3types"></div>
+            <p>
+                A value that will not convert fails the load and says which record and which field it was —
+                there is no silent null and no partial row.
+            </p>
+            <div class="ctl">
+                <button class="plain" id="breaker" aria-pressed="false">put <code>many</code> in a qty</button>
+            </div>
+            <div id="a3verdict"></div>
+            <p class="note">
+                <code>TEMPORAL</code> rather than <code>DATE</code>: the type has always carried a time of day
+                and binds as a timestamp, so it was renamed at 0.47 and the old name is refused by name rather
+                than ignored.
+            </p>
+        </section>
+
+        <section class="act" data-act="4">
+            <h2>Where it lands</h2>
+            <p class="kicker">mapping — two tables, one transaction</p>
+            <p>
+                The second half of the spec says where the records go. Each record selector is mapped to a
+                table, and each field to a column. The names are independent: <code>ordered</code> in the input
+                half becomes <code>ordered_on</code> in the output half.
+            </p>
+            <p>
+                Both tables are filled in <strong>one transaction</strong>. That is the point of one arriving
+                file being one spec rather than two: if either mapping fails the whole file is rolled back, so
+                there is no state in which the orders are loaded and their lines are not.
+            </p>
+            <div class="ctl">
+                <button class="plain" id="breaker2" aria-pressed="false">break one order line</button>
+            </div>
+            <div id="a4verdict"></div>
+            <p>This is the spec the five acts built, as it would sit in a feed directory:</p>
+            <pre class="spec" id="specOut"></pre>
+        </section>
+
+        <div class="pager">
+            <button class="plain" id="prev">← Back</button>
+            <button class="plain" id="next">Next →</button>
+        </div>
+    </main>
+
+    <aside>
+        <div class="panel">
+            <h3>orders.csv</h3>
+            <div class="file" id="file"></div>
+        </div>
+        <div class="panel">
+            <h3>What loads</h3>
+            <div id="result"></div>
+        </div>
+    </aside>
+</div>
+
+<footer>
+    An illustration of the mapping specification, not an implementation of it: this page loads nothing and has no
+    database, and where the two could disagree the toolkit is right.
+    <a href="https://github.com/ralfspoeth/xldr">xldr on GitHub</a> ·
+    <a href="https://github.com/ralfspoeth/xldr/blob/HEAD/docs/tutorial/README.md">the full tutorial</a> ·
+    <a href="index.html">schemas</a>
+</footer>
+
+<script>
+"use strict";
+
+/* The file, and the only data on this page. Everything else is derived. */
+const LINES = [
+    "O,1001,2026-03-01,1",
+    "L,1001,widget,5",
+    "L,1001,sprocket,2",
+    "O,1002,2026-03-02,2",
+    "L,1002,flange,1"
+];
+
+/* The spec, as the controls have it. Mirrors the JSON printed in act 4. */
+const spec = {
+    orders: {
+        table: "orders",
+        disc: { nth: 1, op: "equals", value: "O" },
+        fields: [
+            { name: "id",       nth: 2, type: "TEXT",     column: "id" },
+            { name: "ordered",  nth: 3, type: "TEMPORAL", column: "ordered_on" },
+            { name: "customer", nth: 4, type: "TEXT",     column: "customer_id" }
+        ]
+    },
+    lines: {
+        table: "order_line",
+        disc: { nth: 1, op: "equals", value: "L" },
+        fields: [
+            { name: "order", nth: 2, type: "TEXT",     column: "order_id" },
+            { name: "sku",   nth: 3, type: "TEXT",     column: "sku" },
+            { name: "qty",   nth: 4, type: "INTEGRAL", column: "qty" }
+        ]
+    }
+};
+
+let broken = false;   // acts 3 and 4: put a value in that will not convert
+let act = 0;
+
+const file = () => LINES.map(l => broken ? l.replace("widget,5", "widget,many") : l);
+const split = line => line.split(",");
+
+/* nth counts from one, and a component the line has not is absent rather than
+   an error - the same answer every xldr adapter gives. */
+function at(parts, nth) {
+    return nth >= 1 && nth <= parts.length ? parts[nth - 1] : null;
+}
+
+function keeps(sel, parts) {
+    const raw = at(parts, sel.disc.nth);
+    if (raw === null) return false;
+    if (sel.disc.op === "equals") return raw === sel.disc.value;
+    try { return new RegExp("^(?:" + sel.disc.value + ")$").test(raw); }
+    catch { return false; }              // a pattern that will not compile keeps nothing
+}
+
+/* The conversion, which is shared rather than per-format: the adapter cuts the
+   text out and the declared type decides what it becomes. */
+function convert(type, text) {
+    if (text === null || text.trim() === "") return { value: null };
+    const s = text.trim();
+    switch (type) {
+        case "INTEGRAL":
+            return /^-?\d+$/.test(s) ? { value: s } : { error: "not a whole number" };
+        case "DECIMAL":
+            return /^-?\d+(\.\d+)?$/.test(s) ? { value: s } : { error: "not a decimal" };
+        case "TEMPORAL":
+            return /^\d{4}-\d{2}-\d{2}$/.test(s) && !isNaN(Date.parse(s))
+                ? { value: s + "T00:00" } : { error: "not a date" };
+        default:
+            return { value: s };
+    }
+}
+
+/* One pass over the file: which selector claims each line, and what it reads.
+   Returns the rows per table plus the first failure, because a load stops at
+   the first value it cannot convert and rolls the whole file back. */
+function load() {
+    const out = { orders: [], lines: [] };
+    let failure = null;
+    file().forEach((line, i) => {
+        const parts = split(line);
+        for (const key of ["orders", "lines"]) {
+            const sel = spec[key];
+            if (!keeps(sel, parts)) continue;
+            const row = {};
+            for (const f of sel.fields) {
+                const raw = at(parts, f.nth);
+                const r = convert(f.type, raw);
+                if (r.error && !failure) {
+                    failure = { line: i + 1, field: f.name, type: f.type, raw: raw, why: r.error };
+                }
+                row[f.column] = r.error ? undefined : r.value;
+            }
+            out[key].push({ row, line: i + 1 });
+        }
+    });
+    return { out, failure };
+}
+
+/* ---- rendering ------------------------------------------------------- */
+
+const esc = s => s.replace(/[&<>]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
+
+function paintFile() {
+    const showIdx = document.getElementById("showIdx").checked;
+    const { failure } = load();
+    const hit = new Set();           // components the current act is reading
+    if (act === 1) { hit.add(spec.orders.disc.nth); hit.add(spec.lines.disc.nth); }
+    if (act >= 2) { for (const k of ["orders", "lines"]) for (const f of spec[k].fields) hit.add(f.nth); }
+
+    document.getElementById("file").innerHTML = file().map((line, i) => {
+        const parts = split(line);
+        const isA = keeps(spec.orders, parts), isB = keeps(spec.lines, parts);
+        let cls = "ln";
+        if (act === 0) cls += "";
+        else if (failure && failure.line === i + 1) cls += " bad";
+        else if (isA) cls += " pick-a";
+        else if (isB) cls += " pick-b";
+        else cls += " dim";
+        const body = parts.map((p, j) => {
+            const n = j + 1;
+            const mark = act > 0 && hit.has(n) ? " hit" : "";
+            const idx = showIdx ? `<span class="idx">${n}</span>` : "";
+            return `${idx}<span class="c${mark}">${esc(p)}</span>`;
+        }).join('<span class="c">,</span>');
+        return `<span class="${cls}">${body}</span>`;
+    }).join("");
+}
+
+function paintResult() {
+    const { out, failure } = load();
+    const box = document.getElementById("result");
+    if (failure) {
+        box.innerHTML = `<div class="verdict no"><strong>Nothing loads.</strong> `
+            + `cannot read field <code>${esc(failure.field)}</code> of record ${failure.line} `
+            + `as ${failure.type}, from <code>${esc(failure.raw ?? "null")}</code>. `
+            + `One transaction, so both tables roll back.</div>`;
+        return;
+    }
+    box.innerHTML = ["orders", "lines"].map(key => {
+        const sel = spec[key], rows = out[key];
+        const cols = sel.fields.map(f => f.column);
+        const head = cols.map(c => `<th>${esc(c)}</th>`).join("");
+        const body = rows.length
+            ? rows.map(r => "<tr>" + cols.map(c => {
+                const v = r.row[c];
+                return v === null || v === undefined
+                    ? '<td class="null">null</td>' : `<td>${esc(String(v))}</td>`;
+              }).join("") + "</tr>").join("")
+            : `<tr><td class="null" colspan="${cols.length}">no rows</td></tr>`;
+        return `<p class="tablename">${esc(sel.table)} — ${rows.length} row(s)</p>`
+             + `<div class="scroll"><table class="rows"><thead><tr>${head}</tr></thead>`
+             + `<tbody>${body}</tbody></table></div>`;
+    }).join("");
+}
+
+function paintAct1() {
+    const { out } = load();
+    const a = out.orders.length, b = out.lines.length;
+    const claimed = new Set([...out.orders, ...out.lines].map(r => r.line));
+    const un = LINES.length - claimed.size;
+    const both = a + b > LINES.length;
+    let html;
+    if (both) {
+        html = `<div class="verdict no">Both selectors claim some of the same lines — `
+             + `${a + b} records out of ${LINES.length} lines. A line matched twice is loaded twice.</div>`;
+    } else if (un > 0) {
+        html = `<div class="verdict no">${a} order(s), ${b} line(s), and <strong>${un} line(s) claimed by `
+             + `nobody</strong> — silently not loaded, which is the failure worth catching early.</div>`;
+    } else {
+        html = `<div class="verdict ok">${a} order(s) and ${b} line(s): every line claimed exactly once.</div>`;
+    }
+    document.getElementById("a1verdict").innerHTML = html;
+}
+
+function paintAct2() {
+    const { out } = load();
+    const nulls = [...out.orders, ...out.lines]
+        .flatMap(r => Object.entries(r.row).filter(([, v]) => v === null).map(([c]) => c));
+    document.getElementById("a2verdict").innerHTML = nulls.length
+        ? `<div class="verdict no">${nulls.length} value(s) absent — `
+          + `<code>${esc([...new Set(nulls)].join(", "))}</code> — read as null rather than refused.</div>`
+        : `<div class="verdict ok">Every declared field found a component.</div>`;
+}
+
+function paintAct3() {
+    const { failure } = load();
+    document.getElementById("a3verdict").innerHTML = failure
+        ? `<div class="verdict no">cannot read field <code>${esc(failure.field)}</code> of record `
+          + `${failure.line} as ${failure.type}, from <code>${esc(failure.raw ?? "null")}</code></div>`
+        : `<div class="verdict ok">Every value converted.</div>`;
+}
+
+function paintSpec() {
+    const sel = key => {
+        const s = spec[key];
+        const d = `{"nth": ${s.disc.nth}, "${s.disc.op}": ${JSON.stringify(s.disc.value)}}`;
+        const f = s.fields.map(x => `          {"name": ${JSON.stringify(x.name)}, "nth": ${x.nth}`
+            + (x.type === "TEXT" ? "" : `, "type": "${x.type}"`) + "}").join(",\n");
+        return `      {\n        "name": ${JSON.stringify(key)},\n        "discriminator": ${d},\n`
+             + `        "fieldSelectors": [\n${f}\n        ]\n      }`;
+    };
+    const map = key => {
+        const s = spec[key];
+        const f = s.fields.map(x =>
+            `        {"fieldSelector": ${JSON.stringify(x.name)}, "column": ${JSON.stringify(x.column)}}`).join(",\n");
+        return `    {\n      "recordSelector": ${JSON.stringify(key)},\n`
+             + `      "table": ${JSON.stringify(s.table)},\n      "fieldMapping": [\n${f}\n      ]\n    }`;
+    };
+    document.getElementById("specOut").textContent =
+        `{\n  "input": {\n    "mimeType": "text/csv",\n    "properties": { "header": "absent" },\n`
+        + `    "recordSelectors": [\n${sel("orders")},\n${sel("lines")}\n    ]\n  },\n`
+        + `  "mapping": [\n${map("orders")},\n${map("lines")}\n  ]\n}`;
+}
+
+function paint() {
+    paintFile();
+    paintResult();
+    if (act === 1) paintAct1();
+    if (act === 2) paintAct2();
+    if (act === 3) paintAct3();
+    if (act === 4) paintSpec();
+}
+
+/* ---- controls -------------------------------------------------------- */
+
+function fieldControls(hostId, key) {
+    const host = document.getElementById(hostId);
+    host.innerHTML = `<span style="color:var(--faint)">${key}:</span> ` + spec[key].fields.map((f, i) =>
+        `<label>${esc(f.name)} <input type="number" min="1" max="6" value="${f.nth}"
+            data-key="${key}" data-i="${i}"></label>`).join("");
+    host.addEventListener("input", e => {
+        const t = e.target;
+        if (t.type !== "number") return;
+        spec[t.dataset.key].fields[+t.dataset.i].nth = +t.value;
+        paint();
+    });
+}
+
+function typeControls() {
+    const host = document.getElementById("a3types");
+    const all = [["orders", 1, "ordered"], ["lines", 2, "qty"]];
+    host.innerHTML = all.map(([key, i, label]) =>
+        `<label>${label} <select data-key="${key}" data-i="${i}">`
+        + ["TEXT", "INTEGRAL", "DECIMAL", "TEMPORAL"].map(t =>
+            `<option value="${t}"${spec[key].fields[i].type === t ? " selected" : ""}>${t}</option>`).join("")
+        + `</select></label>`).join("");
+    host.addEventListener("change", e => {
+        const t = e.target;
+        if (t.tagName !== "SELECT") return;
+        spec[t.dataset.key].fields[+t.dataset.i].type = t.value;
+        paint();
+    });
+}
+
+function discControls() {
+    const bind = (nId, opId, vId, key) => {
+        const n = document.getElementById(nId), op = document.getElementById(opId), v = document.getElementById(vId);
+        const read = () => {
+            spec[key].disc = { nth: +n.value, op: op.value, value: v.value };
+            paint();
+        };
+        [n, op, v].forEach(el => el.addEventListener("input", read));
+    };
+    bind("d1n", "d1op", "d1v", "orders");
+    bind("d2n", "d2op", "d2v", "lines");
+}
+
+const ACTS = [
+    ["0", "The file"], ["1", "Which lines"], ["2", "Which values"], ["3", "What they mean"], ["4", "Where they land"]
+];
+
+function show(i) {
+    act = Math.max(0, Math.min(ACTS.length - 1, i));
+    document.querySelectorAll(".act").forEach(s => s.classList.toggle("on", +s.dataset.act === act));
+    document.querySelectorAll("#nav button").forEach((b, j) =>
+        b.setAttribute("aria-current", String(j === act)));
+    document.getElementById("prev").disabled = act === 0;
+    document.getElementById("next").disabled = act === ACTS.length - 1;
+    paint();
+}
+
+document.getElementById("nav").innerHTML = ACTS.map(([n, label], i) =>
+    `<button data-go="${i}"><span class="n">${n}</span>${label}</button>`).join("");
+document.getElementById("nav").addEventListener("click", e => {
+    const b = e.target.closest("button");
+    if (b) show(+b.dataset.go);
+});
+document.getElementById("prev").addEventListener("click", () => show(act - 1));
+document.getElementById("next").addEventListener("click", () => show(act + 1));
+document.getElementById("showIdx").addEventListener("change", paint);
+
+for (const id of ["breaker", "breaker2"]) {
+    document.getElementById(id).addEventListener("click", e => {
+        broken = !broken;
+        for (const other of ["breaker", "breaker2"]) {
+            document.getElementById(other).setAttribute("aria-pressed", String(broken));
+        }
+        paint();
+    });
+}
+
+fieldControls("a2orders", "orders");
+fieldControls("a2lines", "lines");
+typeControls();
+discControls();
+show(0);
+</script>
+</body>
+</html>

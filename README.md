@@ -135,6 +135,12 @@ lookups, expressions, types and notation, and last, because it needs everything 
 draft a spec and knowing what to check. Each page shows whole files rather than fragments, so what you copy is
 something you can put straight into a feed.
 
+For a shorter way in, the
+[interactive walkthrough](https://ralfspoeth.github.io/xldr/walkthrough.html) takes the headerless interleaved
+file alone and builds its spec in five steps, with the discriminators, the positions and the types as controls
+on the page. Every row it shows is computed from the file and the spec as they currently stand, so a spec you
+get wrong is one you watch be wrong - which is the part prose cannot do.
+
 Those pages are checked rather than trusted. Every build reads them: each spec printed in the tutorial is validated
 against the published schema, parsed by the reader that will parse it in anger, and cross-checked against the
 record selectors and `create table` statements of its own page - so a page cannot drift from the release without a
