@@ -1,16 +1,33 @@
 # quarkus-sample
 
-The same webapp again, under Quarkus, as an executable jar rather than a war:
+The same webapp again, under Quarkus, as an executable jar rather than a war.
+
+**Install the toolkit into your local repository first**, from the root of the
+checkout:
+
+    mvn install -DskipTests
+
+Every sample depends on `xlet` and an adapter at `${project.version}`, which
+during development is a snapshot that exists nowhere until something puts it
+there. Skip this and the build stops at *Could not find artifact
+io.github.ralfspoeth.xldr:xlet:jar:…-SNAPSHOT*, which is that and nothing worse.
+Once a release is what you are building against, the dependencies resolve from
+Maven Central and the step is unnecessary.
+
+Then:
 
     cd samples/quarkus-sample && mvn quarkus:dev
 
 then, from another shell,
 
-    curl -i --data-binary @samples/quarkus-sample/src/test/resources/customers.csv \
+    curl -i --data-binary @src/test/resources/customers.csv \
          -H 'Content-Type: text/csv' \
          'http://localhost:8080/load?spec=customers'
 
-`cd` first, and that matters here in a way it does not for the other two - see below.
+`cd` first, and that matters here in a way it does not for the other two: the
+`specs` parameter names a *relative* directory, resolved against the working
+directory, so `specs/` is found only when Quarkus is started from this one. The
+curl path above is relative to this directory too.
 
 ## Why this one needed a change to xlet
 

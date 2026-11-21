@@ -1,12 +1,35 @@
 # sample
 
-A webapp that deploys [`xlet`](../../xlet), runnable with no container installed:
+A webapp that deploys [`xlet`](../../xlet), runnable with no container installed.
+
+**Install the toolkit into your local repository first**, from the root of the
+checkout:
+
+    mvn install -DskipTests
+
+Every sample depends on `xlet` and an adapter at `${project.version}`, which
+during development is a snapshot that exists nowhere until something puts it
+there. Skip this and the build stops at *Could not find artifact
+io.github.ralfspoeth.xldr:xlet:jar:…-SNAPSHOT*. Note that `-pl` alone does not
+help: it narrows the reactor to this one module, so the siblings are still not
+built.
+
+Then, from that same root:
 
     mvn -pl samples/jetty-sample jetty:run
 
-then, from another shell,
+If you copy this sample elsewhere, take `.mvn/jvm.config` with it. Jetty's XML
+parser validates `jetty-env.xml` against the DTD that file declares, and JAXP
+refuses to resolve it unless `-Djavax.xml.accessExternalSchema=all` is set on
+the Maven JVM. The two go together: drop the flag and the parse fails with
+*Schemadokument '' konnte nicht gelesen werden*; drop the `DOCTYPE` and it
+fails instead with *cvc-elt.1.a: cannot find the declaration of element
+Configure*. Both are reported against the `<Configure>` start-tag rather than
+against the line at fault, which is what makes them worth knowing in advance.
 
-    curl -i --data-binary @src/test/resources/customers.csv \
+then, from another shell and also at the root,
+
+    curl -i --data-binary @samples/jetty-sample/src/test/resources/customers.csv \
          -H 'Content-Type: text/csv' \
          'http://localhost:8080/load?spec=customers'
 
@@ -45,7 +68,7 @@ plain `curl` works, and `web.xml` says so where the block would have gone. The o
 ## What is where
 
     pom.xml                                   war packaging, xlet, two adapters
-    src/main/jetty/jetty-env.xml              the DataSource, in Jetty's spelling
+    src/main/webapp/WEB-INF/jetty-env.xml     the DataSource, in Jetty's spelling
     src/main/webapp/WEB-INF/web.xml           the servlet, its mapping, its params
     src/main/webapp/WEB-INF/specs/customers.json   one spec; ?spec=customers names it
     src/test/resources/customers.csv          something to POST

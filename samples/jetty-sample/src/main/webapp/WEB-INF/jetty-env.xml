@@ -2,6 +2,17 @@
 <!DOCTYPE Configure PUBLIC "-//Jetty//Configure//EN" "https://jetty.org/configure_10_0.dtd">
 
 <!--
+    The DOCTYPE above and -Djavax.xml.accessExternalSchema=all in
+    .mvn/jvm.config are a pair, and neither works without the other. Jetty's
+    parser validates this file: without the declaration it has no grammar and
+    says "cvc-elt.1.a: cannot find the declaration of element Configure";
+    without the flag JAXP refuses to resolve the grammar at all and says
+    "Schemadokument '' konnte nicht gelesen werden". Both complaints point at
+    the <Configure> start-tag rather than at the line responsible, which is
+    what makes them worth writing down here.
+-->
+
+<!--
     The DataSource, which in a real deployment is the container's and is why
     xlet asks for one by JNDI name rather than taking a URL: the pool, the
     credentials and the lifecycle belong to whoever runs the application.

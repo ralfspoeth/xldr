@@ -1,10 +1,24 @@
 # spring-sample
 
-The same webapp as [`jetty-sample`](../jetty-sample), under Spring Boot:
+The same webapp as [`jetty-sample`](../jetty-sample), under Spring Boot.
+
+**Install the toolkit into your local repository first**, from the root of the
+checkout:
+
+    mvn install -DskipTests
+
+Every sample depends on `xlet` and an adapter at `${project.version}`, which
+during development is a snapshot that exists nowhere until something puts it
+there. Skip this and the build stops at *Could not find artifact
+io.github.ralfspoeth.xldr:xlet:jar:…-SNAPSHOT*. Note that `-pl` alone does not
+help: it narrows the reactor to this one module, so the siblings are still not
+built.
+
+Then, from that same root:
 
     mvn -pl samples/spring-sample spring-boot:run
 
-then, from another shell,
+then, from another shell and also at the root,
 
     curl -i --data-binary @samples/spring-sample/src/test/resources/customers.csv \
          -H 'Content-Type: text/csv' \

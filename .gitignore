@@ -1,4 +1,7 @@
-/.mvn/
+# Maven 4's project-local repository, which is build output. Not /.mvn/ itself:
+# that directory is also where jvm.config, maven.config and extensions.xml live,
+# and those are configuration that belongs in the repository.
+/.mvn/target/
 /target/
 /.idea/
 *.iml
