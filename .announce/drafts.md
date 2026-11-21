@@ -110,7 +110,7 @@ twice. It is the best place to start if you want to write an adapter for a forma
 
 ### Where this leaves it
 
-xldr is at 1.3.1, on Maven Central, MIT licensed, API and spec format settled since 1.0.
+xldr is at 1.3.2, on Maven Central, MIT licensed, API and spec format settled since 1.0.
 
 It is also written by one person, which you should weigh before depending on it, and which I
 would rather say here than leave you to infer. There is a *Forking and stewardship* section in
@@ -126,7 +126,7 @@ that even more.
 
 ## 2. r/java
 
-**Title:** xldr 1.3.1 - load flat, CSV, XML, JSON and Excel files into database tables from a declarative mapping spec (Java 25, JPMS)
+**Title:** xldr 1.3.2 - load flat, CSV, XML, JSON and Excel files into database tables from a declarative mapping spec (Java 25, JPMS)
 
 **Body:**
 

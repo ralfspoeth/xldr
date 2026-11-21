@@ -7,6 +7,42 @@ listed under **Added**; anything incompatible waits for a `2.0` and is listed un
 The versions are the git tags `xldr-<version>`; the published artifacts carry the same version under the group
 `io.github.ralfspoeth.xldr`.
 
+## 1.3.2
+
+A patch, and one that matters more than its number suggests: before it, `xlet` could not read a mapping spec in any
+classpath deployment - a war, a Quarkus application, a Spring Boot jar. The mapping-spec format is untouched, so
+`mapping-spec-1.0` remains its schema and covers 1.0 through 1.3.2.
+
+### Fixed
+
+- **The mapping-spec readers were invisible on a classpath.** `spec` declared `provides MappingSpecReader with
+  JsonMappingSpecReader, XmlMappingSpecReader` in its `module-info` and nowhere else, and that directive is read
+  only for a resolved *named* module. On a classpath no reader resolved at all - and since the reader is what turns
+  a file into a `MappingSpec`, no spec loaded in any format. A `META-INF/services` entry now carries both.
+
+  **This is the half 1.3.0 missed.** That release gave the five adapters their service files and announced that a
+  war deployment of `xlet` had never worked; it had not, and it still did not, because it failed one step earlier
+  than the adapter lookup the fix addressed. There are two `ServiceLoader` registries in this toolkit and only one
+  was checked. Found by running the Quarkus sample for the first time.
+
+- **The message `xlet` gave was its own obstacle.** *"no reader for this format; a spec is spec.json or spec.xml"*
+  reads as a rule about the file's name, and the file was `customers.json`, which is correct - the readers glob
+  `*.json` and `*.xml` against it. It now states that the rule is the extension, and that a file which already ends
+  that way means no reader was found at all, which is a packaging fault rather than a naming one.
+
+- **The guard that should have caught this checked half of what it covers.** `AdapterRegistrationIT` exists to
+  assert that a provider declares itself both ways, and was written against `InputAdapterFactory` alone, so it
+  passed throughout. It now iterates both services, and a third registry added later fails rather than hides.
+
+### Changed
+
+- **The three samples are runnable, having never been run.** Each depended on `xlet` and an adapter at
+  `${project.version}` while telling the reader to start it directly, which only works where that snapshot is
+  already installed; all three now say to `mvn install` from the root first, and why. `jetty-sample` needed four
+  further corrections, the substantive one being that its `jetty-env.xml` was passed as `<jettyXmls>` - the
+  server-scoped slot - rather than left at `src/main/webapp/WEB-INF/`, where the plugin applies it to the webapp
+  being deployed. Nothing here is published; the samples are read and copied.
+
 ## 1.3.1
 
 A maintenance release, and it is worth being plain about that: no source file in `xldr` changed. What moved is four
