@@ -1,11 +1,13 @@
 package io.github.ralfspoeth.xldr.it;
 
 import io.github.ralfspoeth.xldr.ia.InputAdapterFactory;
+import io.github.ralfspoeth.xldr.spec.io.MappingSpecReader;
 import org.junit.jupiter.api.Test;
 
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.util.List;
 import java.util.ServiceLoader;
 import java.util.TreeSet;
 
@@ -40,8 +42,23 @@ import static org.junit.jupiter.api.Assertions.*;
  */
 class AdapterRegistrationIT {
 
-    private static final String SERVICE =
-            "META-INF/services/" + InputAdapterFactory.class.getName();
+    /**
+     * Every {@link ServiceLoader} registry in the toolkit, because there is more
+     * than one and checking only the obvious one is how the second broke.
+     * <p>
+     * {@code InputAdapterFactory} decides which formats an input may be;
+     * {@code MappingSpecReader} decides whether the spec itself can be read at
+     * all. The second is the more total failure - with no reader, no spec loads
+     * in any format - and it is the one that shipped unregistered from 1.0 to
+     * 1.3.1, because 1.3.0 fixed the adapters and nobody asked what else was
+     * resolved this way.
+     */
+    private static final List<Class<?>> SERVICES =
+            List.of(InputAdapterFactory.class, MappingSpecReader.class);
+
+    private static String resourceFor(Class<?> service) {
+        return "META-INF/services/" + service.getName();
+    }
 
     /**
      * The two registries agree.
@@ -52,21 +69,25 @@ class AdapterRegistrationIT {
      * it was tested on.
      */
     @Test
-    void everyAdapterIsRegisteredBothWays() throws IOException {
-        var onTheModulePath = new TreeSet<String>();
-        ServiceLoader.load(InputAdapterFactory.class)
-                .forEach(f -> onTheModulePath.add(f.getClass().getName()));
-        assertFalse(onTheModulePath.isEmpty(),
-                "no adapter resolved at all; this test cannot say anything");
+    void everyProviderIsRegisteredBothWays() throws IOException {
+        for (var service : SERVICES) {
+            var onTheModulePath = new TreeSet<String>();
+            ServiceLoader.load(service).forEach(p -> onTheModulePath.add(p.getClass().getName()));
+            assertFalse(onTheModulePath.isEmpty(), () ->
+                    "no provider of " + service.getSimpleName() + " resolved at all; this test "
+                            + "cannot say anything about it");
 
-        var inServiceFiles = declaredInServiceFiles();
-        assertFalse(inServiceFiles.isEmpty(), () ->
-                "no " + SERVICE + " found on the class path. Either no adapter ships one - in "
-                        + "which case a war deployment reads nothing - or this test cannot see "
-                        + "them, which would make it worthless rather than passing");
+            var inServiceFiles = declaredInServiceFiles(service);
+            assertFalse(inServiceFiles.isEmpty(), () ->
+                    "no " + resourceFor(service) + " found on the class path. Either nothing "
+                            + "ships one - in which case a classpath deployment has no "
+                            + service.getSimpleName() + " at all - or this test cannot see them, "
+                            + "which would make it worthless rather than passing");
 
-        assertEquals(onTheModulePath, inServiceFiles,
-                "the module path and the service files offer different adapters");
+            assertEquals(onTheModulePath, inServiceFiles, () ->
+                    "the module path and the service files offer different providers of "
+                            + service.getSimpleName());
+        }
     }
 
     /**
@@ -75,20 +96,22 @@ class AdapterRegistrationIT {
      * file naming the old name would not.
      */
     @Test
-    void everyNamedClassExistsAndIsAfactory() throws IOException {
-        for (var name : declaredInServiceFiles()) {
-            var type = assertDoesNotThrow(() -> Class.forName(name),
-                    () -> SERVICE + " names " + name + ", which is not on the path - a factory "
-                            + "renamed in module-info and not here");
-            assertTrue(InputAdapterFactory.class.isAssignableFrom(type),
-                    () -> name + " is not an " + InputAdapterFactory.class.getSimpleName());
+    void everyNamedClassExistsAndImplementsItsService() throws IOException {
+        for (var service : SERVICES) {
+            for (var name : declaredInServiceFiles(service)) {
+                var type = assertDoesNotThrow(() -> Class.forName(name),
+                        () -> resourceFor(service) + " names " + name + ", which is not on the "
+                                + "path - a provider renamed in module-info and not here");
+                assertTrue(service.isAssignableFrom(type),
+                        () -> name + " is not a " + service.getSimpleName());
+            }
         }
     }
 
     /** every provider named by every service file the class loader can see */
-    private static TreeSet<String> declaredInServiceFiles() throws IOException {
+    private static TreeSet<String> declaredInServiceFiles(Class<?> service) throws IOException {
         var named = new TreeSet<String>();
-        var resources = AdapterRegistrationIT.class.getClassLoader().getResources(SERVICE);
+        var resources = AdapterRegistrationIT.class.getClassLoader().getResources(resourceFor(service));
         while (resources.hasMoreElements()) {
             try (var in = resources.nextElement().openStream();
                  var reader = new BufferedReader(new InputStreamReader(in, UTF_8))) {

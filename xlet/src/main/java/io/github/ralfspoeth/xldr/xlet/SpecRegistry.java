@@ -159,8 +159,10 @@ final class SpecRegistry {
         // the path ends in .json or .xml, which is what the reader dispatches on,
         // so no content-type lookup is needed here
         var reader = MappingSpecReader.of(Path.of(resource)).orElseThrow(
-                () -> new ServletException(resource + ": no reader for this format;"
-                        + " a spec is spec.json or spec.xml"));
+                () -> new ServletException(resource + ": no reader for this format."
+                        + " A spec file ends in .json or .xml - the name before that is the"
+                        + " spec's own name. If this one does, then no reader was found at"
+                        + " all, which is a packaging fault rather than a naming one."));
         try {
             var spec = reader.read(in);
             requireAnAdapter(resource, spec);

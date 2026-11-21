@@ -30,5 +30,8 @@ open module io.github.ralfspoeth.xldr.it.test {
 
     // we certainly use the factory;
     uses io.github.ralfspoeth.xldr.ia.InputAdapterFactory;
+    // and the spec readers, which AdapterRegistrationIT resolves directly to
+    // compare against what META-INF/services names
+    uses io.github.ralfspoeth.xldr.spec.io.MappingSpecReader;
     uses java.sql.Driver;
 }
