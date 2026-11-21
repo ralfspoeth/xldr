@@ -67,7 +67,13 @@ public class XldrServlet extends HttpServlet {
 
     static final String SPEC_PARAMETER = "spec";
 
-    private SpecRegistry specs;
+    /**
+     * volatile because {@link #reloadSpecs()} replaces it while requests are
+     * being served. A {@link SpecRegistry} is immutable, so one assignment
+     * publishes the whole new set at once and a request sees the old one or
+     * the new one, never half of either.
+     */
+    private volatile SpecRegistry specs;
     private DataSource dataSource;
     private Map<String, Object> environment;
     /** the schema and catalog every load through this servlet writes into */
@@ -109,6 +115,56 @@ public class XldrServlet extends HttpServlet {
      * the {@code DataSource} belongs to the container, the specs are immutable,
      * and a load in flight holds no state on this object.
      */
+    /**
+     * Re-read the specs and serve what is there now.
+     *
+     * <p>For a deployment that installs specs while running - an administrative
+     * front end that accepts them over HTTP, a configuration directory somebody
+     * edits - instead of restarting to pick one up. The servlet reads its specs
+     * in {@link #init()} and would otherwise never look again.
+     *
+     * <h4>What is guaranteed</h4>
+     * <p><strong>A failed reload changes nothing.</strong> The new set is built
+     * completely, and parsed and checked exactly as at startup, before anything
+     * is swapped. A directory that now holds a spec which will not parse, or one
+     * whose mime type no adapter reads, leaves this servlet serving the specs it
+     * already had and throws - so a bad edit cannot take a working deployment
+     * down, which is the property that makes reloading safe to offer at all.
+     *
+     * <p><strong>The swap is atomic.</strong> One assignment of an immutable
+     * registry, so a request resolves its spec against the old set or the new,
+     * never a mixture.
+     *
+     * <p><strong>A load already running is untouched.</strong> It resolved its
+     * {@link MappingSpec} before the swap and holds it; the spec is immutable
+     * and the loader has what it needs. A spec can therefore be replaced while
+     * a file is being loaded through the version it replaces, and that load
+     * finishes under the old one.
+     *
+     * <p>Counters survive: a spec that disappears stops being reported by the
+     * MXBean without being reset, and comes back with its history if the spec
+     * does.
+     *
+     * <h4>What it does not do</h4>
+     * <p>Authorise anything. Installing a spec is as privileged as editing this
+     * application's configuration - table and column names from a spec are
+     * concatenated into the SQL rather than bound - so whatever exposes this is
+     * responsible for deciding who may reach it. It is deliberately not wired to
+     * a request method here: this servlet answers POSTs with data to load and
+     * nothing else.
+     *
+     * @throws ServletException if the specs cannot be read, with the same
+     *                          message startup would have given
+     */
+    public void reloadSpecs() throws ServletException {
+        // built first, assigned only on success: everything below depends on
+        // this order, and it is the whole of why a bad spec is survivable
+        var reread = SpecRegistry.read(getServletContext(), inherited("specs"));
+        specs = reread;
+        status.specs(reread);
+        LOG.log(INFO, () -> "specs reloaded: " + reread.names());
+    }
+
     @Override
     public void destroy() {
         try {

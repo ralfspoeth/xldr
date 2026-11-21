@@ -28,7 +28,13 @@ final class XletStatus implements XletMXBean {
 
     static final String DOMAIN = "io.github.ralfspoeth.xldr";
 
-    private final SpecRegistry specs;
+    /**
+     * volatile and not final: {@code XldrServlet.reloadSpecs()} replaces the
+     * registry while this bean is registered, and a monitoring view reporting
+     * the set of specs the servlet stopped serving an hour ago would be worse
+     * than no view at all.
+     */
+    private volatile SpecRegistry specs;
     private final Statistics statistics;
     private final int maxConcurrentLoads;
     private final long acquireTimeoutMillis;
@@ -51,6 +57,19 @@ final class XletStatus implements XletMXBean {
         this.maxConcurrentLoads = maxConcurrentLoads;
         this.acquireTimeoutMillis = acquireTimeoutMillis;
         this.maxBytes = maxBytes;
+    }
+
+    /**
+     * Point this bean at the registry the servlet now serves.
+     * <p>
+     * Called from {@code reloadSpecs()} after its swap has succeeded, so this
+     * bean never advertises a set of specs the servlet is not actually serving.
+     * The statistics are untouched: they are keyed by spec name and outlive any
+     * one registry, which is what lets a spec keep its history across a reload
+     * that removed and restored it.
+     */
+    void specs(SpecRegistry specs) {
+        this.specs = specs;
     }
 
     void requestRefused() {

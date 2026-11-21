@@ -147,6 +147,59 @@ class XldrServletTest {
         assertEquals(200, response.status(), response.body());
     }
 
+    /**
+     * A spec added to the directory is served after a reload, and not before.
+     * <p>
+     * The "not before" half is the one worth asserting: the servlet reads its
+     * specs in {@code init()} and would otherwise never look again, so without
+     * it this test would pass against an implementation that read the directory
+     * on every request - a different and much worse design, since a spec that
+     * stopped parsing would then be a 500 rather than a refusal to reload.
+     */
+    @Test
+    void servesAspecAddedToTheDirectoryOnlyAfterAreload(@TempDir Path dir) throws Exception {
+        Files.writeString(dir.resolve("people.json"), PEOPLE_SPEC);
+        var servlet = new Testable(Proxies.dataSource(JDBC_URL).dataSource());
+        servlet.init(configWith(Map.of(), Map.of("specs", dir.toString())));
+
+        Files.writeString(dir.resolve("others.json"), PEOPLE_SPEC);
+        var before = new Proxies.Recorded();
+        servlet.post(Proxies.post("text/csv", Map.of("spec", "others"), TWO_PEOPLE), before);
+        assertEquals(404, before.status(), "the file is there; the servlet has not looked again");
+
+        servlet.reloadSpecs();
+
+        var after = new Proxies.Recorded();
+        servlet.post(Proxies.post("text/csv", Map.of("spec", "others"), TWO_PEOPLE), after);
+        assertEquals(200, after.status(), after.body());
+    }
+
+    /**
+     * A reload that cannot read the directory leaves the servlet serving what it
+     * already had.
+     * <p>
+     * This is the property that makes reloading safe to offer: a bad edit, or a
+     * spec naming a mimeType no adapter reads, must not be able to take down a
+     * deployment that was working a second ago. The new registry is built
+     * completely before anything is swapped, and that ordering is what this
+     * holds down.
+     */
+    @Test
+    void afailedReloadKeepsTheSpecsItAlreadyHad(@TempDir Path dir) throws Exception {
+        Files.writeString(dir.resolve("people.json"), PEOPLE_SPEC);
+        var servlet = new Testable(Proxies.dataSource(JDBC_URL).dataSource());
+        servlet.init(configWith(Map.of(), Map.of("specs", dir.toString())));
+
+        Files.writeString(dir.resolve("broken.json"), "{ this is not a spec");
+        assertThrows(ServletException.class, servlet::reloadSpecs,
+                "a spec that will not parse should fail the reload");
+
+        var response = new Proxies.Recorded();
+        servlet.post(Proxies.post("text/csv", Map.of("spec", "people"), TWO_PEOPLE), response);
+        assertEquals(200, response.status(),
+                "the spec that was working before the failed reload still works");
+    }
+
     /** a directory that is not there is a deployment failure, not an empty registry */
     @Test
     void refusesAspecsDirectoryThatIsNotThere(@TempDir Path dir) {
