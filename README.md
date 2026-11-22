@@ -157,7 +157,7 @@ fix their versions in one place:
             <dependency>
                 <groupId>io.github.ralfspoeth.xldr</groupId>
                 <artifactId>bom</artifactId>
-                <version>1.3.2</version>
+                <version>1.4.0</version>
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>
@@ -266,9 +266,9 @@ All ten are checked by the `tck` module, which is what an adapter is held to:
 class MyConformanceTest extends InputAdapterContract {
     protected InputAdapterFactory factory() { return new MyFactory(); }
     protected String mimeType()             { return "application/x-mine"; }
-    protected InputSpec spec()              { return ...; }   // reads the sample below
-    protected byte[] sample()               { return ...; }
-    protected List<Refusal> refusals()      { return List.of(...); }  // specs you must not build from
+    protected InputSpec spec()              { return ... }   // reads the sample below
+    protected byte[] sample()               { return ... }
+    protected List<Refusal> refusals()      { return List.of(...) }  // specs you must not build from
 }
 ```
 

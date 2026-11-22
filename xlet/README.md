@@ -76,7 +76,7 @@ One jar and one `web.xml`. The jar is on Maven Central with the rest; import the
             <dependency>
                 <groupId>io.github.ralfspoeth.xldr</groupId>
                 <artifactId>bom</artifactId>
-                <version>1.3.2</version>
+                <version>1.4.0</version>
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>
@@ -153,7 +153,10 @@ database. The mapping and the constraint are one decision, so both are yours:
                 <param-value>4</param-value>
             </init-param>
             <!-- read the specs and settle everything at startup, not on the
-                 first request, so a misconfiguration is a deployment failure -->
+                 first request, so a misconfiguration is a deployment failure.
+                 Still the right setting where reloadSpecs() is used: what that
+                 changes is whether startup is the *only* time, not whether a
+                 broken spec is found then -->
             <load-on-startup>1</load-on-startup>
         </servlet>
 
@@ -207,15 +210,32 @@ the wildcard.
 | `delivery.properties`                     | the request; an HTTP body is complete or it is not                   |
 | `env.properties`                          | the servlet's init- and context-params, under the same `env.` prefix |
 | `jdbc.*` in `xldr.properties`             | a `DataSource` from JNDI                                             |
-| `Watcher` + `FeedRegistry` reconciliation | `init()`, once                                                       |
+| `Watcher` + `FeedRegistry` reconciliation | `init()`, and `reloadSpecs()` if something calls it                  |
 | `archive/`                                | the `200` response                                                   |
 | `hospital/` + `.log`                      | the `4xx`/`5xx` response and its body                                |
 | claim by atomic move                      | *nothing* - see [What is not inherited](#what-is-not-inherited)      |
 
-The specs are read once at `init()` and never again: a redeploy is how they change,
-which is what makes them deployment configuration rather than state. A spec that
-will not parse fails initialisation - the servlet does not start - which is the
+The specs are read at `init()` and not again on their own: a redeploy is how they
+change, which is what makes them deployment configuration rather than state. A spec
+that will not parse fails initialisation - the servlet does not start - which is the
 analogue of a feed that does not activate, and it is loud in the same way.
+
+**`reloadSpecs()` is the exception, and it is a method rather than a request.** Since
+1.4.0 a deployment that installs specs while it runs - an administrative front end
+accepting them over HTTP, or a directory somebody edits - can have the servlet
+re-read the directory without a restart. A failed reload changes nothing: the new
+registry is built and checked exactly as at startup before anything is swapped, so a
+spec that will not parse leaves the servlet serving what it already had and throws.
+That ordering is the whole reason this is safe to offer.
+
+It is not wired to a request method, and that is the design rather than an omission.
+This servlet answers POSTs with data to load and nothing else; installing a spec is
+as privileged as editing the application's configuration, because table and column
+names from a spec reach the SQL unbound. Whatever exposes the method decides who may
+reach it, which is a decision a deployment has the context to make and this module
+does not. [`xldr-xui`](https://github.com/ralfspoeth/xldr-xui) is one answer to it:
+an administrator-only page that validates, writes and reloads, and restores the
+previous content if the reload fails.
 
 ## The request
 

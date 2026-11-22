@@ -7,6 +7,52 @@ listed under **Added**; anything incompatible waits for a `2.0` and is listed un
 The versions are the git tags `xldr-<version>`; the published artifacts carry the same version under the group
 `io.github.ralfspoeth.xldr`.
 
+## 1.4.0
+
+A minor, and the number is the point: `xlet` gains a public method, and the rule this project set at 1.0.0 is that
+the third component is for a release that fixes something *without adding anything*. The mapping-spec format is
+untouched, so `mapping-spec-1.0` remains its schema and covers 1.0 through 1.4.0. Nothing an existing deployment
+does changes - a servlet that never calls the new method behaves exactly as it did under 1.3.2.
+
+### Added
+
+- **`XldrServlet.reloadSpecs()`, so a running servlet can pick up a spec installed after it started.** Until now
+  the specs were read in `init()` and never again, which is right for a war deployed once and wrong for an
+  application that installs specs while it runs - an administrative front end accepting them over HTTP, or a
+  configuration directory somebody edits. A restart was the only way.
+
+  **A failed reload changes nothing.** The new registry is built, parsed and checked exactly as at startup before
+  anything is swapped, so a directory that has come to hold a spec which will not parse, or one whose `mimeType` no
+  adapter reads, leaves the servlet serving what it already had and throws. That ordering is the whole reason
+  reloading is safe to offer rather than merely possible: a bad edit cannot take down a deployment that was working
+  a second ago.
+
+  The swap is one assignment of an immutable registry to a `volatile` field, so a request resolves against the old
+  set or the new and never a mixture, and a load already running is untouched - it resolved its `MappingSpec`
+  before the swap and holds something immutable. A spec can therefore be replaced while a file is still loading
+  through the version it replaces.
+
+  **Deliberately not wired to a request method.** This servlet answers POSTs with data to load and nothing else.
+  Installing a spec is as privileged as editing the application's configuration, because table and column names
+  from a spec reach the SQL unbound - so whatever exposes this decides who may reach it, and that is a decision for
+  the deployment rather than a default here.
+
+### Fixed
+
+- **The MXBean would have gone on reporting specs the servlet had stopped serving.** `XletStatus` held the registry
+  in a `final` field, so a swap moved one reference and not the other. Both move together now. A monitoring view
+  that is confidently wrong is worse than none, and this one would have been wrong only after a reload - the state
+  nobody tests for because the previous release had no way to reach it. Found while writing the tests for the
+  method above rather than after shipping it, which is the one piece of luck in this entry.
+
+  The statistics stay keyed by spec name and outlive any one registry, which is what lets a spec keep its history
+  across a reload that removed and restored it.
+
+### Changed
+
+- **`xlet`'s README said the specs are read once at `init()` and never again.** That was the design and is now half
+  of it: it remains what happens unless something calls the new method, and the README says which it is.
+
 ## 1.3.2
 
 A patch, and one that matters more than its number suggests: before it, `xlet` could not read a mapping spec in any
