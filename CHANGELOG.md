@@ -7,7 +7,10 @@ listed under **Added**; anything incompatible waits for a `2.0` and is listed un
 The versions are the git tags `xldr-<version>`; the published artifacts carry the same version under the group
 `io.github.ralfspoeth.xldr`.
 
-## Unreleased
+## 1.4.1
+
+A patch, and by the rule 1.0.0 set: it fixes something and adds nothing. No public member changed, the mapping-spec
+format is untouched, and `mapping-spec-1.0` remains its schema and covers 1.0 through 1.4.1.
 
 ### Fixed
 
