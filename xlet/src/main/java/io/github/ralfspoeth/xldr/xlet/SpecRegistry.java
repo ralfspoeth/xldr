@@ -96,7 +96,8 @@ final class SpecRegistry {
         }
         var specs = new LinkedHashMap<String, MappingSpec>();
         for (var resource : new TreeSet<>(resources)) {
-            if (resource.endsWith("/")) {
+            if (resource.endsWith("/")
+                    || hidden(resource.substring(resource.lastIndexOf('/') + 1))) {
                 continue;
             }
             try (var in = context.getResourceAsStream(resource)) {
@@ -114,10 +115,13 @@ final class SpecRegistry {
     /**
      * A directory on disk, for a deployment that has no war to put them in.
      * <p>
-     * Only the files directly in it, and only those a reader recognises.
-     * Descending would make a spec's name ambiguous - the base name is the name -
-     * and silently skipping an unreadable file would let a typo in an extension
-     * become a {@code 404} much later.
+     * Only the files directly in it, and every one of them has to be a spec:
+     * descending would make a spec's name ambiguous - the base name is the
+     * name - and silently skipping an unreadable file would let a typo in an
+     * extension become a {@code 404} much later.
+     * <p>
+     * The exception is dotfiles, which are skipped - see {@link #hidden} for
+     * why that is a different case from a misnamed spec.
      */
     private static Map<String, MappingSpec> fromDirectory(Path directory)
             throws ServletException {
@@ -127,7 +131,9 @@ final class SpecRegistry {
         }
         var specs = new LinkedHashMap<String, MappingSpec>();
         try (var files = Files.list(directory)) {
-            for (var file : files.filter(Files::isRegularFile).sorted().toList()) {
+            for (var file : files.filter(Files::isRegularFile)
+                    .filter(file -> !hidden(file.getFileName().toString()))
+                    .sorted().toList()) {
                 try (var in = Files.newInputStream(file)) {
                     put(specs, file.toString(), in, directory.toString());
                 }
@@ -180,6 +186,29 @@ final class SpecRegistry {
             throw new ServletException(resource + ": no input adapter reads "
                     + spec.inputSpec().mimeType() + "; is its module on the module path?");
         }
+    }
+
+    /**
+     * Whether a file name is metadata rather than a spec.
+     *
+     * <p>A leading dot and nothing else. The rule has to exist because every
+     * other file in this directory is read as a spec and refused if no reader
+     * recognises it, which is right for {@code customers.jsn} and wrong for
+     * the things that arrive in a directory without being put there:
+     * {@code .DS_Store} from a Finder window, {@code .gitignore} and
+     * {@code .gitattributes} from making the directory a git working tree -
+     * which is a sensible thing to do with it, since it is configuration that
+     * decides what SQL runs and deserves a history. Before this, any of them
+     * stopped the servlet from starting, and the message blamed the file for
+     * not being a spec.
+     *
+     * <p>Deliberately not "skip anything a reader does not recognise". A
+     * misspelled extension would then become a {@code 404} much later, which
+     * is the failure the message in {@link #put} was written to prevent. No
+     * spec is named with a leading dot, so this gives up nothing.
+     */
+    private static boolean hidden(String fileName) {
+        return fileName.startsWith(".");
     }
 
     /**

@@ -7,6 +7,26 @@ listed under **Added**; anything incompatible waits for a `2.0` and is listed un
 The versions are the git tags `xldr-<version>`; the published artifacts carry the same version under the group
 `io.github.ralfspoeth.xldr`.
 
+## Unreleased
+
+### Fixed
+
+- **A dotfile in the specs directory stopped the servlet from starting.** Every file in that directory is read as a
+  spec and refused if no reader recognises it, which is right for a misspelled extension and wrong for the files
+  that arrive there without being put there. `.DS_Store` appears the first time somebody opens the folder in a
+  Finder window. `.gitignore` and `.gitattributes` appear the moment the directory becomes a git working tree -
+  which is a sensible thing to do with configuration that decides what SQL runs and therefore deserves a history.
+  Any of them was fatal, and the message blamed the file for not being a spec.
+
+  Dotfiles are now skipped, in the `/WEB-INF/specs/` path as well as in a named directory, because a rule that held
+  in one source and not the other is the worse kind of difference.
+
+  **Deliberately not "skip anything no reader recognises."** A misspelled `customers.jsn` would then become a `404`
+  long after the deployment that should have reported it, which is the failure the message in that code was written
+  to prevent. No spec is named with a leading dot, so the narrow rule gives up nothing. This is the third time the
+  read-everything rule has bitten: an empty `specs/` cannot be committed to git without a `.gitkeep`, and a
+  `.gitkeep` was read as a spec.
+
 ## 1.4.0
 
 A minor, and the number is the point: `xlet` gains a public method, and the rule this project set at 1.0.0 is that

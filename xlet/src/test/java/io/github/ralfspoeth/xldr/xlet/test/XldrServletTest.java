@@ -236,6 +236,54 @@ class XldrServletTest {
         assertTrue(thrown.getMessage().contains("people"), thrown.getMessage());
     }
 
+    /**
+     * A dotfile in the specs directory is metadata, not a spec it should
+     * choke on.
+     *
+     * <p>Every other file there is read as a spec and refused if no reader
+     * recognises it, which is right for a misspelled extension and was wrong
+     * for the files that arrive without being put there. {@code .DS_Store}
+     * appears the first time somebody opens the folder in a Finder window;
+     * {@code .gitignore} appears the moment the directory becomes a git
+     * working tree, which is a sensible thing to do with configuration that
+     * decides what SQL runs. Either one stopped the servlet from starting,
+     * and blamed the file for not being a spec.
+     *
+     * <p>Asserted alongside a spec that does load, because "skips dotfiles"
+     * and "reads nothing at all" would otherwise look the same.
+     */
+    @Test
+    void ignoresDotfilesInAspecsDirectory(@TempDir Path dir) throws Exception {
+        Files.writeString(dir.resolve("people.json"), PEOPLE_SPEC);
+        Files.writeString(dir.resolve(".DS_Store"), "\0\0 not a spec and never was");
+        Files.writeString(dir.resolve(".gitignore"), "*.tmp\n");
+
+        var servlet = new Testable(Proxies.dataSource(JDBC_URL).dataSource());
+        servlet.init(configWith(Map.of(), Map.of("specs", dir.toString())));
+
+        var recorded = new Proxies.Recorded();
+        servlet.post(Proxies.post("text/csv", Map.of("spec", "people"), TWO_PEOPLE), recorded);
+        assertEquals(200, recorded.status(), recorded.body());
+    }
+
+    /**
+     * And a file with no extension that is <em>not</em> a dotfile is still
+     * refused, which is the boundary the rule above has to keep. Skipping
+     * everything a reader does not recognise would let a misspelled
+     * {@code customers.jsn} become a 404 long after the deployment that
+     * should have reported it.
+     */
+    @Test
+    void stillRefusesAfileThatIsNotASpec(@TempDir Path dir) throws Exception {
+        Files.writeString(dir.resolve("people.json"), PEOPLE_SPEC);
+        Files.writeString(dir.resolve("README"), "the specs live here");
+
+        var servlet = new Testable(Proxies.dataSource(null).dataSource());
+        var thrown = assertThrows(ServletException.class, () -> servlet.init(
+                configWith(Map.of(), Map.of("specs", dir.toString()))));
+        assertTrue(thrown.getMessage().contains("README"), thrown.getMessage());
+    }
+
     @Test
     void refusesToStartWithoutSpecs() {
         var servlet = new Testable(Proxies.dataSource(null).dataSource());

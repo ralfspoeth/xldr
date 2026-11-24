@@ -215,6 +215,16 @@ the wildcard.
 | `hospital/` + `.log`                      | the `4xx`/`5xx` response and its body                                |
 | claim by atomic move                      | *nothing* - see [What is not inherited](#what-is-not-inherited)      |
 
+Every file directly in that directory is read as a spec, and one no reader
+recognises fails initialisation rather than being skipped - a misspelled
+`customers.jsn` that merely vanished would become a `404` long after the
+deployment that should have reported it. **Dotfiles are the exception**, since
+1.4.1: `.DS_Store` arrives the first time somebody opens the folder in a Finder
+window, and `.gitignore` arrives the moment the directory becomes a git working
+tree. Which is worth doing - the directory decides what SQL this servlet runs,
+so it is configuration that deserves a history, and nothing here reads from git
+or writes to it.
+
 The specs are read at `init()` and not again on their own: a redeploy is how they
 change, which is what makes them deployment configuration rather than state. A spec
 that will not parse fails initialisation - the servlet does not start - which is the
